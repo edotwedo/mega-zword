@@ -204,6 +204,14 @@ class App:
             raise ValueError("empty prompt")
         args = ["run", "-p", self.project]
         model = body.get("model") or ""
+        picks = [str(n) for n in body.get("compare") or []]
+        if picks:
+            if not 2 <= len(picks) <= 3 or any(n not in self.backends for n in picks):
+                raise ValueError("compare needs 2 or 3 known AIs")
+            args += ["--compare", ",".join(picks)]
+            if body.get("context"):
+                args.append("--context")
+            return self._start("compare: " + prompt[:70], args, prompt)
         if model:
             if model not in self.backends:
                 raise ValueError(f"unknown AI {model!r}")
