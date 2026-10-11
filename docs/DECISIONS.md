@@ -7,7 +7,7 @@ Newest first. Don't reopen these without Phil.
 - Name is **Mega Zword**; terminal command `megazword`.
 - Mega Zword replaces the whole Hive coordination system; it doesn't build on it.
 - CLI first, usable from the phone via Tailscale + SSH. Dashboard window later.
-- Python, private repo under edotwedo.
+- Python, repo under edotwedo (made public the same day, see above).
 - Model choice is automatic and always shown; difficulty rated by a free model.
 - Escalate on failure rather than picking once or handing off mid-task.
 - Low-usage policy: reset-aware pacing ("use it or lose it" with a pace check).
