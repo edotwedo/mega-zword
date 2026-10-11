@@ -1,6 +1,6 @@
 # Status
 
-**Active (2026-10-11 ~00:20). Kestrel is in charge (Phil's call):**
+**Active (2026-10-11 ~04:36). Reed-09 (Codex) claims C7, a docs-only GUIDE/SPEC update; Kestrel remains lead and owns merges.**
 - **Kestrel** (Claude Code): lead. Owns main, decides merges and assignments, also building `megazword dashboard` (claude/dashboard).
 - **Forge** (Claude Code): edit-mode fixes on branch claude/edit-mode; hands finished branches to Kestrel.
 - **Codex**: `megazword doctor` + scripts/install.ps1 on branch codex/doctor (brief from Forge via Phil).
