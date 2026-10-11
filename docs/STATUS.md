@@ -50,6 +50,12 @@ Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
 - B4 Hive tab UI: room stream, Phil's input box, Start/Pause/Stop, primary
   project, who is talking, turns left. Needs B1's and B3's APIs.
 - B6 Custom title bar and icons for `--app`; GUIDE.md and README for tabs and the room.
+- B12 Per-task model choice for every AI (extends Grok's `[grok.easy|medium|hard]`): add
+  `[claude.<level>]`, `[codex.<level>]`, `[gemini.<level>]` with model + effort. Flags: `claude --model
+  --effort`, `codex -m` and `-c model_reasoning_effort=...`, `agy --model --effort`. Unset level =
+  that CLI's own default (keep Phil's Codex model unless he sets one). Show the choice in the run
+  line. Optional: Antigravity's Claude/GPT pool as a fifth AI (`agy --model <claude/gpt id>`).
+  Settings panel + doctor support. Tests with fakes. Gemini reviews; a Claude lead merges.
 
 Gemini (lots of room; agy) -> `docs/handoffs/2026-10-11-gemini.md`:
 - B10 Calendar read: `[calendar] ical_url`, `megazword calendar today|week`,
