@@ -11,3 +11,5 @@ def isolated_home(tmp_path, monkeypatch):
     # empty folder so no test can reach a real login or the network.
     from megazword import usage_sources
     monkeypatch.setattr(usage_sources, "HOME", tmp_path / "userhome")
+    # ...and never run a real Antigravity CLI for its quota.
+    monkeypatch.setattr(usage_sources, "_agy_path", lambda: None)

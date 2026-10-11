@@ -169,3 +169,54 @@ def test_doctor_finds_antigravity_cli(monkeypatch):
         returncode=0, stdout="1.3.3\n", stderr=""))
     check = next(c for c in doctor.checks() if c.name == "gemini")
     assert check.level == "OK" and "1.3.3" in check.detail
+
+
+AGY_USAGE = {"status": "SUCCESS", "command": {"name": "usage", "data": {"groups": [
+    {"name": "Gemini Models", "buckets": [
+        {"id": "gemini-5h", "window": "5h", "remaining_fraction": 0.75,
+         "reset_time": "2026-10-12T03:00:00Z"},
+        {"id": "gemini-weekly", "window": "weekly", "remaining_fraction": 0.4,
+         "reset_time": "2026-10-15T00:00:00Z"}]},
+    {"name": "Claude and GPT models", "buckets": [
+        {"id": "other-5h", "window": "5h", "remaining_fraction": 0.0,
+         "reset_time": "2026-10-12T03:00:00Z"}]},
+]}}}
+
+
+def test_gemini_meter_reads_agy_usage(monkeypatch):
+    monkeypatch.setattr(usage_sources, "_agy_path", lambda: "fake-agy.exe")
+    seen = []
+
+    def fake_run(cmd, timeout):
+        seen.append(cmd)
+        return SimpleNamespace(returncode=0, stdout=json.dumps(AGY_USAGE), stderr="")
+
+    monkeypatch.setattr(backends, "run_quick", fake_run)
+    meter = usage_sources.gemini()
+    assert seen == [["fake-agy.exe", "-p", "/usage", "--output-format", "json"]]
+    assert meter.source == "agy /usage"
+    by_name = {w.name: w for w in meter.windows}
+    assert by_name["5-hour"].used_percent == pytest.approx(25)
+    assert by_name["weekly"].used_percent == pytest.approx(60)
+    assert by_name["weekly"].resets_at == datetime(2026, 10, 15, tzinfo=timezone.utc)
+    # Antigravity's Claude/GPT pool is shown but never drives the Gemini meter.
+    from megazword import meters, pacing
+    summary = meters.summarize(meter, {})
+    assert summary.state == "meter" and summary.used == pytest.approx(60)
+    assert pacing.status(meter).max_used_percent == pytest.approx(60)
+
+
+def test_gemini_meter_agy_failure_is_reported(monkeypatch, tmp_path):
+    monkeypatch.setattr(usage_sources, "SOURCES", {})
+    monkeypatch.setattr(usage_sources, "_agy_path", lambda: "fake-agy.exe")
+    monkeypatch.setattr(backends, "run_quick", lambda cmd, timeout: SimpleNamespace(
+        returncode=1, stdout="", stderr="not signed in"))
+    meter = next(p for p in usage_sources.all_usage(tmp_path / "log.jsonl")
+                 if p.service == "gemini")
+    assert meter.source == "error" and "not signed in" in meter.note
+
+
+def test_parse_agy_usage_tolerates_odd_shapes():
+    assert usage_sources.parse_agy_usage({}) == []
+    assert usage_sources.parse_agy_usage({"command": {"data": {"groups": [
+        "junk", {"name": "Gemini Models", "buckets": [{"window": "5h"}, "junk"]}]}}}) == []

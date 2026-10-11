@@ -6,7 +6,9 @@
 - Codex: reads the rate-limit snapshot Codex writes into its own session logs
   (~/.codex/sessions). As fresh as the last Codex run.
 - Grok: no local plan meter exists; reports Mega Zword's own recent run counts.
-- Gemini: plan usage not tracked yet; reports Mega Zword's own recent run counts.
+- Gemini: asks the Antigravity CLI (`agy -p /usage --output-format json`, its
+  quota panel; reads, never prompts a model). Without agy, reports Mega
+  Zword's own recent run counts.
 """
 
 from __future__ import annotations
@@ -107,8 +109,55 @@ def grok(log_path: Path | None = None) -> PlanUsage:
                           f"in the last 5h, {weekly.runs if weekly else 0} this week")
 
 
+def _agy_window(raw: str) -> str:
+    """Map an agy bucket window ("5h", "weekly", ...) to our window names."""
+    text = str(raw or "").lower().replace(" ", "").replace("-", "")
+    if text in ("5h", "5hour", "5hours", "fivehour"):
+        return "5-hour"
+    if text.startswith("week") or text in ("7d", "7day", "7days"):
+        return "weekly"
+    return str(raw or "unknown")
+
+
+def parse_agy_usage(data: dict) -> list[Window]:
+    """Turn agy's /usage JSON (command.data.groups[].buckets[] with
+    remaining_fraction 0..1 and reset_time) into windows. Only the Gemini
+    group counts toward the meter (it's what `-m gemini` spends); other groups
+    (Claude/GPT models inside Antigravity) get names pacing ignores."""
+    groups = ((data.get("command") or {}).get("data") or {}).get("groups") or []
+    windows = []
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        gname = str(group.get("name") or "")
+        is_gemini = "gemini" in gname.lower()
+        for bucket in group.get("buckets") or []:
+            if not isinstance(bucket, dict) or bucket.get("remaining_fraction") is None:
+                continue
+            used = max(0.0, min(100.0, (1 - float(bucket["remaining_fraction"])) * 100))
+            name = _agy_window(bucket.get("window") or bucket.get("id"))
+            if not is_gemini:
+                name = f"{gname or 'other'}: {name}"
+            windows.append(Window(name, used, _ts(bucket.get("reset_time"))))
+    return windows
+
+
+def _agy_path() -> str | None:
+    import shutil
+    return shutil.which("agy")
+
+
 def gemini(log_path: Path | None = None) -> PlanUsage:
-    """No verified local quota source; these counts cover only our own runs."""
+    agy = _agy_path()
+    if agy:
+        from .backends import run_quick
+        proc = run_quick([agy, "-p", "/usage", "--output-format", "json"], timeout=30)
+        if proc.returncode != 0:
+            raise RuntimeError(f"agy /usage exited {proc.returncode}: "
+                               f"{(proc.stderr or proc.stdout).strip()[-200:]}")
+        windows = parse_agy_usage(json.loads(proc.stdout))
+        return PlanUsage("gemini", windows, "agy /usage",
+                         note="" if windows else "agy /usage returned no quota buckets")
     if log_path is None:
         from . import config
         log_path = config.HOME / "log.jsonl"
