@@ -48,7 +48,8 @@ def _time(value: str) -> datetime | None:
         return None
 
 
-def summarize(path: Path, window: timedelta, now: datetime | None = None) -> dict[str, RunSummary]:
+def summarize(path: Path, window: timedelta, now: datetime | None = None,
+              project: str | None = None) -> dict[str, RunSummary]:
     """Summarize records in the trailing time window, grouped by backend."""
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -56,6 +57,8 @@ def summarize(path: Path, window: timedelta, now: datetime | None = None) -> dic
     cutoff = now - window
     summaries: dict[str, RunSummary] = {}
     for record in read(path):
+        if project is not None and record.get("project") != project:
+            continue
         stamp = _time(record["time"])
         if stamp is None or stamp < cutoff or stamp > now:
             continue

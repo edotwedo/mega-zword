@@ -16,7 +16,7 @@ from .rater import Rating, rate
 
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry"),
-    "See": ("usage", "stats", "advise", "dashboard", "projects", "history"),
+    "See": ("usage", "stats", "advise", "dashboard", "projects", "history", "export"),
     "Set up": ("init", "doctor", "out", "backends"),
     "Memory": ("note", "decide", "import-hive"),
 }
@@ -87,6 +87,12 @@ def build_parser() -> argparse.ArgumentParser:
     hist = sub.add_parser("history", help="show project memory")
     hist.add_argument("-n", type=int, default=20)
     hist.add_argument("-p", "--project")
+
+    exp = sub.add_parser("export", help="export project memory, answers and run totals as Markdown")
+    exp.add_argument("-p", "--project", help="project name (default: current repo/folder)")
+    exp.add_argument("--since", default="7d", help="window start: Nd or YYYY-MM-DD (UTC; default: 7d)")
+    exp.add_argument("--out", type=Path, help="output file (default: stdout)")
+    exp.add_argument("--force", action="store_true", help="replace an existing output file")
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
@@ -195,6 +201,9 @@ def main(argv: list[str] | None = None,
     if args.command == "doctor":
         from .doctor import run
         return run()
+    if args.command == "export":
+        from .export import command
+        return command(args, cfg)
     if cfg is None:
         try:
             cfg = config.load()
