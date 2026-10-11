@@ -1,6 +1,7 @@
 # Status
 
 **Active (2026-10-11 ~00:20). Kestrel is in charge (Phil's call):**
+- **Reed-09** (Codex, 2026-10-11): Kestrel-assigned dashboard/answers/doctor/installer bug review in isolated `codex/review` worktree; fixes and regression tests in progress.
 - **Kestrel** (Claude Code): lead. Owns main, decides merges and assignments, also building `megazword dashboard` (claude/dashboard).
 - **Forge** (Claude Code): edit-mode fixes on branch claude/edit-mode; hands finished branches to Kestrel.
 - **Codex**: `megazword doctor` + scripts/install.ps1 on branch codex/doctor (brief from Forge via Phil).
