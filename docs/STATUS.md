@@ -1,6 +1,6 @@
 # Status
 
-**Active:** none
+**Active:** Claude Code coordinating (2026-10-10 22:50). Codex on branch codex/pacing (step 2 pacing), Grok on branch grok/escalate (step 3 escalation + local backend). Claude merges.
 **Last updated:** 2026-10-10 by Claude Code
 
 ## Done
