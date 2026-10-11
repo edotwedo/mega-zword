@@ -27,6 +27,10 @@ Example config.toml:
 from __future__ import annotations
 
 import os
+import json
+import tempfile
+import threading
+from copy import deepcopy
 import re
 import tomllib
 from datetime import date, datetime, timedelta, timezone
@@ -161,29 +165,195 @@ def set_out(path: Path, name: str, until: datetime | None) -> None:
     config.toml. Only that line changes; comments and other tables stay."""
     if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
         raise ValueError(f"bad AI name {name!r}")
-    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-    value = f"{name} = {until.isoformat(timespec='seconds')}" if until else None
+    _set_key(path, "out", name, until.isoformat(timespec="seconds") if until else None)
 
-    start = next((i for i, l in enumerate(lines) if l.strip() == "[out]"), None)
-    if start is None:
-        if value:
-            if lines and lines[-1].strip():
-                lines.append("")
-            lines += ["# AIs out of usage until a date or time; auto-pick skips them.",
-                      "[out]", value]
+
+# Serialize writers in the threaded dashboard, including out marks.
+_WRITE_LOCK = threading.RLock()
+
+
+def _statements(text: str):
+    """Yield complete TOML statements without mistaking multiline values for tables."""
+    start, chunk = 0, ""
+    for line in text.splitlines(keepends=True):
+        chunk += line
+        try:
+            parsed = tomllib.loads(chunk)
+        except tomllib.TOMLDecodeError:
+            continue
+        yield start, start + len(chunk), chunk, parsed
+        start += len(chunk)
+        chunk = ""
+    if chunk:
+        raise ValueError("cannot safely locate config setting")
+
+
+def _comments(value: str) -> list[str]:
+    """Comments outside strings, including comments inside a multiline array."""
+    comments, quote, i = [], None, 0
+    while i < len(value):
+        c = value[i]
+        if quote:
+            if c == "\\" and quote.startswith('"'):
+                i += 2
+                continue
+            if value.startswith(quote, i):
+                i += len(quote)
+                quote = None
+                continue
+        elif c in "\"'":
+            quote = c * 3 if value.startswith(c * 3, i) else c
+            i += len(quote)
+            continue
+        elif c == "#":
+            end = value.find("\n", i)
+            end = len(value) if end < 0 else end
+            comments.append(value[i:end].rstrip("\r"))
+            i = end
+        i += 1
+    return comments
+
+
+def _edit_key(text: str, table: str, key: str, value: str | None) -> str:
+    """Preserve untouched bytes; refuse unusual layouts rather than rewrite them."""
+    original = tomllib.loads(text)
+    expected = deepcopy(original)
+    target = expected.setdefault(table, {}) if table else expected
+    if not isinstance(target, dict):
+        raise ValueError(f"{table} must be a table")
+    if value is None:
+        if key not in target:
+            return text
+        del target[key]
     else:
-        end = next((i for i in range(start + 1, len(lines))
-                    if lines[i].lstrip().startswith("[")), len(lines))
-        hit = next((i for i in range(start + 1, end)
-                    if (m := _KEY.match(lines[i])) and m.group(1) == name), None)
-        if hit is not None:
-            if value:
-                lines[hit] = value
-            else:
-                del lines[hit]
-        elif value:
-            last = max((i for i in range(start, end) if lines[i].strip()), default=start)
-            lines.insert(last + 1, value)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    load(path)  # fail loudly now rather than on the next run
+        target[key] = tomllib.loads("value = " + value)["value"]
+    newline = "\r\n" if "\r\n" in text else "\n"
+    section, insert, hit = "", 0, None
+    for start, end, chunk, parsed in _statements(text):
+        stripped = chunk.lstrip()
+        if stripped.startswith("["):
+            # A header with quoted names/comments is parsed by TOML itself.
+            probe = tomllib.loads(chunk + newline + "__mz_marker__ = true")
+            path = []
+            while isinstance(probe, dict) and "__mz_marker__" not in probe and len(probe) == 1:
+                name, probe = next(iter(probe.items()))
+                path.append(name)
+            section = path[0] if len(path) == 1 and isinstance(probe, dict) else None
+        if section == table:
+            insert = end
+            if key in parsed and not stripped.startswith("["):
+                if len(parsed) != 1:
+                    raise ValueError("cannot safely isolate config setting")
+                hit = (start, end, chunk)
+    if hit:
+        start, end, chunk = hit
+        # The keys we write are simple; accept quoted equivalents as well.
+        match = re.match(r"(\s*(?:[A-Za-z0-9_-]+|\"[^\"]+\"|'[^']+')\s*=\s*)", chunk)
+        if not match:
+            raise ValueError("cannot safely isolate config setting")
+        comments = _comments(chunk[match.end():])
+        replacement = (match.group(1) + value if value is not None else "")
+        if comments:
+            replacement += (" " if replacement else "") + comments[0]
+            replacement += "".join(newline + c for c in comments[1:])
+        if chunk.endswith("\n") or comments:
+            replacement += newline
+        result = text[:start] + replacement + text[end:]
+    elif value is not None:
+        # Existing dotted/inline target layouts are intentionally refused below.
+        entry = f"{key} = {value}{newline}"
+        if table and table not in original:
+            result = text + (newline if text and not text.endswith("\n") else "")
+            result += f"{newline}[{table}]{newline}" + entry
+        else:
+            prefix = text[:insert]
+            result = prefix + (newline if prefix and not prefix.endswith("\n") else "") + entry + text[insert:]
+    else:
+        raise ValueError("cannot safely isolate config setting")
+    try:
+        if tomllib.loads(result) != expected:
+            raise ValueError("edit would change other config settings")
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError("cannot safely edit this TOML layout") from exc
+    return result
+
+
+def _atomic_replace(path: Path, data: bytes) -> None:
+    """Same-directory temporary file: readers see either complete version."""
+    fd, name = tempfile.mkstemp(prefix=".config-", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+def _set_key(path: Path, table: str, key: str, value: str | None) -> None:
+    with _WRITE_LOCK:
+        old = path.read_bytes() if path.exists() else None
+        text = old.decode("utf-8") if old is not None else ""
+        edited = _edit_key(text, table, key, value)
+        if edited == text:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        replaced = False
+        try:
+            _atomic_replace(path, edited.encode("utf-8"))
+            replaced = True
+            load(path)  # Confirm the actual file through the application's loader.
+        except Exception:
+            if replaced:
+                if old is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    _atomic_replace(path, old)
+            raise
+
+
+def _known_ai(name: str) -> None:
+    from .backends import default_backends
+    if not isinstance(name, str) or name not in default_backends():
+        raise ValueError(f"unknown AI {name!r}")
+
+
+def _positive_int(value, label: str) -> None:
+    if type(value) is not int or value <= 0:
+        raise ValueError(f"{label} must be a positive whole number")
+
+
+def set_route(level: str, names: list[str], path: Path | None = None) -> None:
+    """Set one route, preserving order. An empty route is allowed."""
+    if not isinstance(level, str) or level not in DEFAULT_ROUTE:
+        raise ValueError("level must be easy, medium or hard")
+    if not isinstance(names, list):
+        raise ValueError("route must be a list of AI names")
+    for name in names:
+        _known_ai(name)
+    if len(set(names)) != len(names):
+        raise ValueError("route cannot contain duplicate AIs")
+    _set_key(path or HOME / "config.toml", "route", level, json.dumps(names))
+
+
+def set_timeout(ai: str, seconds: int | None, path: Path | None = None) -> None:
+    """None removes the override and restores the backend's default timeout."""
+    _known_ai(ai)
+    if seconds is not None:
+        _positive_int(seconds, "timeout")
+    _set_key(path or HOME / "config.toml", "timeouts", ai,
+             str(seconds) if seconds is not None else None)
+
+
+def set_limit(name: str, n: int, path: Path | None = None) -> None:
+    if not isinstance(name, str) or name not in ("log_lines", "memory_lines"):
+        raise ValueError("limit must be log_lines or memory_lines")
+    _positive_int(n, "line limit")
+    _set_key(path or HOME / "config.toml", "limits", name, str(n))
+
+
+def set_flag(name: str, value: bool, path: Path | None = None) -> None:
+    if name != "quality_check" or type(value) is not bool:
+        raise ValueError("quality_check must be true or false")
+    _set_key(path or HOME / "config.toml", "", name, str(value).lower())

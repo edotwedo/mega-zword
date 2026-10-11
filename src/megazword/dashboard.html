@@ -95,6 +95,13 @@ details.ans-item .qfull { color: var(--dim); margin-top: 6px; }
 .toast { position: fixed; bottom: 16px; right: 16px; background: var(--bad); color: #1a0000;
   padding: 9px 14px; border-radius: 8px; display: none; font-weight: 600; }
 .scroll { overflow-x: auto; }
+.settings-grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr)); }
+.setting { border-top:1px solid var(--line); padding:10px 0; }
+.setting input[type=number] { width:110px; max-width:100%; }
+.route-choice { display:flex; align-items:center; gap:6px; margin:5px 0; }
+.route-choice label { flex:1; overflow-wrap:anywhere; }
+.route-choice button { padding:3px 10px; }
+.setting-status { color:var(--dim); font-size:12px; margin-left:8px; }
 @media (max-width: 500px) { main { padding: 12px 16px; grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -131,6 +138,17 @@ details.ans-item .qfull { color: var(--dim); margin-top: 6px; }
     <div class="chart" id="chart"></div>
     <h2 style="margin-top:16px">Runs per day (last 7 days)</h2>
     <div id="trend"></div>
+  </section>
+
+  <section class="wide" aria-labelledby="settings-title">
+    <h2 id="settings-title">Settings</h2>
+    <p class="note">Changing routes changes which AI auto-pick uses.</p>
+    <div class="settings-grid">
+      <div><h2>Routes · first choice at the top</h2><div id="settings-routes"></div></div>
+      <div><h2>Timeouts · seconds</h2><p class="note">Leave blank to use the AI's default timeout.</p><div id="settings-timeouts"></div></div>
+      <div><h2>History limits &amp; quality</h2><div id="settings-other"></div></div>
+    </div>
+    <p class="note">Save each row separately. Changes apply to new tasks. Lower line limits take effect when new entries are written.</p>
   </section>
 
   <section>
@@ -231,6 +249,107 @@ function renderRoute(s) {
       return `<span class="${x ? "x" : ""}">${aiTag(n)}</span>`; }).join(" → ")}</td></tr>`).join("");
 }
 
+function settingRow(parent, id, kind, name, content) {
+  let row = document.getElementById(id);
+  if (row && row.dataset.dirty === "true") return; // Preserve edits across polling/other saves.
+  if (!row) {
+    row = document.createElement("div"); row.id = id; row.className = "setting";
+    $(parent).append(row);
+  }
+  row.dataset.kind = kind; row.dataset.name = name;
+  row.innerHTML = content + `<div class="row"><button class="save-setting" aria-label="Save ${esc(name)}">Save</button><span class="setting-status" role="status"></span></div>`;
+}
+
+function renderSettings(settings) {
+  if (!settings) return;
+  const ais = settings.ais || [];
+  for (const level of ["easy", "medium", "hard"]) {
+    const selected = settings.route[level] || [];
+    const names = [...new Set([...selected, ...ais])];
+    const choices = names.map((name, i) => `<div class="route-choice" data-ai="${esc(name)}">
+      <label><input type="checkbox" ${selected.includes(name) ? "checked" : ""}> ${esc(name)}</label>
+      <button type="button" class="move-ai" data-direction="up" aria-label="Move ${esc(name)} up" ${i === 0 ? "disabled" : ""}>↑</button>
+      <button type="button" class="move-ai" data-direction="down" aria-label="Move ${esc(name)} down" ${i === names.length - 1 ? "disabled" : ""}>↓</button>
+    </div>`).join("");
+    settingRow("settings-routes", "setting-route-" + level, "route", level,
+      `<b>${esc(level)}</b><div class="route-choices">${choices}</div>`);
+  }
+  ais.forEach((name, i) => settingRow("settings-timeouts", "setting-timeout-" + i, "timeout", name,
+    `<label>${esc(name)} <input type="number" min="1" step="1" value="${esc(settings.timeouts[name] ?? "")}" placeholder="default"></label>`));
+  for (const [name, label] of [["log_lines", "Log lines"], ["memory_lines", "Memory lines per project"]]) {
+    settingRow("settings-other", "setting-" + name, "limit", name,
+      `<label>${esc(label)} <input type="number" min="1" step="1" required value="${esc(settings.limits[name])}"></label>`);
+  }
+  settingRow("settings-other", "setting-quality_check", "flag", "quality_check",
+    `<label><input type="checkbox" ${settings.quality_check ? "checked" : ""}> Check answer quality with the local model</label>`);
+}
+
+function markSettingDirty(row) {
+  row.dataset.dirty = "true";
+  row.querySelector(".setting-status").textContent = "Unsaved";
+}
+
+function updateMoveButtons(row) {
+  const choices = [...row.querySelectorAll(".route-choice")];
+  choices.forEach((choice, i) => {
+    choice.querySelector('[data-direction="up"]').disabled = i === 0;
+    choice.querySelector('[data-direction="down"]').disabled = i === choices.length - 1;
+  });
+}
+
+for (const container of ["settings-routes", "settings-timeouts", "settings-other"]) {
+  $(container).addEventListener("input", e => {
+    const row = e.target.closest(".setting"); if (row) markSettingDirty(row);
+  });
+  $(container).addEventListener("click", async e => {
+    const button = e.target.closest("button"), row = e.target.closest(".setting");
+    if (!button || !row) return;
+    if (button.classList.contains("move-ai")) {
+      const choice = button.closest(".route-choice");
+      if (button.dataset.direction === "up" && choice.previousElementSibling)
+        choice.parentNode.insertBefore(choice, choice.previousElementSibling);
+      else if (button.dataset.direction === "down" && choice.nextElementSibling)
+        choice.parentNode.insertBefore(choice.nextElementSibling, choice);
+      updateMoveButtons(row); markSettingDirty(row); button.focus(); return;
+    }
+    if (!button.classList.contains("save-setting")) return;
+    const {kind, name} = row.dataset;
+    let body = {kind};
+    if (kind === "route") {
+      body.level = name;
+      body.names = [...row.querySelectorAll(".route-choice")]
+        .filter(el => el.querySelector("input").checked).map(el => el.dataset.ai);
+    } else if (kind === "flag") {
+      body.name = name; body.value = row.querySelector("input").checked;
+    } else {
+      const input = row.querySelector("input"), value = input.value.trim();
+      if (!input.reportValidity()) return;
+      const n = value === "" ? null : Number(value);
+      if ((n === null && kind !== "timeout") || (n !== null && (!Number.isSafeInteger(n) || n <= 0))) {
+        toast("Enter a positive whole number."); return;
+      }
+      if (kind === "timeout") { body.ai = name; body.seconds = n; }
+      else { body.name = name; body.n = n; }
+    }
+    row.dataset.dirty = "true";
+    const controls = [...row.querySelectorAll("input, button")];
+    controls.forEach(el => el.disabled = true);
+    row.querySelector(".setting-status").textContent = "Saving…";
+    try {
+      const result = await post("/api/settings", body);
+      row.dataset.dirty = "false";
+      renderSettings(result.settings);
+      row.querySelector(".setting-status").textContent = "Saved";
+      if (state) { state.route = result.settings.route; state.settings = result.settings; renderRoute(state); }
+    } catch (err) {
+      controls.forEach(el => el.disabled = false);
+      if (kind === "route") updateMoveButtons(row);
+      row.querySelector(".setting-status").textContent = "Not saved";
+      toast(err.message);
+    }
+  });
+}
+
 function renderChart(s) {
   const by = {};
   for (const [name, r] of Object.entries(s.runs_24h || {}))
@@ -324,7 +443,7 @@ async function load(refresh) {
     .map(([n, ok]) => `<option value="${esc(n)}" ${ok ? "" : "disabled"}>${esc(n)}${ok ? "" : " (not installed)"}${state.out[n] ? " (marked out)" : ""}</option>`).join("");
   sel.value = cur;
   $("meta").textContent = `project ${state.project} · ${state.runs.length} runs logged · updated ${new Date().toLocaleTimeString()}`;
-  renderPlans(state); renderRoute(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state);
+  renderSettings(state.settings); renderPlans(state); renderRoute(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state);
   for (const j of state.jobs) if (!document.getElementById("job-" + j.id)) {
     renderJob(j); if (!j.done && !watching.has(j.id)) watch(j.id); }
 }

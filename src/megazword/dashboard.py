@@ -154,6 +154,7 @@ class App:
             "usage": self.usage.get(force=refresh),
             "out": {n: t.isoformat() for n, t in self.cfg.out_until.items() if t > now},
             "route": self.cfg.route,
+            "settings": self.settings_state(),
             "backends": {n: b.available() for n, b in self.backends.items()},
             "runs": list(reversed(runs)),
             "trend": stats.trend(self.cfg.log_path),
@@ -165,6 +166,30 @@ class App:
         }
 
     # --- actions ---------------------------------------------------------
+    def settings_state(self) -> dict:
+        return {"route": self.cfg.route, "timeouts": self.cfg.timeouts,
+                "limits": {"log_lines": self.cfg.log_lines,
+                           "memory_lines": self.cfg.memory_lines},
+                "quality_check": self.cfg.quality_check,
+                "ais": list(default_backends())}
+
+    def settings(self, body: dict) -> dict:
+        if not isinstance(body, dict):
+            raise ValueError("settings must be an object")
+        kind = body.get("kind")
+        fields = {"route": ("level", "names"), "timeout": ("ai", "seconds"),
+                  "limit": ("name", "n"), "flag": ("name", "value")}
+        if not isinstance(kind, str) or kind not in fields:
+            raise ValueError("unknown settings kind")
+        if any(key not in body for key in fields[kind]):
+            raise ValueError("missing settings field")
+        writer = {"route": config.set_route, "timeout": config.set_timeout,
+                  "limit": config.set_limit, "flag": config.set_flag}[kind]
+        with config._WRITE_LOCK:
+            writer(*(body[key] for key in fields[kind]))
+            self.cfg = config.load()
+            return {"ok": True, "settings": self.settings_state()}
+
     def _start(self, label: str, args: list[str], stdin: str = "") -> dict:
         self._n += 1
         job_id = f"j{self._n}"
@@ -297,12 +322,15 @@ def make_handler(app: App, port: int, remote: bool = False):
                 length = min(int(self.headers.get("Content-Length", 0)), 1_000_000)
                 body = json.loads(self.rfile.read(length) or b"{}")
                 action = {"/api/run": app.run, "/api/retry": app.retry,
-                          "/api/note": app.note, "/api/cancel": app.cancel}.get(self.path)
+                          "/api/note": app.note, "/api/cancel": app.cancel,
+                          "/api/settings": app.settings}.get(self.path)
                 if action is None:
                     return self._json(404, {"error": "not found"})
                 return self._json(200, action(body))
             except (ValueError, json.JSONDecodeError) as exc:
                 return self._json(400, {"error": str(exc)})
+            except OSError:
+                return self._json(500, {"error": "Could not save config; check file access and try again."})
 
     return Handler
 
