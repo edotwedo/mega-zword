@@ -20,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Run your AI CLIs from one place.",
     )
     parser.add_argument("--version", action="version", version=f"megazword {__version__}")
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command")  # none: start screen
 
     run = sub.add_parser("run", help="run a prompt; picks an AI unless -m is given")
     run.add_argument("prompt", nargs="?", help="the prompt (reads stdin if left out)")
@@ -155,6 +155,10 @@ def main(argv: list[str] | None = None,
                   "[megazword] fix that line (or rename the file to start fresh), "
                   "then run `megazword doctor`", file=sys.stderr)
             return 2
+    if args.command is None:
+        from .start import render
+        print(render(cfg))
+        return 0
     if backends is None:
         backends = default_backends(edit=getattr(args, "edit", False), free_models=cfg.free,
                                     lean=cfg.lean)
