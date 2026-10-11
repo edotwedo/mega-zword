@@ -174,10 +174,7 @@ def main() -> int:
         check("out --clear brings it back", "no AI is marked out" in r.stdout, r.stdout + r.stderr)
 
         with open(tmp / "mz" / "config.toml", "a", encoding="utf-8") as f:
-            f.write("
-[timeouts]
-grok = 3
-")
+            f.write("\n[timeouts]\ngrok = 3\n")
         start = time.monotonic()
         r = mz(env, work, "run", "SLEEP-grok hang please", "-m", "grok")
         check("timeout: hung AI is cut off and reported",
