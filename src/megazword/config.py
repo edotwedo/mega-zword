@@ -50,6 +50,11 @@ DEFAULT_ROUTE = {
     "hard": ["claude", "codex", "grok"],
 }
 
+DEFAULT_FREE = {
+    "openrouter": "qwen/qwen3-4b:free",
+    "groq": "llama-3.3-70b-versatile",
+}
+
 
 @dataclass
 class Config:
@@ -62,6 +67,7 @@ class Config:
     quality_check: bool = False
     # AI name -> when its usage comes back. Set by hand for plans with no meter.
     out_until: dict[str, datetime] = field(default_factory=dict)
+    free: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_FREE))
 
     def out_now(self, now: datetime | None = None) -> set[str]:
         """AIs marked out whose return time hasn't passed yet."""
@@ -88,6 +94,13 @@ def load(path: Path | None = None) -> Config:
         cfg.route.update(data.get("route", {}))
         cfg.quality_check = bool(data.get("quality_check", cfg.quality_check))
         cfg.out_until = {name: _as_time(v) for name, v in data.get("out", {}).items()}
+
+        for name, block in data.get("free", {}).items():
+            if name in cfg.free and isinstance(block, dict) and "model" in block:
+                model = block["model"]
+                if not isinstance(model, str) or not model.strip():
+                    raise ValueError(f"free.{name}.model must be a nonempty string")
+                cfg.free[name] = model.strip()
 
         for level, block in data.get("grok", {}).items():
             if isinstance(block, dict) and level in cfg.grok:

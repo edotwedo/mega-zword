@@ -139,9 +139,9 @@ def main(argv: list[str] | None = None,
     if args.command == "doctor":
         from .doctor import run
         return run()
-    if backends is None:
-        backends = default_backends(edit=getattr(args, "edit", False))
     cfg = cfg if cfg is not None else config.load()
+    if backends is None:
+        backends = default_backends(edit=getattr(args, "edit", False), free_models=cfg.free)
     rater = rater if rater is not None else (lambda p: rate(p, cfg.rater_model))
 
     if args.command == "backends":

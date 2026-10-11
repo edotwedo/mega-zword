@@ -177,8 +177,9 @@ def grok_label(backend: Backend) -> str:
     return f"{backend.name} ({extra})" if extra else backend.name
 
 
-def default_backends(edit: bool = False) -> dict[str, Backend]:
-    """The installed-CLI backends. With edit=True the AIs may change files in
+def default_backends(edit: bool = False,
+                     free_models: dict[str, str] | None = None) -> dict[str, Backend]:
+    """CLI and opt-in API backends. With edit=True the AIs may change files in
     the current folder: Claude auto-accepts file edits only (other tools
     still need approval, which a one-shot can't give, so they're refused),
     Codex gets its workspace-write sandbox, and Grok joins only where its OS
@@ -192,4 +193,8 @@ def default_backends(edit: bool = False) -> dict[str, Backend]:
     ]
     if not edit or grok_can_edit():
         backends.append(grok_backend(edit=edit))
+    if not edit:
+        from .config import load
+        from .free_apis import free_backends
+        backends.extend(free_backends(free_models if free_models is not None else load().free))
     return {b.name: b for b in backends}
