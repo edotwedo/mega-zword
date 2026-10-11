@@ -150,16 +150,18 @@ def test_gemini_prefers_antigravity_cli(monkeypatch):
             self.returncode = 0
 
         def communicate(self, stdin, timeout):
-            assert stdin == "hello"
+            assert stdin is None  # agy ignores stdin; the prompt rides on -p
             return "hi\n", ""
 
     monkeypatch.setattr(backends.subprocess, "Popen", Process)
     backend = backends.default_backends(free_models=config.Config().free)["gemini"]
     result = backend.run("hello")
-    assert calls == [["fake-agy.exe", "-p", "--mode", "plan", "--output-format", "text",
-                      "--disable-slash-commands"]]
+    # No --disable-slash-commands: it turns agy's read-only plan mode off.
+    assert calls == [["fake-agy.exe", "--mode", "plan", "--output-format", "text", "-p", "hello"]]
     assert result.ok and result.text == "hi" and result.backend == "gemini"
     assert "gemini" not in backends.default_backends(edit=True, free_models={})
+    long = backend.run("x" * (backends.AGY_MAX_PROMPT + 1))
+    assert not long.ok and "command line" in long.error and len(calls) == 1
 
 
 def test_doctor_finds_antigravity_cli(monkeypatch):

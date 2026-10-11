@@ -26,6 +26,15 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 FAKES = REPO / "scripts" / "fake_cli"
+FAKE_AGY = REPO / "scripts" / "fake_agy"  # only for the Gemini-via-agy checks
+
+
+def _without_real_agy(path: str) -> str:
+    """Drop PATH folders holding a real Antigravity CLI: Gemini prefers agy
+    when it's on PATH, and nothing here may reach a real AI."""
+    names = ("agy", "agy.exe", "agy.cmd", "agy.bat")
+    return os.pathsep.join(p for p in path.split(os.pathsep)
+                           if not any((Path(p) / n).is_file() for n in names if p))
 
 results: list[tuple[str, bool, str]] = []
 
@@ -44,7 +53,7 @@ def make_env(tmp: Path) -> dict:
     home = tmp / "home"
     home.mkdir()
     env.update({
-        "PATH": str(FAKES) + os.pathsep + env.get("PATH", ""),
+        "PATH": str(FAKES) + os.pathsep + _without_real_agy(env.get("PATH", "")),
         "MZ_SMOKE_PYTHON": sys.executable,
         "MEGAZWORD_HOME": str(tmp / "mz"),
         # Refused instantly: the rater falls back to its rule, no local model.
@@ -159,10 +168,20 @@ def main() -> int:
               r.returncode == 0 and "[fake codex] ok: forced" in r.stdout, r.stdout + r.stderr)
 
         mz(env, work, "decide", "Smoke tests stay free")
-        r = mz(env, work, "run", "-m", "gemini", stdin="x" * 50_000 + "\nGemini stdin sentinel")
-        check("Gemini receives long prompts over stdin in read-only mode",
-              r.returncode == 0 and "[fake gemini] ok: Gemini stdin sentinel" in r.stdout,
+        # Gemini runs through the Antigravity CLI (fake agy here): the prompt is
+        # the -p value in plan mode, and prompts too long for a command line are
+        # refused with a clear reason instead of being cut off.
+        # (On Windows the fake is a .cmd, and cmd.exe cuts an argument at its first
+        # newline, so only "answered" is checked; the real agy.exe gets it whole.)
+        agy_env = dict(env, PATH=str(FAKE_AGY) + os.pathsep + env["PATH"])
+        r = mz(agy_env, work, "run", "-m", "gemini", "Gemini plan sentinel")
+        check("Gemini (agy) gets the prompt on -p in read-only plan mode",
+              r.returncode == 0 and "[fake gemini] ok:" in r.stdout
+              and (os.name == "nt" or "Gemini plan sentinel" in r.stdout),
               r.stdout + r.stderr)
+        r = mz(agy_env, work, "run", "-m", "gemini", stdin="x" * 50_000)
+        check("Gemini (agy) refuses a prompt too long for the command line",
+              r.returncode != 0 and "command line" in r.stderr, r.stdout + r.stderr)
 
         mz(env, work, "note", "a note")
         r = mz(env, work, "history")

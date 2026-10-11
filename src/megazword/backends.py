@@ -247,16 +247,19 @@ CLAUDE_LEAN = ["--strict-mcp-config", "--disable-slash-commands", "--restricted"
 CODEX_LEAN = ["-c", "mcp_servers={}"]
 
 
-AGY_ARGS = ["-p", "--mode", "plan", "--output-format", "text", "--disable-slash-commands"]
+# Checked live with agy 1.3.3 on Phil's PC (2026-10-11): -p takes the prompt as
+# its value and ignores stdin; --disable-slash-commands switches plan mode off
+# ("--mode plan has no effect"), so it is not used.
+AGY_ARGS = ["--mode", "plan", "--output-format", "text", "-p", "{prompt}"]
 OLD_GEMINI_ARGS = ["--approval-mode", "plan", "--output-format", "text"]
+AGY_MAX_PROMPT = 30_000  # the prompt is a command-line argument; Windows caps those near 32k
 
 
 @dataclass
 class GeminiBackend(CLIBackend):
     """Gemini through Google's Antigravity CLI (`agy`) when installed, else the
     old Gemini CLI. Google retired the Gemini CLI for personal accounts on
-    2026-06-18. agy flags are from its --help (1.3.3, checked 2026-10-11):
-    -p is print mode (prompt on stdin), --mode plan is its read-only mode.
+    2026-06-18. --mode plan is agy's read-only mode.
     Picked at run time, not at construction, so building the table stays cheap."""
 
     exe: str = "gemini"
@@ -274,6 +277,10 @@ class GeminiBackend(CLIBackend):
 
     def _command(self, prompt: str) -> tuple[list[str], str | None]:
         self._pick()
+        if self.exe == "agy" and len(prompt) > AGY_MAX_PROMPT:
+            raise RuntimeError(f"prompt is {len(prompt):,} characters; agy takes it on the "
+                               f"command line, which fits about {AGY_MAX_PROMPT:,}. "
+                               "Shorten it or use another AI.")
         return super()._command(prompt)
 
 

@@ -15,7 +15,17 @@ def main() -> int:
     if name == "gemini" and args != ["--approval-mode", "plan", "--output-format", "text"]:
         print("fake Gemini requires read-only flags and stdin input", file=sys.stderr)
         return 42
-    if "--prompt-file" in args:
+    if name == "agy":  # Antigravity CLI: the prompt is the value of -p
+        if args == ["-p", "/usage", "--output-format", "json"]:
+            print('{"status":"SUCCESS","command":{"name":"usage","data":{"groups":[{"name":'
+                  '"Gemini Models","buckets":[{"id":"g","window":"weekly",'
+                  '"remaining_fraction":0.9,"reset_time":"2030-01-01T00:00:00Z"}]}]}}}')
+            return 0
+        if args[:5] != ["--mode", "plan", "--output-format", "text", "-p"] or len(args) != 6:
+            print("fake agy requires plan mode and the prompt as the -p value", file=sys.stderr)
+            return 42
+        name, prompt = "gemini", args[5]
+    elif "--prompt-file" in args:
         with open(args[args.index("--prompt-file") + 1], encoding="utf-8") as f:
             prompt = f.read()
     else:
