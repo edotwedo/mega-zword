@@ -64,8 +64,15 @@ def checks(home: Path | None = None) -> list[Check]:
     else:
         try:
             cfg = config.load(path)
+            if not all(isinstance(route, list) and
+                       all(isinstance(name, str) for name in route)
+                       for route in cfg.route.values()):
+                raise ValueError("routes must be lists of backend names")
+            if not isinstance(cfg.rater_model, str):
+                raise ValueError("rater_model must be a string")
             found.append(Check("OK", "config", "parses"))
         except Exception as exc:
+            cfg = config.Config()
             found.append(Check("FAIL", "config", type(exc).__name__,
                                "fix config.toml syntax and values"))
     active = cfg.out_now()

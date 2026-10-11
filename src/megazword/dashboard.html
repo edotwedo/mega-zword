@@ -360,7 +360,7 @@ for (const container of ["settings-routes", "settings-timeouts", "settings-other
 }
 
 function renderChart(s) {
-  const by = {};
+  const by = Object.create(null);  // AI names can't hit Object prototype keys
   for (const [name, r] of Object.entries(s.runs_24h || {}))
     by[name] = {ok: r.ok, bad: r.rejected + r.failed, est_tokens: r.est_tokens ?? 0};
   const names = Object.keys(by);
@@ -400,8 +400,8 @@ function renderRuns(s) {
     s.runs.slice(0, 40).map(r => `<tr><td>${ago(r.time)}</td><td>${aiTag(r.backend)}</td>
       <td>${esc(r.rating || "—")}</td><td>${r.forced ? "you picked" : "auto"}</td>
       <td class="${r.ok ? "ok" : "bad"}">${r.ok ? "ok" : esc(r.rejected || r.error || "failed")}</td>
-      <td class="num">${(r.seconds ?? 0).toFixed(1)}</td><td class="num">${r.prompt_chars ?? ""}</td>
-      <td class="num">${r.answer_chars ?? ""}</td><td class="num">${esc(r.est_tokens ?? 0)}</td></tr>`).join("");
+      <td class="num">${(Number(r.seconds) || 0).toFixed(1)}</td><td class="num">${esc(r.prompt_chars ?? "")}</td>
+      <td class="num">${esc(r.answer_chars ?? "")}</td><td class="num">${esc(r.est_tokens ?? 0)}</td></tr>`).join("");
 }
 
 function renderAnswers(s) {

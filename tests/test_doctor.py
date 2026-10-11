@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from megazword import cli, doctor
 from megazword.usage_sources import PlanUsage
 
@@ -67,3 +69,14 @@ def test_doctor_free_keys_and_routes(tmp_path, monkeypatch):
     assert lines.count("WARN groq: key not set") == 1
     assert "OK routes: known backends only" in lines
     assert "secret-test-credential" not in "\n".join(lines)
+
+
+@pytest.mark.parametrize("body", ['[route]\neasy = 42\n',
+                                   '[route]\neasy = [42]\n',
+                                   'rater_model = 42\n'])
+def test_doctor_reports_invalid_config_types(tmp_path, monkeypatch, body):
+    fake_external(monkeypatch)
+    (tmp_path / "config.toml").write_text(body)
+    checks = doctor.checks(tmp_path)
+    assert any(c.name == "config" and c.level == "FAIL" for c in checks)
+    assert any(c.name == "log" for c in checks)
