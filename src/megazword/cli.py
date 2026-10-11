@@ -46,6 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+
+    retry = sub.add_parser("retry", help="last answer not good enough: ask a stronger AI")
+    retry.add_argument("-m", "--model", help="force which AI tries next")
     return parser
 
 
@@ -133,6 +136,9 @@ def main(argv: list[str] | None = None,
         print(f"[megazword] saved to {memory.project} memory", file=sys.stderr)
         return 0
 
+    if args.command == "retry":
+        return retry_last(args, backends, cfg)
+
     # command == "run"
     prompt = args.prompt if args.prompt is not None else sys.stdin.read()
     if not prompt.strip():
@@ -159,10 +165,20 @@ def main(argv: list[str] | None = None,
               file=sys.stderr)
 
     memory = Memory(config.HOME, args.project or project_name())
+    sent = with_context(prompt, memory.context_block()) if args.context else prompt
+    # A forced AI (-m) never escalates; otherwise move up the chain on failure.
+    return execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))
+
+
+def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
+            memory: Memory, rating: Rating | None, forced: bool,
+            start_after: str | None = None, prior_answer: str | None = None) -> int:
+    """Run the chain with escalation, log every attempt, print the answer,
+    and remember the run so `megazword retry` can pick it up."""
     first_line = prompt.strip().splitlines()[0][:80]
 
     def on_attempt(name, result, reason):
-        log.append(cfg.log_path, backend=name, forced=bool(args.model),
+        log.append(cfg.log_path, backend=name, forced=forced,
                    rating=rating.level if rating else None,
                    rater=rating.source if rating else None,
                    seconds=round(result.seconds, 2), ok=result.ok and not reason,
@@ -173,17 +189,61 @@ def main(argv: list[str] | None = None,
             print(f"[megazword] {name} rejected after {result.seconds:.1f}s: {reason}",
                   file=sys.stderr)
 
-    # A forced AI (-m) never escalates; otherwise move up the chain on failure.
-    sent = with_context(prompt, memory.context_block()) if args.context else prompt
-    outcome = escalate(sent, chain, on_attempt=on_attempt)
+    outcome = escalate(sent, chain, on_attempt=on_attempt,
+                       start_after=start_after, prior_answer=prior_answer)
     if outcome.result is None:
         print("[megazword] no AI gave a usable answer", file=sys.stderr)
         return 1
     result = outcome.result
+    save_last_run(sent, prompt, [b.name for b in chain], result.backend, result.text,
+                  memory.project, rating.level if rating else None)
     print(result.text)
     print(f"[megazword] {result.backend} answered in {result.seconds:.1f}s"
           + (" (after escalating)" if outcome.escalated else ""), file=sys.stderr)
     return 0
+
+
+def last_run_path():
+    return config.HOME / "last_run.json"
+
+
+def save_last_run(sent, prompt, chain, backend, answer, project, level) -> None:
+    import json
+    path = last_run_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"sent": sent, "prompt": prompt, "chain": chain,
+                                "backend": backend, "answer": answer,
+                                "project": project, "rating": level}), encoding="utf-8")
+
+
+def retry_last(args, backends: dict[str, Backend], cfg: config.Config) -> int:
+    import json
+    path = last_run_path()
+    if not path.exists():
+        print("[megazword] nothing to retry yet; run something first", file=sys.stderr)
+        return 2
+    last = json.loads(path.read_text(encoding="utf-8"))
+    memory = Memory(config.HOME, last["project"])
+    level = last.get("rating")
+    rating = Rating(level, "retry", "retry") if level else None
+    if args.model:
+        if args.model not in backends:
+            print(f"Unknown AI '{args.model}'. Choose from: {', '.join(backends)}",
+                  file=sys.stderr)
+            return 2
+        names = [last["backend"], args.model]
+    else:
+        # The rest of the original chain, then the hard-task route as backup.
+        names = list(dict.fromkeys([*last["chain"], *cfg.route.get("hard", [])]))
+    chain = [backends[n] for n in names
+             if n in backends and (n == last["backend"] or backends[n].available())]
+    if not any(b.name != last["backend"] for b in chain):
+        print(f"[megazword] no AI left to try after {last['backend']}", file=sys.stderr)
+        return 1
+    print(f"[megazword] {last['backend']}'s answer rejected; moving up", file=sys.stderr)
+    return execute(last["sent"], last["prompt"], chain, cfg, memory, rating,
+                   forced=bool(args.model), start_after=last["backend"],
+                   prior_answer=last["answer"])
 
 
 if __name__ == "__main__":

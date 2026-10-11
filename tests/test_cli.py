@@ -195,3 +195,26 @@ def test_forced_model_does_not_escalate(capsys, cfg):
     backends = {"fake": FakeBackend("fake", fail=True), "cheap": FakeBackend("cheap")}
     assert main(["run", "hi", "-m", "fake"], backends, cfg) == 1
     assert "cheap" not in capsys.readouterr().err
+
+
+def test_retry_moves_past_last_answerer(capsys, cfg):
+    cfg.route = {"easy": ["cheap"], "medium": [], "hard": ["strong"]}
+    backends = {"cheap": FakeBackend("cheap", reply="c"), "strong": FakeBackend("strong", reply="s")}
+    assert main(["run", "hi"], backends, cfg, rated("easy"), dict) == 0
+    capsys.readouterr()
+    assert main(["retry"], backends, cfg) == 0
+    out = capsys.readouterr()
+    assert out.out.startswith("s: hi") and "not good enough" in out.out
+    assert "cheap's answer rejected" in out.err
+
+
+def test_retry_with_nothing_left(capsys, cfg):
+    cfg.route = {"easy": ["only"], "medium": [], "hard": ["only"]}
+    backends = {"only": FakeBackend("only")}
+    main(["run", "hi"], backends, cfg, rated("easy"), dict)
+    assert main(["retry"], backends, cfg) == 1
+    assert "no AI left" in capsys.readouterr().err
+
+
+def test_retry_before_any_run(capsys, cfg):
+    assert main(["retry"], {}, cfg) == 2
