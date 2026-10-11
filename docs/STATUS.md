@@ -1,7 +1,7 @@
 # Status
 
-**Active:** Claude Code coordinating overnight (2026-10-11 00:00). Codex on branch codex/overnight (usage tracking, init, README). Claude on main (Hive import, merges).
-**Last updated:** 2026-10-10 by Claude Code
+**Active:** none
+**Last updated:** 2026-10-10 23:30 by Grok (branch grok/effort). Claude still owns main (Hive import). Do not merge this onto a dirty main.
 
 ## Done
 - Repo created with handoff rules (AGENTS.md), spec, status and decision log.
@@ -12,6 +12,7 @@
 - Step 2 pacing (Codex wrote `pacing.py`, Claude reviewed/merged): auto-pick now skips AIs that are out (>=95%) or over pace (hard tasks only) and otherwise keeps the route order (cheapest first). Exception (Phil, 2026-10-10): a plan within 1h (5-hour window) or 24h (weekly) of reset with >=20% unused is used first, so leftover usage isn't wasted. Unrecognized windows never block (Phil: Claude's "iguana_necktie" is likely his Claude Cloud credit).
 - Step 4 shared memory (Claude): `megazword note`, `decide`, `history`; `run --context` prepends decisions + recent activity; every run logs a 'done' entry. Stored in ~/.megazword/projects/<project>/memory.jsonl. 26 tests pass.
 - Step 3 escalate-on-failure (Grok wrote `escalate.py` + `OllamaBackend`; Claude merged and wired it in): `megazword run` without `-m` tries the ranked route for the task's difficulty, then stronger routes; a crash, empty answer or refusal moves to the next AI with the earlier attempt as context. `-m` never escalates. Every attempt is logged and recorded in project memory. OllamaBackend exists but isn't registered or routed yet (Phil hasn't said local models should answer tasks). 87 tests pass.
+- Grok model + effort auto-pick (Grok, branch grok/effort, not merged): when the chosen AI is grok, Mega Zword passes `-m` and `--effort` from the task rating. easy -> grok-4.6 low, medium -> grok-4.6 medium, hard -> grok-4.7 high. `-m grok` uses medium. `retry` never uses low. Override in ~/.megazword/config.toml `[grok.<level>]`. Test fakes named grok are not replaced. Print shows `using grok (grok-4.6 medium)`.
 
 ## In progress
 - Nothing.
@@ -27,9 +28,8 @@ Build step 5: phone access (see SPEC.md). Needs Phil at the PC and phone.
 5. Turn off "Expose Ollama to the network" (or firewall 11434 to the Tailscale
    interface only). Optional: phone model server in Termux as an extra backend.
 
-Also open (no Phil needed): Grok usage self-tracking from ~/.megazword/log.jsonl;
-a `megazword retry` command using escalate(start_after=..., prior_answer=...)
-only if Phil asks for it.
+Also open (no Phil needed): merge branch `grok/effort` when main is clean
+(Grok model+effort auto-pick). Grok usage self-tracking from ~/.megazword/log.jsonl.
 
 ## How to run (dev)
     python -m venv .venv

@@ -124,12 +124,39 @@ class OllamaBackend(Backend):
         return ollama.generate(prompt, self.model, self.url, timeout=self.timeout)
 
 
+def grok_backend(model: str = "grok-4.6", effort: str = "medium") -> CLIBackend:
+    """One-shot Grok with a model id and reasoning effort."""
+    return CLIBackend("grok", exe="grok",
+                      args=["-p", "{prompt}", "--output-format", "plain",
+                            "-m", model, "--effort", effort])
+
+
+def apply_grok_effort(backends: dict[str, Backend], level: str,
+                      grok: dict[str, tuple[str, str]]) -> None:
+    """Swap in a Grok CLI tuned for this difficulty. Test fakes are left alone."""
+    current = backends.get("grok")
+    if not isinstance(current, CLIBackend) or current.exe != "grok":
+        return
+    model, effort = grok.get(level, grok.get("medium", ("grok-4.6", "medium")))
+    backends["grok"] = grok_backend(model, effort)
+
+
+def grok_label(backend: Backend) -> str:
+    """'grok (grok-4.6 medium)' when those flags are present."""
+    if not isinstance(backend, CLIBackend) or "--effort" not in backend.args:
+        return backend.name
+    args = backend.args
+    model = args[args.index("-m") + 1] if "-m" in args else ""
+    effort = args[args.index("--effort") + 1]
+    extra = " ".join(p for p in (model, effort) if p)
+    return f"{backend.name} ({extra})" if extra else backend.name
+
+
 def default_backends() -> dict[str, Backend]:
     backends: list[Backend] = [
         CLIBackend("claude", exe="claude", args=["-p"]),
         CodexBackend("codex", exe="codex",
                      args=["exec", "--skip-git-repo-check", "-s", "read-only"]),
-        CLIBackend("grok", exe="grok",
-                   args=["-p", "{prompt}", "--output-format", "plain"]),
+        grok_backend(),
     ]
     return {b.name: b for b in backends}
