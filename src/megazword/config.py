@@ -56,6 +56,8 @@ class Config:
     route: dict[str, list[str]] = field(default_factory=lambda: dict(DEFAULT_ROUTE))
     grok: dict[str, tuple[str, str]] = field(default_factory=lambda: dict(DEFAULT_GROK))
     log_path: Path = HOME / "log.jsonl"
+    # Second-opinion check on auto-picked answers (local model). Off by default.
+    quality_check: bool = False
     # AI name -> when its usage comes back. Set by hand for plans with no meter.
     out_until: dict[str, datetime] = field(default_factory=dict)
 
@@ -81,6 +83,7 @@ def load(path: Path = HOME / "config.toml") -> Config:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
         cfg.rater_model = data.get("rater_model", cfg.rater_model)
         cfg.route.update(data.get("route", {}))
+        cfg.quality_check = bool(data.get("quality_check", cfg.quality_check))
         cfg.out_until = {name: _as_time(v) for name, v in data.get("out", {}).items()}
 
         for level, block in data.get("grok", {}).items():
