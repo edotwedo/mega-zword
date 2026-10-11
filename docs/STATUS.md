@@ -27,10 +27,14 @@
   - Grok model/effort per rating (Grok): easy grok-4.6 low, medium grok-4.6 medium, hard grok-4.7 high; `[grok.<level>]` overrides. Forge merged it with edit mode.
   - `run --edit` (Forge): Claude/Grok `--permission-mode acceptEdits`, Codex `-s workspace-write`. Live check: Claude created the file; Codex and Grok answered but didn't create it (under investigation).
   - `megazword dashboard` (Kestrel): local web page at http://127.0.0.1:8765 with plan meters (bar = used, tick = time elapsed), out marks, route table, 24h runs chart, recent runs, project memory + add note/decision, and a run box (auto or pick an AI, include memory, "Not good enough" = retry). Listens on 127.0.0.1 only; POSTs need a per-launch token and a local Host header. Runs go through the normal CLI in a child process, so routing/logging are identical.
-  - 126 tests pass.
+  - K1 (Kestrel): Grok gets prompts via `--prompt-file` (Windows caps argv ~32k); Claude/Codex already used stdin. 50k-char test.
+  - F1 (Forge): `--edit` on Windows leaves Grok out (its path rules didn't contain writes; its sandbox is Linux/macOS only).
+  - K2 (Kestrel): last 50 answers saved to ~/.megazword/answers.jsonl; dashboard "Past answers"; phone-width fix.
+  - F2 (Forge): optional answer-quality check (`quality_check = true`), local model flags dodges, which then escalate. Off by default.
+  - 136 tests pass.
 
 ## In progress
-- Kestrel: K1. Forge: F1 (edit mode). Codex: C1 (doctor + install.ps1).
+- Kestrel: K3. Forge: F3 then U2. Codex/Astra (headless): C1+C2 on codex/doctor. Kestrel heartbeat runs at :13/:43.
 
 ## Overnight backlog (2026-10-11, Phil asleep; Kestrel assigns)
 Rules: take the top unclaimed item in your lane, write your name next to it,
