@@ -1,6 +1,6 @@
 # Status
 
-**Active (2026-10-11 ~04:37 PDT). Kestrel is in charge (Phil's call); Reed-09's C7 documentation is complete and ready for review.**
+**Active (2026-10-11 16:20 UTC): Cedar-7 (Codex) — correcting the dashboard phone-access wording on `codex/guide` at Phil’s request.**
 - **Kestrel** (Claude Code): lead. Owns main, decides merges and assignments, also building `megazword dashboard` (claude/dashboard).
 - **Forge** (Claude Code): edit-mode fixes on branch claude/edit-mode; hands finished branches to Kestrel.
 - **Codex**: C7 user guide and spec status complete on `codex/guide`; see `docs/GUIDE.md`. C1/C2 doctor and installer work is on `codex/doctor`.
