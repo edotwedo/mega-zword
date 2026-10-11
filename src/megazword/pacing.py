@@ -51,10 +51,14 @@ def status(usage: PlanUsage, now: datetime | None = None) -> PlanStatus:
     """Summarize the most restrictive usage window for a service."""
     if not usage.windows:
         return PlanStatus(usage.service, 0.0, 0.0, "unknown", [])
-    paces = [pace(window, now) for window in usage.windows]
-    maximum = max(float(window.used_percent) for window in usage.windows)
-    unknown = [window.name for window in usage.windows
-               if not window_length(window.name)[1]]
+    # Unrecognized windows (e.g. Claude's "iguana_necktie", which Phil says is
+    # his Claude Cloud credit) are reported but never block a plan.
+    known = [w for w in usage.windows if window_length(w.name)[1]]
+    unknown = [w.name for w in usage.windows if not window_length(w.name)[1]]
+    if not known:
+        return PlanStatus(usage.service, 0.0, 0.0, "unknown", unknown)
+    paces = [pace(window, now) for window in known]
+    maximum = max(float(window.used_percent) for window in known)
     if maximum >= OUT_THRESHOLD:
         verdict = "out"
     elif max(paces) > HARD_ONLY_THRESHOLD:
@@ -77,8 +81,10 @@ def rank(statuses: dict[str, PlanStatus], candidates: list[str], rating: str,
          now: datetime | None = None) -> list[str]:
     """Filter candidates and rank by usage left to burn before reset."""
     del now  # Statuses are computed with their own explicit reference time.
-    eligible = [name for name in candidates
-                if name in statuses and allowed(statuses[name], rating)]
+    # AIs with no meter at all (grok, local models) count as "unknown".
+    statuses = {name: statuses.get(name) or PlanStatus(name, 0.0, 0.0, "unknown", [])
+                for name in candidates}
+    eligible = [name for name in candidates if allowed(statuses[name], rating)]
     order = {name: index for index, name in enumerate(candidates)}
     return sorted(
         eligible,

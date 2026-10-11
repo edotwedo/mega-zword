@@ -58,10 +58,25 @@ def show_usage() -> int:
     return 0
 
 
+def plan_statuses() -> dict:
+    """Current pacing status per AI; empty if the meters can't be read."""
+    from .pacing import status
+    from .usage_sources import all_usage
+    try:
+        return {u.service: status(u) for u in all_usage()}
+    except Exception:
+        return {}
+
+
 def pick(rating: Rating, route: dict[str, list[str]],
-         backends: dict[str, Backend]) -> Backend | None:
-    """First installed AI in the route list for this difficulty."""
-    for name in route.get(rating.level, []):
+         backends: dict[str, Backend], statuses: dict | None = None) -> Backend | None:
+    """First installed AI for this difficulty. With plan statuses, AIs that are
+    out or over pace are skipped and those with the most usage left go first."""
+    names = route.get(rating.level, [])
+    if statuses is not None:
+        from .pacing import rank
+        names = rank(statuses, names, rating.level)
+    for name in names:
         b = backends.get(name)
         if b is not None and b.available():
             return b
@@ -71,7 +86,8 @@ def pick(rating: Rating, route: dict[str, list[str]],
 def main(argv: list[str] | None = None,
          backends: dict[str, Backend] | None = None,
          cfg: config.Config | None = None,
-         rater: Callable[[str], Rating] | None = None) -> int:
+         rater: Callable[[str], Rating] | None = None,
+         statuses: Callable[[], dict] | None = None) -> int:
     args = build_parser().parse_args(argv)
     backends = backends if backends is not None else default_backends()
     cfg = cfg if cfg is not None else config.load()
@@ -111,7 +127,7 @@ def main(argv: list[str] | None = None,
         print(f"[megazword] using {backend.name} (you chose it)", file=sys.stderr)
     else:
         rating = rater(prompt)
-        backend = pick(rating, cfg.route, backends)
+        backend = pick(rating, cfg.route, backends, (statuses or plan_statuses)())
         if backend is None:
             print(f"[megazword] no installed AI for a {rating.level} task; "
                   f"check the route in {config.HOME / 'config.toml'}", file=sys.stderr)

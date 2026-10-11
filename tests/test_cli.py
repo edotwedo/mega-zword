@@ -70,7 +70,7 @@ def test_auto_pick_skips_missing_and_logs(capsys, cfg):
         "gone": FakeBackend("gone", installed=False),
         "strong": FakeBackend("strong", reply="s"),
     }
-    assert main(["run", "design a system"], backends, cfg, rated("hard")) == 0
+    assert main(["run", "design a system"], backends, cfg, rated("hard"), dict) == 0
     out = capsys.readouterr()
     assert out.out.strip() == "s: design a system"
     assert "rated hard" in out.err and "using strong" in out.err
@@ -79,7 +79,7 @@ def test_auto_pick_skips_missing_and_logs(capsys, cfg):
 
 
 def test_auto_pick_with_nothing_installed(capsys, cfg):
-    assert main(["run", "hi"], {}, cfg, rated("easy")) == 1
+    assert main(["run", "hi"], {}, cfg, rated("easy"), dict) == 1
     assert "no installed AI" in capsys.readouterr().err
 
 
@@ -160,3 +160,19 @@ def test_run_records_done_and_passes_context(capsys, cfg):
     from megazword.memory import Memory
     last = Memory(config.HOME, "proj").recent(1)[0]
     assert last.kind == "done" and last.by == "fake" and "ok: hi" in last.text
+
+
+def test_pacing_skips_over_pace_plan(capsys, cfg):
+    from megazword.pacing import PlanStatus
+    cfg.route["easy"] = ["cheap", "strong"]
+    backends = {"cheap": FakeBackend("cheap", reply="c"), "strong": FakeBackend("strong", reply="s")}
+    over = lambda: {"cheap": PlanStatus("cheap", 30.0, 50.0, "hard-only", [])}
+    assert main(["run", "hi"], backends, cfg, rated("easy"), over) == 0
+    assert capsys.readouterr().out.strip() == "s: hi"
+
+
+def test_unknown_window_does_not_block():
+    from megazword.pacing import status
+    from megazword.usage_sources import PlanUsage, Window
+    s = status(PlanUsage("claude", [Window("iguana_necktie", 99.0, None)], "x"))
+    assert s.verdict == "unknown" and s.unknown_windows == ["iguana_necktie"]
