@@ -42,8 +42,14 @@ def redact(value: object) -> str:
 
 
 def escaped(value: object) -> str:
+    """Escape only what Markdown acts on: inline marks anywhere, block marks
+    (heading, list, setext/rule) at a line start. `|` stays escaped because
+    names go into table cells; html.escape already covers `<`, `>` and `&`."""
     text = html.escape(redact(value), quote=False)
-    return re.sub(r"([\\`*_{}\[\]()#+.!|>~-])", r"\\\1", text)
+    text = re.sub(r"([\\`*\[\]|~])", r"\\\1", text)
+    text = re.sub(r"(?<![A-Za-z0-9])_|_(?![A-Za-z0-9])", r"\\_", text)  # a_b is never emphasis
+    text = re.sub(r"(?m)^([ \t]*)([#+=-])", r"\1\\\2", text)
+    return re.sub(r"(?m)^([ \t]*\d+)([.)])", r"\1\\\2", text)  # "1." list: escape the dot
 
 
 def quote(value: object) -> str:
@@ -110,12 +116,22 @@ def command(args, cfg: config.Config | None = None) -> int:
         cutoff(args.since, datetime.now(timezone.utc))
         cfg = cfg if cfg is not None else config.load()
         report = render(project, cfg.log_path, args.since)
+        # Always UTF-8: a Windows redirect (`> report.md`) would otherwise get
+        # cp1252 and fail on emoji. Encoding first means a bad character can't
+        # leave a half-written --out file behind that blocks the next try.
+        data = report.encode("utf-8", errors="replace")
         if args.out is None:
-            print(report, end="")
+            out = getattr(sys.stdout, "buffer", None)
+            if out is None:  # a text-only stream (tests, some IDEs)
+                print(report, end="")
+            else:
+                sys.stdout.flush()
+                out.write(data)
+                out.flush()
         else:
             # Exclusive creation makes overwrite refusal safe against a race.
-            with args.out.open("w" if args.force else "x", encoding="utf-8", newline="\n") as f:
-                f.write(report)
+            with args.out.open("wb" if args.force else "xb") as f:
+                f.write(data)
         return 0
     except FileExistsError:
         print("[megazword] output already exists (use --force to replace)", file=sys.stderr)

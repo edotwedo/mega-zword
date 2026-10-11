@@ -62,8 +62,9 @@ def render(cfg: config.Config, meters=None, now: datetime | None = None,
         lines.append("Plans:  meters still loading (try `megazword usage`)")
         if cfg.out_now(now):  # still say who's out; that needs no meter
             plans = []
-    if plans is not None:
+    else:
         lines.append("Plans:")
+    if plans is not None:
         summaries = summarize_all(plans, cfg.out_until, now)
         for summary in summaries[:6]:
             line = summary.line()

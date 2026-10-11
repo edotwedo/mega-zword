@@ -5,7 +5,7 @@ import pytest
 
 from megazword import answers, config, memory
 from megazword.cli import COMMAND_GROUPS, build_parser, main
-from megazword.export import cutoff, render
+from megazword.export import cutoff, escaped, render
 
 
 NOW = datetime(2026, 10, 11, 12, tzinfo=timezone.utc)
@@ -62,7 +62,9 @@ def test_content_window_and_project_scope(tmp_path):
 def test_markdown_escaping(tmp_path):
     cfg = seed(tmp_path)
     text = render("demo", cfg.log_path, now=NOW)
-    assert "> \\# Heading\n> \n> \\#\\# Sneaky" in text
+    assert "> \\# Heading\n> \n> \\## Sneaky" in text
+    assert escaped("mega-zword v1.5 (beta) a_b") == "mega-zword v1.5 (beta) a_b"
+    assert escaped("1. li\n*x*") == "1\\. li\n\\*x\\*"
     assert "<script>" not in text
     assert "\n``````\ncode\n```\n`````\nend\n``````\n" in text
     assert "\n# Heading" not in text and "\n## Sneaky" not in text
