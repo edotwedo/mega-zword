@@ -71,6 +71,65 @@ on it. The old system is only a place to copy open work from, then retire.
    `megazword dashboard --app` opens an Edge or Chrome app window when
    available. See [GUIDE.md](GUIDE.md) for its sections and daily use.
 
+## Beta 2: Hive room, bot tabs, new look (Phil, 2026-10-11)
+
+Phil's words, short: a real group chat for the bots inside the app, on its own
+tab; different bots pinned to different tabs; and a look like a polished
+Windows app with a little Linux/1337 flair. Work is split across the bots like
+the 2026-10-11 overnight run (lanes in STATUS.md, "Beta 2 backlog").
+
+### R. Hive room (bot group chat)
+- **Separate from Q.** Q is too slow for this. The room lives in Mega Zword:
+  `~/.megazword/rooms/<room>.jsonl`, one message per line
+  (`time, author, text, mentions`). Never committed.
+- **Lightweight on purpose.** Room bots are not workhorses: share info,
+  hand each other work, friendly banter. Lean one-shots only, the cheapest
+  model/effort per AI (Grok low, Claude lean), replies capped (~80 words),
+  read-only (never `--edit`). Real work happens in normal runs and tabs.
+- **They practice prompting each other.** A message can @mention a bot
+  (`@claude`, `@codex`, `@grok`, `@gemini`). A mentioned bot replies next;
+  its reply can mention another. This is the point of the room.
+- **Phil leads when he speaks.** A message from Phil goes first; bots answer
+  it before anything else and follow it over their own plans.
+- **Prime directive** (in every room prompt): work on the project marked
+  primary (`[room] primary = "<project>"` in config.toml, shown at the top of
+  the tab); use plan usage that would otherwise go to waste (pacing's
+  "burn" rule decides who talks more); keep getting better from what worked.
+- **Learning:** at the end of a session the room writes 3-5 short lessons
+  ("what worked, what to do differently") to the primary project's memory
+  (`megazword note`), and the next session's prompt includes the latest ones.
+- **Guard rails:** a session has a turn cap (default 12) and stops early
+  when every AI is out or over pace; skips AIs marked out; one AI talks at a
+  time; Phil can pause or stop from the tab. Until Phil turns automatic runs
+  back on (workshop BUDGET.md), a session only runs when Phil presses Start.
+- **Report to Q:** on session end, a 5-10 line summary is saved to
+  `~/.megazword/rooms/summaries/`. `megazword room post-summary` posts the
+  latest one to Q (workshop PR #33) with `gh` if it's installed and
+  logged in; otherwise it prints the text to paste. No secrets, logins or
+  private info in summaries.
+- CLI too: `megazword room start|stop|say "..."|show|post-summary`.
+
+### T. Bot tabs
+- The app gets a tab strip. Fixed tabs: **Home** (today's dashboard),
+  **Hive** (the room). Plus any number of **chat tabs**, each pinned to one
+  AI or to Auto, with its own history, project and model shown in the tab.
+- New tab: "+" then pick the AI. Rename, close, reorder. Tabs and their
+  history survive a restart (`~/.megazword/tabs.json`; history in answers).
+- Tabs run like `megazword chat` with `-m <ai>`: same lean flags, timeouts,
+  out marks and failure messages.
+
+### D. New look
+- Feels like a Windows 11 app, not a web page: dark by default (light
+  available), a quiet Mica-style surface, Segoe UI Variable for text, 8px
+  rounded panels, thin borders, left sidebar for tabs, a custom title bar in
+  `--app` mode, no big web buttons (icon buttons and a command bar instead).
+- The 1337 flair, kept tasteful: monospace accents (Cascadia Code, falls back
+  to Consolas), a `>_` prompt in input boxes, a terminal-style run log,
+  one green accent for "live", a small ASCII MZ mark on Home, optional
+  scanlines (off by default).
+- Keep everything C9 added: contrast AA, focus rings, labels, live regions,
+  44px phone targets. Must still work on a phone over Tailscale.
+
 ## Open
 - Exact pacing thresholds (tune once it's running).
 - Finish step 5's user-side Tailscale/SSH setup if phone access is still wanted;

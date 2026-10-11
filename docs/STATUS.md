@@ -21,6 +21,41 @@ Do these in order, in `C:\Users\mrmar\mega-zword`. Put your name and the time in
 4. Verify Gemini: `megazword run -m gemini "say hi"` answers (agy reads the prompt on stdin), and `megazword usage` shows a real gemini bar. If either fails, fix `AGY_ARGS` or `parse_agy_usage` from the real output.
 5. Tag Beta 1 (the cloud proxy blocked it): `git tag -a v0.1.0-beta.1 1e58b2c -m "Mega Zword Beta 1"` then `git push origin v0.1.0-beta.1`.
 
+## Beta 2 backlog (Phil, 2026-10-11; spec: SPEC.md "Beta 2")
+Same rules as the overnight run: put your name on an item, work on your own
+branch, small pushes, hand finished branches to Kestrel to merge, tests and
+smoke must pass, no paid calls in tests. Order inside a lane is the order to
+build. If your lane is empty, take the next unclaimed item from another lane.
+
+Kestrel (Claude Code, lead, merges):
+- B1 Room engine (`src/megazword/room.py`): room file, turn loop with
+  @mentions, Phil-first rule, prime directive prompt, turn cap, out/pace
+  stops, lean read-only one-shots, reply cap. CLI `megazword room
+  start|stop|say|show`. Tests with fake CLIs.
+- B2 Lessons + summaries: end-of-session lessons into project memory,
+  summary files, `room post-summary` (gh if present, else print).
+
+Forge (Claude Code):
+- B3 Tabs backend: `tabs.json`, per-tab AI/project/history, dashboard API
+  for list/create/rename/close/send; reuse chat's lean flags and failure text.
+- B4 Hive tab UI: room stream, Phil's input box, Start/Pause/Stop, primary
+  project shown, who is talking, turns left. Built on B1's API.
+
+Codex (high-volume seat):
+- B5 New look (SPEC "D. New look"): restyle dashboard.html as a Windows 11
+  style app with the 1337 accents; sidebar tab strip ready for B3/B4.
+  Keep C9 accessibility. Screenshot desktop and phone widths with headless
+  Edge/Chromium and attach them to the handoff.
+- B6 Custom title bar and icons for `--app` mode; update GUIDE.md and README
+  for tabs and the Hive room once B1-B4 land.
+
+Gemini (agy, new, light jobs only, read-only in Mega Zword):
+- B7 Review pass: read B1-B6 diffs when they land and post findings to the
+  room or STATUS. No code changes.
+
+Grok: out (maxed) until its reset; on return, room banter tone check and B7
+help.
+
 ## Done
 - **Gemini usage meter (Tally-11, 2026-10-11):** `usage_sources.gemini()` runs `agy -p /usage --output-format json` (Antigravity's quota panel, documented; field shape command.data.groups[].buckets[] with remaining_fraction + reset_time, from a public bug report, not yet seen on Phil's PC). Gemini-group buckets become the 5-hour/weekly meter; other groups shown, never block. No agy: falls back to run counts. Tests never run a real agy (conftest). Verified end to end in the cloud with a fake agy and fake Codex log: `megazword usage`, start screen and dashboard /api/state all show codex 42% and gemini 30%. **Not verified live:** real agy JSON on Phil's PC, and the Claude meter (needs his login). Check: `megazword usage`. If gemini shows an error, paste `agy -p /usage --output-format json` output to fix the parser. 520 passed / 1 skipped, smoke 27/27.
 - **Gemini via Antigravity (Tally-11, Claude cloud, 2026-10-11, Phil's request):** Google retired the Gemini CLI for personal accounts; `-m gemini` now runs `agy -p --mode plan --output-format text --disable-slash-commands` (prompt on stdin) when `agy` is on PATH, else the old `gemini` command. Doctor finds agy; login hint says `agy`. Flags from Phil's `agy --help` (1.3.3). Phil installed and signed in to agy on his PC. **Not yet verified live:** that agy print mode reads the prompt from stdin. Check on the PC: `megazword run -m gemini "say hi"`. If agy ignores stdin, switch AGY_ARGS in backends.py to pass `{prompt_file}` or `{prompt}`. 517 passed / 1 skipped, smoke 27/27.
