@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from textwrap import shorten
 
 from .pacing import window_length
 from .usage_sources import PlanUsage
@@ -35,7 +36,7 @@ class Summary:
             filled = max(0, min(10, round(self.used / 10)))
             text = f"[{'#' * filled}{'.' * (10 - filled)}] {self.used:3.0f}% {self.window}"
         else:
-            text = (self.note or "no meter")[:60]
+            text = shorten(self.note or "no meter", width=60, placeholder="...")
         if self.as_of and self.state != "out":
             text += f"  (as of {self.as_of.astimezone():%I:%M %p}{', stale' if self.stale else ''})"
         return f"{self.service:7} {text}"
