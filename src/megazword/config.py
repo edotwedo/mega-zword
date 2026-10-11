@@ -27,8 +27,9 @@ Example config.toml:
 from __future__ import annotations
 
 import os
+import re
 import tomllib
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -55,7 +56,8 @@ class Config:
     rater_model: str = "qwen2.5:1.5b"
     route: dict[str, list[str]] = field(default_factory=lambda: dict(DEFAULT_ROUTE))
     grok: dict[str, tuple[str, str]] = field(default_factory=lambda: dict(DEFAULT_GROK))
-    log_path: Path = HOME / "log.jsonl"
+    # Looked up when a Config is made (not at import) so tests can redirect HOME.
+    log_path: Path = field(default_factory=lambda: HOME / "log.jsonl")
     # Second-opinion check on auto-picked answers (local model). Off by default.
     quality_check: bool = False
     # AI name -> when its usage comes back. Set by hand for plans with no meter.
@@ -77,7 +79,8 @@ def _as_time(value) -> datetime:
     return value if value.tzinfo else value.astimezone()
 
 
-def load(path: Path = HOME / "config.toml") -> Config:
+def load(path: Path | None = None) -> Config:
+    path = path if path is not None else HOME / "config.toml"
     cfg = Config()
     if path.exists():
         data = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -111,3 +114,52 @@ def write_default(path: Path, installed: list[str], force: bool = False) -> None
         raise FileExistsError(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_default(installed), encoding="utf-8")
+
+
+# --- editing [out] from the CLI / dashboard ------------------------------
+
+_KEY = re.compile(r"^\s*([A-Za-z0-9_-]+)\s*=")
+
+
+def parse_until(text: str, now: datetime | None = None) -> datetime:
+    """'7d', '5h', '30m', '2026-10-17' or '2026-10-17T23:30' -> aware datetime."""
+    now = now or datetime.now(timezone.utc)
+    m = re.fullmatch(r"(\d+)\s*([dhm])", text.strip().lower())
+    if m:
+        n, unit = int(m.group(1)), m.group(2)
+        return now + {"d": timedelta(days=n), "h": timedelta(hours=n),
+                      "m": timedelta(minutes=n)}[unit]
+    return _as_time(text.strip())
+
+
+def set_out(path: Path, name: str, until: datetime | None) -> None:
+    """Set (or with until=None, remove) one AI's line in the [out] table of
+    config.toml. Only that line changes; comments and other tables stay."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+        raise ValueError(f"bad AI name {name!r}")
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    value = f"{name} = {until.isoformat(timespec='seconds')}" if until else None
+
+    start = next((i for i, l in enumerate(lines) if l.strip() == "[out]"), None)
+    if start is None:
+        if value:
+            if lines and lines[-1].strip():
+                lines.append("")
+            lines += ["# AIs out of usage until a date or time; auto-pick skips them.",
+                      "[out]", value]
+    else:
+        end = next((i for i in range(start + 1, len(lines))
+                    if lines[i].lstrip().startswith("[")), len(lines))
+        hit = next((i for i in range(start + 1, end)
+                    if (m := _KEY.match(lines[i])) and m.group(1) == name), None)
+        if hit is not None:
+            if value:
+                lines[hit] = value
+            else:
+                del lines[hit]
+        elif value:
+            last = max((i for i in range(start, end) if lines[i].strip()), default=start)
+            lines.insert(last + 1, value)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    load(path)  # fail loudly now rather than on the next run

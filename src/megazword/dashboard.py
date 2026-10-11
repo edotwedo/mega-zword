@@ -199,6 +199,16 @@ class App:
         job.cancel()
         return {"ok": True}
 
+    def set_out(self, body: dict) -> dict:
+        """Mark an AI out (until = '7d', '2026-10-17', ...) or back (clear)."""
+        name = str(body.get("ai", "")).strip()
+        if name not in self.backends and name not in self.cfg.out_until:
+            raise ValueError(f"unknown AI {name!r}")
+        until = None if body.get("clear") else config.parse_until(str(body.get("until") or "7d"))
+        config.set_out(config.HOME / "config.toml", name, until)
+        self.cfg = config.load()
+        return {"ok": True}
+
     def note(self, body: dict) -> dict:
         text = str(body.get("text", "")).strip()
         if not text:

@@ -49,6 +49,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+
+    out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
+    out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
+    group = out.add_mutually_exclusive_group()
+    group.add_argument("--until", help="when it's back: 7d, 5h, 2026-10-17 or 2026-10-17T23:30")
+    group.add_argument("--clear", action="store_true", help="it's back now")
     sub.add_parser("doctor", help="check local setup without running an AI prompt")
     dash = sub.add_parser("dashboard", help="open a local web page with meters, runs and a run box")
     dash.add_argument("--port", type=int, default=8765)
@@ -159,6 +165,9 @@ def main(argv: list[str] | None = None,
 
     if args.command == "usage":
         return show_usage()
+
+    if args.command == "out":
+        return out_command(args, cfg)
 
     if args.command == "dashboard":
         from .dashboard import serve
@@ -283,6 +292,31 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         on_answer(result.text)
     print(f"[megazword] {result.backend} answered in {result.seconds:.1f}s"
           + (" (after escalating)" if outcome.escalated else ""), file=sys.stderr)
+    return 0
+
+
+def out_command(args, cfg: config.Config) -> int:
+    path = config.HOME / "config.toml"
+    if not args.ai:
+        marks = cfg.out_now()
+        if not marks:
+            print("[megazword] no AI is marked out")
+        for name in sorted(marks):
+            print(f"{name:7} out until {cfg.out_until[name].astimezone():%a %b %d %I:%M %p}")
+        return 0
+    if not args.until and not args.clear:
+        print("[megazword] say when it's back (--until 7d) or --clear", file=sys.stderr)
+        return 2
+    try:
+        until = None if args.clear else config.parse_until(args.until)
+        config.set_out(path, args.ai, until)
+    except ValueError as exc:
+        print(f"[megazword] {exc}", file=sys.stderr)
+        return 2
+    if until:
+        print(f"[megazword] {args.ai} marked out until {until.astimezone():%a %b %d %I:%M %p}")
+    else:
+        print(f"[megazword] {args.ai} is back in the rotation")
     return 0
 
 
