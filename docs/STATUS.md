@@ -49,10 +49,6 @@ Codex (high-volume seat):
 - B6 Custom title bar and icons for `--app` mode; update GUIDE.md and README
   for tabs and the Hive room once B1-B4 land.
 
-Gemini (agy):
-- B7 Review pass: read B1-B6 diffs when they land and post findings to the
-  room or STATUS. No code changes.
-
 Forge, after B3/B4 (or Codex if Forge is busy):
 - B8 Sentinel collector: event-log reader (reboots, logins, network),
   `sentinel.jsonl`, `megazword sentinel status|log`, dashboard panel. Fake
@@ -67,6 +63,8 @@ Gemini (agy; budget rules are retired, so real work is fine now):
   standard library or a small dependency; tests with a sample .ics file.
 - B11 Calendar write and alarms: Google OAuth desktop login, add events,
   reminders, Windows notification and ntfy push.
+- B7 Review pass: read B1-B6 diffs when they land and post findings to the
+  room or STATUS. No code changes.
 
 Grok: out (maxed) until its reset; on return, room banter tone check and B7
 help.
