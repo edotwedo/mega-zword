@@ -9,6 +9,7 @@ from typing import Callable
 from . import __version__, config, log
 from .memory import Memory, project_name, with_context
 from .backends import Backend, default_backends
+from .escalate import escalate
 from .rater import Rating, rate
 
 
@@ -68,19 +69,21 @@ def plan_statuses() -> dict:
         return {}
 
 
-def pick(rating: Rating, route: dict[str, list[str]],
-         backends: dict[str, Backend], statuses: dict | None = None) -> Backend | None:
-    """First installed AI for this difficulty. With plan statuses, AIs that are
-    out or over pace are skipped and those with the most usage left go first."""
-    names = route.get(rating.level, [])
-    if statuses is not None:
-        from .pacing import rank
-        names = rank(statuses, names, rating.level)
-    for name in names:
-        b = backends.get(name)
-        if b is not None and b.available():
-            return b
-    return None
+LEVELS = ("easy", "medium", "hard")
+
+
+def candidates(rating: Rating, route: dict[str, list[str]],
+               backends: dict[str, Backend], statuses: dict | None = None) -> list[Backend]:
+    """Installed AIs to try, in order: this difficulty's route (ranked by
+    pacing when statuses are given), then stronger routes as fallbacks."""
+    from .pacing import rank
+    names: list[str] = []
+    for level in LEVELS[LEVELS.index(rating.level):]:
+        level_names = route.get(level, [])
+        if statuses is not None:
+            level_names = rank(statuses, level_names, rating.level)
+        names += [n for n in level_names if n not in names]
+    return [backends[n] for n in names if n in backends and backends[n].available()]
 
 
 def main(argv: list[str] | None = None,
@@ -124,32 +127,43 @@ def main(argv: list[str] | None = None,
             print(f"Unknown AI '{args.model}'. Choose from: {', '.join(backends)}",
                   file=sys.stderr)
             return 2
+        chain = [backend]
         print(f"[megazword] using {backend.name} (you chose it)", file=sys.stderr)
     else:
         rating = rater(prompt)
-        backend = pick(rating, cfg.route, backends, (statuses or plan_statuses)())
-        if backend is None:
+        chain = candidates(rating, cfg.route, backends, (statuses or plan_statuses)())
+        if not chain:
             print(f"[megazword] no installed AI for a {rating.level} task; "
                   f"check the route in {config.HOME / 'config.toml'}", file=sys.stderr)
             return 1
-        print(f"[megazword] rated {rating.level} ({rating.reason}) -> using {backend.name}",
+        print(f"[megazword] rated {rating.level} ({rating.reason}) -> using {chain[0].name}",
               file=sys.stderr)
 
     memory = Memory(config.HOME, args.project or project_name())
-    result = backend.run(with_context(prompt, memory.context_block()) if args.context else prompt)
-    log.append(cfg.log_path, backend=backend.name, forced=bool(args.model),
-               rating=rating.level if rating else None,
-               rater=rating.source if rating else None,
-               seconds=round(result.seconds, 2), ok=result.ok,
-               prompt_chars=len(prompt), answer_chars=len(result.text))
     first_line = prompt.strip().splitlines()[0][:80]
-    memory.add("done", f"{'ok' if result.ok else 'FAILED'}: {first_line}", by=backend.name)
-    if not result.ok:
-        print(f"[megazword] {backend.name} failed after {result.seconds:.1f}s: {result.error}",
-              file=sys.stderr)
+
+    def on_attempt(name, result, reason):
+        log.append(cfg.log_path, backend=name, forced=bool(args.model),
+                   rating=rating.level if rating else None,
+                   rater=rating.source if rating else None,
+                   seconds=round(result.seconds, 2), ok=result.ok and not reason,
+                   rejected=reason, prompt_chars=len(prompt), answer_chars=len(result.text))
+        memory.add("done", f"{'REJECTED (' + reason + ')' if reason else 'ok'}: {first_line}",
+                   by=name)
+        if reason:
+            print(f"[megazword] {name} rejected after {result.seconds:.1f}s: {reason}",
+                  file=sys.stderr)
+
+    # A forced AI (-m) never escalates; otherwise move up the chain on failure.
+    sent = with_context(prompt, memory.context_block()) if args.context else prompt
+    outcome = escalate(sent, chain, on_attempt=on_attempt)
+    if outcome.result is None:
+        print("[megazword] no AI gave a usable answer", file=sys.stderr)
         return 1
+    result = outcome.result
     print(result.text)
-    print(f"[megazword] {backend.name} answered in {result.seconds:.1f}s", file=sys.stderr)
+    print(f"[megazword] {result.backend} answered in {result.seconds:.1f}s"
+          + (" (after escalating)" if outcome.escalated else ""), file=sys.stderr)
     return 0
 
 

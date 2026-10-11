@@ -61,7 +61,7 @@ def test_unknown_model(capsys, cfg):
 
 def test_failure_is_reported_not_raised(capsys, cfg):
     assert main(["run", "hi", "-m", "fake"], fakes(fail=True), cfg) == 1
-    assert "boom" in capsys.readouterr().err
+    assert "boom" in capsys.readouterr().err  # shown via the rejection reason
 
 
 def test_auto_pick_skips_missing_and_logs(capsys, cfg):
@@ -176,3 +176,27 @@ def test_unknown_window_does_not_block():
     from megazword.usage_sources import PlanUsage, Window
     s = status(PlanUsage("claude", [Window("iguana_necktie", 99.0, None)], "x"))
     assert s.verdict == "unknown" and s.unknown_windows == ["iguana_necktie"]
+
+
+def test_refusal_escalates_to_next(capsys, cfg):
+    cfg.route = {"easy": ["cheap"], "medium": [], "hard": ["strong"]}
+    backends = {"cheap": FakeBackend("cheap", reply="I can't"),
+                "strong": FakeBackend("strong", reply="s")}
+    backends["cheap"]._run = lambda p: "I can't."
+    assert main(["run", "hi"], backends, cfg, rated("easy"), dict) == 0
+    out = capsys.readouterr()
+    assert out.out.startswith("s: hi") and "cheap rejected" in out.err
+    assert "after escalating" in out.err
+
+
+def test_all_fail_returns_1(capsys, cfg):
+    cfg.route = {"easy": ["a", "b"], "medium": [], "hard": []}
+    backends = {"a": FakeBackend("a", fail=True), "b": FakeBackend("b", fail=True)}
+    assert main(["run", "hi"], backends, cfg, rated("easy"), dict) == 1
+    assert "no AI gave a usable answer" in capsys.readouterr().err
+
+
+def test_forced_model_does_not_escalate(capsys, cfg):
+    backends = {"fake": FakeBackend("fake", fail=True), "cheap": FakeBackend("cheap")}
+    assert main(["run", "hi", "-m", "fake"], backends, cfg) == 1
+    assert "cheap" not in capsys.readouterr().err
