@@ -124,12 +124,21 @@ class OllamaBackend(Backend):
         return ollama.generate(prompt, self.model, self.url, timeout=self.timeout)
 
 
-def default_backends() -> dict[str, Backend]:
+def default_backends(edit: bool = False) -> dict[str, Backend]:
+    """The installed-CLI backends. With edit=True the AIs may change files in
+    the current folder: Claude and Grok auto-accept file edits only (other
+    tools still need approval, which a one-shot can't give, so they're
+    refused), and Codex gets its workspace-write sandbox (writes limited to
+    the current folder)."""
+    claude_args = ["-p", "--permission-mode", "acceptEdits"] if edit else ["-p"]
+    codex_sandbox = "workspace-write" if edit else "read-only"
+    grok_args = ["-p", "{prompt}", "--output-format", "plain"]
+    if edit:
+        grok_args += ["--permission-mode", "acceptEdits"]
     backends: list[Backend] = [
-        CLIBackend("claude", exe="claude", args=["-p"]),
+        CLIBackend("claude", exe="claude", args=claude_args),
         CodexBackend("codex", exe="codex",
-                     args=["exec", "--skip-git-repo-check", "-s", "read-only"]),
-        CLIBackend("grok", exe="grok",
-                   args=["-p", "{prompt}", "--output-format", "plain"]),
+                     args=["exec", "--skip-git-repo-check", "-s", codex_sandbox]),
+        CLIBackend("grok", exe="grok", args=grok_args),
     ]
     return {b.name: b for b in backends}

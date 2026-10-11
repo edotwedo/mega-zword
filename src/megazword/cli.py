@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import sys
 from typing import Callable
 
@@ -27,6 +28,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("-c", "--context", action="store_true",
                      help="include this project's memory (decisions, recent activity)")
     run.add_argument("-p", "--project", help="project name (default: current repo/folder)")
+    run.add_argument("-e", "--edit", action="store_true",
+                     help="let the AI change files in the current folder")
 
     for name, help_text in (("note", "save a note to project memory"),
                             ("decide", "record a decision every AI must follow")):
@@ -115,7 +118,8 @@ def main(argv: list[str] | None = None,
          rater: Callable[[str], Rating] | None = None,
          statuses: Callable[[], dict] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    backends = backends if backends is not None else default_backends()
+    if backends is None:
+        backends = default_backends(edit=getattr(args, "edit", False))
     cfg = cfg if cfg is not None else config.load()
     rater = rater if rater is not None else (lambda p: rate(p, cfg.rater_model))
 
@@ -143,7 +147,6 @@ def main(argv: list[str] | None = None,
         return show_usage()
 
     if args.command == "import-hive":
-        from pathlib import Path
         from .hive_import import import_hive
         repo = Path(args.repo)
         if not (repo / "DECISIONS.md").exists() and not (repo / "handoffs").is_dir():
@@ -193,6 +196,8 @@ def main(argv: list[str] | None = None,
             return 1
         print(f"[megazword] rated {rating.level} ({rating.reason}) -> using {chain[0].name}",
               file=sys.stderr)
+    if getattr(args, "edit", False):
+        print(f"[megazword] edit mode: AIs may change files in {Path.cwd()}", file=sys.stderr)
 
     memory = Memory(config.HOME, args.project or project_name())
     sent = with_context(prompt, memory.context_block()) if args.context else prompt

@@ -235,3 +235,12 @@ def test_retry_with_nothing_left(capsys, cfg):
 
 def test_retry_before_any_run(capsys, cfg):
     assert main(["retry"], {}, cfg) == 2
+
+
+def test_edit_mode_backend_args():
+    from megazword.backends import default_backends
+    ro, rw = default_backends(), default_backends(edit=True)
+    assert "acceptEdits" not in ro["claude"].args and "acceptEdits" in rw["claude"].args
+    assert "read-only" in ro["codex"].args and "workspace-write" in rw["codex"].args
+    assert "acceptEdits" in rw["grok"].args and "{prompt}" in rw["grok"].args
+    assert "bypassPermissions" not in " ".join(rw["claude"].args + rw["grok"].args)
