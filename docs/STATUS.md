@@ -37,10 +37,17 @@
   - F3 (Forge): `scripts/smoke.py`: end-to-end with fake CLIs, no network or paid calls. Run after every merge.
   - C3/U1 (Codex Astra): public README; rough est_tokens per run in usage + dashboard; 24h chart counts the whole window.
   - U2 (Forge): `megazword out [<ai> --until 7d|date|--clear]` + dashboard buttons. Also fixed tests touching the real ~/.megazword.
-  - 158 tests, 17/17 smoke checks pass.
+  - F4 (Forge): per-AI `[timeouts]`; a hung AI's whole process tree is killed.
+  - C4 (Codex): OpenRouter + Groq backends (key from env; never routed by default).
+  - F5 (Forge): log/memory line caps (`[limits]`), decisions never trimmed; dashboard Cancel kills the AI's process tree.
+  - F6 (Forge): `megazword stats` + 7-day trend chart on the dashboard.
+  - C5 (Codex): Gemini CLI backend (read-only plan mode, never in edit mode, not routed by default; Gemini isn't installed here).
+  - F7 (Forge): chat Ctrl+C cancels the call, not the chat; `/cost`; persistent history if pyreadline3 is installed.
+  - C6 (Codex, finished by Kestrel review): dashboard Settings panel: route order, timeouts, limits, quality_check; safe config writer (atomic, validates, restores on failure).
+  - 272 tests, 21/21 smoke checks pass.
 
 ## In progress
-- Kestrel: dispatch/merge (heartbeat :13/:43). Forge: F4 timeouts, then F5 log caps. Codex headless: C4 free API backends. Codex tab (Reed-09): review of dashboard/doctor/installer on codex/review (via relay inbox).
+- Kestrel: dispatch/merge (heartbeat :13/:43). Forge: F8 file locking, then F9 compare mode. Codex: OUT of usage until ~2:39 AM (marked out in config until 02:45); Reed-09's review job waits in the relay inbox.
 
 ## Overnight backlog (2026-10-11, Phil asleep; Kestrel assigns)
 Rules: take the top unclaimed item in your lane, write your name next to it,
@@ -72,6 +79,7 @@ Codex (Phil starts Codex sessions; Kestrel may dispatch via
   [route], [grok.<level>].
 
 Unassigned / ideas:
+- U4 Codex's meter showed low usage but Codex (gpt-6-astra) hit its limit at ~00:07. Read the limit error ("try again at <time>") from a failed run and auto-mark the AI out until then.
 - U1 Token/usage estimate per run in the log (chars -> rough tokens) and a
   per-AI "cost" column in usage + dashboard.
 - U2 `megazword out grok --until 2026-10-17` command (edit config from CLI)
