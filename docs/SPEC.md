@@ -100,8 +100,9 @@ the 2026-10-11 overnight run (lanes in STATUS.md, "Beta 2 backlog").
   (`megazword note`), and the next session's prompt includes the latest ones.
 - **Guard rails:** a session has a turn cap (default 12) and stops early
   when every AI is out or over pace; skips AIs marked out; one AI talks at a
-  time; Phil can pause or stop from the tab. Until Phil turns automatic runs
-  back on (workshop BUDGET.md), a session only runs when Phil presses Start.
+  time; Phil can pause or stop from the tab. Automatic runs are allowed again
+  (workshop DECISIONS 2026-10-11), so sessions may start on their own when an
+  AI has spare usage near its reset.
 - **Report to Q:** on session end, a 5-10 line summary is saved to
   `~/.megazword/rooms/summaries/`. `megazword room post-summary` posts the
   latest one to Q (workshop PR #33) with `gh` if it's installed and
@@ -129,6 +130,46 @@ the 2026-10-11 overnight run (lanes in STATUS.md, "Beta 2 backlog").
   scanlines (off by default).
 - Keep everything C9 added: contrast AA, focus rings, labels, live regions,
   44px phone targets. Must still work on a phone over Tailscale.
+
+### S. Sentinel (uptime and security log)
+A watchdog script inside Mega Zword. It uses no AI usage. Phil's call
+(workshop DECISIONS 2026-10-11): someone logs disconnects, logins and
+reboots, and tells Phil when production is hit.
+- **Logs** to `~/.megazword/sentinel.jsonl` (never committed), from Windows
+  event logs plus our own checks:
+  - reboots and shutdowns: System log 6005, 6006, 6008 (unexpected), 1074
+    (who and why), Kernel-Power 41;
+  - logins: Security log 4624 (logged in), 4625 (failed attempt), 4634/4647
+    (logged off). Reading the Security log needs Phil's account in the
+    "Event Log Readers" group (one admin command; the installer can offer it);
+  - network: NetworkProfile/Operational 10000/10001 (connected/disconnected);
+  - AI services: login and network failures already in `log.jsonl`
+    (failures.py), so "Codex lost its login" shows up too.
+- **Production checks:** every 5 minutes, HTTP checks of the URLs in
+  `[sentinel] urls` (default: https://tahomatable.org,
+  https://hive-log.phone-liaison.workers.dev, https://updawg.co).
+- **Contacting Phil:** a production URL failing 2 checks in a row, or coming
+  back, sends a phone push via ntfy (free app, no account; the topic is a
+  random name kept in config.toml, never committed). If the PC itself goes
+  offline it can't send anything, so it also pings a free healthchecks.io
+  check every 5 minutes, and healthchecks.io alerts Phil when the pings stop.
+  Both are opt-in; Phil installs the ntfy app and sets them up once.
+- **Runs** as a Windows scheduled task (at logon and every 5 min), set up by
+  `megazword sentinel install`. CLI: `megazword sentinel status|log|check`.
+  The dashboard gets a Sentinel panel; the daily summary goes to the Hive room.
+
+### C. Calendar and alarms (Google Calendar)
+Dial-In (Grok Bot) owns the calendar lane; Mega Zword gives it and the room
+the data. Proton Calendar is out for now.
+- **Step 1, read:** Phil pastes his Google Calendar "secret address in iCal
+  format" into config.toml (`[calendar] ical_url`, never committed, never
+  printed). `megazword calendar today|week`; Home shows the next events; the
+  room's prompt includes today's schedule so bots don't book work over it.
+- **Step 2, write and alarms:** Google Calendar API with a desktop OAuth
+  login (Phil makes a free OAuth client in Google Cloud once; the token stays
+  in `~/.megazword/`). Add events and reminders from the app or chat.
+  Alarms: a Windows notification plus an ntfy phone push N minutes before an
+  event. Later: hand alarms to Up Dawg? when that app is ready.
 
 ## Open
 - Exact pacing thresholds (tune once it's running).

@@ -21,7 +21,7 @@ Do these in order, in `C:\Users\mrmar\mega-zword`. Put your name and the time in
 4. Verify Gemini: `megazword run -m gemini "say hi"` answers (agy reads the prompt on stdin), and `megazword usage` shows a real gemini bar. If either fails, fix `AGY_ARGS` or `parse_agy_usage` from the real output.
 5. Tag Beta 1 (the cloud proxy blocked it): `git tag -a v0.1.0-beta.1 1e58b2c -m "Mega Zword Beta 1"` then `git push origin v0.1.0-beta.1`.
 
-## Beta 2 backlog (Phil, 2026-10-11; spec: SPEC.md "Beta 2")
+## Beta 2 backlog (Phil, 2026-10-11; spec: SPEC.md "Beta 2", sections R, T, D, S, C)
 Same rules as the overnight run: put your name on an item, work on your own
 branch, small pushes, hand finished branches to Kestrel to merge, tests and
 smoke must pass, no paid calls in tests. Order inside a lane is the order to
@@ -49,9 +49,24 @@ Codex (high-volume seat):
 - B6 Custom title bar and icons for `--app` mode; update GUIDE.md and README
   for tabs and the Hive room once B1-B4 land.
 
-Gemini (agy, new, light jobs only, read-only in Mega Zword):
+Gemini (agy):
 - B7 Review pass: read B1-B6 diffs when they land and post findings to the
   room or STATUS. No code changes.
+
+Forge, after B3/B4 (or Codex if Forge is busy):
+- B8 Sentinel collector: event-log reader (reboots, logins, network),
+  `sentinel.jsonl`, `megazword sentinel status|log`, dashboard panel. Fake
+  event data in tests; no admin needed to run tests.
+- B9 Sentinel alerts: production URL checks, ntfy push, healthchecks.io
+  ping, `megazword sentinel install` (scheduled task), docs for Phil's
+  one-time setup.
+
+Gemini (agy; budget rules are retired, so real work is fine now):
+- B10 Calendar read: `[calendar] ical_url`, `megazword calendar today|week`,
+  Home panel, today's schedule in the room prompt. Parse iCal with the
+  standard library or a small dependency; tests with a sample .ics file.
+- B11 Calendar write and alarms: Google OAuth desktop login, add events,
+  reminders, Windows notification and ntfy push.
 
 Grok: out (maxed) until its reset; on return, room banter tone check and B7
 help.

@@ -3,7 +3,9 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-11
-- Phil wants Beta 2 to add: a bot group chat inside the app (separate from Q, lightweight, bots prompt each other, Phil leads when he speaks, prime directive = work the primary project and use up spare usage, learn from each session, summary to Q), bot-per-tab chats, and a Windows 11 look with Linux/1337 flair. Work split across bots like the overnight run. Room sessions start only when Phil presses Start until automatic runs are back on (workshop BUDGET.md).
+- Workshop BUDGET.md limits are retired (Phil). Automatic runs are allowed; every AI may use its own usage. Two more AIs now have their own usage (Gemini via agy is one).
+- Sentinel: Mega Zword logs disconnects/reconnects, logins and login attempts, and reboots, and alerts Phil when production is hit (SPEC section S). Calendar: Google Calendar, Dial-In's lane, built into Mega Zword (SPEC section C).
+- Phil wants Beta 2 to add: a bot group chat inside the app (separate from Q, lightweight, bots prompt each other, Phil leads when he speaks, prime directive = work the primary project and use up spare usage, learn from each session, summary to Q), bot-per-tab chats, and a Windows 11 look with Linux/1337 flair. Work split across bots like the overnight run. 
 - Phil called Beta 1: everything on the remote merged to main and tagged `v0.1.0-beta.1` (package version 0.1.0b1). Work still on someone's PC goes into the next beta.
 - Kestrel (Claude Code session) is in charge of Mega Zword: owns main, merges and assignments. Other workers use their own branches.
 
