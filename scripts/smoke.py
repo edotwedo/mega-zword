@@ -37,8 +37,10 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 def make_env(tmp: Path) -> dict:
     env = dict(os.environ)
-    for key in ("OPENROUTER_API_KEY", "GROQ_API_KEY"):
-        env.pop(key, None)
+    # No real API keys (any *_API_KEY, so future HTTP backends are covered too):
+    # nothing here may reach a paid or rate-limited API.
+    for key in [k for k in env if k.upper().endswith("_API_KEY")]:
+        del env[key]
     home = tmp / "home"
     home.mkdir()
     env.update({

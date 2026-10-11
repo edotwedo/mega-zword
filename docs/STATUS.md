@@ -94,6 +94,7 @@ Unassigned / ideas:
   prep; keep 127.0.0.1 default).
 
 ## Next step (needs Phil)
+- Morning live check (costs a few dozen tokens per AI): `python scripts/live_check.py --yes-spend`. Runs doctor (stops on FAIL), sends "Reply with exactly: pong" once to each installed, not-out AI via `megazword run -m`, then once via auto-pick, and prints AI / ok / seconds / answer length. Without --yes-spend it only explains itself. Never run by the bots.
 Build step 5: phone access (see SPEC.md). Needs Phil at the PC and phone.
 1. Install Tailscale on PC and phone, sign in to the same account.
 2. Enable Windows OpenSSH Server (admin PowerShell:
