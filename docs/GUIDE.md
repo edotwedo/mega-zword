@@ -201,8 +201,9 @@ megazword dashboard --host 100.101.102.103
 ```
 
 Replace the example address. Open the full URL printed in the terminal on the
-phone. It contains a per-launch token; anyone with that link can run your AIs,
-so keep it private. Remote mode requires the token for reads and changes, and
+phone. It contains a per-launch token. Only devices that can reach the PC over
+your Tailscale network can use it; anyone with both tailnet access and the link
+can run your AIs, so keep the link private. Remote mode requires the token for reads and changes, and
 does not launch a browser automatically. The server refuses `0.0.0.0` and `::`.
 Use Tailscale rather than exposing the dashboard to the public internet.
 
