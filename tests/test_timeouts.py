@@ -47,3 +47,22 @@ def test_chat_survives_a_timeout(tmp_path):
     written = []
     assert chat.run(backends, cfg, rated("easy"), dict,
                     read=lambda _p: next(lines), write=written.append) == 0
+
+
+def test_dashboard_cancel_kills_the_ai_underneath():
+    """The job's child (the AI CLI) keeps printing until it's dead."""
+    from megazword.dashboard import Job
+    tick = "import sys, time\nwhile True:\n    print('tick', flush=True); time.sleep(0.1)"
+    parent = (f"import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', {tick!r}]); "
+              "time.sleep(60)")
+    job = Job("j1", "t", [sys.executable, "-c", parent], "")
+    deadline = time.monotonic() + 10
+    while not job.out and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert job.out, "child never started"
+    job.cancel()
+    time.sleep(1.5)
+    before = len(job.out)
+    time.sleep(1.0)
+    assert len(job.out) == before, "the AI process kept running after cancel"
+    assert "cancelled" in "".join(job.err)

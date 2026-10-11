@@ -57,6 +57,8 @@ class Memory:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(asdict(entry)) + "\n")
+        # Decisions are the rules every AI follows; trimming never drops them.
+        trim(self.path, self.max_lines, protect=lambda line: '"kind": "decision"' in line)
         return entry
 
     def entries(self) -> list[Entry]:

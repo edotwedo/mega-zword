@@ -22,8 +22,10 @@ def test_log_trims_to_newest(tmp_path, monkeypatch):
 def test_small_files_are_left_alone(tmp_path):
     p = tmp_path / "log.jsonl"
     for i in range(30):
-        log.append(p, max_lines=10, backend="x", n=i)
-    assert len(lines(p)) == 30  # under the byte pre-check, no rewrite yet
+        log.append(p, max_lines=20, backend="x", n=i)
+    # 30 lines is past 20 * 1.2, but the file is under the byte pre-check
+    # (20 lines * 120 bytes), so it isn't even read yet.
+    assert len(lines(p)) == 30
 
 
 def test_memory_keeps_every_decision(tmp_path, monkeypatch):

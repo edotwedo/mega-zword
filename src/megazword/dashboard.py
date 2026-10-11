@@ -25,7 +25,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from . import answers, config, runlog
-from .backends import default_backends
+from .backends import _kill_tree, default_backends, process_group
 from .memory import Memory, project_name
 
 USAGE_CACHE_SECONDS = 60
@@ -88,9 +88,10 @@ class Job:
         self.out: list[str] = []
         self.err: list[str] = []
         self.code: int | None = None
+        # Own process group so cancel() also stops the AI CLI underneath.
         self.proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace")
+            text=True, encoding="utf-8", errors="replace", **process_group())
         threading.Thread(target=self._feed, args=(stdin,), daemon=True).start()
         threading.Thread(target=self._pump, args=(self.proc.stdout, self.out),
                          daemon=True).start()
@@ -116,7 +117,7 @@ class Job:
     def cancel(self) -> None:
         if self.code is None:
             self.err.append("[megazword] cancelled from the dashboard\n")
-            self.proc.kill()
+            _kill_tree(self.proc, reap=False)
 
     def view(self) -> dict:
         return {"id": self.id, "label": self.label, "started": self.started,
