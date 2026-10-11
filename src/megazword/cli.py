@@ -14,13 +14,52 @@ from .escalate import escalate, looks_failed
 from .rater import Rating, rate
 
 
+COMMAND_GROUPS = {
+    "Ask": ("run", "chat", "retry"),
+    "See": ("usage", "stats", "advise", "dashboard", "projects", "history"),
+    "Set up": ("init", "doctor", "out", "backends"),
+    "Memory": ("note", "decide", "import-hive"),
+}
+
+
+class CLIParser(argparse.ArgumentParser):
+    def error(self, message):
+        self.exit(2, f"{self.prog}: error: {' '.join(message.split())}\n")
+
+    def format_help(self):
+        sub = next((a for a in self._actions
+                    if isinstance(a, argparse._SubParsersAction)), None)
+        if sub is None:
+            return super().format_help()
+        formatter = self._get_formatter()
+        formatter.add_usage(self.usage, self._actions, self._mutually_exclusive_groups)
+        formatter.add_text(self.description)
+        for group in self._action_groups:
+            actions = [a for a in group._group_actions if a is not sub]
+            if actions:
+                formatter.start_section(group.title)
+                formatter.add_arguments(actions)
+                formatter.end_section()
+        commands = {a.dest: a for a in sub._choices_actions}
+        for title, names in COMMAND_GROUPS.items():
+            formatter.start_section(title)
+            formatter.add_arguments([commands[n] for n in names])
+            formatter.end_section()
+        formatter.add_text(self.epilog)
+        return formatter.format_help()
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = CLIParser(
         prog="megazword",
         description="Run your AI CLIs from one place.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog='Examples:\n  megazword run "Explain this code"\n'
+               '  megazword run -m claude "Review my plan"\n'
+               '  megazword chat\n  megazword out grok --until 7d',
     )
     parser.add_argument("--version", action="version", version=f"megazword {__version__}")
-    sub = parser.add_subparsers(dest="command")  # none: start screen
+    sub = parser.add_subparsers(dest="command", metavar="COMMAND")  # none: start screen
 
     run = sub.add_parser("run", help="run a prompt; picks an AI unless -m is given")
     run.add_argument("prompt", nargs="?", help="the prompt (reads stdin if left out)")
@@ -76,6 +115,8 @@ def build_parser() -> argparse.ArgumentParser:
     retry = sub.add_parser("retry", help="last answer not good enough: ask a stronger AI")
     retry.add_argument("-m", "--model", help="force which AI tries next")
     sub.add_parser("chat", help="start an interactive conversation")
+    for action in sub._choices_actions:
+        sub.choices[action.dest].description = action.help
     return parser
 
 
@@ -255,7 +296,12 @@ def main(argv: list[str] | None = None,
         return run(backends, cfg, rater, statuses or plan_statuses)
 
     # command == "run"
-    prompt = args.prompt if args.prompt is not None else sys.stdin.read()
+    try:
+        prompt = args.prompt if args.prompt is not None else (
+            "" if sys.stdin.isatty() else sys.stdin.read())
+    except (OSError, ValueError):
+        print("No prompt given; pass a prompt or pipe text on stdin.", file=sys.stderr)
+        return 2
     if not prompt.strip():
         print("No prompt given.", file=sys.stderr)
         return 2
@@ -383,6 +429,12 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
 
 def out_command(args, cfg: config.Config) -> int:
     path = config.HOME / "config.toml"
+    if not args.ai and (args.until is not None or args.clear):
+        print("[megazword] name an AI to mark out or clear", file=sys.stderr)
+        return 2
+    if args.ai and args.ai not in default_backends() and args.ai not in cfg.out_until:
+        print(f"[megazword] Unknown AI {args.ai!r}", file=sys.stderr)
+        return 2
     if not args.ai:
         marks = cfg.out_now()
         if not marks:
@@ -396,8 +448,12 @@ def out_command(args, cfg: config.Config) -> int:
     try:
         until = None if args.clear else config.parse_until(args.until)
         config.set_out(path, args.ai, until)
+    except OverflowError:
+        print("[megazword] --until is too far in the future; use 7d, 5h or a date",
+              file=sys.stderr)
+        return 2
     except ValueError as exc:
-        print(f"[megazword] {exc}", file=sys.stderr)
+        print(f"[megazword] {' '.join(str(exc).split())}", file=sys.stderr)
         return 2
     if until:
         print(f"[megazword] {args.ai} marked out until {until.astimezone():%a %b %d %I:%M %p}")

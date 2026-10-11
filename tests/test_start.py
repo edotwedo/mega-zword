@@ -56,3 +56,28 @@ def test_bare_megazword_shows_it(capsys, monkeypatch):
     assert main([]) == 0
     out = capsys.readouterr().out
     assert "meters still loading" in out and "megazword --help" in out
+
+
+def test_long_notes_fit_80_columns_without_cutting_words(tmp_path):
+    import re
+    from textwrap import shorten
+    from megazword.meters import summarize
+
+    note = "No CLI usage meter available; Mega Zword recorded 0 runs in the last 24 hours"
+    meters = [PlanUsage(name, [], "x", note=note)
+              for name in ("claude", "codex", "grok", "gemini", "groq", "openrouter")]
+    summary = summarize(meters[3], {}, NOW).line()
+    assert summary == f"gemini  {shorten(note, width=60, placeholder='...')}"
+    for color in (False, True):
+        text = start.render(cfg_with_runs(tmp_path), meters, NOW, color=color)
+        lines = re.sub(r"\x1b\[[0-9;]*m", "", text).splitlines()
+        assert len(lines) < 25
+        assert all(len(line) <= 80 for line in lines)
+        assert "gemini" in text and "..." in text
+
+
+def test_extra_plans_do_not_overflow_start_screen(tmp_path):
+    meters = [PlanUsage(f"ai{i}", [], "x", note="no meter") for i in range(10)]
+    text = start.render(cfg_with_runs(tmp_path), meters, NOW, color=False)
+    assert len(text.splitlines()) < 25
+    assert "more plans: megazword usage" in text

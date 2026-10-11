@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import threading
+from textwrap import shorten
 from datetime import datetime, timezone
 
 from . import config, runlog
@@ -63,7 +64,13 @@ def render(cfg: config.Config, meters=None, now: datetime | None = None,
             plans = []
     if plans is not None:
         lines.append("Plans:")
-        lines += [f"  {s.line()}" for s in summarize_all(plans, cfg.out_until, now)]
+        summaries = summarize_all(plans, cfg.out_until, now)
+        for summary in summaries[:6]:
+            line = summary.line()
+            lines.append("  " + (line if len(line) <= 78 else
+                                  shorten(line, width=78, placeholder="...")))
+        if len(summaries) > 6:
+            lines.append(f"  {len(summaries) - 6} more plans: megazword usage")
 
     recent = runlog.read(cfg.log_path)[-3:]
     lines += ["", "Last runs:" if recent else "Last runs: none yet"]
@@ -72,6 +79,8 @@ def render(cfg: config.Config, meters=None, now: datetime | None = None,
         lines.append(f"  {_ago(str(r['time']), now):7} {r['backend']:7} {result}")
 
     lines += ["", "Try:"]
-    lines += [f"  megazword {cmd:24} {dim(what)}" for cmd, what in COMMANDS]
+    for cmd, what in COMMANDS:
+        prefix = f"  megazword {cmd:24} "
+        lines.append(prefix + dim(shorten(what, width=80 - len(prefix), placeholder="...")))
     lines.append(dim("  megazword --help for everything else"))
     return "\n".join(lines)
