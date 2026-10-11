@@ -49,6 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+    st = sub.add_parser("stats", help="per-day, per-AI table from the run log")
+    st.add_argument("--days", type=int, default=7)
 
     out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -166,6 +168,11 @@ def main(argv: list[str] | None = None,
 
     if args.command == "usage":
         return show_usage()
+
+    if args.command == "stats":
+        from .stats import daily, table
+        print(table(daily(cfg.log_path, max(1, args.days))))
+        return 0
 
     if args.command == "out":
         return out_command(args, cfg)

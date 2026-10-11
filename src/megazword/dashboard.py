@@ -24,7 +24,7 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from . import answers, config, runlog
+from . import stats, answers, config, runlog
 from .backends import _kill_tree, default_backends, process_group
 from .memory import Memory, project_name
 
@@ -156,6 +156,7 @@ class App:
             "route": self.cfg.route,
             "backends": {n: b.available() for n, b in self.backends.items()},
             "runs": list(reversed(runs)),
+            "trend": stats.trend(self.cfg.log_path),
             "runs_24h": {name: asdict(item) for name, item in
                          runlog.summarize(self.cfg.log_path, timedelta(hours=24), now).items()},
             "memory": [asdict(e) for e in reversed(memory.recent(40))],
