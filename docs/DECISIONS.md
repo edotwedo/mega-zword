@@ -2,6 +2,9 @@
 
 Newest first. Don't reopen these without Phil.
 
+## 2026-10-11
+- Kestrel (Claude Code session) is in charge of Mega Zword: owns main, merges and assignments. Other workers use their own branches.
+
 ## 2026-10-10
 - When Mega Zword launches Grok it sets the model and reasoning effort from the task rating: easy -> grok-4.6 low, medium (coding) -> grok-4.6 medium, hard (design) -> grok-4.7 high. Override in ~/.megazword/config.toml under [grok.<level>]. A forced `-m grok` uses medium. A retry never uses low.
 - Routing: cheapest adequate AI first. Spend a stronger plan's leftover usage only when its reset is close (1h for 5-hour windows, 24h for weekly, >=20% unused).

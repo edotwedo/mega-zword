@@ -1,9 +1,9 @@
 # Status
 
-**Active (2026-10-11 ~00:15), three lanes, don't cross them:**
-- **Forge** (Claude Code, coordinator): main branch, merges, edit mode, reviews.
-- **Kestrel** (Claude Code, 2nd session): `megazword dashboard`, branch claude/dashboard.
-- **Codex**: whatever Forge assigns, always on its own codex/* branch.
+**Active (2026-10-11 ~00:20). Kestrel is in charge (Phil's call):**
+- **Kestrel** (Claude Code): lead. Owns main, decides merges and assignments, also building `megazword dashboard` (claude/dashboard).
+- **Forge** (Claude Code): edit-mode fixes on branch claude/edit-mode; hands finished branches to Kestrel.
+- **Codex**: `megazword doctor` + scripts/install.ps1 on branch codex/doctor (brief from Forge via Phil).
 **Last updated:** 2026-10-10 by Claude Code
 
 ## Done
