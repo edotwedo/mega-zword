@@ -82,17 +82,26 @@ def test_allowed_by_verdict_and_rating():
     assert allowed(unknown, "medium")
 
 
-def test_rank_filters_and_spends_most_under_pace_first():
+def test_rank_filters_and_keeps_cheapest_first():
     statuses = {
         "ahead": PlanStatus("ahead", 20, 70, "hard-only", []),
-        "burn": PlanStatus("burn", -30, 20, "free", []),
         "steady": PlanStatus("steady", -5, 50, "free", []),
         "mystery": PlanStatus("mystery", 0, 0, "unknown", []),
         "empty": PlanStatus("empty", 0, 99, "out", []),
+        "expiring": PlanStatus("expiring", -30, 20, "free", [], burn=True),
     }
-    names = ["steady", "mystery", "empty", "burn", "ahead"]
-    assert rank(statuses, names, "easy", NOW) == ["burn", "steady", "mystery"]
-    assert rank(statuses, names, "hard", NOW) == ["burn", "steady", "ahead", "mystery"]
+    names = ["steady", "mystery", "empty", "ahead", "expiring"]
+    assert rank(statuses, names, "easy", NOW) == ["expiring", "steady", "mystery"]
+    assert rank(statuses, names, "hard", NOW) == ["expiring", "steady", "mystery", "ahead"]
+
+
+def test_burn_only_near_reset_with_leftover():
+    soon = usage("a", window("5-hour", 30, NOW + timedelta(minutes=30)))
+    later = usage("b", window("5-hour", 30, NOW + timedelta(hours=3)))
+    spent = usage("c", window("5-hour", 85, NOW + timedelta(minutes=30)))
+    assert status(soon, NOW).burn
+    assert not status(later, NOW).burn
+    assert not status(spent, NOW).burn
 
 
 def test_rank_preserves_candidate_order_for_equal_pace():

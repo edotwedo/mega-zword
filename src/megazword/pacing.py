@@ -13,6 +13,10 @@ WINDOW_LENGTHS = {
 }
 HARD_ONLY_THRESHOLD = 10.0
 OUT_THRESHOLD = 95.0
+# "Use it or lose it": a window this close to its reset with at least
+# LEFTOVER_MIN percent unused gets spent first, even on easy tasks.
+BURN_BEFORE_RESET = {"5-hour": timedelta(hours=1), "weekly": timedelta(hours=24)}
+LEFTOVER_MIN = 20.0
 
 
 @dataclass
@@ -22,6 +26,7 @@ class PlanStatus:
     max_used_percent: float
     verdict: str
     unknown_windows: list[str]
+    burn: bool = False  # near a reset with usage left over: spend it now
 
 
 def window_length(name: str) -> tuple[timedelta, bool]:
@@ -65,7 +70,17 @@ def status(usage: PlanUsage, now: datetime | None = None) -> PlanStatus:
         verdict = "hard-only"
     else:
         verdict = "free"
-    return PlanStatus(usage.service, max(paces), maximum, verdict, unknown)
+    return PlanStatus(usage.service, max(paces), maximum, verdict, unknown,
+                      burn=verdict == "free" and any(_near_reset(w, now) for w in known))
+
+
+def _near_reset(window: Window, now: datetime | None = None) -> bool:
+    if window.resets_at is None or 100.0 - window.used_percent < LEFTOVER_MIN:
+        return False
+    now = now or datetime.now(timezone.utc)
+    reset = window.resets_at if window.resets_at.tzinfo else         window.resets_at.replace(tzinfo=timezone.utc)
+    key = "5-hour" if window.name == "5-hour" else "weekly"
+    return timedelta(0) <= reset - now <= BURN_BEFORE_RESET[key]
 
 
 def allowed(service_status: PlanStatus, rating: str) -> bool:
@@ -79,7 +94,8 @@ def allowed(service_status: PlanStatus, rating: str) -> bool:
 
 def rank(statuses: dict[str, PlanStatus], candidates: list[str], rating: str,
          now: datetime | None = None) -> list[str]:
-    """Filter candidates and rank by usage left to burn before reset."""
+    """Drop AIs that are out or over pace, then keep the route's order
+    (cheapest first), except plans about to reset with usage left go first."""
     del now  # Statuses are computed with their own explicit reference time.
     # AIs with no meter at all (grok, local models) count as "unknown".
     statuses = {name: statuses.get(name) or PlanStatus(name, 0.0, 0.0, "unknown", [])
@@ -88,9 +104,5 @@ def rank(statuses: dict[str, PlanStatus], candidates: list[str], rating: str,
     order = {name: index for index, name in enumerate(candidates)}
     return sorted(
         eligible,
-        key=lambda name: (
-            statuses[name].verdict == "unknown",
-            statuses[name].worst_pace,
-            order[name],
-        ),
+        key=lambda name: (not statuses[name].burn, order[name]),
     )
