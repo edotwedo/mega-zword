@@ -95,6 +95,8 @@ Codex (Phil starts Codex sessions; Kestrel may dispatch via
 - C3 README: dashboard section, chat section, config reference for [out],
   [route], [grok.<level>].
 
+- F24 (Forge, next): meter consistency. Start screen says "codex no meter" while `usage` shows a Codex snapshot and the dashboard shows it out. One shared summary for all three; show snapshot age ("as of 12:13 AM", stale after 1h); out-marked AIs show "out until X" instead of a bar.
+
 Unassigned / ideas:
 - U4 Codex's meter showed low usage but Codex (gpt-6-astra) hit its limit at ~00:07. Read the limit error ("try again at <time>") from a failed run and auto-mark the AI out until then.
 - U1 Token/usage estimate per run in the log (chars -> rough tokens) and a
