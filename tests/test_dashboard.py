@@ -346,7 +346,7 @@ def test_done_waits_for_output_reader(monkeypatch):
         assert not job.view()["done"]
     finally:
         release.set()
-    deadline = time.monotonic() + 5
+    deadline = time.monotonic() + 30  # upper bound only; returns as soon as ready
     while not job.view()["done"] and time.monotonic() < deadline:
         time.sleep(.01)
     assert job.view()["done"] and job.view()["out"] == "last answer\n"
@@ -424,13 +424,13 @@ def test_cancel_stops_backend_child_too(tmp_path):
                    "subprocess.run([sys.executable, '-c', " + repr(child_code) + "])")
     job = dashboard.Job("tree", "fake backend", [sys.executable, "-c", parent_code], "")
     try:
-        deadline = time.monotonic() + 5
+        deadline = time.monotonic() + 30  # upper bound only; returns as soon as ready
         while not ready.exists() and time.monotonic() < deadline:
             time.sleep(.02)
         assert ready.exists()
     finally:
         job.cancel()
-    deadline = time.monotonic() + 5
+    deadline = time.monotonic() + 30  # upper bound only; returns as soon as ready
     while not job.view()["done"] and time.monotonic() < deadline:
         time.sleep(.02)
     # The descendant inherits the pipes; they reach EOF only when it exits.

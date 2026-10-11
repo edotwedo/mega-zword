@@ -61,8 +61,10 @@ def test_dashboard_cancel_kills_the_ai_underneath():
         time.sleep(0.1)
     assert job.out, "child never started"
     job.cancel()
-    time.sleep(1.5)
-    before = len(job.out)
-    time.sleep(1.0)
-    assert len(job.out) == before, "the AI process kept running after cancel"
+    # The child holds the job's stdout open, and a job only reports done after
+    # its output readers hit end-of-file, so "done" means the child is dead.
+    deadline = time.monotonic() + 30
+    while not job.view()["done"] and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert job.view()["done"], "the AI process kept running after cancel"
     assert "cancelled" in "".join(job.err)

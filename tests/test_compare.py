@@ -26,13 +26,21 @@ def cfg(tmp_path):
     return config.Config(log_path=tmp_path / "log.jsonl")
 
 
+@dataclass
+class MeetUp(FakeBackend):
+    """Answers only once all three AIs are running at the same moment. If
+    compare ran them one after another, the barrier would time out."""
+    barrier: threading.Barrier = None
+
+    def _run(self, prompt):
+        self.barrier.wait(timeout=20)
+        return super()._run(prompt)
+
+
 def test_runs_in_parallel_and_prints_each(cfg, capsys):
-    backends = {n: Slow(n, reply=n.upper(), delay=1.0) for n in "abc"}
-    start = time.monotonic()
+    barrier = threading.Barrier(3)
+    backends = {n: MeetUp(n, reply=n.upper(), barrier=barrier) for n in "abc"}
     assert main(["run", "hi", "--compare", "a,b,c"], backends, cfg) == 0
-    # Three 1s calls at once take ~1s; in a row they'd take 3s. Wide margin
-    # so a busy machine doesn't make this flaky.
-    assert time.monotonic() - start < 2.5
     out = capsys.readouterr().out
     for name in "abc":
         assert f"=== {name} · " in out and f"{name.upper()}: " in out
