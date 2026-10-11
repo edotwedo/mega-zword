@@ -1,6 +1,6 @@
 # Status
 
-**Active:** none
+**Active:** Claude Code, since 2026-10-10 22:15 (building step 1)
 **Last updated:** 2026-10-10 by Claude Code
 
 ## Done
