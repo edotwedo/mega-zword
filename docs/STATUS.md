@@ -66,7 +66,8 @@
   - C8 (Codex): grouped `--help` with examples; one-line errors instead of tracebacks; start screen fits 80 columns.
   - C9 (Codex): dashboard accessibility (contrast AA, focus rings, labels, live regions, chart text summaries, 44px phone targets).
   - C10 (Codex): `megazword export [-p P] [--since 7d] [--out FILE]` Markdown report.
-  - 516 tests, 27/27 smoke checks pass.
+  - F25 part 1 (Forge): start screen no longer prints "Plans:" twice; export escapes only what Markdown needs; export always writes UTF-8 (a Windows `>` redirect wrote cp1252 and crashed on emoji).
+  - 516+ tests, 27/27 smoke checks pass.
 
 ## In progress
 - Kestrel: dispatch/merge (heartbeat :13/:43). Forge: F22. Codex: OUT until ~2:39 AM; then Reed-09 does C7 (docs/GUIDE.md + SPEC status), queued in relay inbox.
@@ -103,6 +104,12 @@ Codex (Phil starts Codex sessions; Kestrel may dispatch via
 - F24 (Forge, next): meter consistency. Start screen says "codex no meter" while `usage` shows a Codex snapshot and the dashboard shows it out. One shared summary for all three; show snapshot age ("as of 12:13 AM", stale after 1h); out-marked AIs show "out until X" instead of a bar.
 
 - Nit: export escapes the hyphen in the title ("mega\-zword"); only escape where Markdown needs it.
+
+- F25 leftovers (dashboard, found by Forge, not fixed yet):
+  (a) #jobs has aria-live and is re-rendered every 0.8s, so screen readers re-announce constantly. Drop it; announce only on job finish via an sr-only status region.
+  (b) renderJob keeps focus only on Cancel; focus on copy/vote/answer is lost every poll.
+  (c) load() rebuilds the #model select every 30s even while it's focused or open; skip when it's document.activeElement.
+- Flaky: one dashboard test failed once with a connection error, passed on rerun.
 
 Unassigned / ideas:
 - U4 Codex's meter showed low usage but Codex (gpt-6-astra) hit its limit at ~00:07. Read the limit error ("try again at <time>") from a failed run and auto-mark the AI out until then.
