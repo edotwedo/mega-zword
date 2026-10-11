@@ -104,3 +104,43 @@ def _clip(text: str, limit: int) -> str:
 
 def with_context(prompt: str, block: str) -> str:
     return f"{block}\n\n[Task]\n{prompt}" if block else prompt
+
+
+# --- listing and choosing projects ---------------------------------------
+
+SAFE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
+
+
+@dataclass
+class ProjectInfo:
+    name: str
+    entries: int
+    decisions: int
+    last: str  # time of the newest entry, "" if none
+
+
+def list_projects(home: Path) -> list[ProjectInfo]:
+    """Every project folder under ~/.megazword/projects, newest activity first."""
+    root = home / "projects"
+    if not root.is_dir():
+        return []
+    found = []
+    for folder in root.iterdir():
+        if not folder.is_dir() or not SAFE_NAME.fullmatch(folder.name):
+            continue
+        entries = Memory(home, folder.name).entries()
+        found.append(ProjectInfo(folder.name, len(entries),
+                                 sum(e.kind == "decision" for e in entries),
+                                 max((e.time for e in entries), default="")))
+    return sorted(found, key=lambda p: (p.last, p.name), reverse=True)
+
+
+def check_project(home: Path, name: object, allowed: set[str] = frozenset()) -> str:
+    """`name` if it's a safe project name that exists (or is in `allowed`,
+    e.g. the launch project before it has any entries); else ValueError.
+    The regex alone already rules out "..", slashes and drive letters."""
+    if not isinstance(name, str) or not SAFE_NAME.fullmatch(name):
+        raise ValueError("bad project name")
+    if name not in allowed and not (home / "projects" / name).is_dir():
+        raise ValueError(f"no project named {name!r}")
+    return name

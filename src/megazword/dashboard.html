@@ -114,6 +114,7 @@ details.ans-item .qfull { color: var(--dim); margin-top: 6px; }
 <body>
 <header>
   <h1><b>MEGA</b> ZWORD</h1>
+  <label class="meta">project <select id="project" title="Memory, notes, runs and answers follow this project"></select></label>
   <span class="meta" id="meta">loading…</span>
   <button id="refresh" title="Re-read the usage meters now">↻ Refresh meters</button>
 </header>
@@ -498,9 +499,28 @@ async function watch(id) {
   load();
 }
 
+// "" means the project the dashboard was launched in.
+let project = "";
+
+function renderProjects(s) {
+  const sel = $("project");
+  const names = s.projects || [s.project];
+  sel.innerHTML = names.map(n => `<option value="${esc(n === s.launch_project ? "" : n)}" ${n === s.project ? "selected" : ""}>${esc(n)}${n === s.launch_project ? " (here)" : ""}</option>`).join("");
+}
+$("project").onchange = () => { project = $("project").value; load(); };
+
 async function load(refresh) {
   try {
-    state = await (await fetch("/api/state" + (refresh ? "?refresh=1" : ""))).json();
+    const q = new URLSearchParams();
+    if (refresh) q.set("refresh", "1");
+    if (project) q.set("project", project);
+    const r = await fetch("/api/state" + (q.toString() ? "?" + q : ""));
+    const got = await r.json();
+    if (!r.ok) {  // e.g. the chosen project folder was deleted: go back to the default
+      toast(got.error || "could not load"); project = ""; return load(refresh);
+    }
+    state = got;
+    renderProjects(state);
   } catch { $("meta").textContent = "dashboard server stopped"; return; }
   const sel = $("model"), cur = sel.value;
   sel.innerHTML = '<option value="">auto (route + pacing)</option>' + Object.entries(state.backends)
@@ -521,7 +541,7 @@ async function send() {
       ? [...$("cmppicks").querySelectorAll("input:checked")].map(i => i.value) : [];
     if ($("compare").checked && (compare.length < 2 || compare.length > 3))
       throw new Error("pick 2 or 3 AIs to compare");
-    const {job} = await post("/api/run", {prompt, model: $("model").value, context: $("context").checked, compare});
+    const {job} = await post("/api/run", {prompt, model: $("model").value, context: $("context").checked, compare, project});
     $("prompt").value = ""; watch(job);
   } catch (e) { toast(e.message); }
   $("send").disabled = false;
@@ -535,11 +555,11 @@ $("jobs").addEventListener("click", async e => {
 $("send").onclick = send;
 $("compare").onchange = renderComparePicks;
 $("prompt").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(); });
-$("retry").onclick = async () => { try { const {job} = await post("/api/retry", {model: $("model").value}); watch(job); }
+$("retry").onclick = async () => { try { const {job} = await post("/api/retry", {model: $("model").value, project}); watch(job); }
   catch (e) { toast(e.message); } };
 $("addnote").onclick = async () => {
   const text = $("note").value.trim(); if (!text) return;
-  try { await post("/api/note", {text, decision: $("isdecision").checked}); $("note").value = ""; load(); }
+  try { await post("/api/note", {text, decision: $("isdecision").checked, project}); $("note").value = ""; load(); }
   catch (e) { toast(e.message); } };
 $("refresh").onclick = () => load(true);
 load();

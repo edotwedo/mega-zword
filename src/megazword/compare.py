@@ -50,6 +50,7 @@ def run(sent: str, prompt: str, names: list[str], backends: dict[str, Backend],
         if not r.ok:
             auto_mark_out(r.backend, r.error, cfg)
         log.append(cfg.log_path, cfg.log_lines, backend=r.backend, forced=True, compare=True,
+                   project=memory.project,
                    rating=level, rater=None, seconds=round(r.seconds, 2), ok=r.ok,
                    rejected=None if r.ok else f"failed: {r.error}"[:200],
                    prompt_chars=len(prompt), answer_chars=len(r.text),

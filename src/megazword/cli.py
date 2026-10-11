@@ -51,6 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+    sub.add_parser("projects", help="list projects with memory entries and last activity")
     sub.add_parser("advise", help="suggest a route order from stats and votes (changes nothing)")
     st = sub.add_parser("stats", help="per-day, per-AI table from the run log")
     st.add_argument("--days", type=int, default=7)
@@ -173,6 +174,18 @@ def main(argv: list[str] | None = None,
 
     if args.command == "usage":
         return show_usage()
+
+    if args.command == "projects":
+        from .memory import list_projects
+        found = list_projects(config.HOME)
+        if not found:
+            print("[megazword] no projects yet; they appear after a run, note or decision")
+            return 0
+        print("project              entries  decisions  last activity")
+        for p in found:
+            last = p.last[:16].replace("T", " ") if p.last else "-"
+            print(f"{p.name[:20]:20} {p.entries:7}  {p.decisions:9}  {last}")
+        return 0
 
     if args.command == "advise":
         from . import advise
@@ -306,7 +319,7 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
     def on_attempt(name, result, reason):
         if not result.ok:
             auto_mark_out(name, result.error, cfg)
-        log.append(cfg.log_path, cfg.log_lines, backend=name, forced=forced,
+        log.append(cfg.log_path, cfg.log_lines, backend=name, forced=forced, project=memory.project,
                    rating=rating.level if rating else None,
                    rater=rating.source if rating else None,
                    seconds=round(result.seconds, 2), ok=result.ok and not reason,

@@ -34,21 +34,22 @@ def add(prompt: str, answer: str, backend: str, project: str, rating: str | None
         write_atomic(p, "\n".join(lines) + "\n")
 
 
-def recent(n: int = 20) -> list[dict]:
-    """Newest first; skips damaged lines and non-object records."""
+def recent(n: int = 20, project: str | None = None) -> list[dict]:
+    """Newest first; skips damaged lines and non-object records. With
+    `project`, only that project's answers."""
     p = path()
     if not p.exists():
         return []
     # Windows can't os.replace a file another process has open, so readers
     # take the same lock as writers.
     with locked(p):
-        lines = p.read_text(encoding="utf-8", errors="replace").splitlines()[-n:]
+        lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
     out = []
     for line in lines:
         try:
             record = json.loads(line)
         except ValueError:
             continue
-        if isinstance(record, dict):
+        if isinstance(record, dict) and (project is None or record.get("project") == project):
             out.append(record)
-    return list(reversed(out))
+    return list(reversed(out[-n:]))

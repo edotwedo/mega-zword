@@ -27,7 +27,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import advise, stats, answers, config, runlog
 from .backends import _kill_tree, default_backends, process_group
-from .memory import Memory, project_name
+from .memory import Memory, check_project, list_projects, project_name
 
 USAGE_CACHE_SECONDS = 60
 MAX_JOBS = 50
@@ -151,16 +151,28 @@ class App:
         self._jobs_lock = threading.Lock()
         self._n = 0
 
+    def project_for(self, value: object) -> str:
+        """The project a request asks for (default: the launch project).
+        Only safe names of existing project folders are accepted."""
+        if value in (None, ""):
+            return self.project
+        return check_project(config.HOME, value, {self.project})
+
     # --- reads -----------------------------------------------------------
-    def state(self, refresh: bool = False) -> dict:
+    def state(self, refresh: bool = False, project: object = None) -> dict:
         now = datetime.now(timezone.utc)
-        runs = runlog.read(self.cfg.log_path)[-60:]
-        memory = Memory(config.HOME, self.project, self.cfg.memory_lines)
+        project = self.project_for(project)
+        # Runs logged before projects were recorded show under the launch project.
+        runs = [r for r in runlog.read(self.cfg.log_path)
+                if r.get("project", self.project) == project][-60:]
+        memory = Memory(config.HOME, project, self.cfg.memory_lines)
         with self._jobs_lock:
             jobs = list(self.jobs.values())
         return {
             "now": now.isoformat(),
-            "project": self.project,
+            "project": project,
+            "launch_project": self.project,
+            "projects": sorted({p.name for p in list_projects(config.HOME)} | {self.project}),
             "usage": self.usage.get(force=refresh),
             "out": {n: t.isoformat() for n, t in self.cfg.out_until.items() if t > now},
             "route": self.cfg.route,
@@ -172,7 +184,7 @@ class App:
             "runs_24h": {name: asdict(item) for name, item in
                          runlog.summarize(self.cfg.log_path, timedelta(hours=24), now).items()},
             "memory": [asdict(e) for e in reversed(memory.recent(40))],
-            "answers": answers.recent(20),
+            "answers": answers.recent(20, project),
             "jobs": [j.view() for j in reversed(jobs)][:10],
         }
 
@@ -218,7 +230,7 @@ class App:
         prompt = str(body.get("prompt", "")).strip()
         if not prompt:
             raise ValueError("empty prompt")
-        args = ["run", "-p", self.project]
+        args = ["run", "-p", self.project_for(body.get("project"))]
         model = body.get("model") or ""
         picks = [str(n) for n in body.get("compare") or []]
         if picks:
@@ -237,6 +249,7 @@ class App:
         return self._start(prompt[:80], args, prompt)
 
     def retry(self, body: dict) -> dict:
+        self.project_for(body.get("project"))  # validate; retry reuses the last run's project
         args = ["retry"]
         model = body.get("model") or ""
         if model:
@@ -278,7 +291,8 @@ class App:
         if not text:
             raise ValueError("empty note")
         kind = "decision" if body.get("decision") else "note"
-        Memory(config.HOME, self.project, self.cfg.memory_lines).add(kind, text, "phil")
+        Memory(config.HOME, self.project_for(body.get("project")),
+               self.cfg.memory_lines).add(kind, text, "phil")
         return {"ok": True}
 
 
@@ -350,7 +364,12 @@ def make_handler(app: App, port: int, remote: bool = False):
                 self.wfile.write(body)
                 return
             if path == "/api/state":
-                return self._json(200, app.state(refresh="refresh=1" in self.path))
+                query = parse_qs(urlsplit(self.path).query)
+                try:
+                    return self._json(200, app.state(refresh=query.get("refresh") == ["1"],
+                                                     project=(query.get("project") or [None])[0]))
+                except ValueError as exc:
+                    return self._json(400, {"error": str(exc)})
             if path.startswith("/api/job/"):
                 job = app.jobs.get(path.rsplit("/", 1)[-1])
                 return self._json(200, job.view()) if job else self._json(404, {})
