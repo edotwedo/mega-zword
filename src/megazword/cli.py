@@ -341,11 +341,11 @@ def last_run_path():
 
 def save_last_run(sent, prompt, chain, backend, answer, project, level) -> None:
     import json
-    path = last_run_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"sent": sent, "prompt": prompt, "chain": chain,
-                                "backend": backend, "answer": answer,
-                                "project": project, "rating": level}), encoding="utf-8")
+    from .filelock import write_atomic
+    # Atomic: a parallel job finishing at the same time can't leave half a file.
+    write_atomic(last_run_path(), json.dumps({"sent": sent, "prompt": prompt, "chain": chain,
+                                              "backend": backend, "answer": answer,
+                                              "project": project, "rating": level}))
     from . import answers
     answers.add(prompt, answer, backend, project, level)
 
