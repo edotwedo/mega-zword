@@ -55,3 +55,15 @@ def test_doctor_fails_for_bad_config_and_log(tmp_path, monkeypatch):
     assert any(c.name == "log" and c.level == "FAIL" for c in results)
     monkeypatch.setattr(doctor.config, "HOME", tmp_path)
     assert doctor.run() == 1
+
+
+def test_doctor_free_keys_and_routes(tmp_path, monkeypatch):
+    fake_external(monkeypatch)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "secret-test-credential")
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    (tmp_path / "config.toml").write_text('[route]\neasy = ["openrouter", "groq"]\n')
+    lines = [item.line() for item in doctor.checks(tmp_path)]
+    assert lines.count("OK openrouter: key set") == 1
+    assert lines.count("WARN groq: key not set") == 1
+    assert "OK routes: known backends only" in lines
+    assert "secret-test-credential" not in "\n".join(lines)
