@@ -90,7 +90,7 @@ def show_usage() -> int:
     print("\nMega Zword runs (last 24h)")
     runs = summarize(config.HOME / "log.jsonl", timedelta(hours=24))
     print("AI      runs ok rej/bad sec chars est_tokens")
-    for name in ("claude", "codex", "grok"):
+    for name in ("claude", "codex", "grok", "gemini"):
         item = runs.get(name)
         if item:
             chars = item.prompt_chars + item.answer_chars
@@ -222,6 +222,10 @@ def main(argv: list[str] | None = None,
     if args.model:
         apply_grok_effort(backends, "medium", cfg.grok)
         backend = backends.get(args.model)
+        if backend is None and args.edit and args.model == "gemini":
+            print("[megazword] Gemini edit mode is disabled (folder-contained writes "
+                  "are unverified); use claude or codex for --edit", file=sys.stderr)
+            return 2
         if backend is None and args.edit and args.model == "grok":
             print("[megazword] Grok can't edit files safely on Windows (no sandbox); "
                   "use claude or codex for --edit", file=sys.stderr)

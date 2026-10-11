@@ -2,7 +2,7 @@
 
 Runs every main feature (backends, init, run, escalation, retry, -m, memory,
 usage, chat, dashboard API) in a throwaway home folder with fake claude /
-codex / grok programs first on PATH. No paid calls, no network, and nothing
+codex / grok / gemini programs first on PATH. No paid calls, no network, and nothing
 touches your real ~/.megazword or CLI logins.
 
     python scripts/smoke.py          (or scripts/smoke.ps1)
@@ -129,8 +129,8 @@ def main() -> int:
     env = make_env(tmp)
     try:
         r = mz(env, work, "backends")
-        check("backends finds all three fakes",
-              r.returncode == 0 and r.stdout.count("installed") == 3, r.stdout + r.stderr)
+        check("backends finds all four fakes",
+              r.returncode == 0 and r.stdout.count("installed") == 4, r.stdout + r.stderr)
 
         r = mz(env, work, "init")
         check("init writes a config", r.returncode == 0 and (tmp / "mz" / "config.toml").exists(),
@@ -157,6 +157,11 @@ def main() -> int:
               r.returncode == 0 and "[fake codex] ok: forced" in r.stdout, r.stdout + r.stderr)
 
         mz(env, work, "decide", "Smoke tests stay free")
+        r = mz(env, work, "run", "-m", "gemini", stdin="x" * 50_000 + "\nGemini stdin sentinel")
+        check("Gemini receives long prompts over stdin in read-only mode",
+              r.returncode == 0 and "[fake gemini] ok: Gemini stdin sentinel" in r.stdout,
+              r.stdout + r.stderr)
+
         mz(env, work, "note", "a note")
         r = mz(env, work, "history")
         check("decide / note / history", "Smoke tests stay free" in r.stdout

@@ -34,7 +34,7 @@ def checks(home: Path | None = None) -> list[Check]:
                            "install Python 3.11 or newer"))
     found.append(Check("OK", "megazword", __version__))
 
-    for name in ("claude", "codex", "grok"):
+    for name in ("claude", "codex", "grok", "gemini"):
         path = shutil.which(name)
         if not path:
             found.append(Check("WARN", name, "not on PATH", f"install {name} or add it to PATH"))
@@ -74,11 +74,11 @@ def checks(home: Path | None = None) -> list[Check]:
                        "review [out] in config.toml" if active else ""))
     from .backends import DEFAULT_TIMEOUT
     waits = ", ".join(f"{n} {cfg.timeouts.get(n, DEFAULT_TIMEOUT)}s"
-                      for n in ("claude", "codex", "grok"))
+                      for n in ("claude", "codex", "grok", "gemini"))
     short = [n for n, t in cfg.timeouts.items() if t < 60]
     found.append(Check("WARN" if short else "OK", "timeouts", waits,
                        f"under 60s may cut off real work: {', '.join(short)}" if short else ""))
-    known = {"claude", "codex", "grok", "openrouter", "groq"}
+    known = {"claude", "codex", "grok", "gemini", "openrouter", "groq"}
     unknown = sorted({name for route in cfg.route.values() for name in route
                       if name not in known})
     found.append(Check("WARN" if unknown else "OK", "routes",
