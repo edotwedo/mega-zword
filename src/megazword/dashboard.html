@@ -253,8 +253,11 @@ function renderJob(j) {
   let el = document.getElementById("job-" + j.id);
   if (!el) { el = document.createElement("div"); el.className = "job"; el.id = "job-" + j.id;
     $("jobs").prepend(el); }
+  const secs = Math.max(0, Math.round((Date.now() - new Date(j.started)) / 1000));
   el.innerHTML = `<div class="err">${j.done ? (j.code === 0 ? "✓" : "✗") : '<span class="spin"></span>'}
-    <b>${esc(j.label)}</b><pre>${esc(j.err.trim())}</pre></div>
+    <b>${esc(j.label)}</b>${j.done ? "" : ` <span class="t">${secs}s</span>
+    <button class="cancel" data-job="${esc(j.id)}" style="padding:1px 8px;font-size:12px">Cancel</button>`}
+    <pre>${esc(j.err.trim())}</pre></div>
     ${j.out ? `<div class="ans"><pre>${esc(j.out.trim())}</pre></div>` : ""}`;
 }
 
@@ -295,6 +298,11 @@ async function send() {
   $("send").disabled = false;
 }
 
+$("jobs").addEventListener("click", async e => {
+  const b = e.target.closest("button.cancel"); if (!b) return;
+  b.disabled = true;
+  try { await post("/api/cancel", {job: b.dataset.job}); } catch (err) { toast(err.message); }
+});
 $("send").onclick = send;
 $("prompt").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(); });
 $("retry").onclick = async () => { try { const {job} = await post("/api/retry", {model: $("model").value}); watch(job); }

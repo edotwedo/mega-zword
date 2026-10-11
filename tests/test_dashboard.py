@@ -24,6 +24,10 @@ class FakeBackend:
 class FakeJob:
     def __init__(self, job_id, label, cmd, stdin):
         self.id, self.label, self.cmd, self.stdin = job_id, label, cmd, stdin
+        self.cancelled = False
+
+    def cancel(self):
+        self.cancelled = True
 
     def view(self):
         return {"id": self.id, "label": self.label, "out": "answer", "err": "",
@@ -130,3 +134,24 @@ def test_answers_saved_trimmed_and_shown(app):
     got = answers.recent()
     assert [a["prompt"] for a in got] == ["q4", "q3", "q2"]
     assert app.state()["answers"][0]["answer"] == "a4"
+
+
+def test_cancel_job(app):
+    job = app.run({"prompt": "long task"})["job"]
+    app.cancel({"job": job})
+    assert app.jobs[job].cancelled
+    with pytest.raises(ValueError):
+        app.cancel({"job": "nope"})
+
+
+def test_real_job_cancel_kills_process():
+    import sys
+    import time
+    job = dashboard.Job("j1", "sleep", [sys.executable, "-c", "import time; time.sleep(30)"], "")
+    job.cancel()
+    for _ in range(50):
+        if job.view()["done"]:
+            break
+        time.sleep(0.1)
+    v = job.view()
+    assert v["done"] and v["code"] != 0 and "cancelled" in v["err"]

@@ -110,6 +110,11 @@ class Job:
     def _wait(self) -> None:
         self.code = self.proc.wait()
 
+    def cancel(self) -> None:
+        if self.code is None:
+            self.err.append("[megazword] cancelled from the dashboard\n")
+            self.proc.kill()
+
     def view(self) -> dict:
         return {"id": self.id, "label": self.label, "started": self.started,
                 "out": "".join(self.out), "err": "".join(self.err),
@@ -184,6 +189,13 @@ class App:
             args += ["-m", model]
         return self._start("retry: " + (model or "stronger AI"), args)
 
+    def cancel(self, body: dict) -> dict:
+        job = self.jobs.get(str(body.get("job", "")))
+        if job is None:
+            raise ValueError("no such job")
+        job.cancel()
+        return {"ok": True}
+
     def note(self, body: dict) -> dict:
         text = str(body.get("text", "")).strip()
         if not text:
@@ -240,7 +252,7 @@ def make_handler(app: App, port: int):
                 length = min(int(self.headers.get("Content-Length", 0)), 1_000_000)
                 body = json.loads(self.rfile.read(length) or b"{}")
                 action = {"/api/run": app.run, "/api/retry": app.retry,
-                          "/api/note": app.note}.get(self.path)
+                          "/api/note": app.note, "/api/cancel": app.cancel}.get(self.path)
                 if action is None:
                     return self._json(404, {"error": "not found"})
                 return self._json(200, action(body))
