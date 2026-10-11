@@ -182,14 +182,14 @@ def main(argv: list[str] | None = None,
             print(f"[megazword] {repo} doesn't look like a Hive repo "
                   "(no DECISIONS.md or handoffs/)", file=sys.stderr)
             return 2
-        memory = Memory(config.HOME, args.project)
+        memory = Memory(config.HOME, args.project, cfg.memory_lines)
         decisions, handoffs = import_hive(repo, memory)
         print(f"[megazword] imported {decisions} decisions and {handoffs} open handoffs "
               f"into '{memory.project}' memory (old repo not changed)", file=sys.stderr)
         return 0
 
     if args.command in ("note", "decide", "history"):
-        memory = Memory(config.HOME, args.project or project_name())
+        memory = Memory(config.HOME, args.project or project_name(), cfg.memory_lines)
         if args.command == "history":
             for e in memory.recent(args.n):
                 print(f"{e.time[:16]}  {e.by:8} {e.kind:8} {e.text}")
@@ -242,7 +242,7 @@ def main(argv: list[str] | None = None,
     if getattr(args, "edit", False):
         print(f"[megazword] edit mode: AIs may change files in {Path.cwd()}", file=sys.stderr)
 
-    memory = Memory(config.HOME, args.project or project_name())
+    memory = Memory(config.HOME, args.project or project_name(), cfg.memory_lines)
     sent = with_context(prompt, memory.context_block()) if args.context else prompt
     # A forced AI (-m) never escalates; otherwise move up the chain on failure.
     return execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))
@@ -265,7 +265,7 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         b.timeout = cfg.timeouts.get(b.name, b.timeout)
 
     def on_attempt(name, result, reason):
-        log.append(cfg.log_path, backend=name, forced=forced,
+        log.append(cfg.log_path, cfg.log_lines, backend=name, forced=forced,
                    rating=rating.level if rating else None,
                    rater=rating.source if rating else None,
                    seconds=round(result.seconds, 2), ok=result.ok and not reason,
@@ -347,7 +347,7 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
         print("[megazword] nothing to retry yet; run something first", file=sys.stderr)
         return 2
     last = json.loads(path.read_text(encoding="utf-8"))
-    memory = Memory(config.HOME, last["project"])
+    memory = Memory(config.HOME, last["project"], cfg.memory_lines)
     level = last.get("rating") or "medium"
     if level == "easy":
         level = "medium"  # a retry is real work, not a status pass

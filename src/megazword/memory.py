@@ -16,7 +16,10 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .log import trim
+
 KINDS = ("note", "decision", "done")
+DEFAULT_MEMORY_LINES = 2000
 
 
 @dataclass
@@ -41,8 +44,9 @@ def project_name(cwd: Path | None = None) -> str:
 
 
 class Memory:
-    def __init__(self, home: Path, project: str):
+    def __init__(self, home: Path, project: str, max_lines: int = DEFAULT_MEMORY_LINES):
         self.project = project
+        self.max_lines = max_lines
         self.path = home / "projects" / project / "memory.jsonl"
 
     def add(self, kind: str, text: str, by: str = "phil", time: str | None = None) -> Entry:

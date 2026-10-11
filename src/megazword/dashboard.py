@@ -146,7 +146,7 @@ class App:
     def state(self, refresh: bool = False) -> dict:
         now = datetime.now(timezone.utc)
         runs = runlog.read(self.cfg.log_path)[-60:]
-        memory = Memory(config.HOME, self.project)
+        memory = Memory(config.HOME, self.project, self.cfg.memory_lines)
         return {
             "now": now.isoformat(),
             "project": self.project,
@@ -216,7 +216,7 @@ class App:
         if not text:
             raise ValueError("empty note")
         kind = "decision" if body.get("decision") else "note"
-        Memory(config.HOME, self.project).add(kind, text, "phil")
+        Memory(config.HOME, self.project, self.cfg.memory_lines).add(kind, text, "phil")
         return {"ok": True}
 
 

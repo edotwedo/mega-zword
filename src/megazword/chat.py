@@ -52,7 +52,7 @@ def run(backends: dict[str, Backend], cfg: config.Config,
     """Run chat until /quit or terminal EOF/interrupt. Input and output are injectable."""
     from . import cli
 
-    memory = Memory(config.HOME, project or project_name())
+    memory = Memory(config.HOME, project or project_name(), cfg.memory_lines)
     turns: list[tuple[str, str]] = []
     pinned: str | None = None
     use_context = False
