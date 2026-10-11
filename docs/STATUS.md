@@ -5,6 +5,7 @@
 
 ## Done
 - Repo created with handoff rules (AGENTS.md), spec, status and decision log.
+- Repo made public; AGPL-3.0 license and README added.
 
 ## In progress
 - Nothing.

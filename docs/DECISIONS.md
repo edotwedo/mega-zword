@@ -3,6 +3,7 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-10
+- Repo is public. License: AGPL-3.0 for all versions before 1.0. Phil may choose different terms for 1.0+; to keep that option, outside contributions need a contributor agreement before merging (not set up yet).
 - Name is **Mega Zword**; terminal command `megazword`.
 - Mega Zword replaces the whole Hive coordination system; it doesn't build on it.
 - CLI first, usable from the phone via Tailscale + SSH. Dashboard window later.
