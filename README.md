@@ -195,7 +195,7 @@ Configuration, run logs, and project notes live in `~/.megazword` (on Windows, `
 
 ## License
 
-GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](LICENSE). Versions before 1.0 stay AGPL-3.0.
+Proprietary, all rights reserved. Use only with written permission from the owner. See [LICENSE](LICENSE).
 
 ## Optional free API backends
 

@@ -21,7 +21,7 @@ on it. The old system is only a place to copy open work from, then retire.
 | Mid-task | Escalate on failure: start with the cheapest adequate model, move up if it fails or Phil rejects the answer. Mega Zword passes the context along itself. |
 | Low usage | Reset-aware pacing ("use it or lose it"): compare % used with % of time elapsed in each plan's window. Under pace: spend freely. Over pace: paid plans only take hard tasks. |
 | Coordination | Mega Zword assigns work, keeps shared project memory and a who-did-what log, and does handoffs itself. |
-| Language / repo | Python, public repo edotwedo/mega-zword, AGPL-3.0 before 1.0. |
+| Language / repo | Python, private repo edotwedo/mega-zword, proprietary (all rights reserved; Phil shares it with whom he chooses). |
 
 ## Hardware
 - PC: GTX 1660 (6 GB VRAM). Good for the small difficulty-rating model and 7-8B
