@@ -4,7 +4,7 @@
 
 Mega Zword is a Python command line tool that routes prompts to installed AI command line tools such as Claude Code, Codex, and Grok. It rates task difficulty, tracks its own runs, checks available plan usage, and tries another AI when one fails.
 
-Gemini CLI is optional: use `megazword run -m gemini` with a prompt on stdin after installing and logging in. It uses Gemini's read-only plan mode (requires a version supporting `--approval-mode plan`), is excluded from `--edit` and default routes, and reports Mega Zword run counts while plan usage is not tracked yet.
+Gemini is optional: use `megazword run -m gemini` with a prompt on stdin. Google retired the Gemini CLI for personal accounts on 2026-06-18, so Mega Zword uses its successor, the Antigravity CLI (`agy`), when it is on PATH, and falls back to an old `gemini` install otherwise. Install agy, run `agy` once to sign in, then check with `megazword doctor`. It runs read-only (`agy -p --mode plan`), is excluded from `--edit` and default routes, and reports Mega Zword run counts while plan usage is not tracked yet.
 
 **Status:** Beta 1 (v0.1.0b1, 2026-10-11). Tested on Windows; CI runs on Windows and Linux.
 

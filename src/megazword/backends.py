@@ -247,6 +247,36 @@ CLAUDE_LEAN = ["--strict-mcp-config", "--disable-slash-commands", "--restricted"
 CODEX_LEAN = ["-c", "mcp_servers={}"]
 
 
+AGY_ARGS = ["-p", "--mode", "plan", "--output-format", "text", "--disable-slash-commands"]
+OLD_GEMINI_ARGS = ["--approval-mode", "plan", "--output-format", "text"]
+
+
+@dataclass
+class GeminiBackend(CLIBackend):
+    """Gemini through Google's Antigravity CLI (`agy`) when installed, else the
+    old Gemini CLI. Google retired the Gemini CLI for personal accounts on
+    2026-06-18. agy flags are from its --help (1.3.3, checked 2026-10-11):
+    -p is print mode (prompt on stdin), --mode plan is its read-only mode.
+    Picked at run time, not at construction, so building the table stays cheap."""
+
+    exe: str = "gemini"
+    args: list[str] = field(default_factory=lambda: list(OLD_GEMINI_ARGS))
+
+    def _pick(self) -> None:
+        if shutil.which("agy"):
+            self.exe, self.args = "agy", list(AGY_ARGS)
+        else:
+            self.exe, self.args = "gemini", list(OLD_GEMINI_ARGS)
+
+    def available(self) -> bool:
+        self._pick()
+        return super().available()
+
+    def _command(self, prompt: str) -> tuple[list[str], str | None]:
+        self._pick()
+        return super()._command(prompt)
+
+
 def default_backends(edit: bool = False,
                      free_models: dict[str, str] | None = None,
                      lean: bool = True) -> dict[str, Backend]:
@@ -273,8 +303,7 @@ def default_backends(edit: bool = False,
         # versions must fail, never fall back to permissive approvals.
         # Keep it out of edit mode: folder-contained sandbox writes have not
         # been verified, especially on Windows. auto_edit is not containment.
-        backends.append(CLIBackend("gemini", exe="gemini",
-                                   args=["--approval-mode", "plan", "--output-format", "text"]))
+        backends.append(GeminiBackend("gemini"))
         from .config import Config, load
         from .free_apis import free_backends
         if free_models is None:

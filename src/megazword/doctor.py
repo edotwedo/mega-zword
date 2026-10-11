@@ -35,9 +35,11 @@ def checks(home: Path | None = None) -> list[Check]:
     found.append(Check("OK", "megazword", __version__))
 
     for name in ("claude", "codex", "grok", "gemini"):
-        path = shutil.which(name)
+        # Gemini now ships as the Antigravity CLI (`agy`); the old `gemini` still counts.
+        path = shutil.which(name) if name != "gemini" else (shutil.which("agy") or shutil.which("gemini"))
         if not path:
-            found.append(Check("WARN", name, "not on PATH", f"install {name} or add it to PATH"))
+            found.append(Check("WARN", name, "not on PATH", f"install {name} or add it to PATH" if name != "gemini"
+                                 else "install the Antigravity CLI (agy) or add it to PATH"))
             continue
         try:
             # run_quick kills the whole tree on timeout (npm .cmd shims would

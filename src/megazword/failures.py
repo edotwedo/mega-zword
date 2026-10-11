@@ -18,7 +18,7 @@ LOGIN_FIX = {
     "claude": "run `claude auth login`",
     "codex": "run `codex login`",
     "grok": "run `grok login`",
-    "gemini": "run `gemini` once and sign in",
+    "gemini": "run `agy` once and sign in",
     "openrouter": "set OPENROUTER_API_KEY (see `megazword doctor`)",
     "groq": "set GROQ_API_KEY (see `megazword doctor`)",
 }
@@ -34,7 +34,7 @@ _NETWORK = re.compile(
     r"|no route to host|econnrefused|econnreset|connection (?:refused|reset|aborted)"
     r"|failed to establish a new connection|unable to connect|no internet|you appear to be offline"
     r"|urlopen error|socket\.gaierror|winerror 1100[14]", re.I)
-_MISSING = re.compile(r"is not installed or not on PATH|No such file or directory: '[^']*(claude|codex|grok|gemini)", re.I)
+_MISSING = re.compile(r"is not installed or not on PATH|No such file or directory: '[^']*(claude|codex|grok|gemini|agy)", re.I)
 _TIMEOUT = re.compile(r"gave no answer within (\d+)s", re.I)
 
 

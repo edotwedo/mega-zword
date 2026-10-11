@@ -7,6 +7,7 @@
 **Last updated:** 2026-10-11 by Tally-11 (Claude cloud): Beta 1 tagged
 
 ## Done
+- **Gemini via Antigravity (Tally-11, Claude cloud, 2026-10-11, Phil's request):** Google retired the Gemini CLI for personal accounts; `-m gemini` now runs `agy -p --mode plan --output-format text --disable-slash-commands` (prompt on stdin) when `agy` is on PATH, else the old `gemini` command. Doctor finds agy; login hint says `agy`. Flags from Phil's `agy --help` (1.3.3). Phil installed and signed in to agy on his PC. **Not yet verified live:** that agy print mode reads the prompt from stdin. Check on the PC: `megazword run -m gemini "say hi"`. If agy ignores stdin, switch AGY_ARGS in backends.py to pass `{prompt_file}` or `{prompt}`. 517 passed / 1 skipped, smoke 27/27.
 - **Beta 1 (2026-10-11, Tally-11, Claude cloud, Phil's call):** merged `codex/guide` (C7 user guide + SPEC status, Cedar-7 Tailscale note), version 0.1.0b1, tag `v0.1.0-beta.1`. 515 passed / 1 skipped, smoke 27/27. Anything still only on a PC was not in the remote; push it and it goes into beta 2.
 - Cedar-7 (Codex, 2026-10-11): clarified that remote dashboard use requires both Tailscale access and the per-launch token in `docs/GUIDE.md`; documentation-only.
 - Lean one-shots (Forge, F22, 2026-10-11): routed `claude -p` now adds --strict-mcp-config --disable-slash-commands --restricted (all documented; permission modes untouched; `[oneshot] lean = false` turns it off). Measured direct, "Reply with exactly: pong", 2 runs each: normal 6.6s/6.9s, ~32-33k context tokens, API-equivalent $0.14/$0.12; lean 3.5s/3.6s, ~10.7k tokens, $0.021/$0.002; answers identical. Edit mode verified still writes files. Rejected: --bare (skips OAuth, breaks subscription login); codex --ignore-user-config (drops Phil's model choice) and --ephemeral (kills the Codex usage meter). Codex `-c mcp_servers={}` measured 2026-10-11 ~03:00 (2 runs each): 5.5s/6.0s -> 4.7s/4.8s, tokens identical (6,315), same answer; shipped under [oneshot] lean. Grok has no documented startup-trim flag.
@@ -74,9 +75,6 @@
 
 ## In progress
 - Kestrel: dispatch/merge. Forge: F22. Reed-09's C7 documentation is complete on `codex/guide` and queued for Kestrel to review and merge.
-
-## Next up
-- **Antigravity backend (Phil, 2026-10-11, unclaimed):** Google retired the Gemini CLI for personal accounts on 2026-06-18; its successor is the Antigravity CLI, command `agy`. Phil installed it on his PC at `%LOCALAPPDATA%\agy\bin\agy.exe` (PATH fix given; he still needs to run `agy` once to sign in). Our `gemini` backend calls the retired `gemini` command, so it won't work for him. Next step, on Phil's PC: run `agy --help` and find the one-shot prompt flag, read-only/plan mode and model flag; add an `antigravity` backend modeled on the gemini one (read-only, not routed by default until Phil says), point `-m gemini` at it or retire the old one, update README + doctor, tests with a fake CLI. Reported: agy reads AGENTS.md and GEMINI.md; usage meter unknown.
 
 ## Overnight backlog (2026-10-11, Phil asleep; Kestrel assigns)
 Rules: take the top unclaimed item in your lane, write your name next to it,

@@ -22,7 +22,9 @@ def test_missing_gemini_is_harmless(monkeypatch):
 @pytest.mark.parametrize("returncode", [0, 42])
 def test_gemini_pipes_long_prompt_and_reports_errors(monkeypatch, returncode):
     prompt = 'private "quoted" & | %PATH% $value\n' + "x" * 50_000
-    monkeypatch.setattr(backends.shutil, "which", lambda name: "fake-gemini.cmd")
+    # Old Gemini CLI only (no agy installed).
+    monkeypatch.setattr(backends.shutil, "which",
+                        lambda name: None if name == "agy" else "fake-gemini.cmd")
     calls = []
 
     class Process:
@@ -78,7 +80,7 @@ def test_init_discovers_gemini_without_adding_routes(monkeypatch, capsys, instal
 def test_doctor_checks_gemini_and_accepts_custom_route(tmp_path, monkeypatch, installed):
     fake_external(monkeypatch)
     monkeypatch.setattr(doctor.shutil, "which", lambda name:
-                        f"/fake/{name}" if installed else None)
+                        f"/fake/{name}" if installed and name != "agy" else None)
     commands = []
 
     def version(cmd, **kwargs):
@@ -135,3 +137,35 @@ def test_gemini_meter_failure_is_reported(tmp_path, monkeypatch):
     meter = next(p for p in usage_sources.all_usage(tmp_path / "log.jsonl")
                  if p.service == "gemini")
     assert meter.source == "error" and "fake unreadable log" in meter.note
+
+
+def test_gemini_prefers_antigravity_cli(monkeypatch):
+    # Google retired the Gemini CLI for personal accounts; agy replaces it.
+    monkeypatch.setattr(backends.shutil, "which", lambda name: f"fake-{name}.exe")
+    calls = []
+
+    class Process:
+        def __init__(self, cmd, **kwargs):
+            calls.append(cmd)
+            self.returncode = 0
+
+        def communicate(self, stdin, timeout):
+            assert stdin == "hello"
+            return "hi\n", ""
+
+    monkeypatch.setattr(backends.subprocess, "Popen", Process)
+    backend = backends.default_backends(free_models=config.Config().free)["gemini"]
+    result = backend.run("hello")
+    assert calls == [["fake-agy.exe", "-p", "--mode", "plan", "--output-format", "text",
+                      "--disable-slash-commands"]]
+    assert result.ok and result.text == "hi" and result.backend == "gemini"
+    assert "gemini" not in backends.default_backends(edit=True, free_models={})
+
+
+def test_doctor_finds_antigravity_cli(monkeypatch):
+    monkeypatch.setattr(doctor.shutil, "which",
+                        lambda name: "fake-agy.exe" if name == "agy" else None)
+    monkeypatch.setattr(backends, "run_quick", lambda cmd, timeout: SimpleNamespace(
+        returncode=0, stdout="1.3.3\n", stderr=""))
+    check = next(c for c in doctor.checks() if c.name == "gemini")
+    assert check.level == "OK" and "1.3.3" in check.detail
