@@ -51,6 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+    sub.add_parser("advise", help="suggest a route order from stats and votes (changes nothing)")
     st = sub.add_parser("stats", help="per-day, per-AI table from the run log")
     st.add_argument("--days", type=int, default=7)
 
@@ -171,6 +172,11 @@ def main(argv: list[str] | None = None,
     if args.command == "usage":
         return show_usage()
 
+    if args.command == "advise":
+        from . import advise
+        print(advise.text(advise.advise(cfg)))
+        return 0
+
     if args.command == "stats":
         from .stats import daily, table
         print(table(daily(cfg.log_path, max(1, args.days))))
@@ -234,7 +240,9 @@ def main(argv: list[str] | None = None,
             return 2
         memory = Memory(config.HOME, args.project or project_name(), cfg.memory_lines)
         sent = with_context(prompt, memory.context_block()) if args.context else prompt
-        return compare.run(ONE_SHOT_NOTE + sent, prompt, names, backends, cfg, memory)
+        level = rater(prompt).level  # free local rating, so votes count per difficulty
+        return compare.run(ONE_SHOT_NOTE + sent, prompt, names, backends, cfg, memory,
+                           level=level)
 
     rating: Rating | None = None
     if args.model:

@@ -66,6 +66,7 @@ pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var
 .cmpcol { min-width: 0; } .cmpcol pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .cmphead { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
 #cmppicks label { margin-right: 6px; }
+.cmpcol .vote { margin-top: 6px; font-size: 12px; padding: 2px 8px; }
 .spin { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
   border: 2px solid var(--accent); border-right-color: transparent; animation: s .8s linear infinite; }
 @keyframes s { to { transform: rotate(360deg); } }
@@ -140,6 +141,8 @@ details.ans-item .qfull { color: var(--dim); margin-top: 6px; }
     <h2>Routing</h2>
     <div class="scroll"><table class="route" id="route"></table></div>
     <div class="note" style="margin-top:8px">Easy tasks try the first AI in the row; failures move right, then up to harder rows. Struck out = not installed or marked out.</div>
+    <h2 style="margin-top:16px">Suggestions</h2>
+    <div id="advice" class="note"></div>
     <h2 style="margin-top:16px">Runs by AI (last 24h)</h2>
     <div class="chart" id="chart"></div>
     <h2 style="margin-top:16px">Runs per day (last 7 days)</h2>
@@ -434,13 +437,41 @@ function renderAnswer(j) {
   const parts = j.out.split(/^=== (.+?) · (.+?) ===$/m);
   if (!j.label.startsWith("compare:") || parts.length < 4)
     return `<div class="ans"><pre>${esc(j.out.trim())}</pre></div>`;
+  const rating = (j.err.match(/rated (easy|medium|hard)/) || [])[1] || "";
+  const voted = votedJobs[j.id];
   let cols = "";
   for (let i = 1; i + 2 < parts.length + 1; i += 3) {
     const failed = parts[i + 1].startsWith("failed");
+    const vote = !j.done || failed ? "" : voted
+      ? (voted === parts[i] ? `<span class="ok">★ your pick</span>` : "")
+      : `<button class="vote" data-job="${esc(j.id)}" data-ai="${esc(parts[i])}" data-rating="${esc(rating)}">this one's best</button>`;
     cols += `<div class="ans cmpcol"><div class="cmphead">${aiTag(parts[i])} <span class="${failed ? "bad" : "t"}">${esc(parts[i + 1])}</span></div>
-      <pre>${esc((parts[i + 2] || "").trim())}</pre></div>`;
+      <pre>${esc((parts[i + 2] || "").trim())}</pre>${vote}</div>`;
   }
   return `<div class="cmp">${cols}</div>`;
+}
+
+// Votes feed `megazword advise`; one per compare job.
+const votedJobs = {};
+$("jobs").addEventListener("click", async e => {
+  const b = e.target.closest("button.vote"); if (!b) return;
+  b.disabled = true;
+  const label = (b.closest(".job").querySelector("b") || {}).textContent || "";
+  try {
+    await post("/api/vote", {ai: b.dataset.ai, rating: b.dataset.rating, prompt: label.replace(/^compare: /, "")});
+    votedJobs[b.dataset.job] = b.dataset.ai;
+    renderJob(await (await fetch("/api/job/" + b.dataset.job)).json());
+    load();
+  } catch (err) { toast(err.message); b.disabled = false; }
+});
+
+function renderAdvice(s) {
+  const list = s.advice || [];
+  $("advice").innerHTML = list.length ? list.map(a => `<div><b>${esc(a.level)}</b>
+    ${a.changed ? `try ${a.suggested.map(aiTag).join(" → ")}` : "keep as is"}
+    <span class="t">— ${esc(a.reason)}</span></div>`).join("") +
+    '<div class="t" style="margin-top:4px">Suggestions only; nothing changes unless you edit Routing in Settings.</div>'
+    : '<div class="empty">no suggestions yet</div>';
 }
 
 function renderComparePicks() {
@@ -475,7 +506,7 @@ async function load(refresh) {
     .map(([n, ok]) => `<option value="${esc(n)}" ${ok ? "" : "disabled"}>${esc(n)}${ok ? "" : " (not installed)"}${state.out[n] ? " (marked out)" : ""}</option>`).join("");
   sel.value = cur;
   $("meta").textContent = `project ${state.project} · ${state.runs.length} runs logged · updated ${new Date().toLocaleTimeString()}`;
-  renderSettings(state.settings); renderPlans(state); renderRoute(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state); renderComparePicks();
+  renderSettings(state.settings); renderPlans(state); renderRoute(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state); renderComparePicks(); renderAdvice(state);
   for (const j of state.jobs) if (!document.getElementById("job-" + j.id)) {
     renderJob(j); if (!j.done && !watching.has(j.id)) watch(j.id); }
 }

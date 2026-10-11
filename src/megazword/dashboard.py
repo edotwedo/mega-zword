@@ -24,7 +24,7 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from . import stats, answers, config, runlog
+from . import advise, stats, answers, config, runlog
 from .backends import _kill_tree, default_backends, process_group
 from .memory import Memory, project_name
 
@@ -158,6 +158,7 @@ class App:
             "backends": {n: b.available() for n, b in self.backends.items()},
             "runs": list(reversed(runs)),
             "trend": stats.trend(self.cfg.log_path),
+            "advice": advise.as_dict(advise.advise(self.cfg)),
             "runs_24h": {name: asdict(item) for name, item in
                          runlog.summarize(self.cfg.log_path, timedelta(hours=24), now).items()},
             "memory": [asdict(e) for e in reversed(memory.recent(40))],
@@ -246,6 +247,17 @@ class App:
         self.cfg = config.load()
         return {"ok": True}
 
+    def vote(self, body: dict) -> dict:
+        """'This one's best' on a compare column."""
+        ai = str(body.get("ai", "")).strip()
+        if ai not in self.backends:
+            raise ValueError(f"unknown AI {ai!r}")
+        rating = body.get("rating")
+        if rating not in (None, "", "easy", "medium", "hard"):
+            raise ValueError("bad rating")
+        advise.add_vote(ai, rating or None, str(body.get("prompt", "")))
+        return {"ok": True}
+
     def note(self, body: dict) -> dict:
         text = str(body.get("text", "")).strip()
         if not text:
@@ -330,7 +342,7 @@ def make_handler(app: App, port: int, remote: bool = False):
                 length = min(int(self.headers.get("Content-Length", 0)), 1_000_000)
                 body = json.loads(self.rfile.read(length) or b"{}")
                 action = {"/api/run": app.run, "/api/retry": app.retry,
-                          "/api/note": app.note, "/api/cancel": app.cancel,
+                          "/api/note": app.note, "/api/vote": app.vote, "/api/cancel": app.cancel,
                           "/api/settings": app.settings}.get(self.path)
                 if action is None:
                     return self._json(404, {"error": "not found"})

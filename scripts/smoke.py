@@ -206,6 +206,10 @@ def main() -> int:
               "hit its usage limit" in r.stderr and "codex" in r2.stdout, r.stderr + r2.stdout)
         mz(env, work, "out", "codex", "--clear")
 
+        r = mz(env, work, "advise")
+        check("advise suggests without changing anything",
+              r.returncode == 0 and "Nothing was changed" in r.stdout, r.stdout + r.stderr)
+
         r = mz(env, work, "usage")
         check("usage runs without real meters", r.returncode == 0 and "Mega Zword runs" in r.stdout,
               r.stdout + r.stderr)

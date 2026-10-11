@@ -32,13 +32,14 @@ def parse_names(text: str, backends: dict[str, Backend]) -> list[str]:
 
 
 def run(sent: str, prompt: str, names: list[str], backends: dict[str, Backend],
-        cfg: config.Config, memory: Memory, write=print) -> int:
+        cfg: config.Config, memory: Memory, write=print, level: str | None = None) -> int:
     """Run every AI in parallel, then print each answer under a header.
     Returns 0 if at least one AI answered."""
     chosen = [backends[n] for n in names]
     for b in chosen:
         b.timeout = cfg.timeouts.get(b.name, b.timeout)
-    print(f"[megazword] comparing {', '.join(names)} (running at the same time)",
+    rated = f" (rated {level})" if level else ""
+    print(f"[megazword] comparing {', '.join(names)}{rated} (running at the same time)",
           file=sys.stderr)
     with ThreadPoolExecutor(max_workers=len(chosen)) as pool:
         results: list[Result] = list(pool.map(lambda b: b.run(sent), chosen))
@@ -49,7 +50,7 @@ def run(sent: str, prompt: str, names: list[str], backends: dict[str, Backend],
         if not r.ok:
             auto_mark_out(r.backend, r.error, cfg)
         log.append(cfg.log_path, cfg.log_lines, backend=r.backend, forced=True, compare=True,
-                   rating=None, rater=None, seconds=round(r.seconds, 2), ok=r.ok,
+                   rating=level, rater=None, seconds=round(r.seconds, 2), ok=r.ok,
                    rejected=None if r.ok else f"failed: {r.error}"[:200],
                    prompt_chars=len(prompt), answer_chars=len(r.text),
                    est_tokens=(len(prompt) + len(r.text)) // 4)
