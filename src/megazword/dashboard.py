@@ -17,7 +17,7 @@ import threading
 import time
 import webbrowser
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
@@ -155,6 +155,8 @@ class App:
             "route": self.cfg.route,
             "backends": {n: b.available() for n, b in self.backends.items()},
             "runs": list(reversed(runs)),
+            "runs_24h": {name: asdict(item) for name, item in
+                         runlog.summarize(self.cfg.log_path, timedelta(hours=24), now).items()},
             "memory": [asdict(e) for e in reversed(memory.recent(40))],
             "answers": answers.recent(20),
             "jobs": [j.view() for j in reversed(list(self.jobs.values()))][:10],

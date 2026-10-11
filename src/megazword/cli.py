@@ -87,15 +87,16 @@ def show_usage() -> int:
         print(f"{plan.service:7} {' | '.join(parts)}{note}")
     print("\nMega Zword runs (last 24h)")
     runs = summarize(config.HOME / "log.jsonl", timedelta(hours=24))
-    print("AI      runs ok rej/bad sec chars")
+    print("AI      runs ok rej/bad sec chars est_tokens")
     for name in ("claude", "codex", "grok"):
         item = runs.get(name)
         if item:
             chars = item.prompt_chars + item.answer_chars
             print(f"{name:7} {item.runs:4} {item.ok:2} "
-                  f"{item.rejected}/{item.failed:<3} {item.seconds:3.0f} {chars:5}")
+                  f"{item.rejected}/{item.failed:<3} {item.seconds:3.0f} {chars:5} {item.est_tokens:10}")
         else:
-            print(f"{name:7}    0  0   0   0     0")
+            print(f"{name:7}    0  0 0/0     0     0          0")
+    print("est_tokens: rough (prompt + answer chars) // 4; old runs count as 0.")
     return 0
 
 
@@ -268,7 +269,8 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
                    rating=rating.level if rating else None,
                    rater=rating.source if rating else None,
                    seconds=round(result.seconds, 2), ok=result.ok and not reason,
-                   rejected=reason, prompt_chars=len(prompt), answer_chars=len(result.text))
+                   rejected=reason, prompt_chars=len(prompt), answer_chars=len(result.text),
+                   est_tokens=(len(prompt) + len(result.text)) // 4)
         memory.add("done", f"{'REJECTED (' + reason + ')' if reason else 'ok'}: {first_line}",
                    by=name)
         if reason:

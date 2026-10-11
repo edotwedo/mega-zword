@@ -296,3 +296,33 @@ def test_long_prompt_via_prompt_file_and_stdin():
     for b in (by_file, by_stdin):
         r = b.run(big)
         assert r.ok and r.text == "50000", r.error
+
+
+@pytest.mark.parametrize("answer,fail,expected_code", [
+    ("123456", False, 0), ("", False, 1), ("I can't.", False, 1), ("", True, 1),
+])
+def test_attempt_logs_rough_tokens(cfg, answer, fail, expected_code):
+    backend = FakeBackend("fake", fail=fail)
+    if not fail:
+        backend._run = lambda prompt: answer
+    assert main(["run", "12345", "-m", "fake"], {"fake": backend}, cfg) == expected_code
+    row = json.loads(cfg.log_path.read_text(encoding="utf-8"))
+    assert row["prompt_chars"] == 5
+    assert row["answer_chars"] == len(answer)
+    assert row["est_tokens"] == (5 + len(answer)) // 4
+
+
+def test_usage_displays_token_totals_and_empty_backends(monkeypatch, capsys, cfg):
+    from megazword import log, usage_sources
+    monkeypatch.setattr(usage_sources, "all_usage", lambda *args: [])
+    path = config.HOME / "log.jsonl"
+    log.append(path, backend="claude", ok=True, est_tokens=13)
+    log.append(path, backend="claude", ok=False, est_tokens=4)
+    log.append(path, backend="grok", ok=True, prompt_chars=100)
+    assert main(["usage"], {}, cfg) == 0
+    output = capsys.readouterr().out
+    assert "chars est_tokens" in output
+    rows = {parts[0]: parts for line in output.splitlines()
+            if (parts := line.split()) and parts[0] in ("claude", "codex", "grok")}
+    assert rows["claude"][-1] == "17"
+    assert rows["codex"][-1] == rows["grok"][-1] == "0"

@@ -33,10 +33,14 @@
   - F2 (Forge): optional answer-quality check (`quality_check = true`), local model flags dodges, which then escalate. Off by default.
   - K3 (Kestrel): dashboard shows elapsed time and a Cancel button for running jobs. (True token streaming isn't possible: the CLIs print the answer at the end.)
   - U3 (Kestrel): `megazword dashboard --host <tailscale-ip>` for phone access. Every request needs the per-launch token (link printed in the terminal), and it refuses 0.0.0.0.
-  - 142 tests pass.
+  - C1/C2 (Codex reed09): `megazword doctor` (read-only setup check, all OK live) and `scripts/install.ps1` (user PATH only; NOT run yet, Phil should run it).
+  - F3 (Forge): `scripts/smoke.py`: end-to-end with fake CLIs, no network or paid calls. Run after every merge.
+  - C3/U1 (Codex Astra): public README; rough est_tokens per run in usage + dashboard; 24h chart counts the whole window.
+  - U2 (Forge): `megazword out [<ai> --until 7d|date|--clear]` + dashboard buttons. Also fixed tests touching the real ~/.megazword.
+  - 158 tests, 17/17 smoke checks pass.
 
 ## In progress
-- Kestrel: K3. Forge: F3 then U2. Codex/Astra (headless): C1+C2 on codex/doctor. Kestrel heartbeat runs at :13/:43.
+- Kestrel: dispatch/merge (heartbeat :13/:43). Forge: F4 timeouts, then F5 log caps. Codex headless: C4 free API backends. Codex tab (Reed-09): review of dashboard/doctor/installer on codex/review (via relay inbox).
 
 ## Overnight backlog (2026-10-11, Phil asleep; Kestrel assigns)
 Rules: take the top unclaimed item in your lane, write your name next to it,
