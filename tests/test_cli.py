@@ -282,3 +282,17 @@ def test_forced_grok_edit_on_windows_explains(capsys, cfg, monkeypatch):
     monkeypatch.setattr(b.sys, "platform", "win32")
     assert main(["run", "hi", "--edit", "-m", "grok"], None, cfg) == 2
     assert "can't edit files safely" in capsys.readouterr().err
+
+
+def test_long_prompt_via_prompt_file_and_stdin():
+    """50k chars would overflow a Windows command line (~32k)."""
+    import sys
+    big = "x" * 50_000
+    by_file = CLIBackend("f", exe=sys.executable,
+                         args=["-c", "import sys; print(len(open(sys.argv[1], encoding='utf-8').read()))",
+                               "{prompt_file}"])
+    by_stdin = CLIBackend("s", exe=sys.executable,
+                          args=["-c", "import sys; print(len(sys.stdin.read()))"])
+    for b in (by_file, by_stdin):
+        r = b.run(big)
+        assert r.ok and r.text == "50000", r.error

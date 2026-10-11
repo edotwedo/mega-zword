@@ -53,8 +53,10 @@ class Backend:
 
 @dataclass
 class CLIBackend(Backend):
-    """Runs an installed CLI. `args` may contain "{prompt}" to pass it as an
-    argument; otherwise the prompt goes to stdin."""
+    """Runs an installed CLI. `args` may contain "{prompt_file}" (the prompt is
+    written to a temp file and its path passed) or "{prompt}" (passed as an
+    argument; Windows caps a command line at ~32k chars, so avoid it);
+    otherwise the prompt goes to stdin."""
 
     exe: str = ""
     args: list[str] = field(default_factory=list)
@@ -86,8 +88,20 @@ class CLIBackend(Backend):
         return proc.stdout
 
     def _run(self, prompt: str) -> str:
-        cmd, stdin = self._command(prompt)
-        return self._exec(cmd, stdin)
+        if "{prompt_file}" not in self.args:
+            cmd, stdin = self._command(prompt)
+            return self._exec(cmd, stdin)
+        fd, path = tempfile.mkstemp(prefix="megazword-prompt-", suffix=".txt")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(prompt)
+            exe = shutil.which(self.exe)
+            if exe is None:
+                raise RuntimeError(f"'{self.exe}' is not installed or not on PATH")
+            return self._exec([exe, *(path if a == "{prompt_file}" else a
+                                      for a in self.args)], None)
+        finally:
+            os.remove(path)
 
 
 @dataclass
@@ -128,7 +142,7 @@ class OllamaBackend(Backend):
 def grok_backend(model: str = "grok-4.6", effort: str = "medium",
                  edit: bool = False) -> CLIBackend:
     """One-shot Grok with a model id and reasoning effort."""
-    args = ["-p", "{prompt}", "--output-format", "plain", "-m", model, "--effort", effort]
+    args = ["--prompt-file", "{prompt_file}", "--output-format", "plain", "-m", model, "--effort", effort]
     if edit:
         # Grok's path-scoped allow rules don't hold (tested 2026-10-11: with
         # Write(<folder>/**) allowed it still wrote to ../ and absolute paths),
