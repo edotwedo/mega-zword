@@ -238,6 +238,14 @@ def grok_label(backend: Backend) -> str:
 #                            settings files; file tools stay in the folder
 CLAUDE_LEAN = ["--strict-mcp-config", "--disable-slash-commands", "--restricted"]
 
+# Codex: `-c` (documented config override) empties mcp_servers for the run, so
+# MCP servers from ~/.codex/config.toml aren't started. Measured 2026-10-11,
+# 2 runs each: 5.5s/6.0s -> 4.7s/4.8s, tokens identical (6,315), same answer.
+# The sandbox (-s) and Phil's model settings are untouched. Not used:
+# --ignore-user-config (drops his model choice), --ephemeral (no session log,
+# so the Codex usage meter goes blind).
+CODEX_LEAN = ["-c", "mcp_servers={}"]
+
 
 def default_backends(edit: bool = False,
                      free_models: dict[str, str] | None = None,
@@ -254,7 +262,8 @@ def default_backends(edit: bool = False,
     backends: list[Backend] = [
         CLIBackend("claude", exe="claude", args=claude_args),
         CodexBackend("codex", exe="codex",
-                     args=["exec", "--skip-git-repo-check", "-s", codex_sandbox]),
+                     args=["exec", "--skip-git-repo-check", "-s", codex_sandbox,
+                           *(CODEX_LEAN if lean else [])]),
     ]
     if not edit or grok_can_edit():
         backends.append(grok_backend(edit=edit))
