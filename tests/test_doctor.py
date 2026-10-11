@@ -82,3 +82,11 @@ def test_doctor_reports_invalid_config_types(tmp_path, monkeypatch, body):
     checks = doctor.checks(tmp_path)
     assert any(c.name == "config" and c.level == "FAIL" for c in checks)
     assert any(c.name == "log" for c in checks)
+
+
+def test_meter_error_names_type_and_code_only():
+    from megazword.doctor import _meter_error
+    assert _meter_error("HTTPError: HTTP Error 401: Unauthorized") == "unreadable (HTTPError 401)"
+    assert _meter_error("FileNotFoundError: [Errno 2] No such file") == "unreadable (FileNotFoundError)"
+    assert _meter_error("SECRET TOKEN") == "unreadable"
+    assert _meter_error("") == "unreadable"

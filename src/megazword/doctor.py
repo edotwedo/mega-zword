@@ -24,6 +24,17 @@ class Check:
         return f"{self.level} {self.name}: {self.detail}{suffix}"
 
 
+def _meter_error(note: str) -> str:
+    """Say why a meter failed without echoing the error text, which could
+    contain a token: just the error type and any HTTP status code."""
+    import re
+    kind = note.split(":", 1)[0].strip() if note else ""
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]*", kind):
+        return "unreadable"
+    code = re.search(r"HTTP Error (\d{3})", note)
+    return f"unreadable ({kind}{' ' + code.group(1) if code else ''})"
+
+
 def checks(home: Path | None = None) -> list[Check]:
     home = home or config.HOME
     found: list[Check] = []
@@ -117,7 +128,7 @@ def checks(home: Path | None = None) -> list[Check]:
         for plan in plans:
             found.append(Check("WARN" if plan.source == "error" else "OK",
                                f"{plan.service} meter",
-                               "unreadable" if plan.source == "error" else "readable",
+                               _meter_error(plan.note) if plan.source == "error" else "readable",
                                "check login or local meter files" if plan.source == "error" else ""))
     except Exception:
         found.append(Check("WARN", "usage meters", "unreadable",
