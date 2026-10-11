@@ -45,7 +45,7 @@ def rated(level):
 def test_forced_model_prints_answer(capsys, cfg):
     assert main(["run", "hi there", "-m", "fake"], fakes(), cfg) == 0
     out = capsys.readouterr()
-    assert out.out.strip() == "hello: hi there"
+    assert out.out.strip().endswith("hi there") and "one-shot" in out.out
     assert "using fake" in out.err
 
 
@@ -67,7 +67,7 @@ def test_auto_pick_skips_missing_and_logs(capsys, cfg):
     }
     assert main(["run", "design a system"], backends, cfg, rated("hard"), dict) == 0
     out = capsys.readouterr()
-    assert out.out.strip() == "s: design a system"
+    assert out.out.strip().endswith("design a system") and out.out.startswith("s: ")
     assert "rated hard" in out.err and "using strong" in out.err
     entry = json.loads(cfg.log_path.read_text().splitlines()[-1])
     assert entry["backend"] == "strong" and entry["rating"] == "hard" and entry["ok"]
@@ -179,7 +179,7 @@ def test_pacing_skips_over_pace_plan(capsys, cfg):
     backends = {"cheap": FakeBackend("cheap", reply="c"), "strong": FakeBackend("strong", reply="s")}
     over = lambda: {"cheap": PlanStatus("cheap", 30.0, 50.0, "hard-only", [])}
     assert main(["run", "hi"], backends, cfg, rated("easy"), over) == 0
-    assert capsys.readouterr().out.strip() == "s: hi"
+    assert capsys.readouterr().out.startswith("s: ")
 
 
 def test_unknown_window_does_not_block():
@@ -196,7 +196,7 @@ def test_refusal_escalates_to_next(capsys, cfg):
     backends["cheap"]._run = lambda p: "I can't."
     assert main(["run", "hi"], backends, cfg, rated("easy"), dict) == 0
     out = capsys.readouterr()
-    assert out.out.startswith("s: hi") and "cheap rejected" in out.err
+    assert out.out.startswith("s: ") and "cheap rejected" in out.err
     assert "after escalating" in out.err
 
 
@@ -214,14 +214,15 @@ def test_forced_model_does_not_escalate(capsys, cfg):
 
 
 def test_retry_moves_past_last_answerer(capsys, cfg):
-    cfg.route = {"easy": ["cheap"], "medium": [], "hard": ["strong"]}
-    backends = {"cheap": FakeBackend("cheap", reply="c"), "strong": FakeBackend("strong", reply="s")}
+    cfg.route = {"easy": ["cheap", "mid"], "medium": [], "hard": ["strong"]}
+    backends = {"cheap": FakeBackend("cheap", reply="c"), "mid": FakeBackend("mid", reply="m"),
+                "strong": FakeBackend("strong", reply="s")}
     assert main(["run", "hi"], backends, cfg, rated("easy"), dict) == 0
-    capsys.readouterr()
+    capsys.readouterr()  # retry must go to strong (hard route), not mid
     assert main(["retry"], backends, cfg) == 0
     out = capsys.readouterr()
-    assert out.out.startswith("s: hi") and "not good enough" in out.out
-    assert "cheap's answer rejected" in out.err
+    assert out.out.startswith("s: ") and "not good enough" in out.out
+    assert "cheap's answer rejected" in out.err and "trying a stronger AI" in out.err
 
 
 def test_retry_with_nothing_left(capsys, cfg):

@@ -200,6 +200,12 @@ def main(argv: list[str] | None = None,
     return execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))
 
 
+# The CLIs load their users' global startup rules (e.g. "read the team board
+# first"). For a routed one-shot that wastes time and usage, so say so up front.
+ONE_SHOT_NOTE = ("[Sent by Mega Zword as a one-shot task. Answer it directly. Skip "
+                 "session startup, coordination and check-in routines.]\n\n")
+
+
 def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
             memory: Memory, rating: Rating | None, forced: bool,
             start_after: str | None = None, prior_answer: str | None = None) -> int:
@@ -219,7 +225,7 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
             print(f"[megazword] {name} rejected after {result.seconds:.1f}s: {reason}",
                   file=sys.stderr)
 
-    outcome = escalate(sent, chain, on_attempt=on_attempt,
+    outcome = escalate(ONE_SHOT_NOTE + sent, chain, on_attempt=on_attempt,
                        start_after=start_after, prior_answer=prior_answer)
     if outcome.result is None:
         print("[megazword] no AI gave a usable answer", file=sys.stderr)
@@ -263,14 +269,18 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config) -> int:
             return 2
         names = [last["backend"], args.model]
     else:
-        # The rest of the original chain, then the hard-task route as backup.
-        names = list(dict.fromkeys([*last["chain"], *cfg.route.get("hard", [])]))
+        # Strongest first: the hard-task route, then anything else from the
+        # original chain. The AI that answered last goes first so escalate()
+        # can skip it.
+        names = list(dict.fromkeys([last["backend"], *cfg.route.get("hard", []),
+                                    *last["chain"]]))
     chain = [backends[n] for n in names
              if n in backends and (n == last["backend"] or backends[n].available())]
     if not any(b.name != last["backend"] for b in chain):
         print(f"[megazword] no AI left to try after {last['backend']}", file=sys.stderr)
         return 1
-    print(f"[megazword] {last['backend']}'s answer rejected; moving up", file=sys.stderr)
+    print(f"[megazword] {last['backend']}'s answer rejected; trying a stronger AI",
+          file=sys.stderr)
     return execute(last["sent"], last["prompt"], chain, cfg, memory, rating,
                    forced=bool(args.model), start_after=last["backend"],
                    prior_answer=last["answer"])
