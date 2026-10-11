@@ -216,6 +216,13 @@ def default_backends(edit: bool = False,
     if not edit or grok_can_edit():
         backends.append(grok_backend(edit=edit))
     if not edit:
+        # Piped stdin selects Gemini's headless mode (no -p value needed).
+        # Plan mode is its documented read-only approval mode; unsupported
+        # versions must fail, never fall back to permissive approvals.
+        # Keep it out of edit mode: folder-contained sandbox writes have not
+        # been verified, especially on Windows. auto_edit is not containment.
+        backends.append(CLIBackend("gemini", exe="gemini",
+                                   args=["--approval-mode", "plan", "--output-format", "text"]))
         from .config import load
         from .free_apis import free_backends
         backends.extend(free_backends(free_models if free_models is not None else load().free))
