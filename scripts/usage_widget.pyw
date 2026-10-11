@@ -1,7 +1,7 @@
 """Mega Zword usage widget: a small always-on-top window showing every AI's plan usage.
 
 Run with: .venv\\Scripts\\pythonw scripts\\usage_widget.pyw   (or the desktop shortcut)
-Refreshes every 2 minutes (click to refresh now). Drag to move, right-click to close.
+Refreshes every 5 minutes (click to refresh now). Drag to move, right-click to close.
 Reads the same meters as `megazword usage`; never calls a model.
 """
 
@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from megazword import config, usage_sources
 
-REFRESH_MS = 120_000
+REFRESH_MS = 300_000
 BG, FG, DIM, ACCENT, WARN, BAD = "#14161a", "#e6e6e6", "#8a8f98", "#3ddc84", "#f5c542", "#ff5c5c"
 NAMES = {"claude": "Claude", "codex": "Codex", "grok": "Grok", "gemini": "Gemini"}
 FONT = ("Cascadia Code", 10)

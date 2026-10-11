@@ -49,7 +49,28 @@ def _ts(value) -> datetime | None:
     return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
 
 
+CLAUDE_CACHE_SECONDS = 120  # the endpoint answers 429 when polled too often
+
+
+def _claude_cache() -> Path:
+    from . import config
+    return config.HOME / "meter_cache_claude.json"
+
+
 def claude() -> PlanUsage:
+    """Claude's meter, shared through a small cache file so the status bar,
+    widget, dashboard and CLI together ask Anthropic at most every 2 minutes.
+    On HTTP 429 the last good reading is shown with its time instead."""
+    import urllib.error
+    cache, now = _claude_cache(), datetime.now(timezone.utc)
+    cached = None
+    try:
+        cached = json.loads(cache.read_text(encoding="utf-8"))
+        age = (now - _ts(cached["at"])).total_seconds()
+        if 0 <= age < CLAUDE_CACHE_SECONDS:
+            return _claude_plan(cached["data"])
+    except (OSError, ValueError, KeyError, TypeError):
+        cached = None
     creds = json.loads((HOME / ".claude" / ".credentials.json").read_text(encoding="utf-8"))
     token = creds["claudeAiOauth"]["accessToken"]
     req = urllib.request.Request(
@@ -58,8 +79,25 @@ def claude() -> PlanUsage:
                  "anthropic-beta": "oauth-2025-04-20",
                  "Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        data = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        if exc.code == 429 and cached:
+            seen = _ts(cached["at"])
+            plan = _claude_plan(cached["data"])
+            plan.as_of, plan.note = seen, f"busy (429); last reading {seen.astimezone():%I:%M %p}"
+            return plan
+        raise
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps({"at": now.isoformat(), "data": data}), encoding="utf-8")
+    except OSError:
+        pass
+    return _claude_plan(data)
+
+
+def _claude_plan(data: dict) -> PlanUsage:
     names = {"five_hour": "5-hour", "seven_day": "weekly",
              "seven_day_opus": "weekly (Opus)", "seven_day_sonnet": "weekly (Sonnet)"}
     windows = [
