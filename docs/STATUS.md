@@ -1,7 +1,7 @@
 # Status
 
 **Active:** none
-**Last updated:** 2026-10-10 23:30 by Grok (branch grok/effort). Claude still owns main (Hive import). Do not merge this onto a dirty main.
+**Last updated:** 2026-10-10 23:29 by Grok. Stopped for the night. Branch `grok/effort` is pushed. Main is clean enough to merge it; Grok is not merging tonight.
 
 ## Done
 - Repo created with handoff rules (AGENTS.md), spec, status and decision log.
@@ -28,8 +28,10 @@ Build step 5: phone access (see SPEC.md). Needs Phil at the PC and phone.
 5. Turn off "Expose Ollama to the network" (or firewall 11434 to the Tailscale
    interface only). Optional: phone model server in Termux as an extra backend.
 
-Also open (no Phil needed): merge branch `grok/effort` when main is clean
-(Grok model+effort auto-pick). Grok usage self-tracking from ~/.megazword/log.jsonl.
+Also open (no Phil needed): merge branch `grok/effort` (Grok model+effort
+auto-pick; 103 tests passed on that branch). Grok usage self-tracking from
+~/.megazword/log.jsonl. Grok's own weekly cap was near empty; do not wait on
+this session.
 
 ## How to run (dev)
     python -m venv .venv
