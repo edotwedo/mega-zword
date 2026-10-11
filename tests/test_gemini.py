@@ -115,7 +115,7 @@ def test_gemini_meter_counts_only_own_runs(tmp_path, monkeypatch, capsys):
     assert next(p for p in usage_sources.all_usage(path) if p.service == "gemini") == meter
     assert cli.show_usage() == 0
     output = capsys.readouterr().out
-    assert "gemini  -  plan usage not tracked yet" in output
+    assert "gemini  plan usage not tracked yet" in output
     assert any(line.split()[:3] == ["gemini", "1", "1"] for line in output.splitlines())
 
 

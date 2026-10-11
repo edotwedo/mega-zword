@@ -245,7 +245,8 @@ function renderPlans(s) {
       <div class="bar"><i style="width:${Math.min(100, w.used)}%;background:${barColor(w)}"></i>
       ${w.elapsed != null ? `<b style="left:calc(${w.elapsed}% - 1px)"></b>` : ""}</div></div>`).join("")
       : `<div class="note">${esc(p.note || p.error || "no meter")}</div>`;
-    return `<div class="plan"><div class="plan-head">${aiTag(p.service)} <span>${badges}</span></div>${wins}
+    const age = p.as_of ? `<div class="note${p.stale ? " bad" : ""}">as of ${new Date(p.as_of).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}${p.stale ? " (stale: over an hour old)" : ""}</div>` : "";
+    return `<div class="plan"><div class="plan-head">${aiTag(p.service)} <span>${badges}</span></div>${out[p.service] ? "" : wins}${age}
       ${out[p.service] ? `<div class="outmark">marked out until ${new Date(out[p.service]).toLocaleString()}</div>` : ""}
       ${outButton(p.service, out)}</div>`;
   }).join("");

@@ -82,17 +82,24 @@ def build_parser() -> argparse.ArgumentParser:
 def show_usage() -> int:
     from datetime import timedelta
     from .runlog import summarize
+    from .meters import summarize_all
     from .usage_sources import all_usage
-    for plan in all_usage(config.HOME / "log.jsonl"):
-        if not plan.windows:
-            print(f"{plan.service:7} -  {plan.note}")
-            continue
-        parts = []
-        for w in plan.windows:
-            reset = f", resets {w.resets_at.astimezone():%a %I:%M %p}" if w.resets_at else ""
-            parts.append(f"{w.name} {w.used_percent:.0f}%{reset}")
-        note = f"  ({plan.note})" if plan.note else ""
-        print(f"{plan.service:7} {' | '.join(parts)}{note}")
+    plans = all_usage(config.HOME / "log.jsonl")
+    by_name = {p.service: p for p in plans}
+    try:
+        out_until = config.load().out_until
+    except (ValueError, TypeError, OSError):
+        out_until = {}
+    # Same one-line summary as the start screen and dashboard, then details.
+    for summary in summarize_all(plans, out_until):
+        print(summary.line())
+        plan = by_name.get(summary.service)
+        if plan and plan.windows:
+            parts = []
+            for w in plan.windows:
+                reset = f", resets {w.resets_at.astimezone():%a %I:%M %p}" if w.resets_at else ""
+                parts.append(f"{w.name} {w.used_percent:.0f}%{reset}")
+            print(f"{'':8}{' | '.join(parts)}")
     print("\nMega Zword runs (last 24h)")
     runs = summarize(config.HOME / "log.jsonl", timedelta(hours=24))
     print("AI      runs ok rej/bad sec chars est_tokens")

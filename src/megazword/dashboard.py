@@ -27,6 +27,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from . import advise, stats, answers, config, runlog
 from .backends import _kill_tree, default_backends, process_group
+from .meters import STALE, summarize_all
 from .memory import Memory, check_project, list_projects, project_name
 
 USAGE_CACHE_SECONDS = 60
@@ -45,6 +46,7 @@ class Usage:
         self._lock = threading.Lock()
         self._at = 0.0
         self._data: list[dict] = []
+        self.plans: list = []  # raw PlanUsage from the last read, for meters.summarize_all
 
     def get(self, force: bool = False) -> list[dict]:
         with self._lock:
@@ -59,7 +61,9 @@ class Usage:
         try:
             plans = (self._source or all_usage)()
         except Exception as exc:  # meters are best-effort
+            self.plans = []
             return [{"service": "?", "error": str(exc), "windows": []}]
+        self.plans = plans
         now = datetime.now(timezone.utc)
         out = []
         for plan in plans:
@@ -77,8 +81,11 @@ class Usage:
                 windows.append({"name": w.name, "used": float(w.used_percent),
                                 "resets_at": _iso(w.resets_at), "elapsed": elapsed,
                                 "known": known, "pace": pace(w, now) if known else None})
+            as_of = getattr(plan, "as_of", None)
             out.append({"service": plan.service, "source": plan.source, "note": plan.note,
-                        "verdict": st.verdict, "burn": st.burn, "windows": windows})
+                        "verdict": st.verdict, "burn": st.burn, "windows": windows,
+                        "as_of": _iso(as_of),
+                        "stale": bool(as_of and now - as_of > STALE)})
         return out
 
 
@@ -174,6 +181,9 @@ class App:
             "launch_project": self.project,
             "projects": sorted({p.name for p in list_projects(config.HOME)} | {self.project}),
             "usage": self.usage.get(force=refresh),
+            # Same one-line summaries as the start screen and `megazword usage`.
+            "summaries": [{"service": m.service, "state": m.state, "line": m.line()}
+                          for m in summarize_all(self.usage.plans, self.cfg.out_until, now)],
             "out": {n: t.isoformat() for n, t in self.cfg.out_until.items() if t > now},
             "route": self.cfg.route,
             "settings": self.settings_state(),

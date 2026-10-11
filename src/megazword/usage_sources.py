@@ -33,6 +33,7 @@ class PlanUsage:
     windows: list[Window]
     source: str
     note: str = ""
+    as_of: datetime | None = None  # when the numbers were true (None = just now)
 
 
 def _ts(value) -> datetime | None:
@@ -82,9 +83,14 @@ def codex() -> PlanUsage:
                     label = "weekly" if mins >= 10080 else f"{mins // 60}-hour"
                     windows.append(Window(label, float(w.get("used_percent") or 0),
                                           _ts(w.get("resets_at"))))
+            if not windows:
+                # e.g. a run that failed on its usage limit logs an empty
+                # snapshot; keep looking for the last real one.
+                continue
             seen = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
             return PlanUsage("codex", windows, "codex session log",
-                             note=f"as of last Codex run ({seen.astimezone():%a %I:%M %p})")
+                             note=f"as of last Codex run ({seen.astimezone():%a %I:%M %p})",
+                             as_of=seen)
     return PlanUsage("codex", [], "codex session log", note="no rate-limit data found yet")
 
 

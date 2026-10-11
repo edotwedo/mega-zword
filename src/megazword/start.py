@@ -36,11 +36,6 @@ def _meters(source=None, wait: float = METER_WAIT) -> list | None:
     return box[0] if box else None
 
 
-def _bar(pct: float, width: int = 10) -> str:
-    filled = max(0, min(width, round(pct / 100 * width)))
-    return "#" * filled + "." * (width - filled)
-
-
 def _ago(stamp: str, now: datetime) -> str:
     try:
         t = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
@@ -60,23 +55,15 @@ def render(cfg: config.Config, meters=None, now: datetime | None = None,
     from . import __version__
     lines = [bold(f"Mega Zword {__version__}") + dim("  -  one place for all your AIs"), ""]
 
+    from .meters import summarize_all
     plans = _meters() if meters is None else meters
     if plans is None:
         lines.append("Plans:  meters still loading (try `megazword usage`)")
-    else:
+        if cfg.out_now(now):  # still say who's out; that needs no meter
+            plans = []
+    if plans is not None:
         lines.append("Plans:")
-        for plan in plans:
-            known = [w for w in plan.windows if not w.name.startswith(("iguana", "extra"))]
-            if known:
-                worst = max(known, key=lambda w: w.used_percent)
-                lines.append(f"  {plan.service:7} [{_bar(worst.used_percent)}] "
-                             f"{worst.used_percent:3.0f}% {worst.name}")
-            else:
-                lines.append(f"  {plan.service:7} {dim('no meter')}")
-    out = cfg.out_now(now)
-    if out:
-        lines.append("Out:    " + ", ".join(
-            f"{n} until {cfg.out_until[n].astimezone():%a %b %d %I:%M %p}" for n in sorted(out)))
+        lines += [f"  {s.line()}" for s in summarize_all(plans, cfg.out_until, now)]
 
     recent = runlog.read(cfg.log_path)[-3:]
     lines += ["", "Last runs:" if recent else "Last runs: none yet"]
