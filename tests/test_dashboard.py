@@ -155,3 +155,43 @@ def test_real_job_cancel_kills_process():
         time.sleep(0.1)
     v = job.view()
     assert v["done"] and v["code"] != 0 and "cancelled" in v["err"]
+
+
+@pytest.fixture
+def remote_server(app):
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), None)
+    port = srv.server_address[1]
+    srv.RequestHandlerClass = dashboard.make_handler(app, port, remote=True)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{port}", app
+    srv.shutdown()
+    srv.server_close()
+
+
+def test_remote_needs_token_for_reads(remote_server):
+    base, app = remote_server
+    for path in ("/", "/api/state"):
+        with pytest.raises(urllib.error.HTTPError) as e:
+            urllib.request.urlopen(base + path, timeout=5)
+        assert e.value.code == 403
+
+
+def test_remote_link_sets_cookie_and_cookie_works(remote_server):
+    base, app = remote_server
+    r = urllib.request.urlopen(f"{base}/?t={app.token}", timeout=5)
+    cookie = r.headers["Set-Cookie"]
+    assert "HttpOnly" in cookie and app.token in cookie
+    req = urllib.request.Request(base + "/api/state",
+                                 headers={"Cookie": cookie.split(";")[0], "Host": "pc.tailnet:1"})
+    assert json.loads(urllib.request.urlopen(req, timeout=5).read())["project"] == "proj"
+
+
+def test_remote_post_still_needs_header(remote_server):
+    base, app = remote_server
+    with pytest.raises(urllib.error.HTTPError):
+        _post(base + "/api/run", {"prompt": "x"})
+    assert json.loads(_post(base + "/api/run", {"prompt": "x"}, app.token).read())["job"]
+
+
+def test_serve_refuses_all_interfaces():
+    assert dashboard.serve(host="0.0.0.0", open_browser=False) == 2

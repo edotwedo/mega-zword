@@ -8,6 +8,7 @@ other websites open in the browser can't spend usage through it.
 
 from __future__ import annotations
 
+import hmac
 import json
 import secrets
 import subprocess
@@ -17,9 +18,11 @@ import time
 import webbrowser
 from dataclasses import asdict
 from datetime import datetime, timezone
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 from . import answers, config, runlog
 from .backends import default_backends
@@ -210,7 +213,10 @@ def page(token: str) -> bytes:
     return html.replace("__MZ_TOKEN__", token).encode("utf-8")
 
 
-def make_handler(app: App, port: int):
+def make_handler(app: App, port: int, remote: bool = False):
+    """remote=False: loopback only, Host header must be local, POSTs need the
+    token. remote=True (e.g. over Tailscale): every request needs the token,
+    from ?t=<token> once (then a cookie) or the X-MZ-Token header."""
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
 
     class Handler(BaseHTTPRequestHandler):
@@ -230,14 +236,39 @@ def make_handler(app: App, port: int):
 
         def _host_ok(self) -> bool:
             # Blocks DNS-rebinding: a page on evil.com resolving to 127.0.0.1.
-            return self.headers.get("Host", "") in allowed_hosts
+            # Remote mode relies on the token instead (the Host is a Tailscale name/IP).
+            return remote or self.headers.get("Host", "") in allowed_hosts
+
+        def _given_token(self) -> str:
+            query = parse_qs(urlsplit(self.path).query)
+            if query.get("t"):
+                return query["t"][0]
+            cookie = SimpleCookie(self.headers.get("Cookie", ""))
+            if "mz_t" in cookie:
+                return cookie["mz_t"].value
+            return self.headers.get("X-MZ-Token", "")
+
+        def _token_ok(self, given: str) -> bool:
+            return hmac.compare_digest(given.encode(), app.token.encode())
 
         def do_GET(self):
             if not self._host_ok():
                 return self._json(403, {"error": "bad host"})
+            if remote and not self._token_ok(self._given_token()):
+                return self._json(403, {"error": "open the link with ?t=<token> printed by megazword"})
             path = self.path.split("?")[0]
             if path == "/":
-                return self._send(200, page(app.token), "text/html; charset=utf-8")
+                body = page(app.token)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Cache-Control", "no-store")
+                if remote:
+                    self.send_header("Set-Cookie",
+                                     f"mz_t={app.token}; HttpOnly; SameSite=Strict; Path=/")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             if path == "/api/state":
                 return self._json(200, app.state(refresh="refresh=1" in self.path))
             if path.startswith("/api/job/"):
@@ -246,7 +277,7 @@ def make_handler(app: App, port: int):
             return self._json(404, {"error": "not found"})
 
         def do_POST(self):
-            if not self._host_ok() or self.headers.get("X-MZ-Token") != app.token:
+            if not self._host_ok() or not self._token_ok(self.headers.get("X-MZ-Token", "")):
                 return self._json(403, {"error": "bad token"})
             try:
                 length = min(int(self.headers.get("Content-Length", 0)), 1_000_000)
@@ -262,14 +293,26 @@ def make_handler(app: App, port: int):
     return Handler
 
 
-def serve(port: int = 8765, project: str | None = None, open_browser: bool = True) -> int:
+LOOPBACK = {"127.0.0.1", "localhost", "::1"}
+
+
+def serve(port: int = 8765, project: str | None = None, open_browser: bool = True,
+          host: str = "127.0.0.1") -> int:
+    if host in ("0.0.0.0", "::", ""):
+        print("[megazword] refusing to listen on every network; pass your Tailscale IP "
+              "(see `tailscale ip -4`)", file=sys.stderr)
+        return 2
+    remote = host not in LOOPBACK
     app = App(config.load(), project or project_name())
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app, port))
+        server = ThreadingHTTPServer((host, port), make_handler(app, port, remote))
     except OSError as exc:
-        print(f"[megazword] can't listen on port {port}: {exc}", file=sys.stderr)
+        print(f"[megazword] can't listen on {host}:{port}: {exc}", file=sys.stderr)
         return 1
-    url = f"http://127.0.0.1:{port}/"
+    url = f"http://{host}:{port}/" + (f"?t={app.token}" if remote else "")
+    if remote:
+        print("[megazword] remote mode: anyone with this link can run your AIs. "
+              "Keep it private; it changes every launch.", file=sys.stderr)
     print(f"[megazword] dashboard at {url}  (project: {app.project}; Ctrl+C to stop)",
           file=sys.stderr)
     if open_browser:
