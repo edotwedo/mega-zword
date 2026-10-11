@@ -31,7 +31,9 @@
   - F1 (Forge): `--edit` on Windows leaves Grok out (its path rules didn't contain writes; its sandbox is Linux/macOS only).
   - K2 (Kestrel): last 50 answers saved to ~/.megazword/answers.jsonl; dashboard "Past answers"; phone-width fix.
   - F2 (Forge): optional answer-quality check (`quality_check = true`), local model flags dodges, which then escalate. Off by default.
-  - 136 tests pass.
+  - K3 (Kestrel): dashboard shows elapsed time and a Cancel button for running jobs. (True token streaming isn't possible: the CLIs print the answer at the end.)
+  - U3 (Kestrel): `megazword dashboard --host <tailscale-ip>` for phone access. Every request needs the per-launch token (link printed in the terminal), and it refuses 0.0.0.0.
+  - 142 tests pass.
 
 ## In progress
 - Kestrel: K3. Forge: F3 then U2. Codex/Astra (headless): C1+C2 on codex/doctor. Kestrel heartbeat runs at :13/:43.
@@ -80,7 +82,8 @@ Build step 5: phone access (see SPEC.md). Needs Phil at the PC and phone.
    `Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0`,
    `Start-Service sshd`, `Set-Service sshd -StartupType Automatic`).
 3. Install Termux on the phone, `pkg install openssh`, `ssh mrmar@<pc-tailscale-ip>`.
-4. Turn off "Expose Ollama to the network" (or firewall 11434 to the Tailscale
+4. On the PC: `megazword dashboard --host <PC tailscale IP>`, open the printed link on the phone.
+5. Turn off "Expose Ollama to the network" (or firewall 11434 to the Tailscale
    interface only). Optional: phone model server in Termux as an extra backend.
 
 ## How to run (dev)
