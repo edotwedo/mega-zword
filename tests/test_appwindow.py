@@ -1,5 +1,7 @@
 """App-window launch: browser discovery and the command line. No real browser."""
 
+from pathlib import Path
+
 from megazword import appwindow
 from megazword.cli import build_parser
 
@@ -12,8 +14,9 @@ def find(present, which=lambda n: None):
 
 
 def test_prefers_edge_then_chrome():
-    edge = PF86 + r"\Microsoft\Edge\Application\msedge.exe"
-    chrome = LOCAL + r"\Google\Chrome\Application\chrome.exe"
+    # Built the same way the code builds them, so this also passes on Linux CI.
+    edge = str(Path(PF86) / r"Microsoft\Edge\Application\msedge.exe")
+    chrome = str(Path(LOCAL) / r"Google\Chrome\Application\chrome.exe")
     assert find({edge, chrome}) == edge
     assert find({chrome}) == chrome
 

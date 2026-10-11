@@ -25,3 +25,5 @@ megazword = ["dashboard.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Tests import each other as tests.*, and run against src/ without installing.
+pythonpath = ["src", "."]
