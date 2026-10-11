@@ -15,10 +15,16 @@ Mega Zword is a Python command line tool that routes prompts to installed AI com
 ```powershell
 git clone https://github.com/edotwedo/mega-zword.git
 cd mega-zword
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -e .
+.\scripts\install.ps1
 ```
+
+On Windows, the installer uses `pipx` when available. Otherwise it creates or
+refreshes `.venv` and adds its `Scripts` folder to your user PATH. It is safe to
+run again after updating the checkout. Open a new terminal to use `megazword`
+from any folder. The installer finishes with `megazword doctor`.
+
+To install manually instead: `python -m venv .venv`, then
+`.venv\Scripts\python -m pip install -e .`.
 
 ## Quick start
 
@@ -26,6 +32,7 @@ python -m pip install -e .
 megazword init
 megazword backends
 megazword usage
+megazword doctor
 megazword run "Summarize this folder"
 megazword run -m claude "Explain this function"
 megazword retry
@@ -36,6 +43,12 @@ megazword run --context "Fix the bug"
 ```
 
 `init` creates a default config using the AI tools it finds. `-m` selects an AI directly. `retry` rejects the last answer and asks a stronger AI, showing it the rejected answer. `--context` adds project decisions and recent activity to the prompt.
+
+`doctor` checks Python, the CLI tools and their versions, Ollama and the rater
+model, config routes and active `[out]` marks, usage meters, and log access. It
+prints OK, WARN, or FAIL for each check. WARN covers optional or unavailable
+components; FAIL means the local installation needs repair. It exits with code
+1 if any check fails, otherwise 0. It never sends an AI prompt.
 
 ## Routing
 

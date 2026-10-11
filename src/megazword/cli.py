@@ -49,6 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+    sub.add_parser("doctor", help="check local setup without running an AI prompt")
     dash = sub.add_parser("dashboard", help="open a local web page with meters, runs and a run box")
     dash.add_argument("--port", type=int, default=8765)
     dash.add_argument("-p", "--project")
@@ -126,6 +127,9 @@ def main(argv: list[str] | None = None,
          rater: Callable[[str], Rating] | None = None,
          statuses: Callable[[], dict] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "doctor":
+        from .doctor import run
+        return run()
     if backends is None:
         backends = default_backends(edit=getattr(args, "edit", False))
     cfg = cfg if cfg is not None else config.load()
