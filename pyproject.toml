@@ -20,5 +20,8 @@ megazword = "megazword.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+megazword = ["dashboard.html"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
