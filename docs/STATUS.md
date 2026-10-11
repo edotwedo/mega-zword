@@ -1,6 +1,6 @@
 # Status
 
-**Active:** Claude Code coordinating overnight (2026-10-11 00:00). Codex on branch codex/overnight (usage tracking, init, README). Claude on main (Hive import, merges).
+**Active:** Claude Code (overnight, 2026-10-11)
 **Last updated:** 2026-10-10 by Claude Code
 
 ## Done
@@ -12,6 +12,13 @@
 - Step 2 pacing (Codex wrote `pacing.py`, Claude reviewed/merged): auto-pick now skips AIs that are out (>=95%) or over pace (hard tasks only) and otherwise keeps the route order (cheapest first). Exception (Phil, 2026-10-10): a plan within 1h (5-hour window) or 24h (weekly) of reset with >=20% unused is used first, so leftover usage isn't wasted. Unrecognized windows never block (Phil: Claude's "iguana_necktie" is likely his Claude Cloud credit).
 - Step 4 shared memory (Claude): `megazword note`, `decide`, `history`; `run --context` prepends decisions + recent activity; every run logs a 'done' entry. Stored in ~/.megazword/projects/<project>/memory.jsonl. 26 tests pass.
 - Step 3 escalate-on-failure (Grok wrote `escalate.py` + `OllamaBackend`; Claude merged and wired it in): `megazword run` without `-m` tries the ranked route for the task's difficulty, then stronger routes; a crash, empty answer or refusal moves to the next AI with the earlier attempt as context. `-m` never escalates. Every attempt is logged and recorded in project memory. OllamaBackend exists but isn't registered or routed yet (Phil hasn't said local models should answer tasks). 87 tests pass.
+- Overnight 2026-10-11:
+  - `megazword import-hive <workshop clone>` (Claude): copies old Hive DECISIONS.md bullets (with original dates) and non-done handoffs into project memory 'hive'. Re-running adds nothing new. Ran it live: 28 decisions + 3 open handoffs imported from a snapshot of workshop origin/main.
+  - Project-memory context is capped (newest 15 decisions, 300 chars each) so `--context` stays cheap.
+  - `megazword retry` (Claude): rejects the last answer and asks the strongest untried AI (hard route first), passing the rejected answer as context. Last run saved in ~/.megazword/last_run.json.
+  - Every routed prompt starts with a one-line note telling the AI to skip session startup / coordination routines (Grok one-shot went from 28s to 4s).
+  - Codex: `runlog.py` (per-AI run summaries), Grok usage from Mega Zword's own log, `megazword usage` shows a 24h runs table, `megazword init` writes a commented config with only installed AIs, README rewritten for the public. Claude fixed a double count (rejections were also counted as failures).
+  - `tests/conftest.py` isolates every test from the real ~/.megazword. 98 tests pass.
 
 ## In progress
 - Nothing.
