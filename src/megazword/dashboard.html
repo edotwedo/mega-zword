@@ -64,6 +64,9 @@ pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var
 .job .err { color: var(--dim); font-size: 12.5px; margin-bottom: 6px; }
 .job .ans { background: #0b0e14; padding: 10px; border-radius: 7px; border: 1px solid var(--line); }
 .cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.ans { position: relative; }
+.ans .copy { position: absolute; top: 6px; right: 6px; font-size: 11px; padding: 1px 7px; opacity: .7; }
+.ans .copy:hover { opacity: 1; }
 .cmpcol { min-width: 0; } .cmpcol pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .cmphead { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
 #cmppicks label { margin-right: 6px; }
@@ -121,7 +124,7 @@ details.ans-item .qfull { color: var(--dim); margin-top: 6px; }
 <main>
   <section class="wide">
     <h2>Run a task</h2>
-    <textarea id="prompt" placeholder="Ask anything. Ctrl+Enter to send. Auto picks the cheapest AI that can handle it."></textarea>
+    <textarea id="prompt" placeholder="Ask anything. Ctrl+Enter sends, / jumps here, Esc cancels the newest job. Auto picks the cheapest AI that can handle it."></textarea>
     <div class="row">
       <label>AI <select id="model"><option value="">auto (route + pacing)</option></select></label>
       <label><input type="checkbox" id="context"> include project memory</label>
@@ -410,7 +413,7 @@ function renderAnswers(s) {
   const list = s.answers || [];
   $("answers").innerHTML = list.length ? list.map(a => `<details class="ans-item"><summary>${aiTag(a.backend)}
     <span class="q">${esc(a.prompt)}</span><span class="t">${esc(a.rating || "")} · ${ago(a.time)}</span></summary>
-    <pre class="qfull">${esc(a.prompt)}</pre><div class="ans"><pre>${esc(a.answer)}</pre></div></details>`).join("")
+    <pre class="qfull">${esc(a.prompt)}</pre><div class="ans"><button class="copy" title="Copy this answer">copy</button><pre>${esc(a.answer)}</pre></div></details>`).join("")
     : '<div class="empty">no answers saved yet; run something</div>';
 }
 
@@ -438,7 +441,7 @@ function renderJob(j) {
 function renderAnswer(j) {
   const parts = j.out.split(/^=== (.+?) · (.+?) ===$/m);
   if (!j.label.startsWith("compare:") || parts.length < 4)
-    return `<div class="ans"><pre>${esc(j.out.trim())}</pre></div>`;
+    return `<div class="ans"><button class="copy" title="Copy this answer">copy</button><pre>${esc(j.out.trim())}</pre></div>`;
   const rating = (j.err.match(/rated (easy|medium|hard)/) || [])[1] || "";
   const voted = votedJobs[j.id];
   let cols = "";
@@ -448,7 +451,7 @@ function renderAnswer(j) {
       ? (voted === parts[i] ? `<span class="ok">★ your pick</span>` : "")
       : `<button class="vote" data-job="${esc(j.id)}" data-ai="${esc(parts[i])}" data-rating="${esc(rating)}">this one's best</button>`;
     cols += `<div class="ans cmpcol"><div class="cmphead">${aiTag(parts[i])} <span class="${failed ? "bad" : "t"}">${esc(parts[i + 1])}</span></div>
-      <pre>${esc((parts[i + 2] || "").trim())}</pre>${vote}</div>`;
+      <button class="copy" title="Copy this answer">copy</button><pre>${esc((parts[i + 2] || "").trim())}</pre>${vote}</div>`;
   }
   return `<div class="cmp">${cols}</div>`;
 }
@@ -487,12 +490,54 @@ function renderComparePicks() {
   box.innerHTML = names.map(n => `<label><input type="checkbox" value="${esc(n)}" ${picked.has(n) ? "checked" : ""}> ${esc(n)}</label>`).join(" ");
 }
 
+// Desktop notification when a job finishes while this tab is hidden.
+// Permission is asked once, on the first Send (browsers require a click).
+function askNotifyOnce() {
+  if ("Notification" in window && Notification.permission === "default")
+    Notification.requestPermission().catch(() => {});
+}
+function notifyDone(j) {
+  if (!document.hidden || !("Notification" in window) || Notification.permission !== "granted") return;
+  const body = (j.out || j.err || "").trim().split("\n").find(l => l && !l.startsWith("===")) || "";
+  try {
+    const n = new Notification(`Mega Zword: ${j.code === 0 ? "done" : "failed"}`,
+      {body: `${j.label}\n${body.slice(0, 120)}`, tag: "mz-" + j.id});
+    n.onclick = () => { window.focus(); n.close(); };
+  } catch {}
+}
+
+// Copy buttons on answers (works without clipboard permission via a fallback).
+document.addEventListener("click", async e => {
+  const b = e.target.closest("button.copy"); if (!b) return;
+  const text = (b.parentElement.querySelector("pre") || {}).textContent || "";
+  try { await navigator.clipboard.writeText(text); }
+  catch {
+    const t = document.createElement("textarea"); t.value = text; document.body.append(t);
+    t.select(); document.execCommand("copy"); t.remove();
+  }
+  b.textContent = "copied"; setTimeout(() => b.textContent = "copy", 1200);
+});
+
+// Keyboard: "/" jumps to the prompt; Esc cancels the newest running job.
+document.addEventListener("keydown", async e => {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "");
+  if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault(); $("prompt").focus();
+  } else if (e.key === "Escape") {
+    const b = $("jobs").querySelector("button.cancel:not([disabled])");  // newest job is first
+    if (!b) return;
+    b.disabled = true;
+    try { await post("/api/cancel", {job: b.dataset.job}); toast("cancelled the newest job"); }
+    catch (err) { toast(err.message); b.disabled = false; }
+  }
+});
+
 async function watch(id) {
   watching.add(id);
   while (true) {
     const j = await (await fetch("/api/job/" + id)).json();
     renderJob(j);
-    if (j.done) break;
+    if (j.done) { notifyDone(j); break; }
     await new Promise(r => setTimeout(r, 800));
   }
   watching.delete(id);
@@ -535,6 +580,7 @@ async function load(refresh) {
 async function send() {
   const prompt = $("prompt").value.trim();
   if (!prompt) return;
+  askNotifyOnce();
   $("send").disabled = true;
   try {
     const compare = $("compare").checked
