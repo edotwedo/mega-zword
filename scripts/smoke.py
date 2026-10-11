@@ -186,6 +186,10 @@ def main() -> int:
         check("timeout: auto run escalates past a hung AI",
               r.returncode == 0 and "ok:" in r.stdout, r.stdout + r.stderr)
 
+        r = mz(env, work, "stats")
+        check("stats shows today's runs", r.returncode == 0 and "total" in r.stdout,
+              r.stdout + r.stderr)
+
         r = mz(env, work, "usage")
         check("usage runs without real meters", r.returncode == 0 and "Mega Zword runs" in r.stdout,
               r.stdout + r.stderr)
