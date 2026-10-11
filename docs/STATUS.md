@@ -22,7 +22,8 @@ Build order step 1 (see SPEC.md). Concretely:
 
 ## Machine facts (checked 2026-10-10)
 - Installed: claude 2.1.296, codex-cli 0.162.1, grok 1.0.50, Python 3.11.9, git, gh.
-- Not installed: gemini CLI, ollama.
+- Ollama 0.40.2 installed via winget 2026-10-10 (no models pulled yet).
+- Not installed: gemini CLI.
 
 ## Problems / notes
 - None yet.
