@@ -7,6 +7,7 @@ import sys
 from typing import Callable
 
 from . import __version__, config, log
+from .memory import Memory, project_name, with_context
 from .backends import Backend, default_backends
 from .rater import Rating, rate
 
@@ -22,6 +23,20 @@ def build_parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="run a prompt; picks an AI unless -m is given")
     run.add_argument("prompt", nargs="?", help="the prompt (reads stdin if left out)")
     run.add_argument("-m", "--model", help="force a specific AI, e.g. claude")
+    run.add_argument("-c", "--context", action="store_true",
+                     help="include this project's memory (decisions, recent activity)")
+    run.add_argument("-p", "--project", help="project name (default: current repo/folder)")
+
+    for name, help_text in (("note", "save a note to project memory"),
+                            ("decide", "record a decision every AI must follow")):
+        cmd = sub.add_parser(name, help=help_text)
+        cmd.add_argument("text")
+        cmd.add_argument("-p", "--project")
+        cmd.add_argument("--by", default="phil", help="who is adding it")
+
+    hist = sub.add_parser("history", help="show project memory")
+    hist.add_argument("-n", type=int, default=20)
+    hist.add_argument("-p", "--project")
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
@@ -70,6 +85,16 @@ def main(argv: list[str] | None = None,
     if args.command == "usage":
         return show_usage()
 
+    if args.command in ("note", "decide", "history"):
+        memory = Memory(config.HOME, args.project or project_name())
+        if args.command == "history":
+            for e in memory.recent(args.n):
+                print(f"{e.time[:16]}  {e.by:8} {e.kind:8} {e.text}")
+            return 0
+        memory.add("decision" if args.command == "decide" else "note", args.text, args.by)
+        print(f"[megazword] saved to {memory.project} memory", file=sys.stderr)
+        return 0
+
     # command == "run"
     prompt = args.prompt if args.prompt is not None else sys.stdin.read()
     if not prompt.strip():
@@ -94,12 +119,15 @@ def main(argv: list[str] | None = None,
         print(f"[megazword] rated {rating.level} ({rating.reason}) -> using {backend.name}",
               file=sys.stderr)
 
-    result = backend.run(prompt)
+    memory = Memory(config.HOME, args.project or project_name())
+    result = backend.run(with_context(prompt, memory.context_block()) if args.context else prompt)
     log.append(cfg.log_path, backend=backend.name, forced=bool(args.model),
                rating=rating.level if rating else None,
                rater=rating.source if rating else None,
                seconds=round(result.seconds, 2), ok=result.ok,
                prompt_chars=len(prompt), answer_chars=len(result.text))
+    first_line = prompt.strip().splitlines()[0][:80]
+    memory.add("done", f"{'ok' if result.ok else 'FAILED'}: {first_line}", by=backend.name)
     if not result.ok:
         print(f"[megazword] {backend.name} failed after {result.seconds:.1f}s: {result.error}",
               file=sys.stderr)

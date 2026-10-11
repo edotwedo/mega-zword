@@ -26,6 +26,11 @@ class FakeBackend(Backend):
         return f"{self.reply}: {prompt}"
 
 
+@pytest.fixture(autouse=True)
+def isolated_home(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOME", tmp_path / "home")
+
+
 @pytest.fixture
 def cfg(tmp_path):
     return config.Config(
@@ -135,3 +140,23 @@ def test_codex_usage_from_log(tmp_path, monkeypatch):
     monkeypatch.setattr(usage_sources, "HOME", tmp_path)
     plan = usage_sources.codex()
     assert [(w.name, w.used_percent) for w in plan.windows] == [("5-hour", 3.0), ("weekly", 0.0)]
+
+
+def test_note_decide_history(capsys, cfg):
+    assert main(["decide", "Python only", "-p", "proj"], {}, cfg) == 0
+    assert main(["note", "rater is slow cold", "-p", "proj", "--by", "codex"], {}, cfg) == 0
+    capsys.readouterr()
+    assert main(["history", "-p", "proj"], {}, cfg) == 0
+    out = capsys.readouterr().out
+    assert "decision" in out and "Python only" in out and "codex" in out
+
+
+def test_run_records_done_and_passes_context(capsys, cfg):
+    main(["decide", "be brief", "-p", "proj"], {}, cfg)
+    backends = fakes()
+    assert main(["run", "hi", "-m", "fake", "-p", "proj", "--context"], backends, cfg) == 0
+    out = capsys.readouterr().out
+    assert "be brief" in out and "[Task]" in out  # fake echoes the prompt it got
+    from megazword.memory import Memory
+    last = Memory(config.HOME, "proj").recent(1)[0]
+    assert last.kind == "done" and last.by == "fake" and "ok: hi" in last.text
