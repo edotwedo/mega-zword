@@ -1,5 +1,7 @@
 # Mega Zword
 
+[![tests](https://github.com/edotwedo/mega-zword/actions/workflows/test.yml/badge.svg)](https://github.com/edotwedo/mega-zword/actions/workflows/test.yml)
+
 Mega Zword is a Python command line tool that routes prompts to installed AI command line tools such as Claude Code, Codex, and Grok. It rates task difficulty, tracks its own runs, checks available plan usage, and tries another AI when one fails.
 
 Gemini CLI is optional: use `megazword run -m gemini` with a prompt on stdin after installing and logging in. It uses Gemini's read-only plan mode (requires a version supporting `--approval-mode plan`), is excluded from `--edit` and default routes, and reports Mega Zword run counts while plan usage is not tracked yet.
