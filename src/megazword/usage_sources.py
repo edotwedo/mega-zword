@@ -5,7 +5,7 @@
   token is only sent to api.anthropic.com and never printed or logged.
 - Codex: reads the rate-limit snapshot Codex writes into its own session logs
   (~/.codex/sessions). As fresh as the last Codex run.
-- Grok: no local plan meter exists; returns None until we track it ourselves.
+- Grok: no local plan meter exists; reports Mega Zword's own recent run counts.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 HOME = Path.home()
@@ -87,8 +87,17 @@ def codex() -> PlanUsage:
     return PlanUsage("codex", [], "codex session log", note="no rate-limit data found yet")
 
 
-def grok() -> PlanUsage:
-    return PlanUsage("grok", [], "none", note="Grok keeps no local plan meter; not tracked yet")
+def grok(log_path: Path | None = None) -> PlanUsage:
+    if log_path is None:
+        from . import config
+        log_path = config.HOME / "log.jsonl"
+    from .runlog import summarize
+    now = datetime.now(timezone.utc)
+    recent = summarize(log_path, timedelta(hours=5), now).get("grok")
+    weekly = summarize(log_path, timedelta(days=7), now).get("grok")
+    return PlanUsage("grok", [], "Mega Zword run log",
+                     note=f"no plan meter; Mega Zword sent {recent.runs if recent else 0} runs "
+                          f"in the last 5h, {weekly.runs if weekly else 0} this week")
 
 
 def _find_key(obj, key):
@@ -107,14 +116,18 @@ def _find_key(obj, key):
     return None
 
 
-SOURCES = {"claude": claude, "codex": codex, "grok": grok}
+SOURCES = {"claude": claude, "codex": codex}
 
 
-def all_usage() -> list[PlanUsage]:
+def all_usage(log_path: Path | None = None) -> list[PlanUsage]:
     out = []
     for name, fn in SOURCES.items():
         try:
             out.append(fn())
         except Exception as exc:
             out.append(PlanUsage(name, [], "error", note=f"{type(exc).__name__}: {exc}"))
+    try:
+        out.append(grok(log_path))
+    except Exception as exc:
+        out.append(PlanUsage("grok", [], "error", note=f"{type(exc).__name__}: {exc}"))
     return out
