@@ -50,10 +50,18 @@
   - F10 (Forge): usage-limit errors auto-mark that AI out until its reset (tested on Codex's real message); config writes locked.
   - F11 (Forge): "this one's best" votes on compare, `megazword advise` (suggests route order, never applies), Suggestions box on the dashboard.
   - Dashboard visually checked (headless Edge screenshot) with real data; phone grid fix.
-  - 301 tests, 24/24 smoke checks pass.
+  - F13 (Forge): 20x full-suite loop, 0 failures in 6,460 test runs; timing-based asserts made deterministic.
+  - F14 (Forge): `scripts/live_check.py --yes-spend`: Phil's opt-in real check (one "pong" per AI + one auto run).
+  - F15 (Forge): `megazword dashboard --app` (own Edge window); `scripts/install.ps1 -Shortcut` (Desktop + Start Menu); MZ favicon.
+  - F16 (Forge): `megazword projects` + dashboard project switcher (traversal-safe names).
+  - CI prep (Forge): Unix fake CLIs executable, pytest finds src/ itself. CI workflow itself waits on Phil (see Next step).
+  - F19 (Forge): dashboard notifications when a job finishes in a hidden tab, "/" and Esc shortcuts, copy buttons.
+  - F20 (Forge): plain-English failure reasons with the fix (login, network, missing, timeout, limit); two network failures in a row stop the chain; only limits mark an AI out.
+  - F21 (Forge reviewing Codex's code): config typo or BOM no longer crashes every command; free-API network/429 messages fixed; doctor can't hang on .cmd shims; install.ps1 no longer flattens %VARS% in the user PATH (would have damaged Phil's PATH).
+  - 379 tests, 27/27 smoke checks pass.
 
 ## In progress
-- Kestrel: dispatch/merge (heartbeat :13/:43). Forge: F12 merging Reed-09's review fixes (codex/review, 9 findings), then F13 flaky-test hunt. Codex: OUT until ~2:39 AM; then Reed-09 does C7 (docs/GUIDE.md + SPEC status), queued in relay inbox.
+- Kestrel: dispatch/merge (heartbeat :13/:43). Forge: F22. Codex: OUT until ~2:39 AM; then Reed-09 does C7 (docs/GUIDE.md + SPEC status), queued in relay inbox.
 
 ## Overnight backlog (2026-10-11, Phil asleep; Kestrel assigns)
 Rules: take the top unclaimed item in your lane, write your name next to it,
