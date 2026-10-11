@@ -276,6 +276,8 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         b.timeout = cfg.timeouts.get(b.name, b.timeout)
 
     def on_attempt(name, result, reason):
+        if not result.ok:
+            auto_mark_out(name, result.error, cfg)
         log.append(cfg.log_path, cfg.log_lines, backend=name, forced=forced,
                    rating=rating.level if rating else None,
                    rater=rating.source if rating else None,
@@ -333,6 +335,27 @@ def out_command(args, cfg: config.Config) -> int:
     else:
         print(f"[megazword] {args.ai} is back in the rotation")
     return 0
+
+
+def auto_mark_out(name: str, error: str, cfg: config.Config) -> bool:
+    """If `error` is a usage-limit message, mark that AI out until its reset
+    so auto-pick skips it. Returns True if it marked one."""
+    from .limits import detect
+    hit = detect(error)
+    if hit is None:
+        return False
+    try:
+        config.set_out(config.HOME / "config.toml", name, hit.until)
+    except (OSError, ValueError) as exc:
+        print(f"[megazword] {name} hit its usage limit but I couldn't save that: {exc}",
+              file=sys.stderr)
+        return False
+    cfg.out_until[name] = hit.until
+    how = "" if hit.exact else " (reset time not given; guessing 1 hour)"
+    print(f"[megazword] {name} hit its usage limit; marked out until "
+          f"{hit.until.astimezone():%a %I:%M %p}{how}. Undo: megazword out {name} --clear",
+          file=sys.stderr)
+    return True
 
 
 def last_run_path():

@@ -292,7 +292,10 @@ def _atomic_replace(path: Path, data: bytes) -> None:
 
 
 def _set_key(path: Path, table: str, key: str, value: str | None) -> None:
-    with _WRITE_LOCK:
+    # _WRITE_LOCK: dashboard threads; locked(): other megazword processes
+    # (e.g. a run auto-marking an AI out while the dashboard saves settings).
+    from .filelock import locked
+    with _WRITE_LOCK, locked(path):
         old = path.read_bytes() if path.exists() else None
         text = old.decode("utf-8") if old is not None else ""
         edited = _edit_key(text, table, key, value)

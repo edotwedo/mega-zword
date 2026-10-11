@@ -20,6 +20,10 @@ def main() -> int:
             prompt = f.read()
     else:
         prompt = sys.stdin.read()
+    if f"LIMIT-{name}" in prompt:  # simulate an out-of-usage error (Codex wording)
+        print("ERROR: You’ve hit your usage limit. Upgrade to Pro "
+              "(https://chatgpt.com/explore/pro) or try again at 2:39 AM.", file=sys.stderr)
+        return 1
     if f"SLEEP-{name}" in prompt:  # simulate a hung AI
         import time
         time.sleep(60)
