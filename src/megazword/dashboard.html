@@ -211,9 +211,9 @@ function renderRoute(s) {
 }
 
 function renderChart(s) {
-  const day = Date.now() - 86400e3, by = {};
-  for (const r of s.runs) if (new Date(r.time) >= day) {
-    const b = by[r.backend] ||= {ok: 0, bad: 0}; r.ok ? b.ok++ : b.bad++; }
+  const by = Object.create(null);
+  for (const r of s.activity || [])
+    by[r.backend] = {ok: r.ok, bad: r.failed + r.rejected};
   const names = Object.keys(by);
   if (!names.length) { $("chart").innerHTML = '<div class="empty">no runs in the last 24h</div>'; return; }
   const max = Math.max(...names.map(n => by[n].ok + by[n].bad));
@@ -230,8 +230,8 @@ function renderRuns(s) {
     s.runs.slice(0, 40).map(r => `<tr><td>${ago(r.time)}</td><td>${aiTag(r.backend)}</td>
       <td>${esc(r.rating || "—")}</td><td>${r.forced ? "you picked" : "auto"}</td>
       <td class="${r.ok ? "ok" : "bad"}">${r.ok ? "ok" : esc(r.rejected || r.error || "failed")}</td>
-      <td class="num">${(r.seconds ?? 0).toFixed(1)}</td><td class="num">${r.prompt_chars ?? ""}</td>
-      <td class="num">${r.answer_chars ?? ""}</td></tr>`).join("");
+      <td class="num">${(Number(r.seconds) || 0).toFixed(1)}</td><td class="num">${esc(r.prompt_chars ?? "")}</td>
+      <td class="num">${esc(r.answer_chars ?? "")}</td></tr>`).join("");
 }
 
 function renderAnswers(s) {

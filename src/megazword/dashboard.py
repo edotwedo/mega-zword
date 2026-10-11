@@ -10,15 +10,17 @@ from __future__ import annotations
 
 import hmac
 import json
+import os
 import secrets
+import signal
 import subprocess
 import sys
 import threading
 import time
 import webbrowser
 from dataclasses import asdict
-from datetime import datetime, timezone
-from http.cookies import SimpleCookie
+from datetime import datetime, timedelta, timezone
+from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
@@ -90,12 +92,13 @@ class Job:
         self.code: int | None = None
         self.proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace")
+            text=True, encoding="utf-8", errors="replace", start_new_session=os.name != "nt")
         threading.Thread(target=self._feed, args=(stdin,), daemon=True).start()
-        threading.Thread(target=self._pump, args=(self.proc.stdout, self.out),
-                         daemon=True).start()
-        threading.Thread(target=self._pump, args=(self.proc.stderr, self.err),
-                         daemon=True).start()
+        self._readers = [threading.Thread(target=self._pump, args=(stream, sink), daemon=True)
+                         for stream, sink in ((self.proc.stdout, self.out),
+                                              (self.proc.stderr, self.err))]
+        for reader in self._readers:
+            reader.start()
         threading.Thread(target=self._wait, daemon=True).start()
 
     def _feed(self, text: str) -> None:
@@ -107,16 +110,33 @@ class Job:
 
     @staticmethod
     def _pump(stream, sink: list[str]) -> None:
-        for line in stream:
-            sink.append(line)
+        with stream:
+            for line in stream:
+                sink.append(line)
 
     def _wait(self) -> None:
-        self.code = self.proc.wait()
+        code = self.proc.wait()
+        # Clients stop polling at done; drain both pipes before publishing it.
+        for reader in self._readers:
+            reader.join()
+        self.code = code
 
     def cancel(self) -> None:
         if self.code is None:
+            # The CLI starts a backend child. Killing only the wrapper leaves
+            # the paid task running and can leave output pipes open forever.
+            if os.name == "nt":
+                result = subprocess.run(["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
+                                        capture_output=True, timeout=10,
+                                        creationflags=subprocess.CREATE_NO_WINDOW)
+                if result.returncode and self.proc.poll() is None:
+                    raise OSError("could not stop the job process tree")
+            else:
+                try:
+                    os.killpg(self.proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
             self.err.append("[megazword] cancelled from the dashboard\n")
-            self.proc.kill()
 
     def view(self) -> dict:
         return {"id": self.id, "label": self.label, "started": self.started,
@@ -140,6 +160,7 @@ class App:
         self.launcher = launcher
         self.token = secrets.token_urlsafe(24)
         self.jobs: dict[str, Job] = {}
+        self._jobs_lock = threading.Lock()
         self._n = 0
 
     # --- reads -----------------------------------------------------------
@@ -147,6 +168,8 @@ class App:
         now = datetime.now(timezone.utc)
         runs = runlog.read(self.cfg.log_path)[-60:]
         memory = Memory(config.HOME, self.project)
+        with self._jobs_lock:
+            jobs = list(self.jobs.values())
         return {
             "now": now.isoformat(),
             "project": self.project,
@@ -155,18 +178,25 @@ class App:
             "route": self.cfg.route,
             "backends": {n: b.available() for n, b in self.backends.items()},
             "runs": list(reversed(runs)),
+            "activity": [asdict(item) for item in
+                         runlog.summarize(self.cfg.log_path, timedelta(days=1), now).values()],
             "memory": [asdict(e) for e in reversed(memory.recent(40))],
             "answers": answers.recent(20),
-            "jobs": [j.view() for j in reversed(list(self.jobs.values()))][:10],
+            "jobs": [j.view() for j in reversed(jobs)][:10],
         }
 
     # --- actions ---------------------------------------------------------
     def _start(self, label: str, args: list[str], stdin: str = "") -> dict:
-        self._n += 1
-        job_id = f"j{self._n}"
-        self.jobs[job_id] = self.launcher(job_id, label, megazword_cmd(*args), stdin)
-        while len(self.jobs) > MAX_JOBS:
-            self.jobs.pop(next(iter(self.jobs)))
+        with self._jobs_lock:
+            if len(self.jobs) >= MAX_JOBS:
+                finished = next((key for key, job in self.jobs.items()
+                                 if job.view()["done"]), None)
+                if finished is None:
+                    raise ValueError("too many running jobs; wait or cancel one")
+                del self.jobs[finished]
+            self._n += 1
+            job_id = f"j{self._n}"
+            self.jobs[job_id] = self.launcher(job_id, label, megazword_cmd(*args), stdin)
         return {"job": job_id}
 
     def run(self, body: dict) -> dict:
@@ -176,7 +206,7 @@ class App:
         args = ["run", "-p", self.project]
         model = body.get("model") or ""
         if model:
-            if model not in self.backends:
+            if not isinstance(model, str) or model not in self.backends:
                 raise ValueError(f"unknown AI {model!r}")
             args += ["-m", model]
         if body.get("context"):
@@ -187,7 +217,7 @@ class App:
         args = ["retry"]
         model = body.get("model") or ""
         if model:
-            if model not in self.backends:
+            if not isinstance(model, str) or model not in self.backends:
                 raise ValueError(f"unknown AI {model!r}")
             args += ["-m", model]
         return self._start("retry: " + (model or "stronger AI"), args)
@@ -243,7 +273,13 @@ def make_handler(app: App, port: int, remote: bool = False):
             query = parse_qs(urlsplit(self.path).query)
             if query.get("t"):
                 return query["t"][0]
-            cookie = SimpleCookie(self.headers.get("Cookie", ""))
+            header = self.headers.get("X-MZ-Token", "")
+            if header:
+                return header
+            try:
+                cookie = SimpleCookie(self.headers.get("Cookie", ""))
+            except CookieError:
+                return ""
             if "mz_t" in cookie:
                 return cookie["mz_t"].value
             return self.headers.get("X-MZ-Token", "")
@@ -280,8 +316,14 @@ def make_handler(app: App, port: int, remote: bool = False):
             if not self._host_ok() or not self._token_ok(self.headers.get("X-MZ-Token", "")):
                 return self._json(403, {"error": "bad token"})
             try:
-                length = min(int(self.headers.get("Content-Length", 0)), 1_000_000)
+                length = int(self.headers.get("Content-Length", 0))
+                if length < 0:
+                    raise ValueError("negative Content-Length")
+                if length > 1_000_000:
+                    return self._json(413, {"error": "request too large"})
                 body = json.loads(self.rfile.read(length) or b"{}")
+                if not isinstance(body, dict):
+                    raise ValueError("request body must be a JSON object")
                 action = {"/api/run": app.run, "/api/retry": app.retry,
                           "/api/note": app.note, "/api/cancel": app.cancel}.get(self.path)
                 if action is None:
@@ -289,6 +331,8 @@ def make_handler(app: App, port: int, remote: bool = False):
                 return self._json(200, action(body))
             except (ValueError, json.JSONDecodeError) as exc:
                 return self._json(400, {"error": str(exc)})
+            except OSError:
+                return self._json(500, {"error": "could not complete the action; check local files and executable access"})
 
     return Handler
 

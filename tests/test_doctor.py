@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from megazword import cli, doctor
 from megazword.usage_sources import PlanUsage
 
@@ -55,3 +57,14 @@ def test_doctor_fails_for_bad_config_and_log(tmp_path, monkeypatch):
     assert any(c.name == "log" and c.level == "FAIL" for c in results)
     monkeypatch.setattr(doctor.config, "HOME", tmp_path)
     assert doctor.run() == 1
+
+
+@pytest.mark.parametrize("body", ['[route]\neasy = 42\n',
+                                   '[route]\neasy = [42]\n',
+                                   'rater_model = 42\n'])
+def test_doctor_reports_invalid_config_types(tmp_path, monkeypatch, body):
+    fake_external(monkeypatch)
+    (tmp_path / "config.toml").write_text(body)
+    checks = doctor.checks(tmp_path)
+    assert any(c.name == "config" and c.level == "FAIL" for c in checks)
+    assert any(c.name == "log" for c in checks)
