@@ -285,6 +285,8 @@ def save_last_run(sent, prompt, chain, backend, answer, project, level) -> None:
     path.write_text(json.dumps({"sent": sent, "prompt": prompt, "chain": chain,
                                 "backend": backend, "answer": answer,
                                 "project": project, "rating": level}), encoding="utf-8")
+    from . import answers
+    answers.add(prompt, answer, backend, project, level)
 
 
 def retry_last(args, backends: dict[str, Backend], cfg: config.Config,

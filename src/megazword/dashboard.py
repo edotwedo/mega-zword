@@ -21,7 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
 
-from . import config, runlog
+from . import answers, config, runlog
 from .backends import default_backends
 from .memory import Memory, project_name
 
@@ -148,6 +148,7 @@ class App:
             "backends": {n: b.available() for n, b in self.backends.items()},
             "runs": list(reversed(runs)),
             "memory": [asdict(e) for e in reversed(memory.recent(40))],
+            "answers": answers.recent(20),
             "jobs": [j.view() for j in reversed(list(self.jobs.values()))][:10],
         }
 

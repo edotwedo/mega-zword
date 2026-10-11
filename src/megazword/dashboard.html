@@ -21,7 +21,7 @@ header h1 b { color: var(--accent); }
 header .meta { color: var(--dim); font-size: 13px; }
 header button { margin-left: auto; }
 main { display: grid; gap: 16px; padding: 16px 20px 40px;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); max-width: 1500px; }
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); max-width: 1500px; }
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
   padding: 14px 16px; min-width: 0; }
 section.wide { grid-column: 1 / -1; }
@@ -83,6 +83,14 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   border-radius: 6px 6px 0 0; overflow: hidden; }
 .col small { color: var(--dim); font-size: 12px; }
 .empty { color: var(--dim); font-style: italic; }
+details.ans-item { border-top: 1px solid var(--line); padding: 8px 0; }
+details.ans-item:first-child { border-top: 0; }
+details.ans-item summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; list-style: none; }
+details.ans-item summary::-webkit-details-marker { display: none; }
+details.ans-item summary .q { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details.ans-item summary .t { color: var(--dim); font-size: 12px; white-space: nowrap; }
+details.ans-item .ans { margin-top: 8px; max-height: 480px; overflow: auto; }
+details.ans-item .qfull { color: var(--dim); margin-top: 6px; }
 .toast { position: fixed; bottom: 16px; right: 16px; background: var(--bad); color: #1a0000;
   padding: 9px 14px; border-radius: 8px; display: none; font-weight: 600; }
 .scroll { overflow-x: auto; }
@@ -130,6 +138,11 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
       <button id="addnote">Add</button>
     </div>
     <div class="mem" id="mem"></div>
+  </section>
+
+  <section class="wide">
+    <h2>Past answers</h2>
+    <div id="answers"></div>
   </section>
 
   <section class="wide">
@@ -221,6 +234,14 @@ function renderRuns(s) {
       <td class="num">${r.answer_chars ?? ""}</td></tr>`).join("");
 }
 
+function renderAnswers(s) {
+  const list = s.answers || [];
+  $("answers").innerHTML = list.length ? list.map(a => `<details class="ans-item"><summary>${aiTag(a.backend)}
+    <span class="q">${esc(a.prompt)}</span><span class="t">${esc(a.rating || "")} · ${ago(a.time)}</span></summary>
+    <pre class="qfull">${esc(a.prompt)}</pre><div class="ans"><pre>${esc(a.answer)}</pre></div></details>`).join("")
+    : '<div class="empty">no answers saved yet; run something</div>';
+}
+
 function renderMem(s) {
   $("proj").textContent = "· " + s.project;
   $("mem").innerHTML = s.memory.length ? s.memory.map(e => `<div><span class="k ${esc(e.kind)}">${esc(e.kind)}</span>
@@ -258,7 +279,7 @@ async function load(refresh) {
     .map(([n, ok]) => `<option value="${esc(n)}" ${ok ? "" : "disabled"}>${esc(n)}${ok ? "" : " (not installed)"}${state.out[n] ? " (marked out)" : ""}</option>`).join("");
   sel.value = cur;
   $("meta").textContent = `project ${state.project} · ${state.runs.length} runs logged · updated ${new Date().toLocaleTimeString()}`;
-  renderPlans(state); renderRoute(state); renderChart(state); renderRuns(state); renderMem(state);
+  renderPlans(state); renderRoute(state); renderChart(state); renderRuns(state); renderMem(state); renderAnswers(state);
   for (const j of state.jobs) if (!document.getElementById("job-" + j.id)) {
     renderJob(j); if (!j.done && !watching.has(j.id)) watch(j.id); }
 }

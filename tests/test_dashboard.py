@@ -121,3 +121,12 @@ def test_post_with_token_starts_job(server):
     job = json.loads(_post(base + "/api/run", {"prompt": "hi"}, app.token).read())["job"]
     view = json.loads(urllib.request.urlopen(f"{base}/api/job/{job}", timeout=5).read())
     assert view["done"] and view["out"] == "answer"
+
+
+def test_answers_saved_trimmed_and_shown(app):
+    from megazword import answers
+    for i in range(5):
+        answers.add(f"q{i}", f"a{i}", "claude", "proj", "easy", keep=3)
+    got = answers.recent()
+    assert [a["prompt"] for a in got] == ["q4", "q3", "q2"]
+    assert app.state()["answers"][0]["answer"] == "a4"
