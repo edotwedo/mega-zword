@@ -30,3 +30,9 @@ def reachable(url: str = DEFAULT_URL, timeout: float = 2) -> bool:
             return True
     except OSError:
         return False
+
+
+def models(url: str = DEFAULT_URL, timeout: float = 2) -> set[str]:
+    """Names of locally pulled models; this never runs a generation."""
+    with urllib.request.urlopen(f"{url}/api/tags", timeout=timeout) as resp:
+        return {item["name"] for item in json.loads(resp.read()).get("models", [])}
