@@ -1,15 +1,30 @@
 # Status
 
-**Active: none. Kestrel remains in charge of main, merges and assignments (Phil’s call).**
-- **Kestrel** (Claude Code): lead. Owns main, decides merges and assignments, also building `megazword dashboard` (claude/dashboard).
-- **Forge** (Claude Code): edit-mode fixes on branch claude/edit-mode; hands finished branches to Kestrel.
-- **Codex**: C7 user guide and spec status complete on `codex/guide`; see `docs/GUIDE.md`. C1/C2 doctor and installer work is on `codex/doctor`.
-**Last updated:** 2026-10-11 by Tally-11 (Claude cloud): Beta 1 tagged
+**Active: none.** (Tally-11, Claude cloud, cleared 2026-10-11 ~22:45 UTC.)
+**Version:** Beta 1, `0.1.0b1`, on main. Marker branch `release/beta-1`. The tag `v0.1.0-beta.1` is not on GitHub yet; see Next up.
+**Lead:** Kestrel owns main, merges and assignments (DECISIONS 2026-10-11). Phil's direct requests to any bot also go to main.
+**Last updated:** 2026-10-11 by Tally-11 (Claude cloud).
+
+## Where things live
+- **GitHub, `edotwedo/mega-zword`, branch `main`:** the only real copy. If it isn't pushed here, the next AI can't see it.
+- **Phil's PC, `C:\Users\mrmar\mega-zword`:** Phil's working copy of main, and where `megazword` should be installed from. Run `git pull` there before starting.
+- **Phil's PC, `C:\Users\mrmar\mz-*` folders:** git worktrees, one per bot branch. Some branches exist only there (see Next up item 2). Don't install from them.
+- **Phil's PC, `~\.megazword\`:** Mega Zword's own data: `config.toml`, `log.jsonl` (run log), answers and memory. Never committed.
+- **Logins Mega Zword reads (never committed or printed):** `~\.claude\.credentials.json` (Claude meter), `~\.codex\sessions\` (Codex meter), the `agy` login (Gemini).
+- **Hive coordination:** Q, `edotwedo/workshop` PR #33. Mega Zword's own state stays in this file.
+
+## Next up (on Phil's PC, 2026-10-11, from Tally-11)
+Do these in order, in `C:\Users\mrmar\mega-zword`. Put your name and the time in the Active line first.
+1. Phil's real main checkout is `C:\Users\mrmar\mega-zword` (was at 550f1e3). `git pull`, rerun `scripts\install.ps1` there; doctor should show 0.1.0b1 and gemini 1.3.3 (agy). The install was last run from the `mz-codex-c7` worktree (codex/guide); the reinstall points it back at main.
+2. Local-only branches: `git worktree list` shows branches not on GitHub (codex/chat, codex/export, codex/readme-cost, codex/free-apis, codex/gemini, codex/settings, codex/help-polish, codex/a11y, codex/doctor, claude/stdin, claude/answers, claude/cancel, claude/remote-dash). Run `git branch --no-merged origin/main`; push and review anything listed (Beta 2). Then the `mz-*` worktrees can be removed.
+3. Claude meter: `~/.claude/.credentials.json` exists but the meter is unreadable. `megazword doctor` now shows the error type + HTTP code; likely an expired access token (401). Fix accordingly.
+4. Verify Gemini: `megazword run -m gemini "say hi"` answers (agy reads the prompt on stdin), and `megazword usage` shows a real gemini bar. If either fails, fix `AGY_ARGS` or `parse_agy_usage` from the real output.
+5. Tag Beta 1 (the cloud proxy blocked it): `git tag -a v0.1.0-beta.1 1e58b2c -m "Mega Zword Beta 1"` then `git push origin v0.1.0-beta.1`.
 
 ## Done
 - **Gemini usage meter (Tally-11, 2026-10-11):** `usage_sources.gemini()` runs `agy -p /usage --output-format json` (Antigravity's quota panel, documented; field shape command.data.groups[].buckets[] with remaining_fraction + reset_time, from a public bug report, not yet seen on Phil's PC). Gemini-group buckets become the 5-hour/weekly meter; other groups shown, never block. No agy: falls back to run counts. Tests never run a real agy (conftest). Verified end to end in the cloud with a fake agy and fake Codex log: `megazword usage`, start screen and dashboard /api/state all show codex 42% and gemini 30%. **Not verified live:** real agy JSON on Phil's PC, and the Claude meter (needs his login). Check: `megazword usage`. If gemini shows an error, paste `agy -p /usage --output-format json` output to fix the parser. 520 passed / 1 skipped, smoke 27/27.
 - **Gemini via Antigravity (Tally-11, Claude cloud, 2026-10-11, Phil's request):** Google retired the Gemini CLI for personal accounts; `-m gemini` now runs `agy -p --mode plan --output-format text --disable-slash-commands` (prompt on stdin) when `agy` is on PATH, else the old `gemini` command. Doctor finds agy; login hint says `agy`. Flags from Phil's `agy --help` (1.3.3). Phil installed and signed in to agy on his PC. **Not yet verified live:** that agy print mode reads the prompt from stdin. Check on the PC: `megazword run -m gemini "say hi"`. If agy ignores stdin, switch AGY_ARGS in backends.py to pass `{prompt_file}` or `{prompt}`. 517 passed / 1 skipped, smoke 27/27.
-- **Beta 1 (2026-10-11, Tally-11, Claude cloud, Phil's call):** merged `codex/guide` (C7 user guide + SPEC status, Cedar-7 Tailscale note), version 0.1.0b1, tag `v0.1.0-beta.1`. 515 passed / 1 skipped, smoke 27/27. Anything still only on a PC was not in the remote; push it and it goes into beta 2.
+- **Beta 1 (2026-10-11, Tally-11, Claude cloud, Phil's call):** merged `codex/guide` (C7 user guide + SPEC status, Cedar-7 Tailscale note), version 0.1.0b1, marker branch `release/beta-1` (tag push blocked from the cloud; Next up item 5). 515 passed / 1 skipped, smoke 27/27. Anything still only on a PC was not in the remote; push it and it goes into beta 2.
 - Cedar-7 (Codex, 2026-10-11): clarified that remote dashboard use requires both Tailscale access and the per-launch token in `docs/GUIDE.md`; documentation-only.
 - Lean one-shots (Forge, F22, 2026-10-11): routed `claude -p` now adds --strict-mcp-config --disable-slash-commands --restricted (all documented; permission modes untouched; `[oneshot] lean = false` turns it off). Measured direct, "Reply with exactly: pong", 2 runs each: normal 6.6s/6.9s, ~32-33k context tokens, API-equivalent $0.14/$0.12; lean 3.5s/3.6s, ~10.7k tokens, $0.021/$0.002; answers identical. Edit mode verified still writes files. Rejected: --bare (skips OAuth, breaks subscription login); codex --ignore-user-config (drops Phil's model choice) and --ephemeral (kills the Codex usage meter). Codex `-c mcp_servers={}` measured 2026-10-11 ~03:00 (2 runs each): 5.5s/6.0s -> 4.7s/4.8s, tokens identical (6,315), same answer; shipped under [oneshot] lean. Grok has no documented startup-trim flag.
 - Reed-09 (Codex) bug-fix review merged by Forge (F12, 2026-10-11). Landed: dashboard jobs publish "done" only after both output readers finish (no lost final output); job start/state snapshots share a lock and retention evicts only finished jobs (all slots running -> clear error); API rejects non-object JSON, list-valued model, negative Content-Length (400) and bodies over 1 MB (413), launch/file errors return JSON 500; explicit X-MZ-Token beats a stale cookie, malformed cookies -> 403; answers.recent() reads under the file lock, skips non-object records, keep<1 rejected; run table escapes prompt/answer counts and tolerates string seconds; doctor reports wrong config types as FAIL and continues. Already covered on main and dropped from the review: cancel process tree (filelock/_kill_tree), answers writer lock (filelock + write_atomic), 24h chart full-day count (runs_24h).
@@ -75,15 +90,9 @@
   - 516+ tests, 27/27 smoke checks pass.
 
 ## In progress
-- Kestrel: dispatch/merge. Forge: F22. Reed-09's C7 documentation is complete on `codex/guide` and queued for Kestrel to review and merge.
+- Nothing claimed. C7 (codex/guide) is merged in Beta 1. Agy stdin and the real agy /usage output are unverified until someone runs Next up item 4 on the PC.
 
-## Next up (on Phil's PC, 2026-10-11, from Tally-11)
-1. Phil's real main checkout is `C:\Users\mrmar\mega-zword` (was at 550f1e3). `git pull`, rerun `scripts\install.ps1` there; doctor should show 0.1.0b1 and gemini 1.3.3 (agy). The install was last run from the `mz-codex-c7` worktree (codex/guide); the reinstall points it back at main.
-2. Local-only branches: `git worktree list` shows branches not on GitHub (codex/chat, codex/export, codex/readme-cost, codex/free-apis, codex/gemini, codex/settings, codex/help-polish, codex/a11y, codex/doctor, claude/stdin, claude/answers, claude/cancel, claude/remote-dash). Run `git branch --no-merged origin/main`; push and review anything listed (Beta 2). Then the `mz-*` worktrees can be removed.
-3. Claude meter: `~/.claude/.credentials.json` exists but the meter is unreadable. `megazword doctor` now shows the error type + HTTP code; likely an expired access token (401). Fix accordingly.
-4. Verify `megazword usage` shows a real gemini bar from `agy -p /usage --output-format json`.
-
-## Overnight backlog (2026-10-11, Phil asleep; Kestrel assigns)
+## Overnight backlog (2026-10-11; some items are done, so check Done first)
 Rules: take the top unclaimed item in your lane, write your name next to it,
 work on a branch, push, hand the branch to Kestrel to merge. Tests must pass.
 Never spend paid usage in tests. Don't change routing defaults or turn on
