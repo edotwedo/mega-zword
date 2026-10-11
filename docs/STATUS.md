@@ -77,6 +77,12 @@
 ## In progress
 - Kestrel: dispatch/merge. Forge: F22. Reed-09's C7 documentation is complete on `codex/guide` and queued for Kestrel to review and merge.
 
+## Next up (on Phil's PC, 2026-10-11, from Tally-11)
+1. Phil's real main checkout is `C:\Users\mrmar\mega-zword` (was at 550f1e3). `git pull`, rerun `scripts\install.ps1` there; doctor should show 0.1.0b1 and gemini 1.3.3 (agy). The install was last run from the `mz-codex-c7` worktree (codex/guide); the reinstall points it back at main.
+2. Local-only branches: `git worktree list` shows branches not on GitHub (codex/chat, codex/export, codex/readme-cost, codex/free-apis, codex/gemini, codex/settings, codex/help-polish, codex/a11y, codex/doctor, claude/stdin, claude/answers, claude/cancel, claude/remote-dash). Run `git branch --no-merged origin/main`; push and review anything listed (Beta 2). Then the `mz-*` worktrees can be removed.
+3. Claude meter: `~/.claude/.credentials.json` exists but the meter is unreadable. `megazword doctor` now shows the error type + HTTP code; likely an expired access token (401). Fix accordingly.
+4. Verify `megazword usage` shows a real gemini bar from `agy -p /usage --output-format json`.
+
 ## Overnight backlog (2026-10-11, Phil asleep; Kestrel assigns)
 Rules: take the top unclaimed item in your lane, write your name next to it,
 work on a branch, push, hand the branch to Kestrel to merge. Tests must pass.
