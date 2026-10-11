@@ -61,7 +61,12 @@
   - F21 (Forge reviewing Codex's code): config typo or BOM no longer crashes every command; free-API network/429 messages fixed; doctor can't hang on .cmd shims; install.ps1 no longer flattens %VARS% in the user PATH (would have damaged Phil's PATH).
   - F22 (Forge): lean Claude one-shots (--strict-mcp-config --disable-slash-commands --restricted): ~6.7s -> ~3.5s, ~33k -> ~11k context tokens, same answers; `[oneshot] lean = false` turns it off. Codex lean flag measured after its reset.
   - F23 (Forge): plain `megazword` shows a start screen (plans, out marks, last runs, top commands).
-  - 386 tests, 27/27 smoke checks pass.
+  - F24 (Forge): one meter summary shared by start screen, `usage` and dashboard; snapshot age shown; out AIs show "out until X".
+  - Codex lean (Forge): `-c mcp_servers={}` on one-shots: ~5.8s -> ~4.75s, same tokens and answers.
+  - C8 (Codex): grouped `--help` with examples; one-line errors instead of tracebacks; start screen fits 80 columns.
+  - C9 (Codex): dashboard accessibility (contrast AA, focus rings, labels, live regions, chart text summaries, 44px phone targets).
+  - C10 (Codex): `megazword export [-p P] [--since 7d] [--out FILE]` Markdown report.
+  - 516 tests, 27/27 smoke checks pass.
 
 ## In progress
 - Kestrel: dispatch/merge (heartbeat :13/:43). Forge: F22. Codex: OUT until ~2:39 AM; then Reed-09 does C7 (docs/GUIDE.md + SPEC status), queued in relay inbox.
@@ -96,6 +101,8 @@ Codex (Phil starts Codex sessions; Kestrel may dispatch via
   [route], [grok.<level>].
 
 - F24 (Forge, next): meter consistency. Start screen says "codex no meter" while `usage` shows a Codex snapshot and the dashboard shows it out. One shared summary for all three; show snapshot age ("as of 12:13 AM", stale after 1h); out-marked AIs show "out until X" instead of a bar.
+
+- Nit: export escapes the hyphen in the title ("mega\-zword"); only escape where Markdown needs it.
 
 Unassigned / ideas:
 - U4 Codex's meter showed low usage but Codex (gpt-6-astra) hit its limit at ~00:07. Read the limit error ("try again at <time>") from a failed run and auto-mark the AI out until then.
