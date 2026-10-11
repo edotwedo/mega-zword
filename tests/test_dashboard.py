@@ -211,3 +211,55 @@ def test_daily_tokens_cover_full_log_not_only_recent_runs(app):
     assert state["runs_24h"]["claude"]["runs"] == 65
     assert state["runs_24h"]["claude"]["est_tokens"] == 195
     assert state["runs_24h"]["grok"]["est_tokens"] == 0
+
+
+@pytest.mark.parametrize('token', [None, 'wrong'])
+def test_settings_requires_token(server, token):
+    base, app = server
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        _post(base + '/api/settings', {'kind': 'flag', 'name': 'quality_check', 'value': True}, token)
+    assert exc.value.code == 403
+    assert not (config.HOME / 'config.toml').exists()
+
+
+@pytest.mark.parametrize('body', [
+    {'kind': 'route', 'level': 'easy', 'names': ['codex', 'claude']},
+    {'kind': 'timeout', 'ai': 'claude', 'seconds': 180},
+    {'kind': 'limit', 'name': 'log_lines', 'n': 123},
+    {'kind': 'flag', 'name': 'quality_check', 'value': True},
+])
+def test_settings_api_saves_and_exposes_values(server, body):
+    base, app = server
+    result = json.loads(_post(base + '/api/settings', body, app.token).read())
+    assert result['ok']
+    state = json.loads(urllib.request.urlopen(base + '/api/state', timeout=5).read())
+    assert state['settings'] == result['settings']
+    cfg = config.load()
+    assert state['settings']['route'] == cfg.route
+    assert state['settings']['timeouts'] == cfg.timeouts
+    assert state['settings']['limits'] == {'log_lines': cfg.log_lines, 'memory_lines': cfg.memory_lines}
+    assert state['settings']['quality_check'] == cfg.quality_check
+
+
+@pytest.mark.parametrize('body', [[], None, {'kind': []}, {'kind': 'unknown'},
+    {'kind': 'timeout', 'ai': 'claude'},
+    {'kind': 'flag', 'name': 'quality_check', 'value': 'true'},
+    {'kind': 'limit', 'name': 'log_lines', 'n': 0},
+    {'kind': 'route', 'level': 'easy', 'names': ['bogus']}])
+def test_settings_api_rejects_bad_input(server, body):
+    base, app = server
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        _post(base + '/api/settings', body, app.token)
+    assert exc.value.code == 400
+    assert not (config.HOME / 'config.toml').exists()
+
+
+def test_settings_api_disk_error_returns_json(server, monkeypatch):
+    base, app = server
+    def fail(*args):
+        raise OSError('disk full')
+    monkeypatch.setattr(config, 'set_flag', fail)
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        _post(base + '/api/settings', {'kind': 'flag', 'name': 'quality_check', 'value': True}, app.token)
+    assert exc.value.code == 500
+    assert json.loads(exc.value.read())['error']
