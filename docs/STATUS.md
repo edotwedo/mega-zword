@@ -30,22 +30,54 @@
   - 126 tests pass.
 
 ## In progress
-- Nothing.
+- Kestrel: K1. Forge: F1 (edit mode). Codex: C1 (doctor + install.ps1).
 
-## Next step
+## Overnight backlog (2026-10-11, Phil asleep; Kestrel assigns)
+Rules: take the top unclaimed item in your lane, write your name next to it,
+work on a branch, push, hand the branch to Kestrel to merge. Tests must pass.
+Never spend paid usage in tests. Don't change routing defaults or turn on
+local-model answering without Phil (that's his call; leave a note instead).
+
+Kestrel (lead, main):
+- K1 Send prompts on stdin instead of the command line for every CLI that
+  supports it (Grok, Claude, Codex); Windows caps argv at ~32k chars, so long
+  `--context`/chat prompts can fail. Test with a 50k-char prompt on a fake.
+- K2 Dashboard: phone-friendly layout check; save each run's prompt + answer
+  (last 50, ~/.megazword/answers.jsonl) so the dashboard can show past answers.
+- K3 Dashboard: live streaming of the answer while it's generated.
+
+Forge:
+- F1 (claimed) `--edit`: why Codex/Grok answer but don't create files.
+- F2 Answer-quality check: after an auto run, a fast local/free check flags
+  answers that dodge the question (beyond the current refusal/empty rules);
+  flagged answers escalate like failures. Off by default, config switch.
+- F3 End-to-end smoke script (`scripts/smoke.ps1`) using fake CLIs on PATH:
+  run, retry, chat, dashboard API, usage. No paid calls.
+
+Codex (Phil starts Codex sessions; Kestrel may dispatch via
+`megazword run -m codex --edit` in its own worktree):
+- C1 (claimed) `megazword doctor` + `scripts/install.ps1`.
+- C2 Make `megazword` runnable from any folder (pipx/PATH) and document it.
+- C3 README: dashboard section, chat section, config reference for [out],
+  [route], [grok.<level>].
+
+Unassigned / ideas:
+- U1 Token/usage estimate per run in the log (chars -> rough tokens) and a
+  per-AI "cost" column in usage + dashboard.
+- U2 `megazword out grok --until 2026-10-17` command (edit config from CLI)
+  and an "out" toggle on the dashboard.
+- U3 Dashboard `--host` for Tailscale with token required on GET too (step 5
+  prep; keep 127.0.0.1 default).
+
+## Next step (needs Phil)
 Build step 5: phone access (see SPEC.md). Needs Phil at the PC and phone.
 1. Install Tailscale on PC and phone, sign in to the same account.
 2. Enable Windows OpenSSH Server (admin PowerShell:
    `Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0`,
    `Start-Service sshd`, `Set-Service sshd -StartupType Automatic`).
 3. Install Termux on the phone, `pkg install openssh`, `ssh mrmar@<pc-tailscale-ip>`.
-4. Make `megazword` runnable from any folder (pipx or add .venv\Scripts to PATH).
-5. Turn off "Expose Ollama to the network" (or firewall 11434 to the Tailscale
+4. Turn off "Expose Ollama to the network" (or firewall 11434 to the Tailscale
    interface only). Optional: phone model server in Termux as an extra backend.
-
-Also open (no Phil needed): Grok usage self-tracking from ~/.megazword/log.jsonl;
-a `megazword retry` command using escalate(start_after=..., prior_answer=...)
-only if Phil asks for it.
 
 ## How to run (dev)
     python -m venv .venv
