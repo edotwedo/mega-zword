@@ -7,6 +7,7 @@
 **Last updated:** 2026-10-10 by Claude Code
 
 ## Done
+- Lean one-shots (Forge, F22, 2026-10-11): routed `claude -p` now adds --strict-mcp-config --disable-slash-commands --restricted (all documented; permission modes untouched; `[oneshot] lean = false` turns it off). Measured direct, "Reply with exactly: pong", 2 runs each: normal 6.6s/6.9s, ~32-33k context tokens, API-equivalent $0.14/$0.12; lean 3.5s/3.6s, ~10.7k tokens, $0.021/$0.002; answers identical. Edit mode verified still writes files. Rejected: --bare (skips OAuth, breaks subscription login); codex --ignore-user-config (drops Phil's model choice) and --ephemeral (kills the Codex usage meter). Not yet measured: codex `-c mcp_servers={}` (Codex was out of usage); Grok has no documented startup-trim flag.
 - Reed-09 (Codex) bug-fix review merged by Forge (F12, 2026-10-11). Landed: dashboard jobs publish "done" only after both output readers finish (no lost final output); job start/state snapshots share a lock and retention evicts only finished jobs (all slots running -> clear error); API rejects non-object JSON, list-valued model, negative Content-Length (400) and bodies over 1 MB (413), launch/file errors return JSON 500; explicit X-MZ-Token beats a stale cookie, malformed cookies -> 403; answers.recent() reads under the file lock, skips non-object records, keep<1 rejected; run table escapes prompt/answer counts and tolerates string seconds; doctor reports wrong config types as FAIL and continues. Already covered on main and dropped from the review: cancel process tree (filelock/_kill_tree), answers writer lock (filelock + write_atomic), 24h chart full-day count (runs_24h).
 - Repo created with handoff rules (AGENTS.md), spec, status and decision log.
 - Repo made public; AGPL-3.0 license and README added.
@@ -102,6 +103,7 @@ Unassigned / ideas:
   prep; keep 127.0.0.1 default).
 
 ## Next step (needs Phil)
+- When Codex has usage: measure `echo "Reply with exactly: pong" | codex exec --skip-git-repo-check -s read-only - ` vs the same plus `-c mcp_servers={}` (2 each, note 'tokens used'); if faster with the same answer, add it to CodexBackend args under [oneshot] lean.
 - **CI (2 minutes):** run `gh auth refresh -h github.com -s workflow` once. GitHub blocked pushing the CI workflow because the gh login lacks the "workflow" permission. Then tell Kestrel or Forge; the ready commit is 77334c0 on claude/ci (worktree C:\Users\mrmar\mz-forge18).
 - Morning live check (costs a few dozen tokens per AI): `python scripts/live_check.py --yes-spend`. Runs doctor (stops on FAIL), sends "Reply with exactly: pong" once to each installed, not-out AI via `megazword run -m`, then once via auto-pick, and prints AI / ok / seconds / answer length. Without --yes-spend it only explains itself. Never run by the bots.
 Build step 5: phone access (see SPEC.md). Needs Phil at the PC and phone.

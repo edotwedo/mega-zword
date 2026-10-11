@@ -74,6 +74,9 @@ class Config:
     timeouts: dict[str, int] = field(default_factory=dict)
     # Second-opinion check on auto-picked answers (local model). Off by default.
     quality_check: bool = False
+    # [oneshot] lean: trim what routed one-shots load (MCP servers, skills,
+    # settings files) using documented CLI flags. Safety flags are unaffected.
+    lean: bool = True
     # AI name -> when its usage comes back. Set by hand for plans with no meter.
     out_until: dict[str, datetime] = field(default_factory=dict)
     free: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_FREE))
@@ -103,6 +106,9 @@ def load(path: Path | None = None) -> Config:
         cfg.rater_model = data.get("rater_model", cfg.rater_model)
         cfg.route.update(data.get("route", {}))
         cfg.quality_check = bool(data.get("quality_check", cfg.quality_check))
+        oneshot = data.get("oneshot", {})
+        if isinstance(oneshot, dict) and isinstance(oneshot.get("lean"), bool):
+            cfg.lean = oneshot["lean"]
         cfg.out_until = {name: _as_time(v) for name, v in data.get("out", {}).items()}
         limits = data.get("limits", {})
         for key in ("log_lines", "memory_lines"):

@@ -227,14 +227,29 @@ def grok_label(backend: Backend) -> str:
     return f"{backend.name} ({extra})" if extra else backend.name
 
 
+# Documented `claude` flags that make a routed one-shot leaner without
+# touching login or safety (permission mode stays as set). Measured
+# 2026-10-11, "Reply with exactly: pong": ~6.7s -> ~3.5s, ~33k -> ~10.7k
+# context tokens, same answer. Not used: --bare (it skips OAuth, so a
+# subscription login stops working).
+#   --strict-mcp-config      no MCP servers (none given via --mcp-config)
+#   --disable-slash-commands no skills
+#   --restricted             no code-running tools; ignores user/project
+#                            settings files; file tools stay in the folder
+CLAUDE_LEAN = ["--strict-mcp-config", "--disable-slash-commands", "--restricted"]
+
+
 def default_backends(edit: bool = False,
-                     free_models: dict[str, str] | None = None) -> dict[str, Backend]:
+                     free_models: dict[str, str] | None = None,
+                     lean: bool = True) -> dict[str, Backend]:
     """CLI and opt-in API backends. With edit=True the AIs may change files in
     the current folder: Claude auto-accepts file edits only (other tools
     still need approval, which a one-shot can't give, so they're refused),
     Codex gets its workspace-write sandbox, and Grok joins only where its OS
     sandbox works (not on Windows)."""
     claude_args = ["-p", "--permission-mode", "acceptEdits"] if edit else ["-p"]
+    if lean:
+        claude_args += CLAUDE_LEAN
     codex_sandbox = "workspace-write" if edit else "read-only"
     backends: list[Backend] = [
         CLIBackend("claude", exe="claude", args=claude_args),

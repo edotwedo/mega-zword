@@ -156,7 +156,8 @@ def main(argv: list[str] | None = None,
                   "then run `megazword doctor`", file=sys.stderr)
             return 2
     if backends is None:
-        backends = default_backends(edit=getattr(args, "edit", False), free_models=cfg.free)
+        backends = default_backends(edit=getattr(args, "edit", False), free_models=cfg.free,
+                                    lean=cfg.lean)
     rater = rater if rater is not None else (lambda p: rate(p, cfg.rater_model))
 
     if args.command == "backends":
