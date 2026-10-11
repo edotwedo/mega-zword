@@ -46,6 +46,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+    init = sub.add_parser("init", help="write a default config file")
+    init.add_argument("--force", action="store_true", help="replace an existing config")
 
     retry = sub.add_parser("retry", help="last answer not good enough: ask a stronger AI")
     retry.add_argument("-m", "--model", help="force which AI tries next")
@@ -53,8 +55,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def show_usage() -> int:
+    from datetime import timedelta
+    from .runlog import summarize
     from .usage_sources import all_usage
-    for plan in all_usage():
+    for plan in all_usage(config.HOME / "log.jsonl"):
         if not plan.windows:
             print(f"{plan.service:7} -  {plan.note}")
             continue
@@ -64,6 +68,17 @@ def show_usage() -> int:
             parts.append(f"{w.name} {w.used_percent:.0f}%{reset}")
         note = f"  ({plan.note})" if plan.note else ""
         print(f"{plan.service:7} {' | '.join(parts)}{note}")
+    print("\nMega Zword runs (last 24h)")
+    runs = summarize(config.HOME / "log.jsonl", timedelta(hours=24))
+    print("AI      runs ok rej/bad sec chars")
+    for name in ("claude", "codex", "grok"):
+        item = runs.get(name)
+        if item:
+            chars = item.prompt_chars + item.answer_chars
+            print(f"{name:7} {item.runs:4} {item.ok:2} "
+                  f"{item.rejected}/{item.failed:<3} {item.seconds:3.0f} {chars:5}")
+        else:
+            print(f"{name:7}    0  0   0   0     0")
     return 0
 
 
@@ -107,6 +122,21 @@ def main(argv: list[str] | None = None,
     if args.command == "backends":
         for name, b in backends.items():
             print(f"{name:10} {'installed' if b.available() else 'not found'}")
+        return 0
+
+    if args.command == "init":
+        installed = [name for name, backend in backends.items() if backend.available()]
+        path = config.HOME / "config.toml"
+        try:
+            config.write_default(path, installed, args.force)
+        except FileExistsError:
+            print(f"[megazword] config already exists: {path} (use --force to replace)",
+                  file=sys.stderr)
+            return 1
+        from . import ollama
+        print(f"[megazword] wrote {path}")
+        print(f"[megazword] installed AIs: {', '.join(installed) if installed else 'none'}")
+        print(f"[megazword] Ollama: {'reachable' if ollama.reachable() else 'not reachable'}")
         return 0
 
     if args.command == "usage":

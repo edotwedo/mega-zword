@@ -85,6 +85,22 @@ def test_backends_lists_availability(capsys, cfg):
     assert "ghost" in out and "not found" in out
 
 
+def test_init_writes_only_installed_backends_and_refuses_overwrite(capsys, cfg, monkeypatch):
+    monkeypatch.setattr(config, "HOME", cfg.log_path.parent / "home")
+    backends = {"claude": FakeBackend("claude"),
+                "codex": FakeBackend("codex", installed=False)}
+    from megazword import ollama
+    monkeypatch.setattr(ollama, "reachable", lambda: False)
+    assert main(["init"], backends, cfg) == 0
+    path = config.HOME / "config.toml"
+    loaded = config.load(path)
+    assert loaded.route == {"easy": ["claude"], "medium": ["claude"],
+                            "hard": ["claude"]}
+    assert "codex" not in path.read_text()
+    assert main(["init"], backends, cfg) == 1
+    assert "use --force" in capsys.readouterr().err
+
+
 def test_prompt_placeholder_goes_in_args():
     b = CLIBackend("x", exe="python", args=["-c", "{prompt}"])
     cmd, stdin = b._command("print(1)")
