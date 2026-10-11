@@ -16,7 +16,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .log import trim
+from .filelock import locked
+from .log import trim_unlocked
 
 KINDS = ("note", "decision", "done")
 DEFAULT_MEMORY_LINES = 2000
@@ -55,10 +56,12 @@ class Memory:
         entry = Entry(time or datetime.now(timezone.utc).isoformat(timespec="seconds"),
                       kind, text.strip(), by)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(asdict(entry)) + "\n")
-        # Decisions are the rules every AI follows; trimming never drops them.
-        trim(self.path, self.max_lines, protect=lambda line: '"kind": "decision"' in line)
+        with locked(self.path):  # other megazword processes may write too
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(asdict(entry)) + "\n")
+            # Decisions are the rules every AI follows; trimming never drops them.
+            trim_unlocked(self.path, self.max_lines,
+                          protect=lambda line: '"kind": "decision"' in line)
         return entry
 
     def entries(self) -> list[Entry]:

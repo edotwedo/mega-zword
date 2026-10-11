@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config
+from .filelock import locked, write_atomic
 
 KEEP = 50
 
@@ -25,9 +26,10 @@ def add(prompt: str, answer: str, backend: str, project: str, rating: str | None
     record = {"time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
               "backend": backend, "project": project, "rating": rating,
               "prompt": prompt, "answer": answer}
-    lines = p.read_text(encoding="utf-8").splitlines() if p.exists() else []
-    lines = [*lines, json.dumps(record)][-keep:]
-    p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with locked(p):  # parallel dashboard jobs can finish at the same moment
+        lines = p.read_text(encoding="utf-8").splitlines() if p.exists() else []
+        lines = [*lines, json.dumps(record)][-keep:]
+        write_atomic(p, "\n".join(lines) + "\n")
 
 
 def recent(n: int = 20) -> list[dict]:
