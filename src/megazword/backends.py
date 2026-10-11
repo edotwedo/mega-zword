@@ -14,6 +14,8 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 
+from . import ollama
+
 DEFAULT_TIMEOUT = 600  # seconds
 
 
@@ -102,6 +104,24 @@ class CodexBackend(CLIBackend):
                 return f.read()
         finally:
             os.remove(out_path)
+
+
+@dataclass
+class OllamaBackend(Backend):
+    """A model on a local Ollama server.
+
+    Not added by default_backends(); the router registers the ones it wants.
+    `available` only checks that the server answers, not that `model` is pulled.
+    """
+
+    model: str = ""
+    url: str = ollama.DEFAULT_URL
+
+    def available(self) -> bool:
+        return ollama.reachable(self.url)
+
+    def _run(self, prompt: str) -> str:
+        return ollama.generate(prompt, self.model, self.url, timeout=self.timeout)
 
 
 def default_backends() -> dict[str, Backend]:
