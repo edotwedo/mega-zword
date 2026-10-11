@@ -51,6 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     retry = sub.add_parser("retry", help="last answer not good enough: ask a stronger AI")
     retry.add_argument("-m", "--model", help="force which AI tries next")
+    sub.add_parser("chat", help="start an interactive conversation")
     return parser
 
 
@@ -169,6 +170,10 @@ def main(argv: list[str] | None = None,
     if args.command == "retry":
         return retry_last(args, backends, cfg)
 
+    if args.command == "chat":
+        from .chat import run
+        return run(backends, cfg, rater, statuses or plan_statuses)
+
     # command == "run"
     prompt = args.prompt if args.prompt is not None else sys.stdin.read()
     if not prompt.strip():
@@ -208,7 +213,8 @@ ONE_SHOT_NOTE = ("[Sent by Mega Zword as a one-shot task. Answer it directly. Sk
 
 def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
             memory: Memory, rating: Rating | None, forced: bool,
-            start_after: str | None = None, prior_answer: str | None = None) -> int:
+            start_after: str | None = None, prior_answer: str | None = None,
+            on_answer: Callable[[str], None] | None = None) -> int:
     """Run the chain with escalation, log every attempt, print the answer,
     and remember the run so `megazword retry` can pick it up."""
     first_line = prompt.strip().splitlines()[0][:80]
@@ -233,7 +239,10 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
     result = outcome.result
     save_last_run(sent, prompt, [b.name for b in chain], result.backend, result.text,
                   memory.project, rating.level if rating else None)
-    print(result.text)
+    if on_answer is None:
+        print(result.text)
+    else:
+        on_answer(result.text)
     print(f"[megazword] {result.backend} answered in {result.seconds:.1f}s"
           + (" (after escalating)" if outcome.escalated else ""), file=sys.stderr)
     return 0
@@ -252,7 +261,8 @@ def save_last_run(sent, prompt, chain, backend, answer, project, level) -> None:
                                 "project": project, "rating": level}), encoding="utf-8")
 
 
-def retry_last(args, backends: dict[str, Backend], cfg: config.Config) -> int:
+def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
+               on_answer: Callable[[str], None] | None = None) -> int:
     import json
     path = last_run_path()
     if not path.exists():
@@ -283,7 +293,7 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config) -> int:
           file=sys.stderr)
     return execute(last["sent"], last["prompt"], chain, cfg, memory, rating,
                    forced=bool(args.model), start_after=last["backend"],
-                   prior_answer=last["answer"])
+                   prior_answer=last["answer"], on_answer=on_answer)
 
 
 if __name__ == "__main__":
