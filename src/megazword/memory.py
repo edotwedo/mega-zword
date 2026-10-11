@@ -45,10 +45,10 @@ class Memory:
         self.project = project
         self.path = home / "projects" / project / "memory.jsonl"
 
-    def add(self, kind: str, text: str, by: str = "phil") -> Entry:
+    def add(self, kind: str, text: str, by: str = "phil", time: str | None = None) -> Entry:
         if kind not in KINDS:
             raise ValueError(f"kind must be one of {KINDS}")
-        entry = Entry(datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        entry = Entry(time or datetime.now(timezone.utc).isoformat(timespec="seconds"),
                       kind, text.strip(), by)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as f:
@@ -67,22 +67,30 @@ class Memory:
     def recent(self, n: int = 10, kinds: tuple[str, ...] = KINDS) -> list[Entry]:
         return [e for e in self.entries() if e.kind in kinds][-n:]
 
-    def context_block(self, n: int = 10) -> str:
-        """Recent memory formatted for the top of a prompt. Decisions are
-        always included (they're the rules); notes and done items fill the rest."""
+    def context_block(self, n: int = 10, max_decisions: int = 15,
+                      max_chars: int = 300) -> str:
+        """Recent memory formatted for the top of a prompt: the newest
+        decisions (they're the rules), then recent notes and done items.
+        Capped so context never eats much of a paid plan's usage."""
         entries = self.entries()
-        decisions = [e for e in entries if e.kind == "decision"]
+        decisions = sorted((e for e in entries if e.kind == "decision"),
+                           key=lambda e: e.time)[-max_decisions:]
         others = [e for e in entries if e.kind != "decision"][-n:]
         if not decisions and not others:
             return ""
         lines = [f"[Project memory for '{self.project}', kept by Mega Zword]"]
         if decisions:
             lines.append("Decisions (follow these):")
-            lines += [f"- {e.text}" for e in decisions]
+            lines += [f"- {_clip(e.text, max_chars)}" for e in decisions]
         if others:
             lines.append("Recent activity:")
-            lines += [f"- {e.time[:16]} {e.by} {e.kind}: {e.text}" for e in others]
+            lines += [f"- {e.time[:16]} {e.by} {e.kind}: {_clip(e.text, max_chars)}"
+                      for e in others]
         return "\n".join(lines)
+
+
+def _clip(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: limit - 3].rstrip() + "..."
 
 
 def with_context(prompt: str, block: str) -> str:

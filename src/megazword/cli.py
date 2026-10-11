@@ -35,6 +35,11 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("-p", "--project")
         cmd.add_argument("--by", default="phil", help="who is adding it")
 
+    imp = sub.add_parser("import-hive",
+                         help="copy decisions and open handoffs from an old Hive repo clone")
+    imp.add_argument("repo", help="path to a local clone of the workshop repo")
+    imp.add_argument("-p", "--project", default="hive")
+
     hist = sub.add_parser("history", help="show project memory")
     hist.add_argument("-n", type=int, default=20)
     hist.add_argument("-p", "--project")
@@ -103,6 +108,20 @@ def main(argv: list[str] | None = None,
 
     if args.command == "usage":
         return show_usage()
+
+    if args.command == "import-hive":
+        from pathlib import Path
+        from .hive_import import import_hive
+        repo = Path(args.repo)
+        if not (repo / "DECISIONS.md").exists() and not (repo / "handoffs").is_dir():
+            print(f"[megazword] {repo} doesn't look like a Hive repo "
+                  "(no DECISIONS.md or handoffs/)", file=sys.stderr)
+            return 2
+        memory = Memory(config.HOME, args.project)
+        decisions, handoffs = import_hive(repo, memory)
+        print(f"[megazword] imported {decisions} decisions and {handoffs} open handoffs "
+              f"into '{memory.project}' memory (old repo not changed)", file=sys.stderr)
+        return 0
 
     if args.command in ("note", "decide", "history"):
         memory = Memory(config.HOME, args.project or project_name())

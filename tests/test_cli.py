@@ -26,11 +26,6 @@ class FakeBackend(Backend):
         return f"{self.reply}: {prompt}"
 
 
-@pytest.fixture(autouse=True)
-def isolated_home(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "HOME", tmp_path / "home")
-
-
 @pytest.fixture
 def cfg(tmp_path):
     return config.Config(
