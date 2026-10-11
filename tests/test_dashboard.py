@@ -195,3 +195,19 @@ def test_remote_post_still_needs_header(remote_server):
 
 def test_serve_refuses_all_interfaces():
     assert dashboard.serve(host="0.0.0.0", open_browser=False) == 2
+
+
+def test_daily_tokens_cover_full_log_not_only_recent_runs(app):
+    now = datetime.now(timezone.utc)
+    rows = [dict(time=now.isoformat(), backend="claude", ok=True, est_tokens=3)
+            for _ in range(65)]
+    rows += [dict(time=now.isoformat(), backend="grok", ok=False, prompt_chars=400),
+             dict(time=(now - timedelta(days=2)).isoformat(), backend="claude",
+                  ok=True, est_tokens=999)]
+    app.cfg.log_path.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
+    state = app.state()
+    assert len(state["runs"]) == 60
+    assert state["runs"][2]["est_tokens"] == 3
+    assert state["runs_24h"]["claude"]["runs"] == 65
+    assert state["runs_24h"]["claude"]["est_tokens"] == 195
+    assert state["runs_24h"]["grok"]["est_tokens"] == 0
