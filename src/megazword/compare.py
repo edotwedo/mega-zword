@@ -45,10 +45,10 @@ def run(sent: str, prompt: str, names: list[str], backends: dict[str, Backend],
         results: list[Result] = list(pool.map(lambda b: b.run(sent), chosen))
 
     first_line = prompt.strip().splitlines()[0][:80]
-    from .cli import auto_mark_out
+    from .cli import explain_failure
     for r in results:
         if not r.ok:
-            auto_mark_out(r.backend, r.error, cfg)
+            explain_failure(r.backend, r.error, cfg)
         log.append(cfg.log_path, cfg.log_lines, backend=r.backend, forced=True, compare=True,
                    project=memory.project,
                    rating=level, rater=None, seconds=round(r.seconds, 2), ok=r.ok,

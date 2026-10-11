@@ -202,6 +202,16 @@ def main() -> int:
               r.returncode == 0 and "=== claude · " in r.stdout and "=== codex · " in r.stdout,
               r.stdout + r.stderr)
 
+        r = mz(env, work, "run", "AUTH-claude please", "-m", "claude")
+        r2 = mz(env, work, "out")
+        check("expired login explained with the fix, not marked out",
+              "isn't logged in" in r.stderr and "claude auth login" in r.stderr
+              and "claude" not in r2.stdout, r.stderr + r2.stdout)
+
+        r = mz(env, work, "run", "NET-grok NET-codex NET-claude offline")
+        check("two network failures in a row stop the chain",
+              r.returncode == 1 and "probably your connection" in r.stderr, r.stderr[-400:])
+
         r = mz(env, work, "run", "LIMIT-codex over the cap", "-m", "codex")
         r2 = mz(env, work, "out")
         check("usage-limit error auto-marks the AI out",

@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 from typing import Callable
 
-from . import __version__, config, log
+from . import __version__, config, failures, log
 from .memory import Memory, project_name, with_context
 from .backends import Backend, apply_grok_effort, default_backends, grok_label
 from .escalate import escalate, looks_failed
@@ -316,9 +316,12 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
     for b in chain:  # per-AI timeouts from config ([timeouts] claude = 600)
         b.timeout = cfg.timeouts.get(b.name, b.timeout)
 
+    network = failures.Watch()
+
     def on_attempt(name, result, reason):
+        failure = None
         if not result.ok:
-            auto_mark_out(name, result.error, cfg)
+            failure = explain_failure(name, result.error, cfg)
         log.append(cfg.log_path, cfg.log_lines, backend=name, forced=forced, project=memory.project,
                    rating=rating.level if rating else None,
                    rater=rating.source if rating else None,
@@ -327,17 +330,23 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
                    est_tokens=(len(prompt) + len(result.text)) // 4)
         memory.add("done", f"{'REJECTED (' + reason + ')' if reason else 'ok'}: {first_line}",
                    by=name)
-        if reason:
+        if reason and not failure:
             print(f"[megazword] {name} rejected after {result.seconds:.1f}s: {reason}",
                   file=sys.stderr)
+        network.saw(failure)  # two network failures in a row stops the chain
 
     judge = looks_failed
     if cfg.quality_check and not forced:
         # Only auto-picked runs: if Phil chose the AI, don't second-guess it.
         from .quality import judge_for
         judge = judge_for(prompt, cfg.rater_model, looks_failed)
-    outcome = escalate(ONE_SHOT_NOTE + sent, chain, judge=judge, on_attempt=on_attempt,
-                       start_after=start_after, prior_answer=prior_answer)
+    try:
+        outcome = escalate(ONE_SHOT_NOTE + sent, chain, judge=judge, on_attempt=on_attempt,
+                           start_after=start_after, prior_answer=prior_answer)
+    except failures.NetworkDown:
+        print("[megazword] stopped: two AIs in a row couldn't reach the internet, so it's "
+              "probably your connection. Check it and try again.", file=sys.stderr)
+        return 1
     if outcome.result is None:
         print("[megazword] no AI gave a usable answer", file=sys.stderr)
         return 1
@@ -376,6 +385,19 @@ def out_command(args, cfg: config.Config) -> int:
     else:
         print(f"[megazword] {args.ai} is back in the rotation")
     return 0
+
+
+def explain_failure(name: str, error: str, cfg: config.Config):
+    """Print a plain-English reason + fix for a failed attempt. Usage limits
+    also mark the AI out; auth/network/missing/timeout never do."""
+    failure = failures.classify(name, error)
+    if failure is None:
+        return None
+    if failure.kind == "limit":
+        auto_mark_out(name, error, cfg)
+    else:
+        print(f"[megazword] {failures.line(failure)}", file=sys.stderr)
+    return failure
 
 
 def auto_mark_out(name: str, error: str, cfg: config.Config) -> bool:

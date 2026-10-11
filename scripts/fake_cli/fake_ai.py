@@ -20,6 +20,12 @@ def main() -> int:
             prompt = f.read()
     else:
         prompt = sys.stdin.read()
+    if f"AUTH-{name}" in prompt:  # simulate an expired login
+        print("Error: Not logged in. Please run the login command.", file=sys.stderr)
+        return 1
+    if f"NET-{name}" in prompt:  # simulate no internet
+        print("Error: getaddrinfo ENOTFOUND api.example.com", file=sys.stderr)
+        return 1
     if f"LIMIT-{name}" in prompt:  # simulate an out-of-usage error (Codex wording)
         print("ERROR: You’ve hit your usage limit. Upgrade to Pro "
               "(https://chatgpt.com/explore/pro) or try again at 2:39 AM.", file=sys.stderr)
