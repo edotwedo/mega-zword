@@ -44,10 +44,15 @@
   - C5 (Codex): Gemini CLI backend (read-only plan mode, never in edit mode, not routed by default; Gemini isn't installed here).
   - F7 (Forge): chat Ctrl+C cancels the call, not the chat; `/cost`; persistent history if pyreadline3 is installed.
   - C6 (Codex, finished by Kestrel review): dashboard Settings panel: route order, timeouts, limits, quality_check; safe config writer (atomic, validates, restores on failure).
-  - 272 tests, 21/21 smoke checks pass.
+  - F8 (Forge): cross-process file locks for log/memory/answers/last_run (fixed real torn lines from parallel dashboard jobs).
+  - F9 (Forge): compare mode: `run --compare claude,codex "..."` + dashboard Compare (side by side, stacks on phones).
+  - F10 (Forge): usage-limit errors auto-mark that AI out until its reset (tested on Codex's real message); config writes locked.
+  - F11 (Forge): "this one's best" votes on compare, `megazword advise` (suggests route order, never applies), Suggestions box on the dashboard.
+  - Dashboard visually checked (headless Edge screenshot) with real data; phone grid fix.
+  - 301 tests, 24/24 smoke checks pass.
 
 ## In progress
-- Kestrel: dispatch/merge (heartbeat :13/:43). Forge: F8 file locking, then F9 compare mode. Codex: OUT of usage until ~2:39 AM (marked out in config until 02:45); Reed-09's review job waits in the relay inbox.
+- Kestrel: dispatch/merge (heartbeat :13/:43). Forge: F12 merging Reed-09's review fixes (codex/review, 9 findings), then F13 flaky-test hunt. Codex: OUT until ~2:39 AM; then Reed-09 does C7 (docs/GUIDE.md + SPEC status), queued in relay inbox.
 
 ## Overnight backlog (2026-10-11, Phil asleep; Kestrel assigns)
 Rules: take the top unclaimed item in your lane, write your name next to it,
