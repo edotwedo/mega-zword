@@ -192,3 +192,27 @@ Configuration, run logs, and project notes live in `~/.megazword` (on Windows, `
 ## License
 
 GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](LICENSE). Versions before 1.0 stay AGPL-3.0.
+
+## Optional free API backends
+
+Set `OPENROUTER_API_KEY` or `GROQ_API_KEY` in the environment, then run
+`megazword run "your prompt" -m openrouter` or `-m groq`.
+`megazword doctor` reports whether each key is set, without displaying it.
+`.env.example` lists the variables; Mega Zword does not load `.env` files.
+
+Defaults are `qwen/qwen3-4b:free` for OpenRouter and `llama-3.3-70b-versatile`
+for Groq. Override them in `~/.megazword/config.toml`:
+
+```toml
+[free.openrouter]
+model = "qwen/qwen3-4b:free"
+
+[free.groq]
+model = "llama-3.3-70b-versatile"
+```
+
+These chat-only backends are excluded from `--edit`. They are registered but
+are not in any default route, including routes created by `megazword init`.
+Availability means a nonempty key is set; it does not verify the key, model,
+or remaining quota. Provider free tiers have limits, and model overrides
+may select paid models. Request failures return a failed result normally.

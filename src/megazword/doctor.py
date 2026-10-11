@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -51,6 +52,11 @@ def checks(home: Path | None = None) -> list[Check]:
             found.append(Check("WARN", name, "found, version unavailable",
                                f"check {name} --version"))
 
+    for name, key_env in (("openrouter", "OPENROUTER_API_KEY"), ("groq", "GROQ_API_KEY")):
+        present = bool(os.environ.get(key_env))
+        found.append(Check("OK" if present else "WARN", name,
+                           "key set" if present else "key not set"))
+
     path = home / "config.toml"
     cfg = config.Config()
     if not path.exists():
@@ -72,7 +78,7 @@ def checks(home: Path | None = None) -> list[Check]:
     short = [n for n, t in cfg.timeouts.items() if t < 60]
     found.append(Check("WARN" if short else "OK", "timeouts", waits,
                        f"under 60s may cut off real work: {', '.join(short)}" if short else ""))
-    known = {"claude", "codex", "grok"}
+    known = {"claude", "codex", "grok", "openrouter", "groq"}
     unknown = sorted({name for route in cfg.route.values() for name in route
                       if name not in known})
     found.append(Check("WARN" if unknown else "OK", "routes",

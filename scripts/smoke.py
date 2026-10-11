@@ -37,6 +37,8 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 
 def make_env(tmp: Path) -> dict:
     env = dict(os.environ)
+    for key in ("OPENROUTER_API_KEY", "GROQ_API_KEY"):
+        env.pop(key, None)
     home = tmp / "home"
     home.mkdir()
     env.update({
