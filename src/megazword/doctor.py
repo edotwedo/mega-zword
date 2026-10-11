@@ -66,6 +66,12 @@ def checks(home: Path | None = None) -> list[Check]:
     found.append(Check("WARN" if active else "OK", "out marks",
                        ", ".join(sorted(active)) if active else "none active",
                        "review [out] in config.toml" if active else ""))
+    from .backends import DEFAULT_TIMEOUT
+    waits = ", ".join(f"{n} {cfg.timeouts.get(n, DEFAULT_TIMEOUT)}s"
+                      for n in ("claude", "codex", "grok"))
+    short = [n for n, t in cfg.timeouts.items() if t < 60]
+    found.append(Check("WARN" if short else "OK", "timeouts", waits,
+                       f"under 60s may cut off real work: {', '.join(short)}" if short else ""))
     known = {"claude", "codex", "grok"}
     unknown = sorted({name for route in cfg.route.values() for name in route
                       if name not in known})

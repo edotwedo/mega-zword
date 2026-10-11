@@ -1,7 +1,7 @@
 """A stand-in for the claude / codex / grok CLIs, used by scripts/smoke.py.
 
 Answers instantly, costs nothing. Put "REFUSE-<name>" in a prompt to make
-that fake AI refuse, which exercises escalation.
+that fake AI refuse, or "SLEEP-<name>" to make it hang (tests timeouts).
 """
 
 import sys
@@ -17,6 +17,9 @@ def main() -> int:
             prompt = f.read()
     else:
         prompt = sys.stdin.read()
+    if f"SLEEP-{name}" in prompt:  # simulate a hung AI
+        import time
+        time.sleep(60)
     last = prompt.strip().splitlines()[-1] if prompt.strip() else ""
     answer = "I can't." if f"REFUSE-{name}" in prompt else f"[fake {name}] ok: {last[:60]}"
     if "-o" in args:  # codex writes its final message to a file

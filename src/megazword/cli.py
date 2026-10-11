@@ -260,6 +260,8 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
     """Run the chain with escalation, log every attempt, print the answer,
     and remember the run so `megazword retry` can pick it up."""
     first_line = prompt.strip().splitlines()[0][:80]
+    for b in chain:  # per-AI timeouts from config ([timeouts] claude = 600)
+        b.timeout = cfg.timeouts.get(b.name, b.timeout)
 
     def on_attempt(name, result, reason):
         log.append(cfg.log_path, backend=name, forced=forced,

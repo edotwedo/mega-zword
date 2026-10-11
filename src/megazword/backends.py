@@ -73,19 +73,24 @@ class CLIBackend(Backend):
         return [path, *self.args], prompt
 
     def _exec(self, cmd: list[str], stdin: str | None) -> str:
-        proc = subprocess.run(
-            cmd,
-            input=stdin,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=self.timeout,
-        )
+        # Own process group so a timeout can kill the whole tree: on Windows
+        # the CLIs are .cmd shims whose node child would otherwise keep the
+        # pipes open and hang us after the shim itself is killed.
+        group = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+                 if os.name == "nt" else {"start_new_session": True})
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                                errors="replace", **group)
+        try:
+            out, err = proc.communicate(stdin, timeout=self.timeout)
+        except subprocess.TimeoutExpired:
+            _kill_tree(proc)
+            raise TimeoutError(f"{self.exe} gave no answer within {self.timeout}s "
+                               "(change [timeouts] in config.toml)") from None
         if proc.returncode != 0:
-            detail = (proc.stderr or proc.stdout).strip()[-500:]
+            detail = (err or out).strip()[-500:]
             raise RuntimeError(f"{self.exe} exited with code {proc.returncode}: {detail}")
-        return proc.stdout
+        return out
 
     def _run(self, prompt: str) -> str:
         if "{prompt_file}" not in self.args:
@@ -102,6 +107,23 @@ class CLIBackend(Backend):
                                       for a in self.args)], None)
         finally:
             os.remove(path)
+
+
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """Kill a process and everything it started, then reap it."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                           capture_output=True, timeout=15)
+        else:
+            import signal
+            os.killpg(proc.pid, signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        proc.kill()
+    try:
+        proc.communicate(timeout=5)
+    except (subprocess.TimeoutExpired, ValueError):
+        pass
 
 
 @dataclass

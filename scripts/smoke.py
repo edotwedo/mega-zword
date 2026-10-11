@@ -173,6 +173,20 @@ def main() -> int:
         r = mz(env, work, "out")
         check("out --clear brings it back", "no AI is marked out" in r.stdout, r.stdout + r.stderr)
 
+        with open(tmp / "mz" / "config.toml", "a", encoding="utf-8") as f:
+            f.write("
+[timeouts]
+grok = 3
+")
+        start = time.monotonic()
+        r = mz(env, work, "run", "SLEEP-grok hang please", "-m", "grok")
+        check("timeout: hung AI is cut off and reported",
+              r.returncode == 1 and "gave no answer within 3s" in r.stderr
+              and time.monotonic() - start < 30, r.stderr[-300:])
+        r = mz(env, work, "run", "SLEEP-grok hang please")
+        check("timeout: auto run escalates past a hung AI",
+              r.returncode == 0 and "ok:" in r.stdout, r.stdout + r.stderr)
+
         r = mz(env, work, "usage")
         check("usage runs without real meters", r.returncode == 0 and "Mega Zword runs" in r.stdout,
               r.stdout + r.stderr)
