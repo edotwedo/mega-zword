@@ -75,6 +75,9 @@
 ## In progress
 - Kestrel: dispatch/merge. Forge: F22. Reed-09's C7 documentation is complete on `codex/guide` and queued for Kestrel to review and merge.
 
+## Next up
+- **Antigravity backend (Phil, 2026-10-11, unclaimed):** Google retired the Gemini CLI for personal accounts on 2026-06-18; its successor is the Antigravity CLI, command `agy`. Phil installed it on his PC at `%LOCALAPPDATA%\agy\bin\agy.exe` (PATH fix given; he still needs to run `agy` once to sign in). Our `gemini` backend calls the retired `gemini` command, so it won't work for him. Next step, on Phil's PC: run `agy --help` and find the one-shot prompt flag, read-only/plan mode and model flag; add an `antigravity` backend modeled on the gemini one (read-only, not routed by default until Phil says), point `-m gemini` at it or retire the old one, update README + doctor, tests with a fake CLI. Reported: agy reads AGENTS.md and GEMINI.md; usage meter unknown.
+
 ## Overnight backlog (2026-10-11, Phil asleep; Kestrel assigns)
 Rules: take the top unclaimed item in your lane, write your name next to it,
 work on a branch, push, hand the branch to Kestrel to merge. Tests must pass.
