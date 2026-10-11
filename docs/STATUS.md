@@ -59,7 +59,9 @@
   - F19 (Forge): dashboard notifications when a job finishes in a hidden tab, "/" and Esc shortcuts, copy buttons.
   - F20 (Forge): plain-English failure reasons with the fix (login, network, missing, timeout, limit); two network failures in a row stop the chain; only limits mark an AI out.
   - F21 (Forge reviewing Codex's code): config typo or BOM no longer crashes every command; free-API network/429 messages fixed; doctor can't hang on .cmd shims; install.ps1 no longer flattens %VARS% in the user PATH (would have damaged Phil's PATH).
-  - 379 tests, 27/27 smoke checks pass.
+  - F22 (Forge): lean Claude one-shots (--strict-mcp-config --disable-slash-commands --restricted): ~6.7s -> ~3.5s, ~33k -> ~11k context tokens, same answers; `[oneshot] lean = false` turns it off. Codex lean flag measured after its reset.
+  - F23 (Forge): plain `megazword` shows a start screen (plans, out marks, last runs, top commands).
+  - 386 tests, 27/27 smoke checks pass.
 
 ## In progress
 - Kestrel: dispatch/merge (heartbeat :13/:43). Forge: F22. Codex: OUT until ~2:39 AM; then Reed-09 does C7 (docs/GUIDE.md + SPEC status), queued in relay inbox.
