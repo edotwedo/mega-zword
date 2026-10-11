@@ -1,4 +1,7 @@
 # Install Mega Zword for this Windows user from this checkout.
+#   -Shortcut  also add "Mega Zword" to your Desktop and Start Menu (this user
+#              only); it opens the dashboard in its own app window.
+param([switch]$Shortcut)
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
@@ -37,6 +40,23 @@ if ($pipx) {
     $bin = Join-Path $venv 'Scripts'
     Add-UserPath $bin
     $doctor = Join-Path $bin 'megazword.exe'
+}
+
+if ($Shortcut) {
+    # Re-running overwrites the same two shortcuts, so this is safe to repeat.
+    $shell = New-Object -ComObject WScript.Shell
+    $places = @([Environment]::GetFolderPath('Desktop'),
+                [Environment]::GetFolderPath('Programs'))
+    foreach ($folder in $places) {
+        $link = $shell.CreateShortcut((Join-Path $folder 'Mega Zword.lnk'))
+        $link.TargetPath = $doctor
+        $link.Arguments = 'dashboard --app'
+        $link.WorkingDirectory = $HOME
+        $link.WindowStyle = 7  # start the server window minimized
+        $link.Description = 'Mega Zword dashboard'
+        $link.Save()
+        Write-Host "Shortcut: $(Join-Path $folder 'Mega Zword.lnk')"
+    }
 }
 
 & $doctor doctor

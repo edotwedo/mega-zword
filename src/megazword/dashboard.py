@@ -386,7 +386,7 @@ LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
 
 def serve(port: int = 8765, project: str | None = None, open_browser: bool = True,
-          host: str = "127.0.0.1") -> int:
+          host: str = "127.0.0.1", app_window: bool = False) -> int:
     if host in ("0.0.0.0", "::", ""):
         print("[megazword] refusing to listen on every network; pass your Tailscale IP "
               "(see `tailscale ip -4`)", file=sys.stderr)
@@ -404,7 +404,13 @@ def serve(port: int = 8765, project: str | None = None, open_browser: bool = Tru
               "Keep it private; it changes every launch.", file=sys.stderr)
     print(f"[megazword] dashboard at {url}  (project: {app.project}; Ctrl+C to stop)",
           file=sys.stderr)
-    if open_browser:
+    if open_browser and app_window:
+        from .appwindow import open_app
+
+        def launch() -> None:
+            print(f"[megazword] {open_app(url)}", file=sys.stderr)
+        threading.Timer(0.5, launch).start()
+    elif open_browser:
         threading.Timer(0.5, webbrowser.open, args=(url,)).start()
     try:
         server.serve_forever()

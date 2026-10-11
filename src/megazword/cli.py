@@ -65,6 +65,8 @@ def build_parser() -> argparse.ArgumentParser:
     dash.add_argument("--port", type=int, default=8765)
     dash.add_argument("-p", "--project")
     dash.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
+    dash.add_argument("--app", action="store_true",
+                      help="open in its own app window (Edge/Chrome app mode) instead of a tab")
     dash.add_argument("--host", default="127.0.0.1",
                       help="address to listen on; use your Tailscale IP for phone access")
     init = sub.add_parser("init", help="write a default config file")
@@ -188,7 +190,7 @@ def main(argv: list[str] | None = None,
     if args.command == "dashboard":
         from .dashboard import serve
         return serve(args.port, args.project, not args.no_browser and args.host == "127.0.0.1",
-                     args.host)
+                     args.host, app_window=args.app)
 
     if args.command == "import-hive":
         from .hive_import import import_hive
