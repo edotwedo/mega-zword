@@ -63,6 +63,9 @@ class Config:
     grok: dict[str, tuple[str, str]] = field(default_factory=lambda: dict(DEFAULT_GROK))
     # Looked up when a Config is made (not at import) so tests can redirect HOME.
     log_path: Path = field(default_factory=lambda: HOME / "log.jsonl")
+    # How many lines log.jsonl and each project's memory.jsonl keep ([limits]).
+    log_lines: int = 5000
+    memory_lines: int = 2000
     # AI name -> seconds to wait for an answer before giving up on it.
     timeouts: dict[str, int] = field(default_factory=dict)
     # Second-opinion check on auto-picked answers (local model). Off by default.
@@ -96,6 +99,10 @@ def load(path: Path | None = None) -> Config:
         cfg.route.update(data.get("route", {}))
         cfg.quality_check = bool(data.get("quality_check", cfg.quality_check))
         cfg.out_until = {name: _as_time(v) for name, v in data.get("out", {}).items()}
+        limits = data.get("limits", {})
+        for key in ("log_lines", "memory_lines"):
+            if isinstance(limits.get(key), int) and limits[key] > 0:
+                setattr(cfg, key, limits[key])
         cfg.timeouts = {name: int(v) for name, v in data.get("timeouts", {}).items()
                         if isinstance(v, (int, float)) and v > 0}
 

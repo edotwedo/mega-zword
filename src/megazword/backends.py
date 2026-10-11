@@ -76,11 +76,9 @@ class CLIBackend(Backend):
         # Own process group so a timeout can kill the whole tree: on Windows
         # the CLIs are .cmd shims whose node child would otherwise keep the
         # pipes open and hang us after the shim itself is killed.
-        group = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
-                 if os.name == "nt" else {"start_new_session": True})
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True, encoding="utf-8",
-                                errors="replace", **group)
+                                errors="replace", **process_group())
         try:
             out, err = proc.communicate(stdin, timeout=self.timeout)
         except subprocess.TimeoutExpired:
@@ -109,8 +107,16 @@ class CLIBackend(Backend):
             os.remove(path)
 
 
-def _kill_tree(proc: subprocess.Popen) -> None:
-    """Kill a process and everything it started, then reap it."""
+def process_group() -> dict:
+    """Popen kwargs that start a child in its own process group, so
+    _kill_tree() can later take down everything it started."""
+    return ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+            if os.name == "nt" else {"start_new_session": True})
+
+
+def _kill_tree(proc: subprocess.Popen, reap: bool = True) -> None:
+    """Kill a process and everything it started. With reap=False the caller
+    is already reading the pipes and waiting on the process (dashboard jobs)."""
     try:
         if os.name == "nt":
             subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
@@ -120,6 +126,8 @@ def _kill_tree(proc: subprocess.Popen) -> None:
             os.killpg(proc.pid, signal.SIGKILL)
     except (OSError, subprocess.SubprocessError):
         proc.kill()
+    if not reap:
+        return
     try:
         proc.communicate(timeout=5)
     except (subprocess.TimeoutExpired, ValueError):
