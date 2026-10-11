@@ -5,16 +5,7 @@ param([switch]$Shortcut)
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
-function Add-UserPath([string]$directory) {
-    $current = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $parts = @($current -split ';' | Where-Object { $_ })
-    if (-not ($parts | Where-Object { $_.TrimEnd('\') -ieq $directory.TrimEnd('\') })) {
-        [Environment]::SetEnvironmentVariable('Path', (($parts + $directory) -join ';'), 'User')
-    }
-    if (-not (($env:Path -split ';') | Where-Object { $_.TrimEnd('\') -ieq $directory.TrimEnd('\') })) {
-        $env:Path += ";$directory"
-    }
-}
+. (Join-Path $PSScriptRoot 'userpath.ps1')  # Add-UserPath
 
 $pipx = Get-Command pipx -ErrorAction SilentlyContinue
 if ($pipx) {

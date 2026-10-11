@@ -86,6 +86,7 @@ def test_doctor_checks_gemini_and_accepts_custom_route(tmp_path, monkeypatch, in
         return SimpleNamespace(returncode=0, stdout="fake 1.0\n", stderr="")
 
     monkeypatch.setattr(doctor.subprocess, "run", version)
+    monkeypatch.setattr("megazword.backends.run_quick", version)  # doctor's hang-proof runner
     (tmp_path / "config.toml").write_text('[route]\neasy = ["gemini"]\n')
     lines = "\n".join(item.line() for item in doctor.checks(tmp_path))
     assert ("OK gemini: fake 1.0" if installed else "WARN gemini: not on PATH") in lines

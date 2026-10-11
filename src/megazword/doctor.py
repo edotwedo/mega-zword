@@ -40,8 +40,11 @@ def checks(home: Path | None = None) -> list[Check]:
             found.append(Check("WARN", name, "not on PATH", f"install {name} or add it to PATH"))
             continue
         try:
-            proc = subprocess.run([path, "--version"], capture_output=True, text=True,
-                                  encoding="utf-8", errors="replace", timeout=3)
+            # run_quick kills the whole tree on timeout (npm .cmd shims would
+            # otherwise hang subprocess.run past its timeout). 10s: node CLIs
+            # can take a few seconds to start on a cold Windows machine.
+            from .backends import run_quick
+            proc = run_quick([path, "--version"], timeout=10)
             version = (proc.stdout or proc.stderr).strip().splitlines()
             if proc.returncode == 0 and version:
                 found.append(Check("OK", name, version[0][:120]))

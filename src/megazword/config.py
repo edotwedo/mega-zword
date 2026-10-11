@@ -98,7 +98,8 @@ def load(path: Path | None = None) -> Config:
     path = path if path is not None else HOME / "config.toml"
     cfg = Config()
     if path.exists():
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        # utf-8-sig: Notepad's "UTF-8 with BOM" would otherwise break parsing.
+        data = tomllib.loads(path.read_text(encoding="utf-8-sig"))
         cfg.rater_model = data.get("rater_model", cfg.rater_model)
         cfg.route.update(data.get("route", {}))
         cfg.quality_check = bool(data.get("quality_check", cfg.quality_check))
@@ -297,14 +298,16 @@ def _set_key(path: Path, table: str, key: str, value: str | None) -> None:
     from .filelock import locked
     with _WRITE_LOCK, locked(path):
         old = path.read_bytes() if path.exists() else None
-        text = old.decode("utf-8") if old is not None else ""
+        bom = old is not None and old.startswith(b"\xef\xbb\xbf")
+        text = old.decode("utf-8-sig") if old is not None else ""
         edited = _edit_key(text, table, key, value)
         if edited == text:
             return
         path.parent.mkdir(parents=True, exist_ok=True)
         replaced = False
         try:
-            _atomic_replace(path, edited.encode("utf-8"))
+            # Keep a byte-order mark if the file had one.
+            _atomic_replace(path, (b"\xef\xbb\xbf" if bom else b"") + edited.encode("utf-8"))
             replaced = True
             load(path)  # Confirm the actual file through the application's loader.
         except Exception:

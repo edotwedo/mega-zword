@@ -10,6 +10,8 @@ def fake_external(monkeypatch):
     monkeypatch.setattr(doctor.shutil, "which", lambda name: f"/fake/{name}")
     monkeypatch.setattr(doctor.subprocess, "run", lambda args, **kwargs:
                         SimpleNamespace(returncode=0, stdout="version 1\n", stderr=""))
+    monkeypatch.setattr("megazword.backends.run_quick", lambda cmd, timeout:
+                        SimpleNamespace(returncode=0, stdout="version 1\n", stderr=""))
     monkeypatch.setattr(doctor.ollama, "reachable", lambda: True)
     monkeypatch.setattr(doctor.ollama, "models", lambda: {"qwen2.5:1.5b"})
     monkeypatch.setattr(doctor.usage_sources, "all_usage", lambda path: [

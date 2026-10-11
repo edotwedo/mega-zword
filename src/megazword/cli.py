@@ -147,7 +147,14 @@ def main(argv: list[str] | None = None,
     if args.command == "doctor":
         from .doctor import run
         return run()
-    cfg = cfg if cfg is not None else config.load()
+    if cfg is None:
+        try:
+            cfg = config.load()
+        except (ValueError, TypeError, OSError) as exc:  # TOMLDecodeError is a ValueError
+            print(f"[megazword] can't read {config.HOME / 'config.toml'}: {exc}\n"
+                  "[megazword] fix that line (or rename the file to start fresh), "
+                  "then run `megazword doctor`", file=sys.stderr)
+            return 2
     if backends is None:
         backends = default_backends(edit=getattr(args, "edit", False), free_models=cfg.free)
     rater = rater if rater is not None else (lambda p: rate(p, cfg.rater_model))

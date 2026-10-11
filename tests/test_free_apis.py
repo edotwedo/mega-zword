@@ -56,10 +56,11 @@ def test_available_without_network(api, monkeypatch, value):
 
 @pytest.mark.parametrize("error, message", [
     (urllib.error.HTTPError("https://example.test", 429, "secret-test-credential", {},
-                            io.BytesIO(b"secret-test-credential")), "API HTTP error 429"),
+                            io.BytesIO(b"secret-test-credential")), "API HTTP error 429: rate limited"),
     (TimeoutError("secret-test-credential"), "API request timed out"),
     (urllib.error.URLError(TimeoutError("secret-test-credential")), "API request timed out"),
-    (urllib.error.URLError("secret-test-credential"), "API connection failed"),
+    (urllib.error.URLError("secret-test-credential"),
+     "API connection failed: unable to connect (network or DNS)"),
     (OSError("secret-test-credential"), "API request failed"),
 ])
 def test_failures_are_safe_results(api, monkeypatch, error, message):

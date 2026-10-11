@@ -112,6 +112,21 @@ class CLIBackend(Backend):
             os.remove(path)
 
 
+def run_quick(cmd: list[str], timeout: float) -> subprocess.CompletedProcess:
+    """subprocess.run for short commands (e.g. `--version`) that can't hang:
+    on timeout the whole tree is killed, so a .cmd shim's node child can't
+    keep the pipes open. Raises subprocess.TimeoutExpired like run()."""
+    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, text=True, encoding="utf-8",
+                            errors="replace", **process_group())
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_tree(proc)
+        raise
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+
 def process_group() -> dict:
     """Popen kwargs that start a child in its own process group, so
     _kill_tree() can later take down everything it started."""
@@ -236,7 +251,12 @@ def default_backends(edit: bool = False,
         # been verified, especially on Windows. auto_edit is not containment.
         backends.append(CLIBackend("gemini", exe="gemini",
                                    args=["--approval-mode", "plan", "--output-format", "text"]))
-        from .config import load
+        from .config import Config, load
         from .free_apis import free_backends
-        backends.extend(free_backends(free_models if free_models is not None else load().free))
+        if free_models is None:
+            try:
+                free_models = load().free
+            except (ValueError, TypeError, OSError):  # broken config.toml: use defaults
+                free_models = Config().free
+        backends.extend(free_backends(free_models))
     return {b.name: b for b in backends}
