@@ -1,12 +1,13 @@
 # Status
 
-**Active (2026-10-11 16:20 UTC): Cedar-7 (Codex) — correcting the dashboard phone-access wording on `codex/guide` at Phil’s request.**
+**Active: none. Kestrel remains in charge of main, merges and assignments (Phil’s call).**
 - **Kestrel** (Claude Code): lead. Owns main, decides merges and assignments, also building `megazword dashboard` (claude/dashboard).
 - **Forge** (Claude Code): edit-mode fixes on branch claude/edit-mode; hands finished branches to Kestrel.
 - **Codex**: C7 user guide and spec status complete on `codex/guide`; see `docs/GUIDE.md`. C1/C2 doctor and installer work is on `codex/doctor`.
 **Last updated:** 2026-10-11 by Reed-09 (Codex)
 
 ## Done
+- Cedar-7 (Codex, 2026-10-11): clarified that remote dashboard use requires both Tailscale access and the per-launch token in `docs/GUIDE.md`; documentation-only.
 - Lean one-shots (Forge, F22, 2026-10-11): routed `claude -p` now adds --strict-mcp-config --disable-slash-commands --restricted (all documented; permission modes untouched; `[oneshot] lean = false` turns it off). Measured direct, "Reply with exactly: pong", 2 runs each: normal 6.6s/6.9s, ~32-33k context tokens, API-equivalent $0.14/$0.12; lean 3.5s/3.6s, ~10.7k tokens, $0.021/$0.002; answers identical. Edit mode verified still writes files. Rejected: --bare (skips OAuth, breaks subscription login); codex --ignore-user-config (drops Phil's model choice) and --ephemeral (kills the Codex usage meter). Codex `-c mcp_servers={}` measured 2026-10-11 ~03:00 (2 runs each): 5.5s/6.0s -> 4.7s/4.8s, tokens identical (6,315), same answer; shipped under [oneshot] lean. Grok has no documented startup-trim flag.
 - Reed-09 (Codex) bug-fix review merged by Forge (F12, 2026-10-11). Landed: dashboard jobs publish "done" only after both output readers finish (no lost final output); job start/state snapshots share a lock and retention evicts only finished jobs (all slots running -> clear error); API rejects non-object JSON, list-valued model, negative Content-Length (400) and bodies over 1 MB (413), launch/file errors return JSON 500; explicit X-MZ-Token beats a stale cookie, malformed cookies -> 403; answers.recent() reads under the file lock, skips non-object records, keep<1 rejected; run table escapes prompt/answer counts and tolerates string seconds; doctor reports wrong config types as FAIL and continues. Already covered on main and dropped from the review: cancel process tree (filelock/_kill_tree), answers writer lock (filelock + write_atomic), 24h chart full-day count (runs_24h).
 - Reed-09 (Codex, C7): `docs/GUIDE.md` covers all commands in `megazword --help`, daily use, dashboard panels, Tailscale browser access, and doctor-led troubleshooting. `docs/SPEC.md` now marks each build step built or partly built with its command. Branch `codex/guide`, ready for Kestrel to merge.
