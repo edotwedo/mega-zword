@@ -6,6 +6,7 @@
 - Codex: reads the rate-limit snapshot Codex writes into its own session logs
   (~/.codex/sessions). As fresh as the last Codex run.
 - Grok: no local plan meter exists; reports Mega Zword's own recent run counts.
+- Gemini: plan usage not tracked yet; reports Mega Zword's own recent run counts.
 """
 
 from __future__ import annotations
@@ -100,6 +101,20 @@ def grok(log_path: Path | None = None) -> PlanUsage:
                           f"in the last 5h, {weekly.runs if weekly else 0} this week")
 
 
+def gemini(log_path: Path | None = None) -> PlanUsage:
+    """No verified local quota source; these counts cover only our own runs."""
+    if log_path is None:
+        from . import config
+        log_path = config.HOME / "log.jsonl"
+    from .runlog import summarize
+    now = datetime.now(timezone.utc)
+    recent = summarize(log_path, timedelta(hours=5), now).get("gemini")
+    weekly = summarize(log_path, timedelta(days=7), now).get("gemini")
+    return PlanUsage("gemini", [], "Mega Zword run log",
+                     note=f"plan usage not tracked yet; Mega Zword sent {recent.runs if recent else 0} runs "
+                          f"in the last 5h, {weekly.runs if weekly else 0} this week")
+
+
 def _find_key(obj, key):
     if isinstance(obj, dict):
         if key in obj:
@@ -126,8 +141,9 @@ def all_usage(log_path: Path | None = None) -> list[PlanUsage]:
             out.append(fn())
         except Exception as exc:
             out.append(PlanUsage(name, [], "error", note=f"{type(exc).__name__}: {exc}"))
-    try:
-        out.append(grok(log_path))
-    except Exception as exc:
-        out.append(PlanUsage("grok", [], "error", note=f"{type(exc).__name__}: {exc}"))
+    for name, fn in (("grok", grok), ("gemini", gemini)):
+        try:
+            out.append(fn(log_path))
+        except Exception as exc:
+            out.append(PlanUsage(name, [], "error", note=f"{type(exc).__name__}: {exc}"))
     return out

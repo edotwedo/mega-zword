@@ -1,4 +1,4 @@
-"""A stand-in for the claude / codex / grok CLIs, used by scripts/smoke.py.
+"""A stand-in for the claude / codex / grok / gemini CLIs, used by scripts/smoke.py.
 
 Answers instantly, costs nothing. Put "REFUSE-<name>" in a prompt to make
 that fake AI refuse, or "SLEEP-<name>" to make it hang (tests timeouts).
@@ -12,6 +12,9 @@ def main() -> int:
     if "--version" in args:
         print(f"fake-{name} 0.0")
         return 0
+    if name == "gemini" and args != ["--approval-mode", "plan", "--output-format", "text"]:
+        print("fake Gemini requires read-only flags and stdin input", file=sys.stderr)
+        return 42
     if "--prompt-file" in args:
         with open(args[args.index("--prompt-file") + 1], encoding="utf-8") as f:
             prompt = f.read()
