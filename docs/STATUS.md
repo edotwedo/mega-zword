@@ -1,6 +1,6 @@
 # Status
 
-**Active:** none
+**Active:** Claude Code coordinating overnight (2026-10-11 00:00). Codex on branch codex/overnight (usage tracking, init, README). Claude on main (Hive import, merges).
 **Last updated:** 2026-10-10 by Claude Code
 
 ## Done

@@ -26,7 +26,7 @@ on it. The old system is only a place to copy open work from, then retire.
 ## Hardware
 - PC: GTX 1660 (6 GB VRAM). Good for the small difficulty-rating model and 7-8B
   models at 4-bit.
-- Phone: 16 GB RAM, the stronger local box, but not always online. Runs a model
+- Phone: 16 GB RAM, the stronger local box, but not always online. Ollama already installed on it (2026-10-10). Runs a model
   server (Ollama or llama.cpp in Termux). Mega Zword checks it's reachable over
   Tailscale before each task and falls back if not. ADB is not needed.
 
