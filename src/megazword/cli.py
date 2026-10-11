@@ -30,6 +30,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("-p", "--project", help="project name (default: current repo/folder)")
     run.add_argument("-e", "--edit", action="store_true",
                      help="let the AI change files in the current folder")
+    run.add_argument("--compare", metavar="AIS",
+                     help="same prompt on 2-3 AIs at once, e.g. claude,codex")
 
     for name, help_text in (("note", "save a note to project memory"),
                             ("decide", "record a decision every AI must follow")):
@@ -217,6 +219,22 @@ def main(argv: list[str] | None = None,
     if not prompt.strip():
         print("No prompt given.", file=sys.stderr)
         return 2
+
+    if args.compare:
+        from . import compare
+        if args.model or args.edit:
+            print("[megazword] --compare can't be combined with -m or --edit "
+                  "(parallel edits to one folder would collide)", file=sys.stderr)
+            return 2
+        apply_grok_effort(backends, "medium", cfg.grok)
+        try:
+            names = compare.parse_names(args.compare, backends)
+        except ValueError as exc:
+            print(f"[megazword] {exc}", file=sys.stderr)
+            return 2
+        memory = Memory(config.HOME, args.project or project_name(), cfg.memory_lines)
+        sent = with_context(prompt, memory.context_block()) if args.context else prompt
+        return compare.run(ONE_SHOT_NOTE + sent, prompt, names, backends, cfg, memory)
 
     rating: Rating | None = None
     if args.model:
