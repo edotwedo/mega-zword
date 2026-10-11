@@ -55,7 +55,7 @@
   - F14 (Forge): `scripts/live_check.py --yes-spend`: Phil's opt-in real check (one "pong" per AI + one auto run).
   - F15 (Forge): `megazword dashboard --app` (own Edge window); `scripts/install.ps1 -Shortcut` (Desktop + Start Menu); MZ favicon.
   - F16 (Forge): `megazword projects` + dashboard project switcher (traversal-safe names).
-  - CI prep (Forge): Unix fake CLIs executable, pytest finds src/ itself. CI workflow itself waits on Phil (see Next step).
+  - F17 (Forge): GitHub Actions CI (.github/workflows/test.yml): pytest + smoke on Windows and Ubuntu, Python 3.11 and 3.12, every push and PR, no secrets. First run 38166747316 passed. Warnings to handle later: checkout/setup-python run on deprecated Node 20; ubuntu-latest becomes Ubuntu 26 on Oct 19.
   - F19 (Forge): dashboard notifications when a job finishes in a hidden tab, "/" and Esc shortcuts, copy buttons.
   - F20 (Forge): plain-English failure reasons with the fix (login, network, missing, timeout, limit); two network failures in a row stop the chain; only limits mark an AI out.
   - F21 (Forge reviewing Codex's code): config typo or BOM no longer crashes every command; free-API network/429 messages fixed; doctor can't hang on .cmd shims; install.ps1 no longer flattens %VARS% in the user PATH (would have damaged Phil's PATH).
@@ -121,8 +121,7 @@ Unassigned / ideas:
   prep; keep 127.0.0.1 default).
 
 ## Next step (needs Phil)
-- **CI (2 minutes):** run `gh auth refresh -h github.com -s workflow` once. GitHub blocked pushing the CI workflow because the gh login lacks the "workflow" permission. Then tell Kestrel or Forge; the ready commit is 77334c0 on claude/ci (worktree C:\Users\mrmar\mz-forge18).
-- Morning live check (costs a few dozen tokens per AI): `python scripts/live_check.py --yes-spend`. Runs doctor (stops on FAIL), sends "Reply with exactly: pong" once to each installed, not-out AI via `megazword run -m`, then once via auto-pick, and prints AI / ok / seconds / answer length. Without --yes-spend it only explains itself. Never run by the bots.
+- Morning live check (costs a few dozen tokens per AI): from C:\Users\mrmar\mega-zword run `.venv\Scripts\python scripts\live_check.py --yes-spend`. Runs doctor (stops on FAIL), sends "Reply with exactly: pong" once to each installed, not-out AI via `megazword run -m`, then once via auto-pick, and prints AI / ok / seconds / answer length. Without --yes-spend it only explains itself. Never run by the bots.
 Build step 5: phone access (see SPEC.md). Needs Phil at the PC and phone.
 1. Install Tailscale on PC and phone, sign in to the same account.
 2. Enable Windows OpenSSH Server (admin PowerShell:
