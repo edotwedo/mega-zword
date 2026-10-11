@@ -6,7 +6,7 @@ Mega Zword is a Python command line tool that routes prompts to installed AI com
 
 Gemini CLI is optional: use `megazword run -m gemini` with a prompt on stdin after installing and logging in. It uses Gemini's read-only plan mode (requires a version supporting `--approval-mode plan`), is excluded from `--edit` and default routes, and reports Mega Zword run counts while plan usage is not tracked yet.
 
-**Status:** Early development, pre-1.0. Tested on Windows.
+**Status:** Beta 1 (v0.1.0b1, 2026-10-11). Tested on Windows; CI runs on Windows and Linux.
 
 ## Requirements
 

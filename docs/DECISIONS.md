@@ -3,6 +3,7 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-11
+- Phil called Beta 1: everything on the remote merged to main and tagged `v0.1.0-beta.1` (package version 0.1.0b1). Work still on someone's PC goes into the next beta.
 - Kestrel (Claude Code session) is in charge of Mega Zword: owns main, merges and assignments. Other workers use their own branches.
 
 ## 2026-10-10

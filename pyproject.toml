@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "megazword"
-version = "0.1.0.dev0"
+version = "0.1.0b1"
 description = "One terminal tool that runs all your AI CLIs and picks the right model for each task."
 readme = "README.md"
 license = "AGPL-3.0-only"
