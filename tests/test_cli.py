@@ -122,3 +122,16 @@ def test_rater_falls_back_when_ollama_down(monkeypatch):
     monkeypatch.setattr(rater.ollama, "generate", down)
     r = rater.rate("hi")
     assert r.source == "rule" and "unavailable" in r.reason
+
+
+def test_codex_usage_from_log(tmp_path, monkeypatch):
+    from megazword import usage_sources
+    day = tmp_path / ".codex" / "sessions" / "2026" / "10" / "10"
+    day.mkdir(parents=True)
+    rec = {"payload": {"rate_limits": {
+        "primary": {"used_percent": 3.0, "window_minutes": 300, "resets_at": 1791711582},
+        "secondary": {"used_percent": 0.0, "window_minutes": 10080, "resets_at": 1792298382}}}}
+    (day / "rollout.jsonl").write_text(json.dumps(rec) + "\n")
+    monkeypatch.setattr(usage_sources, "HOME", tmp_path)
+    plan = usage_sources.codex()
+    assert [(w.name, w.used_percent) for w in plan.windows] == [("5-hour", 3.0), ("weekly", 0.0)]

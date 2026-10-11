@@ -24,7 +24,23 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("-m", "--model", help="force a specific AI, e.g. claude")
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
+    sub.add_parser("usage", help="show each AI plan's current usage")
     return parser
+
+
+def show_usage() -> int:
+    from .usage_sources import all_usage
+    for plan in all_usage():
+        if not plan.windows:
+            print(f"{plan.service:7} -  {plan.note}")
+            continue
+        parts = []
+        for w in plan.windows:
+            reset = f", resets {w.resets_at.astimezone():%a %I:%M %p}" if w.resets_at else ""
+            parts.append(f"{w.name} {w.used_percent:.0f}%{reset}")
+        note = f"  ({plan.note})" if plan.note else ""
+        print(f"{plan.service:7} {' | '.join(parts)}{note}")
+    return 0
 
 
 def pick(rating: Rating, route: dict[str, list[str]],
@@ -50,6 +66,9 @@ def main(argv: list[str] | None = None,
         for name, b in backends.items():
             print(f"{name:10} {'installed' if b.available() else 'not found'}")
         return 0
+
+    if args.command == "usage":
+        return show_usage()
 
     # command == "run"
     prompt = args.prompt if args.prompt is not None else sys.stdin.read()
