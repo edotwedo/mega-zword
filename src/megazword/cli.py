@@ -100,9 +100,11 @@ LEVELS = ("easy", "medium", "hard")
 
 
 def candidates(rating: Rating, route: dict[str, list[str]],
-               backends: dict[str, Backend], statuses: dict | None = None) -> list[Backend]:
+               backends: dict[str, Backend], statuses: dict | None = None,
+               out: set[str] = frozenset()) -> list[Backend]:
     """Installed AIs to try, in order: this difficulty's route (ranked by
-    pacing when statuses are given), then stronger routes as fallbacks."""
+    pacing when statuses are given), then stronger routes as fallbacks.
+    AIs in `out` (marked out of usage in config) are skipped."""
     from .pacing import rank
     names: list[str] = []
     for level in LEVELS[LEVELS.index(rating.level):]:
@@ -110,7 +112,8 @@ def candidates(rating: Rating, route: dict[str, list[str]],
         if statuses is not None:
             level_names = rank(statuses, level_names, rating.level)
         names += [n for n in level_names if n not in names]
-    return [backends[n] for n in names if n in backends and backends[n].available()]
+    return [backends[n] for n in names
+            if n in backends and n not in out and backends[n].available()]
 
 
 def main(argv: list[str] | None = None,
@@ -194,13 +197,17 @@ def main(argv: list[str] | None = None,
         print(f"[megazword] using {backend.name} (you chose it)", file=sys.stderr)
     else:
         rating = rater(prompt)
-        chain = candidates(rating, cfg.route, backends, (statuses or plan_statuses)())
+        out = cfg.out_now()
+        chain = candidates(rating, cfg.route, backends, (statuses or plan_statuses)(), out)
         if not chain:
             print(f"[megazword] no installed AI for a {rating.level} task; "
                   f"check the route in {config.HOME / 'config.toml'}", file=sys.stderr)
             return 1
         print(f"[megazword] rated {rating.level} ({rating.reason}) -> using {chain[0].name}",
               file=sys.stderr)
+        if out:
+            print(f"[megazword] skipped (marked out in config): {', '.join(sorted(out))}",
+                  file=sys.stderr)
     if getattr(args, "edit", False):
         print(f"[megazword] edit mode: AIs may change files in {Path.cwd()}", file=sys.stderr)
 
@@ -290,7 +297,8 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
         names = list(dict.fromkeys([last["backend"], *cfg.route.get("hard", []),
                                     *last["chain"]]))
     chain = [backends[n] for n in names
-             if n in backends and (n == last["backend"] or backends[n].available())]
+             if n in backends and (n == last["backend"]
+                                   or (n not in cfg.out_now() and backends[n].available()))]
     if not any(b.name != last["backend"] for b in chain):
         print(f"[megazword] no AI left to try after {last['backend']}", file=sys.stderr)
         return 1

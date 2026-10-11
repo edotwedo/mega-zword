@@ -237,6 +237,29 @@ def test_retry_before_any_run(capsys, cfg):
     assert main(["retry"], {}, cfg) == 2
 
 
+def test_marked_out_ai_is_skipped(capsys, cfg):
+    from datetime import datetime, timedelta, timezone
+    cfg.route = {"easy": ["cheap", "strong"], "medium": ["strong"], "hard": ["strong"]}
+    cfg.out_until = {"cheap": datetime.now(timezone.utc) + timedelta(days=7)}
+    backends = {"cheap": FakeBackend("cheap", reply="c"), "strong": FakeBackend("strong", reply="s")}
+    assert main(["run", "hi"], backends, cfg, rated("easy"), dict) == 0
+    out = capsys.readouterr()
+    assert out.out.startswith("s: ") and "skipped (marked out in config): cheap" in out.err
+
+
+def test_out_mark_expires(cfg):
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    cfg.out_until = {"a": now - timedelta(hours=1), "b": now + timedelta(hours=1)}
+    assert cfg.out_now() == {"b"}
+
+
+def test_out_table_loads_dates_and_times(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text('[out]\ngrok = 2026-10-17T23:30:00-07:00\ncodex = 2026-10-12\n')
+    cfg = config.load(p)
+    assert cfg.out_until["grok"].isoformat() == "2026-10-17T23:30:00-07:00"
+    assert cfg.out_until["codex"].tzinfo is not None
 def test_edit_mode_backend_args():
     from megazword.backends import default_backends
     ro, rw = default_backends(), default_backends(edit=True)

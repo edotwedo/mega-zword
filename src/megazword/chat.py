@@ -139,9 +139,9 @@ def run(backends: dict[str, Backend], cfg: config.Config,
             chain = [backends[pinned]]
             write(f"[megazword] using {pinned} (pinned)")
         else:
-            rating = rater(sent)
+            rating = rater(message)  # rate the new message, not the whole chat
             chain = cli.candidates(rating, cfg.route, backends,
-                                   (statuses or cli.plan_statuses)())
+                                   (statuses or cli.plan_statuses)(), cfg.out_now())
             if not chain:
                 write(f"[megazword] no installed AI for a {rating.level} task")
                 continue
