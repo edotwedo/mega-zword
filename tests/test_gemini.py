@@ -195,7 +195,7 @@ def test_gemini_meter_reads_agy_usage(monkeypatch):
 
     monkeypatch.setattr(backends, "run_quick", fake_run)
     meter = usage_sources.gemini()
-    assert seen == [["fake-agy.exe", "-p", "/usage", "--output-format", "json"]]
+    assert seen == [["fake-agy.exe", "-p", "/usage", "--output-format", "json", "--print-timeout", "45s"]]
     assert meter.source == "agy /usage"
     by_name = {w.name: w for w in meter.windows}
     assert by_name["5-hour"].used_percent == pytest.approx(25)

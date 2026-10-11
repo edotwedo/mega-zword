@@ -3,9 +3,12 @@
 - Claude: asks Anthropic's usage endpoint with the login Claude Code already
   saved (~/.claude/.credentials.json). Unofficial endpoint, read-only. The
   token is only sent to api.anthropic.com and never printed or logged.
-- Codex: reads the rate-limit snapshot Codex writes into its own session logs
-  (~/.codex/sessions). As fresh as the last Codex run.
-- Grok: no local plan meter exists; reports Mega Zword's own recent run counts.
+- Codex: asks Codex's own app server for its live rate limits
+  (`account/rateLimits/read`, no model call). Falls back to the snapshot Codex
+  writes into its session logs (~/.codex/sessions), as fresh as the last run.
+- Grok: reads the billing line the Grok CLI logs when it fetches its credits
+  (~/.grok/logs/unified.jsonl: weekly creditUsagePercent). Without it, reports
+  Mega Zword's own recent run counts.
 - Gemini: asks the Antigravity CLI (`agy -p /usage --output-format json`, its
   quota panel; reads, never prompts a model). Without agy, reports Mega
   Zword's own recent run counts.
@@ -67,7 +70,63 @@ def claude() -> PlanUsage:
     return PlanUsage("claude", windows, "anthropic usage endpoint")
 
 
+def _window_label(mins) -> str:
+    mins = int(mins or 0)
+    return "weekly" if mins >= 10080 else f"{mins // 60}-hour"
+
+
+def _codex_cmd() -> list[str] | None:
+    import shutil
+    exe = shutil.which("codex")
+    return [exe, "app-server"] if exe else None
+
+
+def codex_live(timeout: float = 15) -> PlanUsage | None:
+    """Ask Codex's own app server (`codex app-server`, JSON-RPC on stdio) for
+    `account/rateLimits/read`: the live plan meter, no model call, under a
+    second. None when Codex isn't installed or doesn't answer in time."""
+    cmd = _codex_cmd()
+    if not cmd:
+        return None
+    import subprocess
+    import threading
+    from .backends import _kill_tree, process_group
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
+                            errors="replace", **process_group())
+    timer = threading.Timer(timeout, _kill_tree, args=(proc, False))
+    timer.start()
+    try:
+        for msg in ({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                     "params": {"clientInfo": {"name": "megazword", "version": "1"}}},
+                    {"jsonrpc": "2.0", "method": "initialized"},
+                    {"jsonrpc": "2.0", "id": 2, "method": "account/rateLimits/read"}):
+            proc.stdin.write(json.dumps(msg) + "\n")
+        proc.stdin.flush()
+        for line in proc.stdout:  # ends when the timer kills a silent server
+            try:
+                msg = json.loads(line)
+            except ValueError:
+                continue
+            if msg.get("id") == 2:
+                limits = (msg.get("result") or {}).get("rateLimits") or {}
+                windows = [Window(_window_label(w.get("windowDurationMins")),
+                                  float(w.get("usedPercent") or 0), _ts(w.get("resetsAt")))
+                           for w in (limits.get("primary"), limits.get("secondary")) if w]
+                return PlanUsage("codex", windows, "codex app-server (live)") if windows else None
+        return None
+    finally:
+        timer.cancel()
+        _kill_tree(proc, reap=False)
+
+
 def codex() -> PlanUsage:
+    try:
+        live = codex_live()
+    except (OSError, ValueError):
+        live = None
+    if live:
+        return live
     logs = sorted((HOME / ".codex" / "sessions").rglob("*.jsonl"),
                   key=lambda p: p.stat().st_mtime, reverse=True)
     for path in logs[:20]:
@@ -96,7 +155,50 @@ def codex() -> PlanUsage:
     return PlanUsage("codex", [], "codex session log", note="no rate-limit data found yet")
 
 
+GROK_BILLING_MSG = "billing: fetched credits config"
+
+
+def grok_billing(now: datetime | None = None) -> PlanUsage | None:
+    """Grok's plan meter from the billing line the Grok CLI logs each time it
+    fetches its credits (~/.grok/logs/unified.jsonl): creditUsagePercent and the
+    weekly period. Reads only the end of the log. None when no line is found."""
+    path = HOME / ".grok" / "logs" / "unified.jsonl"
+    if not path.is_file():
+        return None
+    with path.open("rb") as f:
+        f.seek(max(0, path.stat().st_size - 4_000_000))
+        tail = f.read().decode("utf-8", errors="replace").splitlines()
+    for line in reversed(tail):
+        if GROK_BILLING_MSG not in line:
+            continue
+        try:
+            entry = json.loads(line)
+            cfg = entry["ctx"]["config"]
+            used = float(cfg["creditUsagePercent"])
+            end = _ts(cfg.get("billingPeriodEnd") or cfg["currentPeriod"]["end"])
+            seen = _ts(entry["ts"])
+        except (ValueError, KeyError, TypeError):
+            continue
+        now = now or datetime.now(timezone.utc)
+        if end and now >= end:
+            # The week rolled over after this reading; Grok hasn't fetched the
+            # new one yet (it does when it next runs), so don't show stale use.
+            nxt = end
+            while nxt <= now:
+                nxt += timedelta(days=7)
+            return PlanUsage("grok", [Window("weekly", 0.0, nxt)], "grok billing log",
+                             note=f"new week since {end.astimezone():%a %I:%M %p}; "
+                                  "exact use shows after Grok's next run")
+        return PlanUsage("grok", [Window("weekly", used, end)], "grok billing log",
+                         note=f"as of Grok's last check ({seen.astimezone():%a %I:%M %p})",
+                         as_of=seen)
+    return None
+
+
 def grok(log_path: Path | None = None) -> PlanUsage:
+    billing = grok_billing()
+    if billing:
+        return billing
     if log_path is None:
         from . import config
         log_path = config.HOME / "log.jsonl"
@@ -151,7 +253,9 @@ def gemini(log_path: Path | None = None) -> PlanUsage:
     agy = _agy_path()
     if agy:
         from .backends import run_quick
-        proc = run_quick([agy, "-p", "/usage", "--output-format", "json"], timeout=30)
+        # --print-timeout: without it agy can quit before Google's quota server answers.
+        proc = run_quick([agy, "-p", "/usage", "--output-format", "json", "--print-timeout", "45s"],
+                         timeout=60)
         if proc.returncode != 0:
             raise RuntimeError(f"agy /usage exited {proc.returncode}: "
                                f"{(proc.stderr or proc.stdout).strip()[-200:]}")

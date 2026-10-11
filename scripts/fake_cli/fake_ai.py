@@ -9,6 +9,8 @@ import sys
 
 def main() -> int:
     name, args = sys.argv[1], sys.argv[2:]
+    if args[:1] == ["app-server"]:  # no fake Codex app server: Mega Zword falls back to logs
+        return 1
     if "--version" in args:
         print(f"fake-{name} 0.0")
         return 0
@@ -16,7 +18,7 @@ def main() -> int:
         print("fake Gemini requires read-only flags and stdin input", file=sys.stderr)
         return 42
     if name == "agy":  # Antigravity CLI: the prompt is the value of -p
-        if args == ["-p", "/usage", "--output-format", "json"]:
+        if args[:4] == ["-p", "/usage", "--output-format", "json"]:
             print('{"status":"SUCCESS","command":{"name":"usage","data":{"groups":[{"name":'
                   '"Gemini Models","buckets":[{"id":"g","window":"weekly",'
                   '"remaining_fraction":0.9,"reset_time":"2030-01-01T00:00:00Z"}]}]}}}')

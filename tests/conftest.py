@@ -13,3 +13,5 @@ def isolated_home(tmp_path, monkeypatch):
     monkeypatch.setattr(usage_sources, "HOME", tmp_path / "userhome")
     # ...and never run a real Antigravity CLI for its quota.
     monkeypatch.setattr(usage_sources, "_agy_path", lambda: None)
+    # ...or a real Codex app server for its live rate limits.
+    monkeypatch.setattr(usage_sources, "_codex_cmd", lambda: None)
