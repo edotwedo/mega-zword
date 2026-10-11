@@ -164,6 +164,15 @@ def main() -> int:
         check("--context sends project memory", "ok:" in r.stdout and r.returncode == 0,
               r.stdout + r.stderr)
 
+        mz(env, work, "out", "grok", "--until", "1d")
+        r = mz(env, work, "run", "while grok is out")
+        check("out: marked-out AI is skipped",
+              r.returncode == 0 and "[fake grok]" not in r.stdout and "ok:" in r.stdout,
+              r.stdout + r.stderr)
+        mz(env, work, "out", "grok", "--clear")
+        r = mz(env, work, "out")
+        check("out --clear brings it back", "no AI is marked out" in r.stdout, r.stdout + r.stderr)
+
         r = mz(env, work, "usage")
         check("usage runs without real meters", r.returncode == 0 and "Mega Zword runs" in r.stdout,
               r.stdout + r.stderr)
