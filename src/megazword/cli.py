@@ -46,6 +46,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+    dash = sub.add_parser("dashboard", help="open a local web page with meters, runs and a run box")
+    dash.add_argument("--port", type=int, default=8765)
+    dash.add_argument("-p", "--project")
+    dash.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
     init = sub.add_parser("init", help="write a default config file")
     init.add_argument("--force", action="store_true", help="replace an existing config")
 
@@ -144,6 +148,10 @@ def main(argv: list[str] | None = None,
 
     if args.command == "usage":
         return show_usage()
+
+    if args.command == "dashboard":
+        from .dashboard import serve
+        return serve(args.port, args.project, not args.no_browser)
 
     if args.command == "import-hive":
         from pathlib import Path

@@ -1,0 +1,123 @@
+"""Dashboard tests: no real AIs, no real meters, no real child processes."""
+
+import json
+import threading
+import urllib.error
+import urllib.request
+from datetime import datetime, timedelta, timezone
+from http.server import ThreadingHTTPServer
+
+import pytest
+
+from megazword import config, dashboard
+from megazword.usage_sources import PlanUsage, Window
+
+
+class FakeBackend:
+    def __init__(self, ok=True):
+        self.ok = ok
+
+    def available(self):
+        return self.ok
+
+
+class FakeJob:
+    def __init__(self, job_id, label, cmd, stdin):
+        self.id, self.label, self.cmd, self.stdin = job_id, label, cmd, stdin
+
+    def view(self):
+        return {"id": self.id, "label": self.label, "out": "answer", "err": "",
+                "done": True, "code": 0, "started": ""}
+
+
+@pytest.fixture
+def app(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    log = tmp_path / "log.jsonl"
+    log.write_text(json.dumps({"time": "2026-10-11T05:00:00+00:00", "backend": "claude",
+                               "ok": True, "seconds": 2.0}) + "\n")
+    reset = datetime.now(timezone.utc) + timedelta(hours=2)
+    usage = dashboard.Usage(lambda: [PlanUsage("claude", [Window("5-hour", 26.0, reset)], "test")])
+    cfg = config.Config(log_path=log,
+                        out_until={"grok": datetime.now(timezone.utc) + timedelta(days=3)})
+    return dashboard.App(cfg, "proj", usage, {"claude": FakeBackend(), "grok": FakeBackend()},
+                         FakeJob)
+
+
+def test_state_has_meters_pace_out_and_runs(app):
+    s = app.state()
+    w = s["usage"][0]["windows"][0]
+    assert w["used"] == 26.0 and 55 < w["elapsed"] < 65 and w["pace"] < 0
+    assert "grok" in s["out"] and s["runs"][0]["backend"] == "claude"
+    json.dumps(s, default=str)
+
+
+def test_run_sends_prompt_on_stdin_with_project_and_model(app):
+    job = app.run({"prompt": "hello there", "model": "claude", "context": True})["job"]
+    j = app.jobs[job]
+    assert j.stdin == "hello there"
+    assert j.cmd[-6:] == ["run", "-p", "proj", "-m", "claude", "--context"]
+
+
+def test_run_rejects_empty_and_unknown(app):
+    with pytest.raises(ValueError):
+        app.run({"prompt": "  "})
+    with pytest.raises(ValueError):
+        app.run({"prompt": "x", "model": "evil; rm"})
+
+
+def test_note_and_decision_land_in_memory(app):
+    app.note({"text": "use sonnet for setup"})
+    app.note({"text": "grok out this week", "decision": True})
+    kinds = [m["kind"] for m in app.state()["memory"]]
+    assert kinds[:2] == ["decision", "note"]
+
+
+@pytest.fixture
+def server(app):
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), None)
+    port = srv.server_address[1]
+    srv.RequestHandlerClass = dashboard.make_handler(app, port)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{port}", app
+    srv.shutdown()
+    srv.server_close()
+
+
+def _post(url, body, token=None, host=None):
+    req = urllib.request.Request(url, json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json"})
+    if token:
+        req.add_header("X-MZ-Token", token)
+    if host:
+        req.add_header("Host", host)
+    return urllib.request.urlopen(req, timeout=5)
+
+
+def test_page_carries_token_and_state_serves(server):
+    base, app = server
+    html = urllib.request.urlopen(base + "/", timeout=5).read().decode()
+    assert app.token in html and "MEGA" in html
+    state = json.loads(urllib.request.urlopen(base + "/api/state", timeout=5).read())
+    assert state["project"] == "proj"
+
+
+def test_post_without_token_is_refused(server):
+    base, app = server
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _post(base + "/api/run", {"prompt": "spend my usage"})
+    assert e.value.code == 403 and not app.jobs
+
+
+def test_foreign_host_is_refused(server):
+    base, app = server
+    with pytest.raises(urllib.error.HTTPError) as e:
+        _post(base + "/api/run", {"prompt": "x"}, app.token, host="evil.example:80")
+    assert e.value.code == 403
+
+
+def test_post_with_token_starts_job(server):
+    base, app = server
+    job = json.loads(_post(base + "/api/run", {"prompt": "hi"}, app.token).read())["job"]
+    view = json.loads(urllib.request.urlopen(f"{base}/api/job/{job}", timeout=5).read())
+    assert view["done"] and view["out"] == "answer"
