@@ -38,13 +38,40 @@ on it. The old system is only a place to copy open work from, then retire.
   `codex exec`, `grok -p`, `gemini -p`.
 
 ## Build order
-1. Core: run one task through any backend, rate difficulty, pick a model, log it.
-2. Usage tracking and reset-aware pacing.
-3. Escalate-on-failure with context passing.
-4. Shared project memory and work log (the coordination layer).
-5. Phone access setup (Tailscale + SSH) and the phone model backend.
-6. Import open work from the old Hive, then retire it.
-7. Optional dashboard window.
+1. **Built:** run prompts through supported CLI/API backends, rate difficulty,
+   choose a tool, and log each attempt. Use `megazword run`, `backends`, and
+   `doctor`. Ollama rates locally when reachable; a simple fallback rule works
+   when it is not. OpenRouter and Groq are optional forced backends and are not
+   in the default routes. Gemini is optional, read-only, and not routed by
+   default.
+2. **Built, partly estimated:** usage meters and reset-aware pacing are in
+   `megazword usage`, the start screen, and Dashboard Plans & Pace. Claude uses
+   its usage endpoint; Codex uses its latest local session snapshot; Grok,
+   Gemini, OpenRouter and Groq do not expose a plan meter here, so their counts
+   come from Mega Zword's own run log. Some readings are estimates or can be
+   stale.
+3. **Built:** `megazword run` escalates across eligible tools on failure and
+   passes prior attempts as context. `megazword retry` retries the last saved
+   answer. Optional local quality checking is controlled by
+   `quality_check = true` in the config.
+4. **Partly built:** project notes, decisions, memory context, run history,
+   answer history and exports are available through `note`, `decide`,
+   `history`, `run --context`, `chat`, `dashboard` and `export`. The project
+   memory is local; the full automatic multi-agent handoff system described in
+   the original concept is not implemented.
+5. **Partly built:** `megazword dashboard --host <tailscale-ip>` serves the
+   dashboard for a private Tailscale connection, with a per-launch token.
+   Tailscale sign-in and Windows OpenSSH setup remain manual. There is no
+   phone-model answering backend; Ollama is only used locally for rating and
+   optional answer checks.
+6. **Built for import:** `megazword import-hive <local-workshop-clone>` copies
+   old decisions and open handoffs to project memory. The import does not
+   retire or modify the old Hive; retirement remains a separate manual task.
+7. **Built:** `megazword dashboard` provides the local web view and run box.
+   `megazword dashboard --app` opens an Edge or Chrome app window when
+   available. See [GUIDE.md](GUIDE.md) for its sections and daily use.
 
 ## Open
 - Exact pacing thresholds (tune once it's running).
+- Finish step 5's user-side Tailscale/SSH setup if phone access is still wanted;
+  decide separately whether to build a phone model backend.
