@@ -18,6 +18,7 @@ class RunSummary:
     seconds: float = 0.0
     prompt_chars: int = 0
     answer_chars: int = 0
+    est_tokens: int = 0
 
 
 def read(path: Path) -> list[dict]:
@@ -67,6 +68,7 @@ def summarize(path: Path, window: timedelta, now: datetime | None = None) -> dic
         item.seconds += _number(record.get("seconds"))
         item.prompt_chars += int(_number(record.get("prompt_chars")))
         item.answer_chars += int(_number(record.get("answer_chars")))
+        item.est_tokens += int(_number(record.get("est_tokens")))
     return summaries
 
 

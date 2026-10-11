@@ -148,6 +148,7 @@ details.ans-item .qfull { color: var(--dim); margin-top: 6px; }
   <section class="wide">
     <h2>Recent runs</h2>
     <div class="scroll"><table id="runs"></table></div>
+    <div class="note">Est. tokens = (prompt + answer characters) / 4, rounded down. Old runs count as 0. This is not a billing or quota meter.</div>
   </section>
 </main>
 <div class="toast" id="toast"></div>
@@ -211,27 +212,27 @@ function renderRoute(s) {
 }
 
 function renderChart(s) {
-  const day = Date.now() - 86400e3, by = {};
-  for (const r of s.runs) if (new Date(r.time) >= day) {
-    const b = by[r.backend] ||= {ok: 0, bad: 0}; r.ok ? b.ok++ : b.bad++; }
+  const by = {};
+  for (const [name, r] of Object.entries(s.runs_24h || {}))
+    by[name] = {ok: r.ok, bad: r.rejected + r.failed, est_tokens: r.est_tokens ?? 0};
   const names = Object.keys(by);
   if (!names.length) { $("chart").innerHTML = '<div class="empty">no runs in the last 24h</div>'; return; }
   const max = Math.max(...names.map(n => by[n].ok + by[n].bad));
   $("chart").innerHTML = names.map(n => {
     const c = AICOLOR[n] || "var(--info)", b = by[n];
-    return `<div class="col"><small>${b.ok + b.bad}</small><div class="stack" style="height:${(b.ok + b.bad) / max * 80}px">
+    return `<div class="col" title="${esc(n)}: ${b.ok + b.bad} runs; ${esc(b.est_tokens)} est. tokens"><small>${b.ok + b.bad}</small><div class="stack" style="height:${(b.ok + b.bad) / max * 80}px">
       <div style="flex:${b.ok};background:${c}"></div><div style="flex:${b.bad};background:var(--bad)"></div></div>${aiTag(n)}</div>`;
   }).join("");
 }
 
 function renderRuns(s) {
   if (!s.runs.length) { $("runs").innerHTML = '<tr><td class="empty">no runs yet</td></tr>'; return; }
-  $("runs").innerHTML = `<tr><th>when</th><th>AI</th><th>rated</th><th>how</th><th>result</th><th class="num">secs</th><th class="num">prompt</th><th class="num">answer</th></tr>` +
+  $("runs").innerHTML = `<tr><th>when</th><th>AI</th><th>rated</th><th>how</th><th>result</th><th class="num">secs</th><th class="num">prompt</th><th class="num">answer</th><th class="num">est. tokens</th></tr>` +
     s.runs.slice(0, 40).map(r => `<tr><td>${ago(r.time)}</td><td>${aiTag(r.backend)}</td>
       <td>${esc(r.rating || "—")}</td><td>${r.forced ? "you picked" : "auto"}</td>
       <td class="${r.ok ? "ok" : "bad"}">${r.ok ? "ok" : esc(r.rejected || r.error || "failed")}</td>
       <td class="num">${(r.seconds ?? 0).toFixed(1)}</td><td class="num">${r.prompt_chars ?? ""}</td>
-      <td class="num">${r.answer_chars ?? ""}</td></tr>`).join("");
+      <td class="num">${r.answer_chars ?? ""}</td><td class="num">${esc(r.est_tokens ?? 0)}</td></tr>`).join("");
 }
 
 function renderAnswers(s) {
