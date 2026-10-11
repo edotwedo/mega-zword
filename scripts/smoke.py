@@ -195,6 +195,11 @@ def main() -> int:
         check("stats shows today's runs", r.returncode == 0 and "total" in r.stdout,
               r.stdout + r.stderr)
 
+        r = mz(env, work, "run", "side by side", "--compare", "claude,codex")
+        check("compare runs two AIs and prints both",
+              r.returncode == 0 and "=== claude · " in r.stdout and "=== codex · " in r.stdout,
+              r.stdout + r.stderr)
+
         r = mz(env, work, "usage")
         check("usage runs without real meters", r.returncode == 0 and "Mega Zword runs" in r.stdout,
               r.stdout + r.stderr)

@@ -62,6 +62,10 @@ pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var
 .job:first-child { border-top: 0; }
 .job .err { color: var(--dim); font-size: 12.5px; margin-bottom: 6px; }
 .job .ans { background: #0b0e14; padding: 10px; border-radius: 7px; border: 1px solid var(--line); }
+.cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.cmpcol { min-width: 0; } .cmpcol pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cmphead { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+#cmppicks label { margin-right: 6px; }
 .spin { display: inline-block; width: 10px; height: 10px; border-radius: 50%;
   border: 2px solid var(--accent); border-right-color: transparent; animation: s .8s linear infinite; }
 @keyframes s { to { transform: rotate(360deg); } }
@@ -118,6 +122,8 @@ details.ans-item .qfull { color: var(--dim); margin-top: 6px; }
     <div class="row">
       <label>AI <select id="model"><option value="">auto (route + pacing)</option></select></label>
       <label><input type="checkbox" id="context"> include project memory</label>
+      <label title="Same prompt on 2-3 AIs at once, answers side by side"><input type="checkbox" id="compare"> compare</label>
+      <span id="cmppicks" hidden></span>
       <button class="go" id="send">Send ▸</button>
       <button id="retry" title="Last answer not good enough: give it to a stronger AI">Not good enough ↑</button>
     </div>
@@ -419,7 +425,33 @@ function renderJob(j) {
     <b>${esc(j.label)}</b>${j.done ? "" : ` <span class="t">${secs}s</span>
     <button class="cancel" data-job="${esc(j.id)}" style="padding:1px 8px;font-size:12px">Cancel</button>`}
     <pre>${esc(j.err.trim())}</pre></div>
-    ${j.out ? `<div class="ans"><pre>${esc(j.out.trim())}</pre></div>` : ""}`;
+    ${j.out ? renderAnswer(j) : ""}`;
+}
+
+// Compare jobs print "=== name · 4.2s ===" before each answer; show them as
+// columns (they stack on a phone because of auto-fit).
+function renderAnswer(j) {
+  const parts = j.out.split(/^=== (.+?) · (.+?) ===$/m);
+  if (!j.label.startsWith("compare:") || parts.length < 4)
+    return `<div class="ans"><pre>${esc(j.out.trim())}</pre></div>`;
+  let cols = "";
+  for (let i = 1; i + 2 < parts.length + 1; i += 3) {
+    const failed = parts[i + 1].startsWith("failed");
+    cols += `<div class="ans cmpcol"><div class="cmphead">${aiTag(parts[i])} <span class="${failed ? "bad" : "t"}">${esc(parts[i + 1])}</span></div>
+      <pre>${esc((parts[i + 2] || "").trim())}</pre></div>`;
+  }
+  return `<div class="cmp">${cols}</div>`;
+}
+
+function renderComparePicks() {
+  const box = $("cmppicks"), on = $("compare").checked;
+  box.hidden = !on;
+  $("model").disabled = on;
+  if (!on || !state) return;
+  const was = new Set([...box.querySelectorAll("input:checked")].map(i => i.value));
+  const names = Object.entries(state.backends).filter(([n, ok]) => ok).map(([n]) => n);
+  const picked = was.size ? was : new Set(names.slice(0, 2));
+  box.innerHTML = names.map(n => `<label><input type="checkbox" value="${esc(n)}" ${picked.has(n) ? "checked" : ""}> ${esc(n)}</label>`).join(" ");
 }
 
 async function watch(id) {
@@ -443,7 +475,7 @@ async function load(refresh) {
     .map(([n, ok]) => `<option value="${esc(n)}" ${ok ? "" : "disabled"}>${esc(n)}${ok ? "" : " (not installed)"}${state.out[n] ? " (marked out)" : ""}</option>`).join("");
   sel.value = cur;
   $("meta").textContent = `project ${state.project} · ${state.runs.length} runs logged · updated ${new Date().toLocaleTimeString()}`;
-  renderSettings(state.settings); renderPlans(state); renderRoute(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state);
+  renderSettings(state.settings); renderPlans(state); renderRoute(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state); renderComparePicks();
   for (const j of state.jobs) if (!document.getElementById("job-" + j.id)) {
     renderJob(j); if (!j.done && !watching.has(j.id)) watch(j.id); }
 }
@@ -453,7 +485,11 @@ async function send() {
   if (!prompt) return;
   $("send").disabled = true;
   try {
-    const {job} = await post("/api/run", {prompt, model: $("model").value, context: $("context").checked});
+    const compare = $("compare").checked
+      ? [...$("cmppicks").querySelectorAll("input:checked")].map(i => i.value) : [];
+    if ($("compare").checked && (compare.length < 2 || compare.length > 3))
+      throw new Error("pick 2 or 3 AIs to compare");
+    const {job} = await post("/api/run", {prompt, model: $("model").value, context: $("context").checked, compare});
     $("prompt").value = ""; watch(job);
   } catch (e) { toast(e.message); }
   $("send").disabled = false;
@@ -465,6 +501,7 @@ $("jobs").addEventListener("click", async e => {
   try { await post("/api/cancel", {job: b.dataset.job}); } catch (err) { toast(err.message); }
 });
 $("send").onclick = send;
+$("compare").onchange = renderComparePicks;
 $("prompt").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(); });
 $("retry").onclick = async () => { try { const {job} = await post("/api/retry", {model: $("model").value}); watch(job); }
   catch (e) { toast(e.message); } };
