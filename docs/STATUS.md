@@ -1,6 +1,9 @@
 # Status
 
-**Active:** Claude Code (overnight, 2026-10-11)
+**Active (2026-10-11 ~00:15), three lanes, don't cross them:**
+- **Forge** (Claude Code, coordinator): main branch, merges, edit mode, reviews.
+- **Kestrel** (Claude Code, 2nd session): `megazword dashboard`, branch claude/dashboard.
+- **Codex**: whatever Forge assigns, always on its own codex/* branch.
 **Last updated:** 2026-10-10 by Claude Code
 
 ## Done
@@ -19,6 +22,11 @@
   - Every routed prompt starts with a one-line note telling the AI to skip session startup / coordination routines (Grok one-shot went from 28s to 4s).
   - Codex: `runlog.py` (per-AI run summaries), Grok usage from Mega Zword's own log, `megazword usage` shows a 24h runs table, `megazword init` writes a commented config with only installed AIs, README rewritten for the public. Claude fixed a double count (rejections were also counted as failures).
   - `tests/conftest.py` isolates every test from the real ~/.megazword. 98 tests pass.
+  - `megazword chat` (Codex): interactive session, last 3 turns as context, /retry /model /auto /usage /note /decide /history /context /clear, multi-line input. Forge fixed: rates only the new message; respects [out].
+  - `[out]` config (Kestrel): mark an AI out of usage until a date; auto-pick and retry skip it. Grok marked out until 2026-10-17.
+  - Grok model/effort per rating (Grok): easy grok-4.6 low, medium grok-4.6 medium, hard grok-4.7 high; `[grok.<level>]` overrides. Forge merged it with edit mode.
+  - `run --edit` (Forge): Claude/Grok `--permission-mode acceptEdits`, Codex `-s workspace-write`. Live check: Claude created the file; Codex and Grok answered but didn't create it (under investigation).
+  - 118 tests pass.
 
 ## In progress
 - Nothing.

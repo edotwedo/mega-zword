@@ -9,7 +9,7 @@ from typing import Callable
 
 from . import __version__, config, log
 from .memory import Memory, project_name, with_context
-from .backends import Backend, default_backends
+from .backends import Backend, apply_grok_effort, default_backends, grok_label
 from .escalate import escalate
 from .rater import Rating, rate
 
@@ -188,22 +188,24 @@ def main(argv: list[str] | None = None,
 
     rating: Rating | None = None
     if args.model:
+        apply_grok_effort(backends, "medium", cfg.grok)
         backend = backends.get(args.model)
         if backend is None:
             print(f"Unknown AI '{args.model}'. Choose from: {', '.join(backends)}",
                   file=sys.stderr)
             return 2
         chain = [backend]
-        print(f"[megazword] using {backend.name} (you chose it)", file=sys.stderr)
+        print(f"[megazword] using {grok_label(backend)} (you chose it)", file=sys.stderr)
     else:
         rating = rater(prompt)
+        apply_grok_effort(backends, rating.level, cfg.grok)
         out = cfg.out_now()
         chain = candidates(rating, cfg.route, backends, (statuses or plan_statuses)(), out)
         if not chain:
             print(f"[megazword] no installed AI for a {rating.level} task; "
                   f"check the route in {config.HOME / 'config.toml'}", file=sys.stderr)
             return 1
-        print(f"[megazword] rated {rating.level} ({rating.reason}) -> using {chain[0].name}",
+        print(f"[megazword] rated {rating.level} ({rating.reason}) -> using {grok_label(chain[0])}",
               file=sys.stderr)
         if out:
             print(f"[megazword] skipped (marked out in config): {', '.join(sorted(out))}",
@@ -282,8 +284,11 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
         return 2
     last = json.loads(path.read_text(encoding="utf-8"))
     memory = Memory(config.HOME, last["project"])
-    level = last.get("rating")
-    rating = Rating(level, "retry", "retry") if level else None
+    level = last.get("rating") or "medium"
+    if level == "easy":
+        level = "medium"  # a retry is real work, not a status pass
+    apply_grok_effort(backends, level, cfg.grok)
+    rating = Rating(level, "retry", "retry") if last.get("rating") else None
     if args.model:
         if args.model not in backends:
             print(f"Unknown AI '{args.model}'. Choose from: {', '.join(backends)}",

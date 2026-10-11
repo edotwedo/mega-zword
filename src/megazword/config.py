@@ -12,6 +12,16 @@ Example config.toml:
     # Mark an AI as out of usage until a date or time; auto-pick skips it.
     [out]
     grok = 2026-10-17T23:30:00-07:00
+
+    [grok.easy]
+    model = "grok-4.6"
+    effort = "low"
+    [grok.medium]
+    model = "grok-4.6"
+    effort = "medium"
+    [grok.hard]
+    model = "grok-4.7"
+    effort = "high"
 """
 
 from __future__ import annotations
@@ -23,6 +33,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 HOME = Path(os.environ.get("MEGAZWORD_HOME", Path.home() / ".megazword"))
+
+DEFAULT_GROK = {
+    # easy = status-sized; medium = coding; hard = design. Phil, 2026-10-10.
+    "easy": ("grok-4.6", "low"),
+    "medium": ("grok-4.6", "medium"),
+    "hard": ("grok-4.7", "high"),
+}
 
 DEFAULT_ROUTE = {
     # First installed AI in each list wins. Placeholder order until usage
@@ -37,6 +54,7 @@ DEFAULT_ROUTE = {
 class Config:
     rater_model: str = "qwen2.5:1.5b"
     route: dict[str, list[str]] = field(default_factory=lambda: dict(DEFAULT_ROUTE))
+    grok: dict[str, tuple[str, str]] = field(default_factory=lambda: dict(DEFAULT_GROK))
     log_path: Path = HOME / "log.jsonl"
     # AI name -> when its usage comes back. Set by hand for plans with no meter.
     out_until: dict[str, datetime] = field(default_factory=dict)
@@ -64,6 +82,12 @@ def load(path: Path = HOME / "config.toml") -> Config:
         cfg.rater_model = data.get("rater_model", cfg.rater_model)
         cfg.route.update(data.get("route", {}))
         cfg.out_until = {name: _as_time(v) for name, v in data.get("out", {}).items()}
+
+        for level, block in data.get("grok", {}).items():
+            if isinstance(block, dict) and level in cfg.grok:
+                model, effort = cfg.grok[level]
+                cfg.grok[level] = (str(block.get("model", model)),
+                                   str(block.get("effort", effort)))
     return cfg
 
 
