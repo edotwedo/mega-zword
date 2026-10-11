@@ -10,7 +10,7 @@ from typing import Callable
 from . import __version__, config, log
 from .memory import Memory, project_name, with_context
 from .backends import Backend, apply_grok_effort, default_backends, grok_label
-from .escalate import escalate
+from .escalate import escalate, looks_failed
 from .rater import Rating, rate
 
 
@@ -253,7 +253,12 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
             print(f"[megazword] {name} rejected after {result.seconds:.1f}s: {reason}",
                   file=sys.stderr)
 
-    outcome = escalate(ONE_SHOT_NOTE + sent, chain, on_attempt=on_attempt,
+    judge = looks_failed
+    if cfg.quality_check and not forced:
+        # Only auto-picked runs: if Phil chose the AI, don't second-guess it.
+        from .quality import judge_for
+        judge = judge_for(prompt, cfg.rater_model, looks_failed)
+    outcome = escalate(ONE_SHOT_NOTE + sent, chain, judge=judge, on_attempt=on_attempt,
                        start_after=start_after, prior_answer=prior_answer)
     if outcome.result is None:
         print("[megazword] no AI gave a usable answer", file=sys.stderr)
