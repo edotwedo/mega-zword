@@ -198,6 +198,10 @@ def main(argv: list[str] | None = None,
     if args.model:
         apply_grok_effort(backends, "medium", cfg.grok)
         backend = backends.get(args.model)
+        if backend is None and args.edit and args.model == "grok":
+            print("[megazword] Grok can't edit files safely on Windows (no sandbox); "
+                  "use claude or codex for --edit", file=sys.stderr)
+            return 2
         if backend is None:
             print(f"Unknown AI '{args.model}'. Choose from: {', '.join(backends)}",
                   file=sys.stderr)

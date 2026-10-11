@@ -265,5 +265,20 @@ def test_edit_mode_backend_args():
     ro, rw = default_backends(), default_backends(edit=True)
     assert "acceptEdits" not in ro["claude"].args and "acceptEdits" in rw["claude"].args
     assert "read-only" in ro["codex"].args and "workspace-write" in rw["codex"].args
-    assert "acceptEdits" in rw["grok"].args and "{prompt}" in rw["grok"].args
-    assert "bypassPermissions" not in " ".join(rw["claude"].args + rw["grok"].args)
+    assert "bypassPermissions" not in " ".join(rw["claude"].args)
+
+
+def test_grok_edit_only_with_sandbox(monkeypatch):
+    from megazword import backends as b
+    monkeypatch.setattr(b.sys, "platform", "win32")
+    assert "grok" not in b.default_backends(edit=True) and "grok" in b.default_backends()
+    monkeypatch.setattr(b.sys, "platform", "linux")
+    args = b.default_backends(edit=True)["grok"].args
+    assert args[args.index("--sandbox") + 1] == "workspace"
+
+
+def test_forced_grok_edit_on_windows_explains(capsys, cfg, monkeypatch):
+    from megazword import backends as b
+    monkeypatch.setattr(b.sys, "platform", "win32")
+    assert main(["run", "hi", "--edit", "-m", "grok"], None, cfg) == 2
+    assert "can't edit files safely" in capsys.readouterr().err

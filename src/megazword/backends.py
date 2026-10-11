@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 import subprocess
 import tempfile
 import time
@@ -129,8 +130,16 @@ def grok_backend(model: str = "grok-4.6", effort: str = "medium",
     """One-shot Grok with a model id and reasoning effort."""
     args = ["-p", "{prompt}", "--output-format", "plain", "-m", model, "--effort", effort]
     if edit:
-        args += ["--permission-mode", "acceptEdits"]
+        # Grok's path-scoped allow rules don't hold (tested 2026-10-11: with
+        # Write(<folder>/**) allowed it still wrote to ../ and absolute paths),
+        # so only its OS sandbox can keep edits in the folder.
+        args += ["--sandbox", "workspace", "--allow", "Write", "--allow", "Edit"]
     return CLIBackend("grok", exe="grok", args=args)
+
+
+def grok_can_edit() -> bool:
+    """Grok's sandbox exists only on Linux (Landlock) and macOS (Seatbelt)."""
+    return sys.platform.startswith("linux") or sys.platform == "darwin"
 
 
 def apply_grok_effort(backends: dict[str, Backend], level: str,
@@ -140,7 +149,7 @@ def apply_grok_effort(backends: dict[str, Backend], level: str,
     if not isinstance(current, CLIBackend) or current.exe != "grok":
         return
     model, effort = grok.get(level, grok.get("medium", ("grok-4.6", "medium")))
-    backends["grok"] = grok_backend(model, effort, edit="acceptEdits" in current.args)
+    backends["grok"] = grok_backend(model, effort, edit="--sandbox" in current.args)
 
 
 def grok_label(backend: Backend) -> str:
@@ -156,16 +165,17 @@ def grok_label(backend: Backend) -> str:
 
 def default_backends(edit: bool = False) -> dict[str, Backend]:
     """The installed-CLI backends. With edit=True the AIs may change files in
-    the current folder: Claude and Grok auto-accept file edits only (other
-    tools still need approval, which a one-shot can't give, so they're
-    refused), and Codex gets its workspace-write sandbox (writes limited to
-    the current folder)."""
+    the current folder: Claude auto-accepts file edits only (other tools
+    still need approval, which a one-shot can't give, so they're refused),
+    Codex gets its workspace-write sandbox, and Grok joins only where its OS
+    sandbox works (not on Windows)."""
     claude_args = ["-p", "--permission-mode", "acceptEdits"] if edit else ["-p"]
     codex_sandbox = "workspace-write" if edit else "read-only"
     backends: list[Backend] = [
         CLIBackend("claude", exe="claude", args=claude_args),
         CodexBackend("codex", exe="codex",
                      args=["exec", "--skip-git-repo-check", "-s", codex_sandbox]),
-        grok_backend(edit=edit),
     ]
+    if not edit or grok_can_edit():
+        backends.append(grok_backend(edit=edit))
     return {b.name: b for b in backends}
