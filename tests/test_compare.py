@@ -27,10 +27,12 @@ def cfg(tmp_path):
 
 
 def test_runs_in_parallel_and_prints_each(cfg, capsys):
-    backends = {"a": Slow("a", reply="A"), "b": Slow("b", reply="B"), "c": Slow("c", reply="C")}
+    backends = {n: Slow(n, reply=n.upper(), delay=1.0) for n in "abc"}
     start = time.monotonic()
     assert main(["run", "hi", "--compare", "a,b,c"], backends, cfg) == 0
-    assert time.monotonic() - start < 1.4  # three 0.5s calls at once, not 1.5s in a row
+    # Three 1s calls at once take ~1s; in a row they'd take 3s. Wide margin
+    # so a busy machine doesn't make this flaky.
+    assert time.monotonic() - start < 2.5
     out = capsys.readouterr().out
     for name in "abc":
         assert f"=== {name} · " in out and f"{name.upper()}: " in out
