@@ -44,7 +44,10 @@ def run(sent: str, prompt: str, names: list[str], backends: dict[str, Backend],
         results: list[Result] = list(pool.map(lambda b: b.run(sent), chosen))
 
     first_line = prompt.strip().splitlines()[0][:80]
+    from .cli import auto_mark_out
     for r in results:
+        if not r.ok:
+            auto_mark_out(r.backend, r.error, cfg)
         log.append(cfg.log_path, cfg.log_lines, backend=r.backend, forced=True, compare=True,
                    rating=None, rater=None, seconds=round(r.seconds, 2), ok=r.ok,
                    rejected=None if r.ok else f"failed: {r.error}"[:200],

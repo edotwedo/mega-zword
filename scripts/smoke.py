@@ -200,6 +200,12 @@ def main() -> int:
               r.returncode == 0 and "=== claude · " in r.stdout and "=== codex · " in r.stdout,
               r.stdout + r.stderr)
 
+        r = mz(env, work, "run", "LIMIT-codex over the cap", "-m", "codex")
+        r2 = mz(env, work, "out")
+        check("usage-limit error auto-marks the AI out",
+              "hit its usage limit" in r.stderr and "codex" in r2.stdout, r.stderr + r2.stdout)
+        mz(env, work, "out", "codex", "--clear")
+
         r = mz(env, work, "usage")
         check("usage runs without real meters", r.returncode == 0 and "Mega Zword runs" in r.stdout,
               r.stdout + r.stderr)
