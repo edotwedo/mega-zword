@@ -81,6 +81,11 @@ class CLIBackend(Backend):
                                 errors="replace", **process_group())
         try:
             out, err = proc.communicate(stdin, timeout=self.timeout)
+        except KeyboardInterrupt:
+            # Ctrl+C: the CLI is in its own process group so it didn't get the
+            # signal; stop it (and its children) before passing Ctrl+C on.
+            _kill_tree(proc)
+            raise
         except subprocess.TimeoutExpired:
             _kill_tree(proc)
             raise TimeoutError(f"{self.exe} gave no answer within {self.timeout}s "
