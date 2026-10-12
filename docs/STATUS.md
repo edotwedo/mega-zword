@@ -1,6 +1,6 @@
 # Status
 
-**Active: none (Codex session 01a12d3d released a tested B6 step, 2026-10-12 09:22 PT).** App header/icon and guide on `codex/b6-app-frame-2026-10-12`: 643 tests, 36/36 smoke, desktop/390px checks. Native frame replacement remains unfinished; see B6 below.
+**Active: Tally-11 on B6b native window (pywebview + .exe + Start menu shortcut; Phil's decision 2026-10-12, workshop DECISIONS.md), claimed 10:05 PT because Codex is at 100% until 2:14 PM. Codex keeps the tab-order claim.** Earlier: App header/icon and guide on `codex/b6-app-frame-2026-10-12`: 643 tests, 36/36 smoke, desktop/390px checks. Native frame replacement remains unfinished; see B6 below.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
 **Last updated:** 2026-10-12 04:48 PT by Larch-11: B4 complete; Codex usage after work 82% of 5-hour / 57% weekly; Claude 43% of 5-hour / 54% weekly; Grok 15% weekly; Gemini out until Oct 18. Codex crossed the 80% marker; next step is B6 after a fresh usage check.
