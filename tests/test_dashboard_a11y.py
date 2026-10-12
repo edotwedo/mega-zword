@@ -56,6 +56,18 @@ def test_new_dashboard_shell_keeps_navigation_and_icon_controls_accessible():
     assert '"Cascadia Code"' in CSS and '&gt;_' in HTML and '[MZ]' in HTML
 
 
+def test_hive_tab_exposes_room_controls_and_status():
+    page = Markup(HTML)
+    assert page.by_id('tab-home')['aria-pressed'] == 'true'
+    assert page.by_id('tab-hive')['aria-pressed'] == 'false'
+    assert page.by_id('room-input')['aria-label'] == 'Your message to the room'
+    assert page.by_id('room-turn-cap')['aria-label'] == 'Room turn limit'
+    assert page.by_id('room-messages')['role'] == 'region'
+    assert page.by_id('room-status')['role'] == 'status'
+    button_text = [attrs.get('id') for tag, attrs in page.elements if tag == 'button']
+    assert {'room-send', 'room-start', 'room-pause', 'room-stop'} <= set(button_text)
+
+
 @pytest.fixture(scope='module')
 def rendered():
     node = shutil.which('node')

@@ -344,7 +344,8 @@ class App:
     def room_view(self, name: object = None, n: int = 50) -> dict:
         name = self._room_name(name)
         state = room.load_state(name)
-        return {"room": name, "running": self.room_running(), "primary": state.primary,
+        return {"room": name, "running": self.room_running(), "paused": state.paused,
+                "primary": state.primary,
                 "turn_count": state.turn_count, "turn_cap": state.turn_cap,
                 "last_speaker": state.last_speaker,
                 "messages": [asdict(m) for m in room.read_messages(name)[-n:]]}
@@ -376,6 +377,11 @@ class App:
     def room_stop(self, body: dict) -> dict:
         name = self._room_name(body.get("room"))
         room.set_stopped(name)
+        return self.room_view(name)
+
+    def room_pause(self, body: dict) -> dict:
+        name = self._room_name(body.get("room"))
+        room.set_paused(name)
         return self.room_view(name)
 
 
@@ -487,6 +493,7 @@ def make_handler(app: App, port: int, remote: bool = False):
                           "/api/tabs/send": app.tabs_send,
                           "/api/room/say": app.room_say,
                           "/api/room/start": app.room_start,
+                          "/api/room/pause": app.room_pause,
                           "/api/room/stop": app.room_stop}.get(self.path)
                 if action is None:
                     return self._json(404, {"error": "not found"})

@@ -39,6 +39,7 @@ class RoomState:
     room: str = DEFAULT_ROOM
     active: bool = False
     stopped: bool = False
+    paused: bool = False
     turn_count: int = 0
     turn_cap: int = DEFAULT_TURN_CAP
     primary: str = "workshop"
@@ -145,6 +146,14 @@ def set_stopped(room: str = DEFAULT_ROOM, stopped: bool = True, home: Path | Non
     state.stopped = stopped
     if stopped:
         state.active = False
+        state.paused = False
+    save_state(state, home)
+
+
+def set_paused(room: str = DEFAULT_ROOM, paused: bool = True, home: Path | None = None) -> None:
+    """Ask a running room to pause after its current bot reply."""
+    state = load_state(room, home)
+    state.paused = paused
     save_state(state, home)
 
 
@@ -384,16 +393,20 @@ def run_room(room: str = DEFAULT_ROOM,
     backends = backends or default_backends(edit=False, free_models=cfg.free, lean=cfg.lean)
 
     state = load_state(room, home)
+    resuming = state.paused
+    if not resuming:
+        state.turn_count = 0
     state.primary = primary
     state.active = True
     state.stopped = False
+    state.paused = False
     turn_cap = max_turns if max_turns is not None else cfg.room_turn_cap
     state.turn_cap = turn_cap
     save_state(state, home)
 
     write(f"[megazword room] started room '{room}' for project '{primary}' (turn cap: {turn_cap})")
 
-    turns_taken = 0
+    turns_taken = state.turn_count if resuming else 0
     session_active: dict[str, bool] = {name: False for name in backends}
 
     try:
@@ -401,6 +414,9 @@ def run_room(room: str = DEFAULT_ROOM,
             state = load_state(room, home)
             if state.stopped:
                 write(f"[megazword room] session stopped on command")
+                break
+            if state.paused:
+                write("[megazword room] paused after current reply")
                 break
 
             messages = read_messages(room, home)
@@ -449,6 +465,10 @@ def run_room(room: str = DEFAULT_ROOM,
             # Save message
             appended = append_message(room, speaker, text, prompt_chars=prompt_chars, home=home)
             turns_taken += 1
+            # Preserve pause/stop requests made while the backend was replying.
+            controls = load_state(room, home)
+            state.paused = controls.paused
+            state.stopped = controls.stopped
             state.turn_count += 1
             state.last_speaker = speaker
             save_state(state, home)
