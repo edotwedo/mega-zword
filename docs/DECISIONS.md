@@ -7,6 +7,7 @@ Newest first. Don't reopen these without Phil.
 - Phil: the Hive room must not waste tokens re-reading everything to get the bots on the same page. Efficiency rules are part of B1 (SPEC section R, "Token budget").
 
 ## 2026-10-11
+- Phil (Larch-11 chat): stop repeat permission requests for routine authorized project work, especially folder/file reads. Correct launcher project scopes and stale approval instructions. This does not authorize unrelated destructive actions or spending.
 - Phil, revised: Mistral (and other trains-on-data free AIs) gets the lightest rules, not strict ones. It's routed normally and takes the small repetitive jobs first; edit mode is allowed; the sandbox is optional for big batches; one light secret guard stays. This replaces the stricter B15 line below. His terms: fine as long as it's legal (no piracy) and they don't resell his work.
 - Phil OKs free AIs that train on what we send (first: Mistral Experiment tier). His words: he doesn't mind training as long as they don't package and sell it, and he has no valuable data yet. Rules (STATUS B15): never auto-routed; a prompt guard blocks secrets, logins and private folders; any file-changing work runs only in a sandbox; a trusted AI reviews the diff before it's applied.
 - Phil: Mega Zword is proprietary and private, all rights reserved. He shares it with whom he chooses. This replaces the 2026-10-10 AGPL decision. At the switch the repo had no forks, stars, outside contributors or outside clones. Don't add an open-source license or make the repo public without Phil.

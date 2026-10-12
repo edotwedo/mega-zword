@@ -1,6 +1,6 @@
 # Status
 
-**Active: Larch-11 (Codex), 2026-10-11T18:22-07:00.** Own branch codex/beta2-2026-10-11; saving board/launch work, then B12, B13, B5, B4, B6, B14 after R1.
+**Active: none.** Larch-11 released 2026-10-11 at Phil's request; Codex 92% five-hour. Temporary controls handed to Tally-11 via Q; Grok suggested for permission repair while Codex resets at 19:56 PT.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
 **Last updated:** 2026-10-12 by Tally-11 (Claude cloud): lead change; B1 token-budget rules added.
@@ -51,7 +51,7 @@ Antigravity Claude/GPT pool (unused; `agy` session on Phil's PC) -> `docs/handof
   session reuse, prompt size logged per turn.
 
 Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
-- First [claimed: Larch-11, 2026-10-11]: push the unsaved Tahoma Table board (workshop handoff 2026-10-11-unsaved-work-audit.md).
+- First [done: Larch-11, 2026-10-11]: board saved in coop-interest PR #3 (`codex/tahoma-board-2026-10-11`, 21 tests); launch stash recovered in workshop PR #50 (`codex/recover-tahoma-2026-10-11`, 4 tests), account CSV excluded and stash retained.
 - B5 New look (SPEC "D. New look"): Windows 11 style with the 1337 accents;
   sidebar tab strip ready for B3/B4. Keep C9 accessibility. Screenshots at
   desktop and phone widths.
@@ -114,6 +114,7 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
 5. Each step: check `megazword usage` first, claim the item here, post one line in Q when done.
    If a bot runs low, the next one with room takes over its item.
 ## Done
+- **Beta 2 launcher permissions (Larch-11, 2026-10-11):** explicit accept-edits and shared project directories for agy, project write scope for Codex, read/search allow rules for Grok. Added `-Resume` and `-PrintOnly`; resolves shared Python from git common directory so running the launcher from a worktree works. 530 tests and 28/28 smoke checks passed. Existing running sessions keep their old flags until resumed; live prompt reduction is not verified. Temporary lead next: identify the terminal prompting, checkpoint/stop that lane, then run `scripts/start_beta2.ps1 -Only <lane> -Resume` from this branch. The affected live agy PIDs observed were 26948 (Gemini) and 25604 (Antigravity); recheck before any process action. Feature lane next: B12, then B13, B5, B4, B6, B14.
 - **Gemini usage meter (Tally-11, 2026-10-11):** `usage_sources.gemini()` runs `agy -p /usage --output-format json` (Antigravity's quota panel, documented; field shape command.data.groups[].buckets[] with remaining_fraction + reset_time, from a public bug report, not yet seen on Phil's PC). Gemini-group buckets become the 5-hour/weekly meter; other groups shown, never block. No agy: falls back to run counts. Tests never run a real agy (conftest). Verified end to end in the cloud with a fake agy and fake Codex log: `megazword usage`, start screen and dashboard /api/state all show codex 42% and gemini 30%. **Not verified live:** real agy JSON on Phil's PC, and the Claude meter (needs his login). Check: `megazword usage`. If gemini shows an error, paste `agy -p /usage --output-format json` output to fix the parser. 520 passed / 1 skipped, smoke 27/27.
 - **Gemini via Antigravity (Tally-11, Claude cloud, 2026-10-11, Phil's request):** Google retired the Gemini CLI for personal accounts; `-m gemini` now runs `agy -p --mode plan --output-format text --disable-slash-commands` (prompt on stdin) when `agy` is on PATH, else the old `gemini` command. Doctor finds agy; login hint says `agy`. Flags from Phil's `agy --help` (1.3.3). Phil installed and signed in to agy on his PC. **Not yet verified live:** that agy print mode reads the prompt from stdin. Check on the PC: `megazword run -m gemini "say hi"`. If agy ignores stdin, switch AGY_ARGS in backends.py to pass `{prompt_file}` or `{prompt}`. 517 passed / 1 skipped, smoke 27/27.
 - **Beta 1 (2026-10-11, Tally-11, Claude cloud, Phil's call):** merged `codex/guide` (C7 user guide + SPEC status, Cedar-7 Tailscale note), version 0.1.0b1, marker branch `release/beta-1` (tag push blocked from the cloud; Next up item 5). 515 passed / 1 skipped, smoke 27/27. Anything still only on a PC was not in the remote; push it and it goes into beta 2.
