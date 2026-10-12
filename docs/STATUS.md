@@ -79,19 +79,17 @@ Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
      what we send; it goes in with the B15 rules (marked `trains_on_data`, sandbox only for any work).
   Skip: Perplexity (no free API), Qwen Code OAuth (ended 2026-04-15), GitHub Models (closed),
   Cerebras (now a 30-day $5 credit).
-- B15 Untrusted-AI rules + sandbox (Phil, 2026-10-11; first user: Mistral Experiment). Any backend
-  marked `trains_on_data = true` in config:
-  1. Never auto-routed. It runs only when picked (`-m mistral`) or in a room/tab Phil points at it.
-  2. Prompt guard before sending: block (don't just warn) on secret-looking text (API keys, tokens,
-     passwords, private keys, `.env` lines, emails, phone numbers), files under `~\.claude`, `~\.codex`,
-     `~\.grok`, `~\.megazword`, workshop `common-ground/private`, and Phil's private paperwork folder.
-     Show what was blocked; `--force` is not allowed for these.
-  3. No `--edit` on the real machine. Work mode runs in a sandbox: Windows Sandbox (`.wsb` file that
-     maps one scratch folder read-write, nothing else; networking on only for the API) when Phil has
-     enabled it; otherwise a throwaway copy in `~\.megazword\sandbox\<job>` with no git remotes, no
-     credentials and no PATH tools beyond Python. Results come back as a diff.
-  4. A trusted AI (Claude, Codex or Gemini) reviews the diff before anything is applied to a real repo.
-  5. Every run is logged with a `trains_on_data` flag so `megazword stats` shows what was sent.
+- B15 Light rules for AIs that train on our data (Phil, 2026-10-11, revised the same day: "lightest
+  setting"; first user: Mistral Experiment). Any backend marked `trains_on_data = true`:
+  1. **Routed normally, and first in line for small repetitive jobs.** Add it to the front of the
+     `easy` route and let the room/Hive hand it bulk chores (renames, boilerplate, test stubs, doc
+     cleanup, summaries, reformatting, first drafts). Bigger or design work keeps the usual route.
+  2. **One light guard:** before sending, drop obvious secrets (API keys, tokens, passwords, private
+     keys, `.env` values) and never attach files from `~\.claude`, `~\.codex`, `~\.grok`,
+     `~\.megazword` or private folders. That's the same care every bot already takes.
+  3. **Edit mode is allowed** like any other AI. The sandbox (Windows Sandbox or a throwaway folder) is
+     an option (`--sandbox`) for big batches, not a requirement.
+  4. Normal review, same as the other bots. Runs are logged with a `trains_on_data` flag.
   Tests with fakes; never call the real provider in tests.
 
 Gemini (lots of room; agy) -> `docs/handoffs/2026-10-11-gemini.md`:
