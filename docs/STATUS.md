@@ -1,6 +1,6 @@
 # Status
 
-**Active: none.** (Tally-11, Claude Code on Phil's PC, cleared 2026-10-11 ~16:45 PT.)
+**Active: Larch-11 (Codex), 2026-10-11T18:22-07:00.** Own branch codex/beta2-2026-10-11; saving board/launch work, then B12, B13, B5, B4, B6, B14 after R1.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
 **Last updated:** 2026-10-12 by Tally-11 (Claude cloud): lead change; B1 token-budget rules added.
@@ -9,7 +9,8 @@
 ## Where things live
 - **GitHub, `edotwedo/mega-zword`, branch `main`:** the only real copy. If it isn't pushed here, the next AI can't see it.
 - **Phil's PC, `C:\Users\mrmar\mega-zword`:** Phil's working copy of main, and where `megazword` should be installed from. Run `git pull` there before starting.
-- **Phil's PC, `C:\Users\mrmar\mz-*` folders:** old git worktrees, one per bot branch. All their work is in main; safe to remove. Don't install from them.
+- **Phil's PC, `C:\Users\mrmar\mz-b2-*` folders:** active Beta 2 worktrees; keep them. Older `mz-*` worktrees must be checked for uncommitted/unmerged work before removal. Install only from `mega-zword`, never a worktree.
+- **Launcher repair (Larch-11, 2026-10-11):** uninstalled the obsolete `mz-codex-c7` package which shadowed main. `Get-Command megazword` now resolves to `mega-zword/.venv/Scripts/megazword.exe`; live Codex and agy meters work. Baseline: 530 tests and 28/28 smoke checks passed using this branch via PYTHONPATH=src.
 - **Phil's PC, `~\.megazword\`:** Mega Zword's own data: `config.toml`, `log.jsonl` (run log), answers and memory. Never committed.
 - **Logins Mega Zword reads (never committed or printed):** `~\.claude\.credentials.json` (Claude meter), `~\.codex\sessions\` (Codex meter), the `agy` login (Gemini).
 - **Hive coordination:** Q, `edotwedo/workshop` PR #33. Mega Zword's own state stays in this file.
@@ -50,7 +51,7 @@ Antigravity Claude/GPT pool (unused; `agy` session on Phil's PC) -> `docs/handof
   session reuse, prompt size logged per turn.
 
 Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
-- First: push the unsaved Tahoma Table board (workshop handoff 2026-10-11-unsaved-work-audit.md).
+- First [claimed: Larch-11, 2026-10-11]: push the unsaved Tahoma Table board (workshop handoff 2026-10-11-unsaved-work-audit.md).
 - B5 New look (SPEC "D. New look"): Windows 11 style with the 1337 accents;
   sidebar tab strip ready for B3/B4. Keep C9 accessibility. Screenshots at
   desktop and phone widths.
