@@ -230,9 +230,10 @@ primary project, last speaker and turns remaining. Enter a message and choose
 current reply to finish; **Resume** continues toward the selected turn cap.
 **Stop** ends the session. The room is coordination chat, not an editing worker.
 
-Additional AI chat tabs have backend APIs and persistent history, but the current
-sidebar does not yet expose creation, rename, reorder or close controls for them.
-Do not confuse the Home/Hive buttons with complete per-AI chat-tab support.
+**Chats** (sidebar, under Home and Hive): pick an AI (or auto) and press **+** for a
+new chat tab. Each tab keeps its AI, project and last few turns across restarts.
+Ctrl+Enter sends; **Rename** changes the name; **Close tab** needs two clicks.
+Links: `#hive` opens the Hive, `#tab-t1` opens tab t1. Tabs can't be reordered yet.
 
 ### Home controls
 

@@ -32,9 +32,10 @@ button, select, input, textarea { font: inherit; color: var(--text); background:
 .brand-name { font-size: 14px; font-weight: 750; letter-spacing: .12em; }
 .side-label { margin: 0 10px 4px; color: var(--dim); font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
 .tab-strip { display: grid; gap: 5px; }
+.sidebar, .sidebar > div { min-width: 0; }
 .nav-tab { min-height: 42px; display: flex; align-items: center; gap: 11px; padding: 8px 11px;
   width:100%; border: 1px solid transparent; border-radius: var(--radius); color: var(--dim);
-  background:transparent; text-align:left; text-decoration: none; }
+  background:transparent; text-align:left; text-decoration: none; min-width: 0; overflow: hidden; }
 .nav-tab:hover { background: var(--button); color: var(--text); }
 .nav-tab[aria-pressed="true"] { color: var(--text); background: #1a2922; border-color: #3a6250; }
 .nav-icon { width: 18px; text-align: center; font: 600 14px var(--mono); }
@@ -150,7 +151,8 @@ details.ans-item .qfull { color: var(--dim); margin-top: 6px; }
   .tab-strip { display: flex; overflow-x: auto; }
   .nav-tab { flex: 0 0 auto; width:auto; min-height: 44px; }
   main { padding: 14px 14px 32px; grid-template-columns: minmax(0, 1fr); gap: 11px; }
-  #hive:not([hidden]) { padding:14px 14px 32px; gap:11px; }
+  #hive:not([hidden]), #chat:not([hidden]) { padding:14px 14px 32px; gap:11px; }
+  .chat-tab-label { max-width: 11em; }
   section { padding: 14px; }
   header { min-height: 58px; padding: 10px 14px; }
 }
@@ -176,7 +178,7 @@ input::placeholder, textarea::placeholder { color:var(--dim); opacity:1; }
 }
 @media (prefers-reduced-motion: reduce) { .spin { animation:none; } }
 main[hidden], #hive[hidden] { display:none; }
-#hive:not([hidden]) { display:grid; gap:14px; padding:22px clamp(16px, 3vw, 38px) 44px; grid-template-columns:minmax(0,1fr); max-width:1600px; margin:0 auto; }
+#hive:not([hidden]), #chat:not([hidden]) { display:grid; gap:14px; padding:22px clamp(16px, 3vw, 38px) 44px; grid-template-columns:minmax(0,1fr); max-width:1600px; margin:0 auto; }
 .room-messages { max-height: min(55vh, 560px); min-height: 180px; overflow:auto; margin:14px 0;
   padding:10px 12px; background:var(--inset); border:1px solid var(--line); border-radius:var(--radius); }
 .room-message { padding:10px 2px; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
@@ -186,6 +188,10 @@ main[hidden], #hive[hidden] { display:none; }
 .room-compose { align-items:stretch; }
 .room-compose textarea { flex:1 1 280px; min-height:68px; }
 .room-status { margin:0; color:var(--dim); }
+.new-chat { margin:6px 0 0; gap:6px; flex-wrap:nowrap; }
+.new-chat select { flex:1; min-width:0; }
+#chat[hidden] { display:none; }
+.chat-tab-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -200,6 +206,11 @@ main[hidden], #hive[hidden] { display:none; }
     <button class="nav-tab" id="tab-home" type="button" aria-pressed="true" data-view="home"><span class="nav-icon" aria-hidden="true">⌂</span>Home</button>
     <button class="nav-tab" id="tab-hive" type="button" aria-pressed="false" data-view="hive"><span class="nav-icon" aria-hidden="true">◇</span>Hive</button>
   </nav></div>
+  <div><p class="side-label">Chats</p><nav class="tab-strip" id="chat-tabs" aria-label="Chat tabs"></nav>
+    <div class="row new-chat">
+      <select id="new-tab-ai" aria-label="AI for a new chat tab"><option value="auto">auto</option></select>
+      <button id="new-tab" type="button" aria-label="New chat tab" title="New chat tab">+</button>
+    </div></div>
   <div class="side-status"><span class="live-dot">● LIVE</span><br>Local workspace</div>
 </aside>
 <div class="workspace" id="home">
@@ -299,6 +310,25 @@ main[hidden], #hive[hidden] { display:none; }
       <button id="room-stop" type="button">Stop</button>
       <span class="note">Pause takes effect after the current bot reply.</span>
     </div>
+  </section>
+</div>
+<div id="chat" class="hive-view" role="region" aria-labelledby="chat-title" hidden>
+  <section class="wide">
+    <h2 id="chat-title">Chat</h2>
+    <div class="row">
+      <span class="note" id="chat-info"></span>
+      <input id="chat-rename" aria-label="Chat tab name" maxlength="80" style="flex:1 1 160px;min-width:0">
+      <button id="chat-rename-save" type="button">Rename</button>
+      <button id="chat-close" type="button">Close tab</button>
+    </div>
+    <div class="room-messages" id="chat-messages" role="region" aria-label="Chat messages" aria-live="polite" tabindex="0"></div>
+    <label class="prompt-label" for="chat-input">&gt;_ <span class="sr-only">Your message</span></label>
+    <div class="row room-compose">
+      <textarea id="chat-input" aria-label="Your message" placeholder="Message this tab's AI. Ctrl+Enter sends. It remembers the last few turns."></textarea>
+      <button id="chat-send" type="button" class="go">Send</button>
+    </div>
+    <div class="row"><label><input type="checkbox" id="chat-context"> include project memory</label>
+      <span class="note" id="chat-status" role="status" aria-live="polite"></span></div>
   </section>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
@@ -711,6 +741,12 @@ async function load(refresh) {
     }
     state = got;
     renderProjects(state);
+    setChatTabs(state.tabs); renderChatAis();
+    if (!load.opened) {  // deep link on first load: #hive or #tab-t1
+      load.opened = true;
+      const h = location.hash || "";
+      if (h === "#hive") setView("hive"); else if (h.startsWith("#tab-")) setView("tab:" + h.slice(5));
+    }
     updateWindowTitle();
   } catch { $("meta").textContent = "dashboard server stopped"; return; }
   const sel = $("model"), cur = sel.value;
@@ -755,17 +791,78 @@ $("addnote").onclick = async () => {
   catch (e) { toast(e.message); } };
 $("refresh").onclick = () => load(true);
 
-let roomPollTimer = null;
+let roomPollTimer = null, currentView = "home";
 function setView(view) {
+  const tab = view.startsWith("tab:") ? chatTab(view.slice(4)) : null;
+  if (view.startsWith("tab:") && !tab) view = "home";  // closed elsewhere
+  currentView = view;
   const hive = view === "hive";
-  $("home-view").hidden = hive;
+  $("home-view").hidden = view !== "home";
   $("hive").hidden = !hive;
-  $("view-title").textContent = hive ? "Hive" : "Home";
+  $("chat").hidden = !tab;
+  $("view-title").textContent = hive ? "Hive" : tab ? tab.title : "Home";
   updateWindowTitle();
-  $("tab-home").setAttribute("aria-pressed", String(!hive));
+  $("tab-home").setAttribute("aria-pressed", String(view === "home"));
   $("tab-hive").setAttribute("aria-pressed", String(hive));
+  renderChatTabs();
+  if (tab) renderChat(tab);
   if (hive) loadRoom();
   else { clearTimeout(roomPollTimer); roomPollTimer = null; }
+}
+
+// Chat tabs (B3 backend, UI by Tally-11 2026-10-12): one pinned AI (or auto) per tab,
+// history kept by the server in tabs.json.
+let chatTabs = [];
+const chatTab = id => chatTabs.find(t => t.id === id);
+const chatBusy = new Set();
+function renderChatTabs() {
+  $("chat-tabs").innerHTML = chatTabs.map(t => `<button class="nav-tab" type="button" data-tab="${esc(t.id)}"
+    aria-pressed="${currentView === "tab:" + t.id}" title="${esc(t.title)} · ${esc(t.ai)} · ${esc(t.project)}"><span class="nav-icon" aria-hidden="true">${chatBusy.has(t.id) ? "…" : "▸"}</span><span class="chat-tab-label">${esc(t.title)}</span></button>`).join("");
+}
+function renderChatAis() {
+  const sel = $("new-tab-ai"), cur = sel.value || "auto";
+  sel.innerHTML = '<option value="auto">auto</option>' + Object.entries(state?.backends || {})
+    .filter(([, ok]) => ok).map(([n]) => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  sel.value = [...sel.options].some(o => o.value === cur) ? cur : "auto";
+}
+function renderChat(tab) {
+  $("chat-title").textContent = tab.title;
+  $("chat-info").textContent = `AI: ${tab.ai} · project: ${tab.project}`;
+  if (document.activeElement !== $("chat-rename")) $("chat-rename").value = tab.title;
+  const busy = chatBusy.has(tab.id);
+  $("chat-send").disabled = busy;
+  $("chat-status").textContent = busy ? "Waiting for the AI…" : "";
+  const turns = tab.history || [];
+  const signature = tab.id + JSON.stringify(turns);
+  if ($("chat-messages").dataset.signature === signature) return;
+  $("chat-messages").dataset.signature = signature;
+  $("chat-messages").innerHTML = turns.map(t => `<article class="room-message"><b>you</b><div>${esc(t.user)}</div></article>
+    <article class="room-message"><b>${esc(t.backend || tab.ai)}</b><div>${esc(t.answer)}</div></article>`).join("")
+    || '<p class="empty">No messages yet. The tab keeps the last few turns.</p>';
+  $("chat-messages").scrollTop = $("chat-messages").scrollHeight;
+}
+function setChatTabs(list) {
+  chatTabs = Array.isArray(list) ? list : [];
+  renderChatTabs();
+  if (currentView.startsWith("tab:")) {
+    const tab = chatTab(currentView.slice(4));
+    if (tab) renderChat(tab); else setView("home");
+  }
+}
+async function reloadChatTabs() {
+  try { const r = await fetch("/api/tabs"); if (r.ok) setChatTabs((await r.json()).tabs); } catch {}
+}
+async function sendChat() {
+  const id = currentView.slice(4), text = $("chat-input").value.trim();
+  if (!currentView.startsWith("tab:") || !text || chatBusy.has(id)) return;
+  chatBusy.add(id); $("chat-input").value = ""; setView(currentView);
+  try {
+    const res = await post("/api/tabs/send", {id, prompt: text, context: $("chat-context").checked});
+    if (!res.ok) { toast(res.error || "no answer"); if (currentView === "tab:" + id) $("chat-input").value = text; }
+  } catch (e) { toast(e.message); }
+  chatBusy.delete(id);
+  await reloadChatTabs();
+  if (currentView === "tab:" + id) setView(currentView);
 }
 
 function renderRoom(data) {
@@ -821,6 +918,31 @@ $("room-start").onclick = () => {
   const turns = Number($("room-turn-cap").value);
   if (!Number.isInteger(turns) || turns < 1 || turns > 50) { toast("Turns must be 1-50."); return; }
   roomAction("/api/room/start", {turns, project: state?.launch_project});
+};
+$("chat-tabs").addEventListener("click", e => {
+  const b = e.target.closest("button[data-tab]"); if (b) setView("tab:" + b.dataset.tab); });
+$("new-tab").onclick = async () => {
+  try {
+    const tab = await post("/api/tabs", {ai: $("new-tab-ai").value, project});
+    await reloadChatTabs(); setView("tab:" + tab.id); $("chat-input").focus();
+  } catch (e) { toast(e.message); }
+};
+$("chat-send").onclick = sendChat;
+$("chat-input").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) sendChat(); });
+$("chat-rename-save").onclick = async () => {
+  const title = $("chat-rename").value.trim(); if (!title || !currentView.startsWith("tab:")) return;
+  try { await post("/api/tabs/rename", {id: currentView.slice(4), title}); $("chat-rename").blur(); await reloadChatTabs(); setView(currentView); }
+  catch (e) { toast(e.message); }
+};
+$("chat-close").onclick = async () => {
+  const b = $("chat-close");
+  if (b.dataset.confirm !== "1") {  // two clicks, no browser dialog
+    b.dataset.confirm = "1"; b.textContent = "Click again to close";
+    setTimeout(() => { b.dataset.confirm = ""; b.textContent = "Close tab"; }, 4000); return;
+  }
+  b.dataset.confirm = ""; b.textContent = "Close tab";
+  try { await post("/api/tabs/close", {id: currentView.slice(4)}); await reloadChatTabs(); setView("home"); }
+  catch (e) { toast(e.message); }
 };
 $("room-pause").onclick = () => roomAction("/api/room/pause");
 $("room-stop").onclick = () => roomAction("/api/room/stop");

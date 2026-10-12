@@ -69,7 +69,7 @@ def test_hive_tab_exposes_room_controls_and_status():
 
 
 @pytest.fixture(scope='module')
-def rendered():
+def rendered(tmp_path_factory):
     node = shutil.which('node')
     if not node:
         pytest.skip('node not installed')
@@ -94,7 +94,10 @@ renderChart({runs_24h:{codex:{ok:2,failed:1,rejected:0,est_tokens:90}}});
 renderTrend({trend:[{day:'2026-10-11',runs:{codex:3},ok:{codex:2}}]});
 console.log(JSON.stringify(Object.fromEntries([...elements].map(([k,v])=>[k,v.innerHTML]))));
 '''
-    result = subprocess.run([node, '-e', stub + script + exercise], capture_output=True,
+    # A file, not `node -e`: the script outgrew Windows' ~32k command-line limit.
+    program = tmp_path_factory.mktemp('a11y') / 'render.js'
+    program.write_text(stub + script + exercise, encoding='utf-8')
+    result = subprocess.run([node, str(program)], capture_output=True,
                             text=True, encoding='utf-8', check=True, timeout=30)
     return {k: Markup(v) for k, v in json.loads(result.stdout).items()}
 
