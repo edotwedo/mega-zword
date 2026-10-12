@@ -36,6 +36,8 @@ Grok (available now; Oct 17 is its weekly reset) -> `docs/handoffs/2026-10-11-gr
   event data in tests; no admin needed to run tests.
 - B9 Sentinel alerts: production URL checks, ntfy push, healthchecks.io ping,
   `megazword sentinel install`, docs for Phil's one-time setup.
+- R1 (do first, it's quick): re-check the free tiers in B14 against each provider's own pricing page
+  today; post a table (limits, signup needs, data-training terms) in STATUS under B14.
 
 Antigravity Claude/GPT pool (unused; `agy` session on Phil's PC) -> `docs/handoffs/2026-10-11-antigravity.md`:
 - B1 Room engine (`src/megazword/room.py`): room file, turn loop with
@@ -59,6 +61,21 @@ Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
   that CLI's own default (keep Phil's Codex model unless he sets one). Show the choice in the run
   line. Optional: Antigravity's Claude/GPT pool as a fifth AI (`agy --model <claude/gpt id>`).
   Settings panel + doctor support. Tests with fakes. Gemini reviews; a Claude lead merges.
+- B13 Plain `megazword` opens the app (Phil, 2026-10-11): with no command, launch `dashboard --app`
+  detached and print one line saying so; keep the text start screen as `megazword start` (and when
+  stdout isn't a terminal, or `MEGAZWORD_NO_APP=1`, keep today's start screen so tests and scripts
+  don't open windows). Update `--help`, GUIDE.md, tests.
+- B14 More free AIs (research 2026-10-11; Grok re-checks limits first, see R1). Add as optional
+  backends beside OpenRouter/Groq in `free_apis.py` (OpenAI-compatible HTTP, key from env, never
+  routed by default, shown in `backends`/doctor, per-provider request counts as their meter):
+  1. Cloudflare Workers AI: 10,000 Neurons/day free, no card; Kimi K2.5, Qwen3, gpt-oss-120b,
+     Llama 3.3 70B. Phil already has a Cloudflare account (needs an account id + API token).
+  2. Z.ai GLM Flash (GLM-4.7-Flash listed free on the price sheet).
+  3. Google AI Studio Gemini API free tier (separate from agy's pool).
+  4. NVIDIA NIM free credits.
+  5. Mistral "Experiment" tier (~1B tokens/month free) ONLY if Phil OKs that it trains on our data.
+  Skip: Perplexity (no free API), Qwen Code OAuth (ended 2026-04-15), GitHub Models (closed),
+  Cerebras (now a 30-day $5 credit).
 
 Gemini (lots of room; agy) -> `docs/handoffs/2026-10-11-gemini.md`:
 - B10 Calendar read: `[calendar] ical_url`, `megazword calendar today|week`,
