@@ -15,6 +15,9 @@ Build `src/megazword/room.py`: the Hive room, a lightweight group chat for the b
   always go first. The prime directive prompt: work the primary project (`[room] primary`), use spare usage.
 - Turn cap (default 12). Stop early when every AI is out or over pace. One AI talks at a time.
 - Lean, read-only one-shots only (never `--edit`), replies capped at about 80 words.
+- **Token budget (Phil, 2026-10-12), part of B1, not a later fix:** state card instead of the full room,
+  rolling summary plus the last 4 messages, wake only the mentioned AI, reuse CLI sessions where supported
+  (fall back to one-shots), and log prompt size per turn. Details: SPEC.md section R, "Token budget".
 - CLI: `megazword room start|stop|say|show`. Tests use the fake CLIs. Claude adds lessons and summaries
   later (B2), and Codex builds the screen for it (B4).
 

@@ -2,6 +2,10 @@
 
 Newest first. Don't reopen these without Phil.
 
+## 2026-10-12
+- Phil lost Kestrel's chat. Tally-11 (Claude cloud chat) takes Kestrel's seat as Mega Zword lead: owns main, merges and assignments. Other Claude sessions pick their own designation.
+- Phil: the Hive room must not waste tokens re-reading everything to get the bots on the same page. Efficiency rules are part of B1 (SPEC section R, "Token budget").
+
 ## 2026-10-11
 - Phil: Mega Zword is proprietary and private, all rights reserved. He shares it with whom he chooses. This replaces the 2026-10-10 AGPL decision. At the switch the repo had no forks, stars, outside contributors or outside clones. Don't add an open-source license or make the repo public without Phil.
 - Workshop BUDGET.md limits are retired (Phil). Automatic runs are allowed; every AI may use its own usage. Two more AIs now have their own usage (Gemini via agy is one).

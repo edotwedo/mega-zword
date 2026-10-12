@@ -109,6 +109,22 @@ the 2026-10-11 overnight run (lanes in STATUS.md, "Beta 2 backlog").
   logged in; otherwise it prints the text to paste. No secrets, logins or
   private info in summaries.
 - CLI too: `megazword room start|stop|say "..."|show|post-summary`.
+- **Token budget (Phil, 2026-10-12).** Each one-shot re-reads its own setup
+  (about 11k tokens for lean Claude, about 6k for Codex) plus whatever we
+  send, so the room must not resend everything every turn:
+  1. Send a short **state card**, not the whole room: primary project, what's
+     in progress, last 3 decisions, today's schedule (once B10 lands). Under
+     about 300 words, rebuilt only when something changes.
+  2. Send a **rolling summary** plus only the last few messages (default 4).
+     After every 6 turns, the cheapest available AI condenses older messages
+     into 5 lines.
+  3. **Wake only who's needed.** Only the mentioned AI is called. With no
+     mention, the next AI in the burn order speaks; the others stay asleep.
+  4. **Reuse sessions where the CLI supports it** (`agy --continue` /
+     `--conversation`, `claude --continue`, `codex exec resume`), so each
+     turn sends only the new message and the provider's cache covers the
+     rest. Fall back to one-shots if resume fails. Measure it: log prompt
+     characters per turn, and show tokens per room turn in `megazword stats`.
 
 ### T. Bot tabs
 - The app gets a tab strip. Fixed tabs: **Home** (today's dashboard),
