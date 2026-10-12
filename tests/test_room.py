@@ -410,3 +410,37 @@ def test_state_survives_concurrent_saves_and_extra_keys(tmp_path):
     for t in threads:
         t.join(30)
     assert not bad
+
+
+def test_bot_out_of_usage_mid_session_is_marked_out_and_others_continue(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+
+    class Limited(FakeBackend):
+        def _run(self, prompt):
+            self.calls.append(prompt)
+            raise RuntimeError("You've hit your usage limit. Try again in 3 hours.")
+
+    claude, codex = Limited("claude"), FakeBackend("codex", reply="on it @codex")
+    cfg = config.Config(log_path=tmp_path / "log.jsonl")
+    room.say("hive", "go @claude", home=tmp_path, write=lambda s: None)
+    out = []
+    room.run_room("hive", max_turns=2, project="workshop", backends={"claude": claude, "codex": codex},
+                  cfg=cfg, write=out.append, home=tmp_path)
+    assert len(claude.calls) == 1 and len(codex.calls) == 2
+    assert "claude" in cfg.out_now()
+    assert any("out of usage" in line for line in out)
+    logged = [json.loads(l) for l in (tmp_path / "log.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert [e["ok"] for e in logged if e["backend"] == "claude"] == [False]
+
+
+def test_other_failures_still_end_the_session(tmp_path):
+    class Broken(FakeBackend):
+        def _run(self, prompt):
+            raise RuntimeError("segfault")
+
+    out = []
+    room.say("hive", "go @claude", home=tmp_path, write=lambda s: None)
+    room.run_room("hive", max_turns=3, project="workshop",
+                  backends={"claude": Broken("claude"), "codex": FakeBackend("codex")},
+                  cfg=config.Config(log_path=tmp_path / "log.jsonl"), write=out.append, home=tmp_path)
+    assert any("claude failed: segfault" in line for line in out)

@@ -493,9 +493,17 @@ def run_room(room: str = DEFAULT_ROOM,
             backend = eligible[speaker]
             text, ok, seconds, err = run_speaker(speaker, backend, prompt, session_active[speaker])
             if not ok:
-                write(f"[megazword room] {speaker} failed: {err}")
-                # Mark session inactive on failure
+                log.append(cfg.log_path, cfg.log_lines, backend=speaker, forced=False,
+                           project=primary, room=room, seconds=round(seconds, 2), ok=False,
+                           prompt_chars=prompt_chars, answer_chars=0, est_tokens=prompt_chars // 4)
                 session_active[speaker] = False
+                # Out of usage mid-session: mark it out (like a normal run) and let the
+                # others carry on. It drops out of `eligible` next turn, so this can't loop.
+                from .cli import auto_mark_out
+                if auto_mark_out(speaker, err, cfg):
+                    write(f"[megazword room] {speaker} is out of usage; the others carry on")
+                    continue
+                write(f"[megazword room] {speaker} failed: {err}")
                 break
 
             session_active[speaker] = True
