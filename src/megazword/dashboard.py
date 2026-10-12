@@ -25,7 +25,7 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from . import advise, stats, answers, config, runlog, sentinel, tabs
+from . import advise, stats, answers, config, room, runlog, sentinel, tabs
 from .backends import _kill_tree, default_backends, process_group
 from .meters import STALE, summarize_all
 from .memory import Memory, check_project, list_projects, project_name
@@ -157,6 +157,7 @@ class App:
         self.jobs: dict[str, Job] = {}
         self._jobs_lock = threading.Lock()
         self._n = 0
+        self._room_thread: threading.Thread | None = None
 
     def project_for(self, value: object) -> str:
         """The project a request asks for (default: the launch project).
@@ -329,6 +330,54 @@ class App:
                          lambda p: rate(p, self.cfg.rater_model),
                          cli.plan_statuses, bool(body.get("context")))
 
+    # Hive room API for the B4 tab (Tally-11, 2026-10-12). Turns run in a background
+    # thread in this process; Stop sets the room's stop flag, checked before every turn.
+    def _room_name(self, value: object) -> str:
+        name = str(value or self.cfg.room_name).strip()
+        if not name or not all(c.isalnum() or c in "-_" for c in name):
+            raise ValueError("room name may use letters, digits, - and _")
+        return name
+
+    def room_running(self) -> bool:
+        return self._room_thread is not None and self._room_thread.is_alive()
+
+    def room_view(self, name: object = None, n: int = 50) -> dict:
+        name = self._room_name(name)
+        state = room.load_state(name)
+        return {"room": name, "running": self.room_running(), "primary": state.primary,
+                "turn_count": state.turn_count, "turn_cap": state.turn_cap,
+                "last_speaker": state.last_speaker,
+                "messages": [asdict(m) for m in room.read_messages(name)[-n:]]}
+
+    def room_say(self, body: dict) -> dict:
+        name = self._room_name(body.get("room"))
+        text = str(body.get("text") or "").strip()
+        if not text:
+            raise ValueError("empty message")
+        room.say(name, text, author="phil", write=lambda s: None)
+        return self.room_view(name)
+
+    def room_start(self, body: dict) -> dict:
+        name = self._room_name(body.get("room"))
+        if self.room_running():
+            raise ValueError("the room is already running; stop it first")
+        turns = body.get("turns")
+        if turns is not None and (not isinstance(turns, int) or not 1 <= turns <= 50):
+            raise ValueError("turns must be 1-50")
+        project = self.project_for(body.get("project") or self.cfg.room_primary)
+        from . import cli
+        self._room_thread = threading.Thread(
+            target=room.run_room, daemon=True,
+            kwargs=dict(room=name, max_turns=turns, project=project, backends=self.backends,
+                        cfg=self.cfg, statuses=cli.plan_statuses, write=lambda s: None))
+        self._room_thread.start()
+        return self.room_view(name)
+
+    def room_stop(self, body: dict) -> dict:
+        name = self._room_name(body.get("room"))
+        room.set_stopped(name)
+        return self.room_view(name)
+
 
 def page(token: str) -> bytes:
     html = resources.files("megazword").joinpath("dashboard.html").read_text("utf-8")
@@ -409,6 +458,12 @@ def make_handler(app: App, port: int, remote: bool = False):
                 return self._json(200, job.view()) if job else self._json(404, {})
             if path == "/api/tabs":
                 return self._json(200, app.tabs_list())
+            if path == "/api/room":
+                query = parse_qs(urlsplit(self.path).query)
+                try:
+                    return self._json(200, app.room_view((query.get("room") or [None])[0]))
+                except ValueError as exc:
+                    return self._json(400, {"error": str(exc)})
             return self._json(404, {"error": "not found"})
 
         def do_POST(self):
@@ -429,7 +484,10 @@ def make_handler(app: App, port: int, remote: bool = False):
                           "/api/tabs": app.tabs_create,
                           "/api/tabs/rename": app.tabs_rename,
                           "/api/tabs/close": app.tabs_close,
-                          "/api/tabs/send": app.tabs_send}.get(self.path)
+                          "/api/tabs/send": app.tabs_send,
+                          "/api/room/say": app.room_say,
+                          "/api/room/start": app.room_start,
+                          "/api/room/stop": app.room_stop}.get(self.path)
                 if action is None:
                     return self._json(404, {"error": "not found"})
                 return self._json(200, action(body))

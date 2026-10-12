@@ -134,7 +134,13 @@ Messages are saved to `~/.megazword/rooms/<room>.jsonl`.
 - `megazword room show`: View recent messages in the room.
 - `megazword room start [--turns 12]`: Run the room turn loop. Stops early if all bots are out of usage or over pace.
 - `megazword room stop`: Stop active room turns.
-- `megazword room post-summary`: View or post the latest room summary to Q (workshop PR #33).
+- `megazword room post-summary`: Show the latest room summary. Add `--post` to post it to Q (workshop PR #33).
+
+After a session of 3 or more turns, one bot writes 3-5 short lessons into the
+project's memory, and the next session starts with the latest ones. Each turn
+sends a short state card, a rolling summary and the last few messages, not the
+whole history, to keep usage down. The dashboard reads and drives the same room
+through `/api/room` (view) and `/api/room/say`, `/api/room/start` and `/api/room/stop`.
 
 
 Notes, decisions and completed runs are saved under

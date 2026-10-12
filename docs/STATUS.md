@@ -55,7 +55,10 @@ Codex (Larch-11) -> `docs/handoffs/2026-10-11-codex.md`:
   sidebar tab strip ready for B3/B4. Keep C9 accessibility. Screenshots at
   desktop and phone widths.
 - B4 Hive tab UI: room stream, Phil's input box, Start/Pause/Stop, primary
-  project, who is talking, turns left. Needs B1's and B3's APIs.
+  project, who is talking, turns left. **Room API ready (Tally-11, 2026-10-12):** GET
+  `/api/room?room=hive` -> `{room, running, primary, turn_count, turn_cap, last_speaker, messages[]}`;
+  POST `/api/room/say {text}`, `/api/room/start {turns?, project?}` (runs turns in a background
+  thread), `/api/room/stop`. All need the usual X-MZ-Token. Poll GET every few seconds while running.
 - B6 Custom title bar and icons for `--app`; GUIDE.md and README for tabs and the room.
 - **B12 done (Tally-11, 2026-10-12, Codex was idle):** `[claude|codex|gemini.<level>]` model + effort
   in config.toml, applied on every route like Grok's; shown in the run line and in `doctor`. Flags checked
