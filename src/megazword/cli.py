@@ -11,7 +11,7 @@ from typing import Callable
 
 from . import __version__, config, failures, log
 from .memory import Memory, project_name, with_context
-from .backends import Backend, apply_grok_effort, default_backends, grok_label
+from .backends import Backend, apply_levels, default_backends, grok_label
 from .escalate import escalate, looks_failed
 from .rater import Rating, rate
 
@@ -411,7 +411,7 @@ def main(argv: list[str] | None = None,
             print("[megazword] --compare can't be combined with -m or --edit "
                   "(parallel edits to one folder would collide)", file=sys.stderr)
             return 2
-        apply_grok_effort(backends, "medium", cfg.grok)
+        apply_levels(backends, "medium", cfg.grok, cfg.levels)
         try:
             names = compare.parse_names(args.compare, backends)
         except ValueError as exc:
@@ -425,7 +425,7 @@ def main(argv: list[str] | None = None,
 
     rating: Rating | None = None
     if args.model:
-        apply_grok_effort(backends, "medium", cfg.grok)
+        apply_levels(backends, "medium", cfg.grok, cfg.levels)
         backend = backends.get(args.model)
         if backend is None and args.edit and args.model == "gemini":
             print("[megazword] Gemini edit mode is disabled (folder-contained writes "
@@ -443,7 +443,7 @@ def main(argv: list[str] | None = None,
         print(f"[megazword] using {grok_label(backend)} (you chose it)", file=sys.stderr)
     else:
         rating = rater(prompt)
-        apply_grok_effort(backends, rating.level, cfg.grok)
+        apply_levels(backends, rating.level, cfg.grok, cfg.levels)
         out = cfg.out_now()
         chain = candidates(rating, cfg.route, backends, (statuses or plan_statuses)(), out)
         if not chain:
@@ -627,7 +627,7 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
     level = last.get("rating") or "medium"
     if level == "easy":
         level = "medium"  # a retry is real work, not a status pass
-    apply_grok_effort(backends, level, cfg.grok)
+    apply_levels(backends, level, cfg.grok, cfg.levels)
     rating = Rating(level, "retry", "retry") if last.get("rating") else None
     if args.model:
         if args.model not in backends:

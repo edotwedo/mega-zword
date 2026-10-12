@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import chat, config
-from .backends import Backend, apply_grok_effort, grok_label
+from .backends import Backend, apply_levels, grok_label
 from .filelock import locked, write_atomic
 from .memory import Memory, check_project, project_name
 from .rater import Rating
@@ -160,13 +160,13 @@ def send(tab_id: str, prompt: str, backends: dict[str, Backend], cfg: config.Con
     if pin != AUTO:
         if pin not in backends:
             raise ValueError(f"unknown AI {pin!r}")
-        apply_grok_effort(backends, "medium", cfg.grok)
+        apply_levels(backends, "medium", cfg.grok, cfg.levels)
         chain = [backends[pin]]
         using = grok_label(chain[0])
         forced = True
     else:
         rating = rater(message)
-        apply_grok_effort(backends, rating.level, cfg.grok)
+        apply_levels(backends, rating.level, cfg.grok, cfg.levels)
         chain = cli.candidates(rating, cfg.route, backends,
                                (statuses or cli.plan_statuses)(), cfg.out_now())
         if not chain:

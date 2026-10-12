@@ -104,6 +104,17 @@ def checks(home: Path | None = None) -> list[Check]:
     short = [n for n, t in cfg.timeouts.items() if t < 60]
     found.append(Check("WARN" if short else "OK", "timeouts", waits,
                        f"under 60s may cut off real work: {', '.join(short)}" if short else ""))
+    # B12: per-level model/effort for Claude, Codex, Gemini (unset = the CLI's default).
+    efforts = {"minimal", "low", "medium", "high", "xhigh", "max"}
+    picks, odd = [], []
+    for name, table in cfg.levels.items():
+        for level, (model, effort) in sorted(table.items()):
+            picks.append(f"{name}.{level} {'/'.join(p for p in (model, effort) if p) or 'default'}")
+            if effort and effort not in efforts:
+                odd.append(f"{name}.{level} effort '{effort}'")
+    found.append(Check("WARN" if odd else "OK", "model levels",
+                       ", ".join(picks) if picks else "CLI defaults",
+                       f"unknown effort: {', '.join(odd)}" if odd else ""))
     known = {"claude", "codex", "grok", "gemini", "openrouter", "groq"}
     unknown = sorted({name for route in cfg.route.values() for name in route
                       if name not in known})

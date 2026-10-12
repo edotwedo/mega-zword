@@ -159,6 +159,12 @@ as `megazword dashboard --app`) and leaves it running after you close the
 terminal. `megazword start` shows the old text start screen. Scripts and pipes
 still get the text screen, and so does any run with `MEGAZWORD_NO_APP=1` set.
 
+Each AI can use a different model and effort for easy, medium and hard tasks.
+Add blocks like `[claude.hard]` (`model = "opus"`, `effort = "high"`), `[codex.easy]`
+(`effort = "low"`) or `[gemini.hard]` to `config.toml`. Anything you leave out
+keeps that AI's own default. The run line shows the choice, and `megazword doctor`
+lists them.
+
 `megazword usage` shows the available plan meters and Mega Zword run totals.
 Claude's meter comes from its usage endpoint; Codex's meter comes from the
 latest snapshot in its local session logs; Grok and Gemini use Mega Zword's run

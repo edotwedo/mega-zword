@@ -22,6 +22,14 @@ Example config.toml:
     [grok.hard]
     model = "grok-4.7"
     effort = "high"
+
+    # Same idea for Claude, Codex and Gemini (agy). Leave one out to keep
+    # that CLI's own default model and effort.
+    [claude.hard]
+    model = "opus"
+    effort = "high"
+    [codex.easy]
+    effort = "low"
 """
 
 from __future__ import annotations
@@ -76,6 +84,10 @@ class Config:
     rater_model: str = "qwen2.5:1.5b"
     route: dict[str, list[str]] = field(default_factory=lambda: dict(DEFAULT_ROUTE))
     grok: dict[str, tuple[str, str]] = field(default_factory=lambda: dict(DEFAULT_GROK))
+    # B12: [claude.<level>], [codex.<level>], [gemini.<level>] model + effort. Empty = the
+    # CLI's own default (Phil's Codex model stays unless he sets one).
+    levels: dict[str, dict[str, tuple[str, str]]] = field(
+        default_factory=lambda: {name: {} for name in ("claude", "codex", "gemini")})
     # Looked up when a Config is made (not at import) so tests can redirect HOME.
     log_path: Path = field(default_factory=lambda: HOME / "log.jsonl")
     # How many lines log.jsonl and each project's memory.jsonl keep ([limits]).
@@ -146,6 +158,12 @@ def load(path: Path | None = None) -> Config:
                 model, effort = cfg.grok[level]
                 cfg.grok[level] = (str(block.get("model", model)),
                                    str(block.get("effort", effort)))
+
+        for name, table in cfg.levels.items():
+            for level, block in (data.get(name) or {}).items():
+                if level in DEFAULT_ROUTE and isinstance(block, dict):
+                    table[level] = (str(block.get("model", "")).strip(),
+                                    str(block.get("effort", "")).strip())
 
         room_block = data.get("room", {})
         if isinstance(room_block, dict):

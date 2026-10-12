@@ -14,7 +14,7 @@ import sys
 import subprocess
 import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from . import ollama
 
@@ -223,13 +223,47 @@ def apply_grok_effort(backends: dict[str, Backend], level: str,
     backends["grok"] = grok_backend(model, effort, edit="--sandbox" in current.args)
 
 
+LEVEL_AIS = ("claude", "codex", "gemini")
+
+
+def apply_levels(backends: dict[str, Backend], level: str,
+                 grok: dict[str, tuple[str, str]],
+                 levels: dict[str, dict[str, tuple[str, str]]] | None = None) -> None:
+    """B12: Grok plus Claude, Codex and Gemini get the model and effort set for this
+    difficulty in config.toml ([claude.hard] etc.). Unset = that CLI's own default.
+    Only the real CLIs are swapped (a copy each); test fakes are left alone."""
+    apply_grok_effort(backends, level, grok)
+    for name, table in (levels or {}).items():
+        model, effort = table.get(level, ("", ""))
+        current = backends.get(name)
+        if not (model or effort) or not isinstance(current, CLIBackend):
+            continue
+        if isinstance(current, GeminiBackend):
+            extra = [*(["--model", model] if model else []), *(["--effort", effort] if effort else [])]
+            backends[name] = replace(current, args=list(current.args), level_args=extra)
+        elif current.exe == "claude":
+            extra = [*(["--model", model] if model else []), *(["--effort", effort] if effort else [])]
+            backends[name] = replace(current, args=[*current.args, *extra])
+        elif current.exe == "codex":
+            extra = [*(["-m", model] if model else []),
+                     *(["-c", f"model_reasoning_effort={effort}"] if effort else [])]
+            backends[name] = replace(current, args=[*current.args, *extra])
+
+
 def grok_label(backend: Backend) -> str:
-    """'grok (grok-4.6 medium)' when those flags are present."""
-    if not isinstance(backend, CLIBackend) or "--effort" not in backend.args:
+    """'grok (grok-4.6 medium)', 'codex (gpt-5.5 high)': the model and effort when set."""
+    if not isinstance(backend, CLIBackend):
         return backend.name
-    args = backend.args
-    model = args[args.index("-m") + 1] if "-m" in args else ""
-    effort = args[args.index("--effort") + 1]
+    args = [*backend.args, *getattr(backend, "level_args", [])]
+    model = effort = ""
+    for flag in ("-m", "--model"):
+        if flag in args[:-1]:
+            model = args[args.index(flag) + 1]
+    if "--effort" in args[:-1]:
+        effort = args[args.index("--effort") + 1]
+    for a in args:
+        if a.startswith("model_reasoning_effort="):
+            effort = a.split("=", 1)[1]
     extra = " ".join(p for p in (model, effort) if p)
     return f"{backend.name} ({extra})" if extra else backend.name
 
@@ -271,10 +305,12 @@ class GeminiBackend(CLIBackend):
 
     exe: str = "gemini"
     args: list[str] = field(default_factory=lambda: list(OLD_GEMINI_ARGS))
+    # B12: agy's --model/--effort for this task's level; empty = agy's own default.
+    level_args: list[str] = field(default_factory=list)
 
     def _pick(self) -> None:
         if shutil.which("agy"):
-            self.exe, self.args = "agy", list(AGY_ARGS)
+            self.exe, self.args = "agy", [*AGY_ARGS[:-2], *self.level_args, *AGY_ARGS[-2:]]
         else:
             self.exe, self.args = "gemini", list(OLD_GEMINI_ARGS)
 

@@ -57,13 +57,15 @@ Codex (Larch-11) -> `docs/handoffs/2026-10-11-codex.md`:
 - B4 Hive tab UI: room stream, Phil's input box, Start/Pause/Stop, primary
   project, who is talking, turns left. Needs B1's and B3's APIs.
 - B6 Custom title bar and icons for `--app`; GUIDE.md and README for tabs and the room.
-- **B12 next:** per-task model choice for every AI (extends Grok's `[grok.easy|medium|hard]`): add
+- **B12 done (Tally-11, 2026-10-12, Codex was idle):** `[claude|codex|gemini.<level>]` model + effort
+  in config.toml, applied on every route like Grok's; shown in the run line and in `doctor`. Flags checked
+  against the real CLIs on Phil's PC. Settings panel left for B5. Original spec: per-task model choice for every AI (extends Grok's `[grok.easy|medium|hard]`): add
   `[claude.<level>]`, `[codex.<level>]`, `[gemini.<level>]` with model + effort. Flags: `claude --model
   --effort`, `codex -m` and `-c model_reasoning_effort=...`, `agy --model --effort`. Unset level =
   that CLI's own default (keep Phil's Codex model unless he sets one). Show the choice in the run
   line. Optional: Antigravity's Claude/GPT pool as a fifth AI (`agy --model <claude/gpt id>`).
   Settings panel + doctor support. Tests with fakes. Gemini reviews; a Claude lead merges.
-- B13 Plain `megazword` opens the app (Phil, 2026-10-11): with no command, launch `dashboard --app`
+- **B13 done (Tally-11, 2026-10-12, merged 9c19570).** Plain `megazword` opens the app (Phil, 2026-10-11): with no command, launch `dashboard --app`
   detached and print one line saying so; keep the text start screen as `megazword start` (and when
   stdout isn't a terminal, or `MEGAZWORD_NO_APP=1`, keep today's start screen so tests and scripts
   don't open windows). Update `--help`, GUIDE.md, tests.
