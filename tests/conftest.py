@@ -15,6 +15,8 @@ def isolated_home(tmp_path, monkeypatch):
     monkeypatch.setattr(usage_sources, "_agy_path", lambda: None)
     # ...or a real Codex app server for its live rate limits.
     monkeypatch.setattr(usage_sources, "_codex_cmd", lambda: None)
+    # ...or open the app window from a plain `megazword` (B13).
+    monkeypatch.setenv("MEGAZWORD_NO_APP", "1")
     # ...or the real GitHub CLI, which would post room summaries to Q.
     from megazword import room
     monkeypatch.setattr(room, "_gh_path", lambda: None)

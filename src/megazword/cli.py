@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
+import subprocess
 import sys
 from typing import Callable
 
@@ -16,7 +18,7 @@ from .rater import Rating, rate
 
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room"),
-    "See": ("usage", "stats", "advise", "dashboard", "projects", "history", "export",
+    "See": ("start", "usage", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel"),
     "Set up": ("init", "doctor", "out", "backends"),
     "Memory": ("note", "decide", "import-hive"),
@@ -97,6 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+    sub.add_parser("start", help="text start screen (plain `megazword` opens the app window)")
     sub.add_parser("projects", help="list projects with memory entries and last activity")
     sub.add_parser("advise", help="suggest a route order from stats and votes (changes nothing)")
     st = sub.add_parser("stats", help="per-day, per-AI table from the run log")
@@ -224,6 +227,32 @@ def candidates(rating: Rating, route: dict[str, list[str]],
             if n in backends and n not in out and backends[n].available()]
 
 
+def opens_app() -> bool:
+    """B13: plain `megazword` opens the app, but only for a person at a terminal. Scripts,
+    tests and pipes (stdout not a terminal) or MEGAZWORD_NO_APP=1 keep the text start screen."""
+    if os.environ.get("MEGAZWORD_NO_APP", "").strip() not in ("", "0"):
+        return False
+    try:
+        return sys.stdout.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
+def launch_app() -> None:
+    """Start `megazword dashboard --app` detached, so closing this terminal leaves it running."""
+    exe = Path(sys.executable)
+    windowless = exe.with_name("pythonw.exe")
+    python = str(windowless if windowless.exists() else exe)
+    cmd = [python, "-c", "import sys; from megazword.cli import main; "
+           "sys.exit(main(['dashboard', '--app']))"]
+    flags = 0
+    if os.name == "nt":
+        flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, creationflags=flags,
+                     start_new_session=os.name != "nt", close_fds=True)
+
+
 def main(argv: list[str] | None = None,
          backends: dict[str, Backend] | None = None,
          cfg: config.Config | None = None,
@@ -244,7 +273,12 @@ def main(argv: list[str] | None = None,
                   "[megazword] fix that line (or rename the file to start fresh), "
                   "then run `megazword doctor`", file=sys.stderr)
             return 2
-    if args.command is None:
+    if args.command is None and opens_app():
+        launch_app()
+        print("[megazword] opening the Mega Zword app window "
+              "(`megazword start` shows the text start screen)")
+        return 0
+    if args.command in (None, "start"):
         from .start import render
         print(render(cfg))
         return 0
