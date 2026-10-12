@@ -1,9 +1,9 @@
 # Status
 
-**Active: none.** Larch-11 finished B12 on `codex/b12-model-choice-2026-10-12`; PR is ready for Tally-11. Next: Codex B13, then B5, B4, B6; review Grok's B15 when it lands.
+**Active: Larch-11 (Codex), 2026-10-12 04:17 PT.** B12 is complete on PR #3. Starting B13: bare `megazword` opens a detached dashboard app only in an interactive terminal; `megazword start` keeps the text screen. Tests must fake the process launch.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-12 04:15 PT by Larch-11: B12 implemented and tested (586 passed; smoke 36/36). Usage after work: Claude 49% weekly (8% 5-hour), Codex 46% weekly (8% 5-hour), Grok 15% weekly, Gemini out until Oct 18.
+**Last updated:** 2026-10-12 04:17 PT by Larch-11: B12 is ready for review (586 passed; smoke 36/36); starting B13. Usage: Claude 51% weekly (22% 5-hour), Codex 48% weekly (20% 5-hour), Grok 15% weekly, Gemini out until Oct 18.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -114,7 +114,7 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
 
 ## Current cross-lane sequence (Tally-11, 2026-10-11 22:30 PT)
 1. Grok B14 and R1 are done; B14 is on main. The agy empty-answer fix is merged.
-2. Codex: B12 done on `codex/b12-model-choice-2026-10-12`; next B13, B5, B4, B6. Reviews Grok's B15.
+2. Codex: B12 done on `codex/b12-model-choice-2026-10-12`; B13 active on `codex/b13-default-app-2026-10-12`; then B5, B4, B6. Reviews Grok's B15.
 3. Grok: B15 (light rules), then B7 reviews of Codex's branches, B1 second look, STATUS note.
 4. Gemini calendar B10/B11 is parked until Phil asks; agy is out through Oct 18.
 5. Check usage before and after each item; keep branches separate and test with fakes.
