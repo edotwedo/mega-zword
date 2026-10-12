@@ -185,6 +185,36 @@ def test_room_stop_command(tmp_path):
     assert state.stopped
 
 
+def test_room_pause_waits_for_current_fake_reply(tmp_path, monkeypatch):
+    cfg = config.Config(log_path=tmp_path / "log.jsonl")
+    room.say("pauseroom", "Please reply @codex", home=tmp_path)
+
+    replies = 0
+    def fake_reply(speaker, backend, prompt, resume):
+        nonlocal replies
+        replies += 1
+        if replies == 1:
+            room.set_paused("pauseroom", home=tmp_path)
+        return "finished this reply", True, 0.1, ""
+
+    monkeypatch.setattr(room, "run_speaker", fake_reply)
+    output = []
+    room.run_room("pauseroom", max_turns=4, project="sample",
+                  backends={"codex": FakeBackend("codex")}, cfg=cfg,
+                  statuses=lambda: {}, write=output.append, home=tmp_path)
+    state = room.load_state("pauseroom", home=tmp_path)
+    assert state.paused and not state.active
+    assert [m.text for m in room.read_messages("pauseroom", home=tmp_path)] == [
+        "Please reply @codex", "finished this reply"]
+    assert any("paused after current reply" in line for line in output)
+
+    room.run_room("pauseroom", max_turns=2, project="sample",
+                  backends={"codex": FakeBackend("codex")}, cfg=cfg,
+                  statuses=lambda: {}, write=output.append, home=tmp_path)
+    state = room.load_state("pauseroom", home=tmp_path)
+    assert state.turn_count == 2 and not state.paused and replies == 2
+
+
 def test_save_summary_report(tmp_path):
     messages = [
         room.RoomMessage("2026-10-11T12:00:00Z", "phil", "hello"),

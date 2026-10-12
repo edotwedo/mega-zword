@@ -350,6 +350,19 @@ def test_tabs_http_list_create_rename_close_send(server, monkeypatch):
     assert "tabs" in app.state()
 
 
+def test_room_http_say_pause_and_stop(server):
+    base, app = server
+    initial = json.loads(urllib.request.urlopen(base + "/api/room?room=hive", timeout=5).read())
+    assert initial["room"] == "hive" and initial["paused"] is False
+    said = json.loads(_post(base + "/api/room/say", {"room":"hive", "text":"Hello @codex"}, app.token).read())
+    assert said["messages"][-1]["author"] == "phil"
+    assert said["messages"][-1]["mentions"] == ["codex"]
+    paused = json.loads(_post(base + "/api/room/pause", {"room":"hive"}, app.token).read())
+    assert paused["paused"] is True
+    stopped = json.loads(_post(base + "/api/room/stop", {"room":"hive"}, app.token).read())
+    assert stopped["paused"] is False
+
+
 def test_remote_malformed_cookie_returns_forbidden(remote_server):
     base, app = remote_server
     req = urllib.request.Request(base + "/api/state", headers={"Cookie": "bad@name=value"})

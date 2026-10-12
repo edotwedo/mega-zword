@@ -32,9 +32,10 @@ button, select, input, textarea { font: inherit; color: var(--text); background:
 .side-label { margin: 0 10px 4px; color: var(--dim); font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
 .tab-strip { display: grid; gap: 5px; }
 .nav-tab { min-height: 42px; display: flex; align-items: center; gap: 11px; padding: 8px 11px;
-  border: 1px solid transparent; border-radius: var(--radius); color: var(--dim); text-decoration: none; }
+  width:100%; border: 1px solid transparent; border-radius: var(--radius); color: var(--dim);
+  background:transparent; text-align:left; text-decoration: none; }
 .nav-tab:hover { background: var(--button); color: var(--text); }
-.nav-tab[aria-current="page"] { color: var(--text); background: #1a2922; border-color: #3a6250; }
+.nav-tab[aria-pressed="true"] { color: var(--text); background: #1a2922; border-color: #3a6250; }
 .nav-icon { width: 18px; text-align: center; font: 600 14px var(--mono); }
 .side-status { margin-top: auto; color: var(--dim); font-size: 12px; padding: 10px; border-top: 1px solid var(--line); }
 .live-dot { color: var(--accent); font: 700 11px var(--mono); }
@@ -139,8 +140,9 @@ details.ans-item .qfull { color: var(--dim); margin-top: 6px; }
   .sidebar { position: static; height: auto; padding: 11px 14px 8px; gap: 10px; border-right: 0; border-bottom: 1px solid var(--line); }
   .side-label, .side-status { display: none; }
   .tab-strip { display: flex; overflow-x: auto; }
-  .nav-tab { flex: 0 0 auto; min-height: 44px; }
+  .nav-tab { flex: 0 0 auto; width:auto; min-height: 44px; }
   main { padding: 14px 14px 32px; grid-template-columns: minmax(0, 1fr); gap: 11px; }
+  #hive:not([hidden]) { padding:14px 14px 32px; gap:11px; }
   section { padding: 14px; }
   header { min-height: 58px; padding: 10px 14px; }
 }
@@ -165,6 +167,17 @@ input::placeholder, textarea::placeholder { color:var(--dim); opacity:1; }
   .cmp { grid-template-columns:minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) { .spin { animation:none; } }
+main[hidden], #hive[hidden] { display:none; }
+#hive:not([hidden]) { display:grid; gap:14px; padding:22px clamp(16px, 3vw, 38px) 44px; grid-template-columns:minmax(0,1fr); max-width:1600px; margin:0 auto; }
+.room-messages { max-height: min(55vh, 560px); min-height: 180px; overflow:auto; margin:14px 0;
+  padding:10px 12px; background:var(--inset); border:1px solid var(--line); border-radius:var(--radius); }
+.room-message { padding:10px 2px; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+.room-message:last-child { border-bottom:0; }
+.room-message b { color:var(--accent); font:600 12px var(--mono); text-transform:uppercase; }
+.room-message time { float:right; color:var(--dim); font-size:12px; }
+.room-compose { align-items:stretch; }
+.room-compose textarea { flex:1 1 280px; min-height:68px; }
+.room-status { margin:0; color:var(--dim); }
 </style>
 </head>
 <body>
@@ -172,22 +185,19 @@ input::placeholder, textarea::placeholder { color:var(--dim); opacity:1; }
 <aside class="sidebar" aria-label="Workspace sidebar">
   <div class="sidebar-head"><a class="brand" href="#home" aria-label="Mega Zword Home"><span class="brand-mark">MZ</span><span class="brand-name">MEGA ZWORD</span></a></div>
   <div><p class="side-label">Workspace</p><nav class="tab-strip" aria-label="Workspace tabs">
-    <a class="nav-tab" href="#home" aria-current="page"><span class="nav-icon" aria-hidden="true">⌂</span>Home</a>
-    <a class="nav-tab" href="#hive"><span class="nav-icon" aria-hidden="true">◇</span>Hive</a>
+    <button class="nav-tab" id="tab-home" type="button" aria-pressed="true" data-view="home"><span class="nav-icon" aria-hidden="true">⌂</span>Home</button>
+    <button class="nav-tab" id="tab-hive" type="button" aria-pressed="false" data-view="hive"><span class="nav-icon" aria-hidden="true">◇</span>Hive</button>
   </nav></div>
   <div class="side-status"><span class="live-dot">● LIVE</span><br>Local workspace</div>
 </aside>
 <div class="workspace" id="home">
 <header>
-  <h1>Home <span class="live-dot" title="Local dashboard is live">●</span></h1>
+  <h1><span id="view-title">Home</span> <span class="live-dot" title="Local dashboard is live">●</span></h1>
   <label class="meta">project <select id="project" title="Memory, notes, runs and answers follow this project"></select></label>
   <span class="meta" id="meta">loading…</span>
   <button id="refresh" aria-label="Refresh usage meters" title="Re-read the usage meters now">↻</button>
 </header>
-<main>
-  <section id="hive" class="hive-placeholder wide" aria-labelledby="hive-title">
-    <h2 id="hive-title">Hive room</h2><p class="note">The shared room tab is ready for the next dashboard step.</p>
-  </section>
+<main id="home-view">
   <section class="wide">
     <h2><span class="ascii-mark" aria-hidden="true">[MZ]</span> Run a task</h2>
     <label class="prompt-label" for="prompt">&gt;_ <span class="sr-only">Task prompt</span></label>
@@ -259,6 +269,26 @@ input::placeholder, textarea::placeholder { color:var(--dim); opacity:1; }
     <div class="note">Est. tokens = (prompt + answer characters) / 4, rounded down. Old runs count as 0. This is not a billing or quota meter.</div>
   </section>
 </main>
+<div id="hive" class="hive-view" role="region" aria-labelledby="hive-title" hidden>
+  <section class="wide">
+    <h2 id="hive-title">Hive room</h2>
+    <p class="room-status" id="room-status" role="status" aria-live="polite">Room is idle.</p>
+    <div class="row" id="room-summary" aria-label="Room status"></div>
+    <div class="room-messages" id="room-messages" role="region" aria-label="Hive room messages" tabindex="0"></div>
+    <label class="prompt-label" for="room-input">&gt;_ <span class="sr-only">Your message to the room</span></label>
+    <div class="row room-compose">
+      <textarea id="room-input" aria-label="Your message to the room" placeholder="Say something to the room. Use @claude, @codex, @grok or @gemini to choose who replies."></textarea>
+      <button id="room-send" type="button">Send</button>
+    </div>
+    <div class="row">
+      <label>Turns <input id="room-turn-cap" type="number" min="1" max="50" value="12" aria-label="Room turn limit"></label>
+      <button id="room-start" type="button" class="go">Start</button>
+      <button id="room-pause" type="button">Pause</button>
+      <button id="room-stop" type="button">Stop</button>
+      <span class="note">Pause takes effect after the current bot reply.</span>
+    </div>
+  </section>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 </div></div>
 <script>
@@ -705,6 +735,75 @@ $("addnote").onclick = async () => {
   try { await post("/api/note", {text, decision: $("isdecision").checked, project}); $("note").value = ""; load(); }
   catch (e) { toast(e.message); } };
 $("refresh").onclick = () => load(true);
+
+let roomPollTimer = null;
+function setView(view) {
+  const hive = view === "hive";
+  $("home-view").hidden = hive;
+  $("hive").hidden = !hive;
+  $("view-title").textContent = hive ? "Hive" : "Home";
+  $("tab-home").setAttribute("aria-pressed", String(!hive));
+  $("tab-hive").setAttribute("aria-pressed", String(hive));
+  if (hive) loadRoom();
+  else { clearTimeout(roomPollTimer); roomPollTimer = null; }
+}
+
+function renderRoom(data) {
+  const turnsLeft = Math.max(0, data.turn_cap - data.turn_count);
+  $("room-summary").innerHTML = `<span>Primary project: <b>${esc(data.primary)}</b></span>
+    <span>Turns: <b>${data.turn_count}/${data.turn_cap}</b> (${turnsLeft} left)</span>
+    <span>Last speaker: <b>${esc(data.last_speaker || "none")}</b></span>`;
+  $("room-status").textContent = data.running
+    ? data.paused ? "Pause requested; the current reply will finish first." : "Room is running."
+    : data.paused ? "Room is paused. Start resumes from the latest message." : "Room is idle.";
+  $("room-start").textContent = data.paused && !data.running ? "Resume" : "Start";
+  $("room-start").disabled = data.running;
+  $("room-pause").disabled = !data.running || data.paused;
+  $("room-stop").disabled = !data.running && !data.paused;
+  const messages = data.messages || [];
+  const signature = JSON.stringify(messages);
+  if ($("room-messages").dataset.signature !== signature) {
+    $("room-messages").dataset.signature = signature;
+    $("room-messages").innerHTML = messages.map(m => {
+      const stamp = m.time ? new Date(m.time).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}) : "";
+      return `<article class="room-message"><b>${esc(m.author)}</b><time>${esc(stamp)}</time><div>${esc(m.text)}</div></article>`;
+    }).join("") || '<p class="empty">No messages yet. Say hello to the room.</p>';
+    $("room-messages").scrollTop = $("room-messages").scrollHeight;
+  }
+  if (roomPollTimer) clearTimeout(roomPollTimer);
+  roomPollTimer = data.running ? setTimeout(loadRoom, 2500) : null;
+}
+
+async function loadRoom() {
+  try {
+    const response = await fetch("/api/room?room=hive");
+    if (!response.ok) throw new Error("Could not load the Hive room.");
+    renderRoom(await response.json());
+  } catch (e) { $("room-status").textContent = e.message; }
+}
+
+async function roomAction(path, body = {}) {
+  try { await post(path, {room:"hive", ...body}); await loadRoom(); }
+  catch (e) { toast(e.message); }
+}
+
+$("tab-home").onclick = () => setView("home");
+$("tab-hive").onclick = () => setView("hive");
+$("room-send").onclick = async () => {
+  const text = $("room-input").value.trim(); if (!text) return;
+  $("room-send").disabled = true;
+  try { await post("/api/room/say", {room:"hive", text}); $("room-input").value = ""; await loadRoom(); }
+  catch (e) { toast(e.message); }
+  $("room-send").disabled = false;
+};
+$("room-input").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("room-send").click(); });
+$("room-start").onclick = () => {
+  const turns = Number($("room-turn-cap").value);
+  if (!Number.isInteger(turns) || turns < 1 || turns > 50) { toast("Turns must be 1-50."); return; }
+  roomAction("/api/room/start", {turns, project: state?.launch_project});
+};
+$("room-pause").onclick = () => roomAction("/api/room/pause");
+$("room-stop").onclick = () => roomAction("/api/room/stop");
 load();
 setInterval(() => load(), 30000);
 setInterval(() => state && renderPlans(state), 60000);
