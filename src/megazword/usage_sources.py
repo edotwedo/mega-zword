@@ -90,8 +90,10 @@ def claude() -> PlanUsage:
             return plan
         raise
     try:
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        cache.write_text(json.dumps({"at": now.isoformat(), "data": data}), encoding="utf-8")
+        # Atomic: the status bar, widget and dashboard read this file at the same time, and a
+        # half-written one would cost an extra API call and lose the 429 fallback.
+        from .filelock import write_atomic
+        write_atomic(cache, json.dumps({"at": now.isoformat(), "data": data}))
     except OSError:
         pass
     return _claude_plan(data)
