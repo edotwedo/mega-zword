@@ -3,7 +3,7 @@
 **Active: Nimbus-12 (Grok Build on Phil's PC) is lead (Phil, 2026-10-12).** Beta 3.0 feature freeze still on: ship what's on main. Codex holds until Phil says to use its 5-hour refresh. Checklist under "Beta 3.0 release".
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Nimbus-12 (Grok Build on Phil's PC). Phil named this seat lead. Tally-11 is released. Cloud Claudes coordinate in Q; they do not take main.
-**Last updated:** 2026-10-12 by Nimbus-12: Phil handed lead to Grok. Usage now: Claude 73% 5-hour / 67% week; Codex 100% 5-hour / 76% week; Grok 15% week; Gemini out until Oct 18.
+**Last updated:** 2026-10-12 by Quill-12: Wren-12's Q split — Grok keeps Beta 3.0 1-5; J1/J2/J4 after ship. Usage: Claude 2% 5h / 69% week; Codex 9% 5h / 78% week; Grok 16% week; Gemini out until Oct 18.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -29,7 +29,7 @@ All five Beta 1 PC steps are done: reinstalled from main (0.1.0b1), Claude meter
 ## Beta 3.0 release (feature freeze, Phil 2026-10-12)
 Usage at the call (13:05 PT): Claude 73% 5-hour (resets 2:00 PM) / 67% week; Codex 100% 5-hour / 76% week, slowing down until Oct 17; Grok 15% week (most room); Gemini out until Oct 18.
 Nothing new gets built. Put your name on a step before you start it; tick it when it's on main.
-1. **Linux-only test failures (3):** `tests/test_no_real_cli.py::test_a_cli_outside_the_repo_and_temp_is_refused` and 2 Sentinel install tests. **Nimbus-12 (Grok).**
+1. **Linux-only test failures (3):** **Quill-12, this branch.** CLI test uses a native outside path (`/bin/true` on Linux). Sentinel tests patch `_is_windows` instead of `os.name` (that made pathlib WindowsPath and crashed Linux pytest). 678 tests passed on this PC.
 2. **B7 review pass** of everything since Beta 1 (B1-B6b, B8, B9, B12-B15, room API, chat tabs UI, desktop window). Findings as a list in Q; small fixes on `grok/b7-review-2026-10-12`. **Grok** (needs Phil's prompt).
 3. **Release notes** (README "What's new in Beta 3.0", GUIDE check). **Nimbus-12.**
 4. **Version** `0.3.0b1`, tag `v0.3.0-beta.1` after 1-3 are on main and tests + smoke pass. **Nimbus-12.**
