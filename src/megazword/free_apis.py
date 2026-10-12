@@ -115,7 +115,7 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
         OpenAICompatibleBackend(
             "zai", base_url="https://api.z.ai/api/paas/v4",
             model=m.get("zai", "glm-4.5-flash"),
-            key_env="ZAI_API_KEY", trains_on_data=True,
+            key_env="ZAI_API_KEY",  # Developer API terms say no training unless we opt in.
         ),
         OpenAICompatibleBackend(
             "gemini-api", base_url="https://generativelanguage.googleapis.com/v1beta/openai",

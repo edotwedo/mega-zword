@@ -1,26 +1,26 @@
 # Status
 
-**Active: Nimbus-12 (Grok Build on Phil's PC), 2026-10-11 ~20:05 PT.** Merging B14 to main (Phil's call). Tally-11 still named lead but not merging tonight.
+**Active: none.** Larch-11 (Codex) finished the B14 cross-review on `codex/review-grok-b14-2026-10-12`; 571 tests and smoke 36/36 pass. Next: Codex starts B12 from the handoff after Tally-11 reviews/merges this branch.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-11 by Nimbus-12 (Grok Build): B14 on `grok/b14-free-ais`; merging to main.
+**Last updated:** 2026-10-12 by Larch-11 (Codex): corrected Z.ai's API data-use label, cleared stale lane notes, and passed 571 tests plus smoke 36/36. Usage after work: Claude 87% (5h)/45% (week), Codex 1% (5h)/44% (week), Grok 14% (week), Gemini out until Oct 18.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
 - **GitHub, `edotwedo/mega-zword`, branch `main`:** the only real copy. If it isn't pushed here, the next AI can't see it.
 - **Phil's PC, `C:\Users\mrmar\mega-zword`:** Phil's working copy of main, and where `megazword` should be installed from. Run `git pull` there before starting.
-- **Phil's PC, `C:\Users\mrmar\mz-*` folders:** old git worktrees, one per bot branch. All their work is in main; safe to remove. Don't install from them.
+- **Phil's PC, `C:\Users\mrmar\mz-b2-*` folders:** active Beta 2 worktrees; keep them. Check older worktrees for uncommitted/unmerged work before removal. Install only from `mega-zword`, never a worktree.
 - **Phil's PC, `~\.megazword\`:** Mega Zword's own data: `config.toml`, `log.jsonl` (run log), answers and memory. Never committed.
 - **Logins Mega Zword reads (never committed or printed):** `~\.claude\.credentials.json` (Claude meter), `~\.codex\sessions\` (Codex meter), the `agy` login (Gemini).
 - **Hive coordination:** Q, `edotwedo/workshop` PR #33. Mega Zword's own state stays in this file.
 
 
 ## Next up (from Tally-11, 2026-10-11): done
-All five PC steps are done: reinstalled from main (0.1.0b1), no local-only branches left (every `mz-*` branch is in main; the folders can be removed), Claude meter readable, Gemini verified live (`agy` answered in plan mode), Beta 1 tagged.
+All five Beta 1 PC steps are done: reinstalled from main (0.1.0b1), Claude meter readable, Gemini verified live (`agy` answered in plan mode), Beta 1 tagged. Older worktree folders were not certified safe to remove; check each before cleanup.
 
 ## Beta 2 lanes (reassigned 2026-10-11 by usage room; spec: SPEC.md "Beta 2", sections R, T, D, S, C)
 Each lane has a handoff in `docs/handoffs/2026-10-11-*.md` with everything needed to start cold.
-**Fewer handoffs (Tally-11, lead, 2026-10-12):** lanes are frozen for Beta 2. No more reshuffles; a lane moves only if its bot is out of usage for more than a day, and only the lead moves it. Four bots build at once: Antigravity (B1), Codex (B5, then B4/B6), Gemini (B10) and Grok (B3, then B8/B9). Grok is available now (Phil, 2026-10-12): Oct 17 is just its weekly reset, not an out date. Claude (the lead) only reviews and merges; build work goes to the other bots. Finish and push your item before starting the next. Each bot updates its own line here when done; nobody writes a new handoff file for work already described.
+**Lane update (Tally-11, 2026-10-12; handoff `2026-10-11-gemini-lane-moved.md`):** Gemini/agy is at 100% in both pools until Oct 18; park B10/B11. Codex takes B12, then B15, B13, B5, B4, B6. Grok round 2 skips B10, fixes the agy empty-answer bug, reviews B7 and B1, and updates STATUS. B14 and Grok B3/B8/B9 plus Antigravity B1 are already on main. Finish and push each item before starting another. Claude (Tally-11) is lead and merges/reconciles lanes.
 Rules: put your name on an item here, own branch, small pushes, tests + smoke pass, no paid calls in
 tests, hand finished branches to the lead (Tally-11) to merge; post the branch name in Q. Lane empty? Take the next
 unclaimed item from another lane.
@@ -29,7 +29,7 @@ Usage at assignment (5h/week % used): Claude 59/31, Codex 12/30, Grok -/0 (new w
 Antigravity Claude/GPT pool -/0.
 
 Grok (available now; Oct 17 is its weekly reset) -> `docs/handoffs/2026-10-11-grok.md`:
-- **R1 (Nimbus-12, 2026-10-12): done.** Table under B14. Codex can start B14.
+- **R1 (Nimbus-12, 2026-10-12): done.** Table under B14. Larch-11 cross-review found and fixed the Z.ai API training label on `codex/review-grok-b14-2026-10-12`.
 - **B3 Tabs backend (Nimbus-12, 2026-10-12): done.** `tabs.json`, per-tab AI/project/history,
   dashboard API list/create/rename/close/send. Codex B4 can wire the UI.
 - **B8 Sentinel collector (Nimbus-12, 2026-10-12): done.** Event-log reader (reboots,
@@ -44,15 +44,16 @@ Antigravity Claude/GPT pool (Atlas-11; B1 done on branch agy/b1-room) -> `docs/h
   start|stop|say|show|post-summary`. Branch `agy/b1-room` ready for lead to merge.
   Tests: 541 passed, smoke 31/31. Token-budget rules verified.
 
-Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
-- First: push the unsaved Tahoma Table board (workshop handoff 2026-10-11-unsaved-work-audit.md).
+Codex (Larch-11) -> `docs/handoffs/2026-10-11-codex.md`:
+- First item done: board saved in [coop-interest PR #3](https://github.com/edotwedo/coop-interest/pull/3);
+  Oct 7 launch stash recovered in [workshop PR #50](https://github.com/edotwedo/workshop/pull/50).
 - B5 New look (SPEC "D. New look"): Windows 11 style with the 1337 accents;
   sidebar tab strip ready for B3/B4. Keep C9 accessibility. Screenshots at
   desktop and phone widths.
 - B4 Hive tab UI: room stream, Phil's input box, Start/Pause/Stop, primary
   project, who is talking, turns left. Needs B1's and B3's APIs.
 - B6 Custom title bar and icons for `--app`; GUIDE.md and README for tabs and the room.
-- B12 Per-task model choice for every AI (extends Grok's `[grok.easy|medium|hard]`): add
+- **B12 next:** per-task model choice for every AI (extends Grok's `[grok.easy|medium|hard]`): add
   `[claude.<level>]`, `[codex.<level>]`, `[gemini.<level>]` with model + effort. Flags: `claude --model
   --effort`, `codex -m` and `-c model_reasoning_effort=...`, `agy --model --effort`. Unset level =
   that CLI's own default (keep Phil's Codex model unless he sets one). Show the choice in the run
@@ -62,7 +63,7 @@ Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
   detached and print one line saying so; keep the text start screen as `megazword start` (and when
   stdout isn't a terminal, or `MEGAZWORD_NO_APP=1`, keep today's start screen so tests and scripts
   don't open windows). Update `--help`, GUIDE.md, tests.
-- **B14 More free AIs (Nimbus-12, 2026-10-11): done, merging to main.** optional
+- **B14 More free AIs (Nimbus-12, merged to main as `295b658`):** optional
   backends beside OpenRouter/Groq in `free_apis.py` (OpenAI-compatible HTTP, key from env, never
   routed by default, shown in `backends`/doctor, per-provider request counts as their meter).
   **Use the table below; do not invent extra quota numbers.**
@@ -82,7 +83,7 @@ Read from each provider's own pricing/terms pages today. **Several Gmail/email a
 
 Sources (opened 2026-10-12): [Cloudflare Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) (updated 2026-10-09); [Cloudflare Workers AI service terms](https://www.cloudflare.com/service-specific-terms-developer-platform/); [Z.ai pricing](https://docs.z.ai/guides/overview/pricing); [Z.ai Terms of Use](https://docs.z.ai/legal-agreement/terms-of-use) (2026-04-14); [Gemini Developer API pricing](https://ai.google.dev/gemini-api/docs/pricing); [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) (effective 2026-03-23); [Google APIs Terms](https://developers.google.com/terms) §2.d; [NVIDIA Run NIM Anywhere / Pricing](https://docs.api.nvidia.com/nim/docs/run-anywhere); [NVIDIA NIM product page](https://www.nvidia.com/en-gb/ai-data-science/products/nim-microservices/); [Mistral rate-limit help](https://help.mistral.ai/en/articles/698531-why-am-i-hitting-api-rate-limits-and-how-do-i-increase-them); [Mistral training help](https://help.mistral.ai/en/articles/347617-do-you-use-my-user-data-to-train-your-artificial-intelligence-models).
 
-**For Codex (B14):** Cloudflare, Z.ai Flash (free models only), Gemini API unpaid, NVIDIA NIM prototype, Mistral Free mode. Mark Gemini unpaid + Z.ai individual + Mistral Free mode `trains_on_data=true` (Mistral first for repetitive jobs per B15). Cloudflare and NVIDIA hosted NIM default off. Env keys only; never default-routed.
+**B14 implementation notes:** Cloudflare, Z.ai Flash (free models only), Gemini API unpaid, NVIDIA NIM prototype, Mistral Free mode. Mark Gemini unpaid and Mistral Free mode `trains_on_data=true` (Mistral first for repetitive jobs per B15). The Z.ai Developer API terms say submitted content is not used to train unless the developer opts in; do not mark it as training by default. Cloudflare and NVIDIA hosted NIM default off. Env keys only; never default-routed.
 - B15 Light rules for AIs that train on our data (Phil, 2026-10-11, revised the same day: "lightest
   setting"; first user: Mistral Experiment). Any backend marked `trains_on_data = true`:
   1. **Routed normally, and first in line for small repetitive jobs.** Add it to the front of the
@@ -108,14 +109,12 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
 - B2 Lessons + summaries (small): end-of-session lessons into project memory,
   summary files, `room post-summary`. After B1 lands.
 
-## Workflow between the AIs (Beta 2 free-AI track)
-1. Grok: R1, today's free-tier limits and terms (including multiple-account rules), into STATUS under B14.
-2. Codex: B14, the free backends, using Grok's table. Mistral is built behind B15's switch.
-3. Gemini: B15, the untrusted-AI rules and sandbox. Grok reviews B15 as a second, security-minded check.
-4. Gemini: reviews Codex's B14. Codex reviews Gemini's B15. A Claude lead merges both once tests and
-   smoke pass.
-5. Each step: check `megazword usage` first, claim the item here, post one line in Q when done.
-   If a bot runs low, the next one with room takes over its item.
+## Current cross-lane sequence (Tally-11, 2026-10-12)
+1. Grok B14 and R1 are done; B14 is on main.
+2. Codex: B12, then B15, then B13, B5, B4, B6. Grok reviews B15.
+3. Grok round 2: agy empty-answer handling, B7 review, B1 second look, then update STATUS.
+4. Gemini calendar B10/B11 is parked until Phil asks; agy is out through Oct 18.
+5. Check usage before and after each item; keep branches separate and test with fakes.
 ## Done
 - **B1 Room engine (Atlas-11 / Antigravity, 2026-10-11):** Built `src/megazword/room.py` and CLI commands `megazword room start|stop|say|show|post-summary`. Hive room JSONL storage (`~/.megazword/rooms/<room>.jsonl`), turn loop with `@mentions` targeting, Phil-first priority rule, prime directive prompt, turn cap (default 12), out/over-pace early stops, lean read-only one-shots, and ~80-word replies. Implements token-budget optimizations: state card (<300 words), rolling summary + last 4 messages with automatic condensation after every 6 turns, waking only the needed AI (burn order fallback), CLI session reuse where supported, and per-turn prompt size logging to `log.jsonl`. 541 passed, smoke 31/31. Branch `agy/b1-room`, handed to Tally-11 to merge.
 - **Gemini usage meter (Tally-11, 2026-10-11):** `usage_sources.gemini()` runs `agy -p /usage --output-format json` (Antigravity's quota panel, documented; field shape command.data.groups[].buckets[] with remaining_fraction + reset_time, from a public bug report, not yet seen on Phil's PC). Gemini-group buckets become the 5-hour/weekly meter; other groups shown, never block. No agy: falls back to run counts. Tests never run a real agy (conftest). Verified end to end in the cloud with a fake agy and fake Codex log: `megazword usage`, start screen and dashboard /api/state all show codex 42% and gemini 30%. **Not verified live:** real agy JSON on Phil's PC, and the Claude meter (needs his login). Check: `megazword usage`. If gemini shows an error, paste `agy -p /usage --output-format json` output to fix the parser. 520 passed / 1 skipped, smoke 27/27.

@@ -137,7 +137,7 @@ def test_b14_backends_exist_off_route_and_train_flags():
         for names in config.DEFAULT_ROUTE.values():
             assert name not in names
         assert name not in default_backends(edit=True)
-    assert backends["zai"].trains_on_data
+    assert not backends["zai"].trains_on_data
     assert backends["gemini-api"].trains_on_data
     assert backends["mistral"].trains_on_data
     assert not backends["cloudflare"].trains_on_data
@@ -187,3 +187,12 @@ def test_bad_model_config(tmp_path, model):
     path.write_text(f"[free.groq]\nmodel = {model}\n")
     with pytest.raises(ValueError, match="nonempty string"):
         config.load(path)
+
+
+def test_provider_training_labels_match_developer_api_terms():
+    backends = default_backends()
+    # R1 records that Z.ai developer/API content is not used for training unless
+    # the developer opts in. Consumer-plan terms are not the API terms.
+    assert not backends["zai"].trains_on_data
+    assert backends["gemini-api"].trains_on_data
+    assert backends["mistral"].trains_on_data
