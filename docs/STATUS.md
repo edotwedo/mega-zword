@@ -1,6 +1,6 @@
 # Status
 
-**Active: Tally-11 (lead), 2026-10-12 ~05:00 PT.** Merged B5 + B4 (Larch-11) and the phone launcher (`megazword dashboard --phone`, Codex). Next: Codex B6 (title bar, icons); Grok B7 reviews. Main has B12/B13/B15; `codex/b12-model-choice` and `codex/b13-default-app` are duplicates, not merged.
+**Active: none (Codex session 01a12d3d released a tested B6 step, 2026-10-12 09:22 PT).** App header/icon and guide on `codex/b6-app-frame-2026-10-12`: 643 tests, 36/36 smoke, desktop/390px checks. Native frame replacement remains unfinished; see B6 below.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
 **Last updated:** 2026-10-12 04:48 PT by Larch-11: B4 complete; Codex usage after work 82% of 5-hour / 57% weekly; Claude 43% of 5-hour / 54% weekly; Grok 15% weekly; Gemini out until Oct 18. Codex crossed the 80% marker; next step is B6 after a fresh usage check.
@@ -57,7 +57,7 @@ Codex (Larch-11) -> `docs/handoffs/2026-10-11-codex.md`:
   Oct 7 launch stash recovered in [workshop PR #50](https://github.com/edotwedo/workshop/pull/50).
 - **B5 New look (Larch-11, 2026-10-12): done.** Windows 11-style dark dashboard, responsive sidebar tabs, 8px panels, accessible icon buttons, Cascadia Code accents, terminal prompt and run cards, green live accent and MZ mark. Desktop and 390px phone previews visually checked. 598 tests passed; smoke 36/36.
 - **B4 Hive tab UI (Larch-11, 2026-10-12): done.** Home/Hive navigation and a room screen with messages, Phil's input box, Start/Pause/Stop, primary project, last speaker and turns left. GET `/api/room?room=hive` also reports `paused`; POST endpoints are `/api/room/say`, `/api/room/start`, `/api/room/pause`, and `/api/room/stop`. Pause completes the current reply, and Resume continues to the selected turn cap. Poll GET every few seconds while running.
-- B6 Custom title bar and icons for `--app`; GUIDE.md and README for tabs and the room.
+- **B6 partial (Codex session 01a12d3d):** app-mode MZ icon/header and view/project window title; GUIDE explains Hive controls and missing per-AI tab-management UI. Branch `codex/b6-app-frame-2026-10-12`. Native window frame remains owned by Edge/Chrome, so full native title-bar replacement is not implemented.
 - **B12 done (Tally-11, 2026-10-12, Codex was idle):** `[claude|codex|gemini.<level>]` model + effort
   in config.toml, applied on every route like Grok's; shown in the run line and in `doctor`. Flags checked
   against the real CLIs on Phil's PC. Settings panel left for B5. Original spec: per-task model choice for every AI (extends Grok's `[grok.easy|medium|hard]`): add

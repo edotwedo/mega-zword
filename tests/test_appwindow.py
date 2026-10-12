@@ -29,14 +29,14 @@ def test_falls_back_to_path_then_none():
 
 def test_command_line():
     assert appwindow.app_command("edge.exe", "http://127.0.0.1:8765/") == \
-        ["edge.exe", "--app=http://127.0.0.1:8765/", "--new-window"]
+        ["edge.exe", "--app=http://127.0.0.1:8765/?app=1", "--new-window"]
 
 
 def test_open_app_launches_or_falls_back():
     launched, opened = [], []
     note = appwindow.open_app("http://x/", browser="edge.exe",
                               popen=lambda cmd, **k: launched.append(cmd), fallback=opened.append)
-    assert launched == [["edge.exe", "--app=http://x/", "--new-window"]] and not opened
+    assert launched == [["edge.exe", "--app=http://x/?app=1", "--new-window"]] and not opened
     assert "app window" in note
 
     def broken(cmd, **k):
@@ -55,3 +55,13 @@ def test_favicon_is_inline_svg():
     from importlib import resources
     html = resources.files("megazword").joinpath("dashboard.html").read_text(encoding="utf-8")
     assert '<link rel="icon" href="data:image/svg+xml,' in html and "MZ" in html
+
+
+def test_app_url_keeps_token_and_view_and_is_idempotent():
+    from urllib.parse import parse_qs, urlsplit
+    original = "http://100.80.1.2:8765/?t=private-test-token&empty=#hive"
+    marked = appwindow.app_url(original)
+    assert parse_qs(urlsplit(marked).query, keep_blank_values=True) == {
+        "t": ["private-test-token"], "empty": [""], "app": ["1"]}
+    assert urlsplit(marked).fragment == "hive"
+    assert appwindow.app_url(marked) == marked

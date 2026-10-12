@@ -214,6 +214,28 @@ Run `megazword dashboard`. By default it serves only this PC at
 `--app` opens an Edge or Chrome app window when available. Ctrl+C in the
 terminal stops the server.
 
+The app window has an MZ icon and a compact branded title strip showing the
+selected view and project. Its window title follows Home/Hive and the project,
+so multiple windows are distinguishable in the task switcher. Edge/Chrome still
+owns the native draggable frame and minimize, maximize and close buttons; the
+page does not replace these OS controls. Closing the window does not stop a
+detached server started by plain `megazword`.
+
+### Home and Hive
+
+Use the sidebar's **Home** and **Hive** buttons to switch views. Home contains
+the task box, meters and history. Hive shows the shared room conversation,
+primary project, last speaker and turns remaining. Enter a message and choose
+**Send**, then **Start** to run a bounded room session. **Pause** waits for the
+current reply to finish; **Resume** continues toward the selected turn cap.
+**Stop** ends the session. The room is coordination chat, not an editing worker.
+
+Additional AI chat tabs have backend APIs and persistent history, but the current
+sidebar does not yet expose creation, rename, reorder or close controls for them.
+Do not confuse the Home/Hive buttons with complete per-AI chat-tab support.
+
+### Home controls
+
 The project selector switches the memory, notes, runs and answers shown. The
 page refreshes its state periodically; **Refresh meters** rereads the usage
 sources immediately.

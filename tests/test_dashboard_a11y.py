@@ -77,6 +77,7 @@ def rendered():
     script = SCRIPT[:SCRIPT.rindex('\nload();')]
     stub = '''
 const elements = new Map();
+const location = {search:'?app=1'};
 const document = {activeElement:null, addEventListener(){}, getElementById(id) {
   if (!elements.has(id)) elements.set(id, {innerHTML:'', dataset:{}, contains(){return false},
     addEventListener(){}, querySelectorAll(){return []}, append(){}});
