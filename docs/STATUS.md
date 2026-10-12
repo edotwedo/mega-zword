@@ -75,9 +75,24 @@ Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
   2. Z.ai GLM Flash (GLM-4.7-Flash listed free on the price sheet).
   3. Google AI Studio Gemini API free tier (separate from agy's pool).
   4. NVIDIA NIM free credits.
-  5. Mistral "Experiment" tier (~1B tokens/month free) ONLY if Phil OKs that it trains on our data.
+  5. Mistral "Experiment" tier (~1B tokens/month free). Phil OKed it 2026-10-11 even though it trains on
+     what we send; it goes in with the B15 rules (marked `trains_on_data`, sandbox only for any work).
   Skip: Perplexity (no free API), Qwen Code OAuth (ended 2026-04-15), GitHub Models (closed),
   Cerebras (now a 30-day $5 credit).
+- B15 Untrusted-AI rules + sandbox (Phil, 2026-10-11; first user: Mistral Experiment). Any backend
+  marked `trains_on_data = true` in config:
+  1. Never auto-routed. It runs only when picked (`-m mistral`) or in a room/tab Phil points at it.
+  2. Prompt guard before sending: block (don't just warn) on secret-looking text (API keys, tokens,
+     passwords, private keys, `.env` lines, emails, phone numbers), files under `~\.claude`, `~\.codex`,
+     `~\.grok`, `~\.megazword`, workshop `common-ground/private`, and Phil's private paperwork folder.
+     Show what was blocked; `--force` is not allowed for these.
+  3. No `--edit` on the real machine. Work mode runs in a sandbox: Windows Sandbox (`.wsb` file that
+     maps one scratch folder read-write, nothing else; networking on only for the API) when Phil has
+     enabled it; otherwise a throwaway copy in `~\.megazword\sandbox\<job>` with no git remotes, no
+     credentials and no PATH tools beyond Python. Results come back as a diff.
+  4. A trusted AI (Claude, Codex or Gemini) reviews the diff before anything is applied to a real repo.
+  5. Every run is logged with a `trains_on_data` flag so `megazword stats` shows what was sent.
+  Tests with fakes; never call the real provider in tests.
 
 Gemini (lots of room; agy) -> `docs/handoffs/2026-10-11-gemini.md`:
 - B10 Calendar read: `[calendar] ical_url`, `megazword calendar today|week`,
@@ -91,6 +106,14 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
 - B2 Lessons + summaries (small): end-of-session lessons into project memory,
   summary files, `room post-summary`. After B1 lands.
 
+## Workflow between the AIs (Beta 2 free-AI track)
+1. Grok: R1, today's free-tier limits and terms (including multiple-account rules), into STATUS under B14.
+2. Codex: B14, the free backends, using Grok's table. Mistral is built behind B15's switch.
+3. Gemini: B15, the untrusted-AI rules and sandbox. Grok reviews B15 as a second, security-minded check.
+4. Gemini: reviews Codex's B14. Codex reviews Gemini's B15. A Claude lead merges both once tests and
+   smoke pass.
+5. Each step: check `megazword usage` first, claim the item here, post one line in Q when done.
+   If a bot runs low, the next one with room takes over its item.
 ## Done
 - **Gemini usage meter (Tally-11, 2026-10-11):** `usage_sources.gemini()` runs `agy -p /usage --output-format json` (Antigravity's quota panel, documented; field shape command.data.groups[].buckets[] with remaining_fraction + reset_time, from a public bug report, not yet seen on Phil's PC). Gemini-group buckets become the 5-hour/weekly meter; other groups shown, never block. No agy: falls back to run counts. Tests never run a real agy (conftest). Verified end to end in the cloud with a fake agy and fake Codex log: `megazword usage`, start screen and dashboard /api/state all show codex 42% and gemini 30%. **Not verified live:** real agy JSON on Phil's PC, and the Claude meter (needs his login). Check: `megazword usage`. If gemini shows an error, paste `agy -p /usage --output-format json` output to fix the parser. 520 passed / 1 skipped, smoke 27/27.
 - **Gemini via Antigravity (Tally-11, Claude cloud, 2026-10-11, Phil's request):** Google retired the Gemini CLI for personal accounts; `-m gemini` now runs `agy -p --mode plan --output-format text --disable-slash-commands` (prompt on stdin) when `agy` is on PATH, else the old `gemini` command. Doctor finds agy; login hint says `agy`. Flags from Phil's `agy --help` (1.3.3). Phil installed and signed in to agy on his PC. **Not yet verified live:** that agy print mode reads the prompt from stdin. Check on the PC: `megazword run -m gemini "say hi"`. If agy ignores stdin, switch AGY_ARGS in backends.py to pass `{prompt_file}` or `{prompt}`. 517 passed / 1 skipped, smoke 27/27.

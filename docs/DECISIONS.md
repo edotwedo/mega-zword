@@ -7,6 +7,7 @@ Newest first. Don't reopen these without Phil.
 - Phil: the Hive room must not waste tokens re-reading everything to get the bots on the same page. Efficiency rules are part of B1 (SPEC section R, "Token budget").
 
 ## 2026-10-11
+- Phil OKs free AIs that train on what we send (first: Mistral Experiment tier). His words: he doesn't mind training as long as they don't package and sell it, and he has no valuable data yet. Rules (STATUS B15): never auto-routed; a prompt guard blocks secrets, logins and private folders; any file-changing work runs only in a sandbox; a trusted AI reviews the diff before it's applied.
 - Phil: Mega Zword is proprietary and private, all rights reserved. He shares it with whom he chooses. This replaces the 2026-10-10 AGPL decision. At the switch the repo had no forks, stars, outside contributors or outside clones. Don't add an open-source license or make the repo public without Phil.
 - Workshop BUDGET.md limits are retired (Phil). Automatic runs are allowed; every AI may use its own usage. Two more AIs now have their own usage (Gemini via agy is one).
 - Sentinel: Mega Zword logs disconnects/reconnects, logins and login attempts, and reboots, and alerts Phil when production is hit (SPEC section S). Calendar: Google Calendar, Dial-In's lane, built into Mega Zword (SPEC section C).
