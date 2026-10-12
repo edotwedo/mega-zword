@@ -114,6 +114,8 @@ def read_messages(room: str = DEFAULT_ROOM, home: Path | None = None) -> list[Ro
                 continue
             try:
                 data = json.loads(line)
+                if not isinstance(data, dict):  # e.g. a stray `5` or `"text"` line
+                    continue
                 messages.append(RoomMessage(
                     time=data.get("time", ""),
                     author=data.get("author", "unknown"),

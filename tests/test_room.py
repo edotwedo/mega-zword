@@ -444,3 +444,42 @@ def test_other_failures_still_end_the_session(tmp_path):
                   backends={"claude": Broken("claude"), "codex": FakeBackend("codex")},
                   cfg=config.Config(log_path=tmp_path / "log.jsonl"), write=out.append, home=tmp_path)
     assert any("claude failed: segfault" in line for line in out)
+
+
+def test_bad_lines_in_the_room_log_are_skipped(tmp_path):
+    room.append_message("messy", "phil", "first", home=tmp_path)
+    with room.room_path("messy", tmp_path).open("a", encoding="utf-8") as f:
+        f.write('\n5\n"just text"\n[1, 2]\n{not json\n')
+    room.append_message("messy", "claude", "second", home=tmp_path)
+    assert [m.text for m in room.read_messages("messy", home=tmp_path)] == ["first", "second"]
+
+
+def test_broken_state_file_starts_fresh(tmp_path):
+    room.say("broken", "hi", home=tmp_path)
+    room.state_path("broken", tmp_path).parent.mkdir(parents=True, exist_ok=True)
+    room.state_path("broken", tmp_path).write_text("{oops", encoding="utf-8")
+    state = room.load_state("broken", tmp_path)
+    assert state.room == "broken" and not state.stopped
+
+
+def test_long_session_condenses_older_messages_into_the_prompt(tmp_path):
+    cfg = config.Config(log_path=tmp_path / "log.jsonl", room_turn_cap=10)
+    claude = FakeBackend("claude", reply="claude turn @codex")
+    codex = FakeBackend("codex", reply="codex turn @claude")
+    room.say("long", "kick off @claude", home=tmp_path)
+    code = room.run_room(room="long", max_turns=10, project="workshop",
+                         backends={"claude": claude, "codex": codex}, cfg=cfg,
+                         statuses=lambda: {}, write=lambda s: None, home=tmp_path)
+    assert code == 0
+    turns = [p for p in claude.calls + codex.calls if "[Sent by Mega Zword" in p]
+    # Early turns fit in the recent window; later ones carry a rolling summary instead.
+    assert "[Earlier room summary]" not in turns[0]
+    assert any("[Earlier room summary]" in p for p in turns)
+    state = room.load_state("long", tmp_path)
+    assert state.rolling_summary and state.summarized_count > room.RECENT_MESSAGES_COUNT
+
+
+def test_show_empty_room(tmp_path):
+    out = []
+    assert room.show("empty", home=tmp_path, write=out.append) == 0
+    assert out == ["[megazword room] room 'empty' has no messages yet"]
