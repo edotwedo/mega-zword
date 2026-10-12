@@ -7,6 +7,7 @@ CLI accepts the prompt on stdin we use that, because Windows .cmd shims
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -94,7 +95,12 @@ class CLIBackend(Backend):
         if proc.returncode != 0:
             detail = (err or out).strip()[-500:]
             raise RuntimeError(f"{self.exe} exited with code {proc.returncode}: {detail}")
+        self._check_output(out, err)
         return out
+
+    def _check_output(self, out: str, err: str) -> None:
+        """Hook for backends that must inspect stderr even on exit 0."""
+        return
 
     def _run(self, prompt: str) -> str:
         if "{prompt_file}" not in self.args:
@@ -283,6 +289,41 @@ class GeminiBackend(CLIBackend):
                                f"command line, which fits about {AGY_MAX_PROMPT:,}. "
                                "Shorten it or use another AI.")
         return super()._command(prompt)
+
+    def _check_output(self, out: str, err: str) -> None:
+        # Headless `--mode plan` auto-denies file/command tools, then exits 0
+        # with status SUCCESS and an empty response, and still charges quota.
+        if self.exe != "agy":
+            return
+        text = (out or "").strip()
+        err_l = (err or "").lower()
+        denied = ("auto-denied" in err_l or "jetski: no output" in err_l
+                  or "headless mode cannot prompt" in err_l)
+        if _agy_bare_success(text) or denied:
+            raise RuntimeError(
+                "agy produced no answer (headless plan mode auto-denied a tool; "
+                "quota was still charged)")
+
+
+def _agy_bare_success(text: str) -> bool:
+    """True when stdout is empty, the word SUCCESS, or JSON with empty response."""
+    raw = (text or "").strip()
+    if not raw:
+        return True
+    if raw.strip("\"'").upper() == "SUCCESS":
+        return True
+    if raw[:1] == "{":
+        try:
+            payload = json.loads(raw)
+        except ValueError:
+            return False
+        if isinstance(payload, dict) and str(payload.get("status") or "").upper() == "SUCCESS":
+            response = payload.get("response")
+            if response in (None, "", []):
+                return True
+            if isinstance(response, str) and not response.strip():
+                return True
+    return False
 
 
 def default_backends(edit: bool = False,

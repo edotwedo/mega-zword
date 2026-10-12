@@ -78,6 +78,11 @@ def test_normal_answers_that_say_cant_are_kept(text):
     assert looks_failed(text) is None
 
 
+def test_looks_failed_keeps_a_sentence_that_says_success():
+    assert looks_failed("The deploy was a success after the tests passed.") is None
+    assert looks_failed("SUCCESS") is None
+
+
 def test_long_answer_is_not_judged():
     essay = "Here is a full explanation. " + ("You can't skip the check. " * 30)
     assert len(essay) > 320

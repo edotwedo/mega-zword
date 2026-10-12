@@ -164,6 +164,35 @@ def test_gemini_prefers_antigravity_cli(monkeypatch):
     assert not long.ok and "command line" in long.error and len(calls) == 1
 
 
+def _agy_backend(monkeypatch, stdout, stderr=""):
+    monkeypatch.setattr(backends.shutil, "which",
+                        lambda name: "fake-agy.exe" if name == "agy" else None)
+
+    class Process:
+        def __init__(self, cmd, **kwargs):
+            self.returncode = 0
+
+        def communicate(self, stdin, timeout):
+            return stdout, stderr
+
+    monkeypatch.setattr(backends.subprocess, "Popen", Process)
+    return backends.default_backends(free_models=config.Config().free)["gemini"]
+
+
+def test_agy_bare_success_is_a_failed_run(monkeypatch):
+    denial = ('jetski: no output produced — a tool required the "read_file" '
+              "permission that headless mode cannot prompt for, so it was auto-denied\n")
+    for stdout in ("SUCCESS\n", "", '{"status":"SUCCESS","response":""}\n'):
+        result = _agy_backend(monkeypatch, stdout, denial).run("hello")
+        assert not result.ok and "auto-denied" in result.error
+        assert result.text == ""
+
+
+def test_agy_sentence_that_says_success_is_kept(monkeypatch):
+    result = _agy_backend(monkeypatch, "The tests succeeded on Python 3.11.\n").run("hello")
+    assert result.ok and "succeeded" in result.text
+
+
 def test_doctor_finds_antigravity_cli(monkeypatch):
     monkeypatch.setattr(doctor.shutil, "which",
                         lambda name: "fake-agy.exe" if name == "agy" else None)
