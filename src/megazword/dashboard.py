@@ -25,7 +25,7 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from . import advise, stats, answers, config, runlog, tabs
+from . import advise, stats, answers, config, runlog, sentinel, tabs
 from .backends import _kill_tree, default_backends, process_group
 from .meters import STALE, summarize_all
 from .memory import Memory, check_project, list_projects, project_name
@@ -197,6 +197,7 @@ class App:
             "answers": answers.recent(20, project),
             "jobs": [j.view() for j in reversed(jobs)][:10],
             "tabs": tabs.list_tabs(),
+            "sentinel": sentinel.summary(),
         }
 
     # --- actions ---------------------------------------------------------

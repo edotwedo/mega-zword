@@ -111,7 +111,9 @@ def dashboard_checks(env: dict, cwd: Path) -> None:
         token = m.group(1)
         code, body = http(base + "/api/state")
         state = json.loads(body) if code == 200 else {}
-        check("dashboard /api/state", code == 200 and state.get("project") == "smoke", body[:200])
+        check("dashboard /api/state",
+              code == 200 and state.get("project") == "smoke" and "sentinel" in state,
+              body[:200])
         code, _ = http(base + "/api/run", {"prompt": "hi"}, token="wrong")
         check("dashboard rejects a bad token", code == 403)
         code, body = http(base + "/api/run", {"prompt": "dashboard hello"}, token=token)
@@ -262,6 +264,12 @@ def main() -> int:
 
         r = mz(env, work, "usage")
         check("usage runs without real meters", r.returncode == 0 and "Mega Zword runs" in r.stdout,
+              r.stdout + r.stderr)
+
+        r = mz(env, work, "sentinel", "log")
+        check("sentinel log runs", r.returncode == 0, r.stdout + r.stderr)
+        r = mz(env, work, "sentinel", "status")
+        check("sentinel status runs", r.returncode == 0 and "Sentinel" in r.stdout,
               r.stdout + r.stderr)
 
         r = mz(env, work, "chat", stdin="first message\nsecond message\n/usage\n/quit\n")

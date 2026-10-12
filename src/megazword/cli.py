@@ -16,7 +16,8 @@ from .rater import Rating, rate
 
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry"),
-    "See": ("usage", "stats", "advise", "dashboard", "projects", "history", "export"),
+    "See": ("usage", "stats", "advise", "dashboard", "projects", "history", "export",
+            "sentinel"),
     "Set up": ("init", "doctor", "out", "backends"),
     "Memory": ("note", "decide", "import-hive"),
 }
@@ -100,6 +101,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("advise", help="suggest a route order from stats and votes (changes nothing)")
     st = sub.add_parser("stats", help="per-day, per-AI table from the run log")
     st.add_argument("--days", type=int, default=7)
+    sent = sub.add_parser("sentinel", help="uptime and security log (reboots, logins, network)")
+    sent.add_argument("action", nargs="?", choices=("status", "log"), default="status")
+    sent.add_argument("-n", type=int, default=20, help="how many events to show for log")
 
     out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -265,6 +269,10 @@ def main(argv: list[str] | None = None,
         from .stats import daily, table
         print(table(daily(cfg.log_path, max(1, args.days))))
         return 0
+
+    if args.command == "sentinel":
+        from . import sentinel
+        return sentinel.command(args)
 
     if args.command == "out":
         return out_command(args, cfg)
