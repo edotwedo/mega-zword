@@ -1,5 +1,10 @@
 # Using Mega Zword day to day
 
+Type `megazword` in an interactive terminal to open the dashboard in its own
+app window. Use `megazword start` to show the text start screen instead. If
+output is redirected, the text screen stays the default; set
+`MEGAZWORD_NO_APP=1` to force that behavior in an interactive terminal.
+
 Mega Zword is a local command line tool. It routes a prompt to one of your AI
 tools, keeps a run log and project memory, and can show the work in a dashboard.
 It does not run tasks in the background. Start it when you need it.

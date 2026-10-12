@@ -1,6 +1,7 @@
 """Plain `megazword` shows a short start screen."""
 
 import json
+import io
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -56,6 +57,53 @@ def test_bare_megazword_shows_it(capsys, monkeypatch):
     assert main([]) == 0
     out = capsys.readouterr().out
     assert "meters still loading" in out and "megazword --help" in out
+
+
+def test_bare_megazword_opens_detached_app_on_terminal(monkeypatch):
+    class Terminal(io.StringIO):
+        def isatty(self):
+            return True
+    terminal = Terminal()
+    opened = []
+    monkeypatch.setattr("sys.stdout", terminal)
+    monkeypatch.setattr("megazword.cli._launch_dashboard_app", lambda: opened.append(True))
+    assert main([], cfg=config.Config()) == 0
+    assert opened == [True]
+    assert terminal.getvalue() == "Started Mega Zword app. Run `megazword start` for the text screen.\n"
+
+
+def test_no_app_env_and_explicit_start_keep_text_screen(monkeypatch):
+    class Terminal(io.StringIO):
+        def isatty(self):
+            return True
+    monkeypatch.setattr(start, "_meters", lambda *a, **k: [])
+    terminal = Terminal()
+    monkeypatch.setattr("sys.stdout", terminal)
+    monkeypatch.setenv("MEGAZWORD_NO_APP", "1")
+    assert main([], cfg=config.Config()) == 0
+    assert "Try:" in terminal.getvalue()
+    terminal.seek(0)
+    terminal.truncate(0)
+    monkeypatch.delenv("MEGAZWORD_NO_APP")
+    assert main(["start"], cfg=config.Config()) == 0
+    assert "Try:" in terminal.getvalue()
+
+
+def test_dashboard_app_launch_is_detached_and_never_uses_a_shell(monkeypatch):
+    import subprocess
+    from megazword import cli
+
+    launched = []
+    cli._launch_dashboard_app(lambda command, **options: launched.append((command, options)))
+    command, options = launched[0]
+    assert command[-3:] == ["megazword", "dashboard", "--app"]
+    assert options["stdin"] is options["stdout"] is options["stderr"] is subprocess.DEVNULL
+    assert options["close_fds"] and "shell" not in options
+    if cli.os.name == "nt":
+        assert options["creationflags"] == (subprocess.DETACHED_PROCESS |
+                                             subprocess.CREATE_NEW_PROCESS_GROUP)
+    else:
+        assert options["start_new_session"]
 
 
 def test_long_notes_fit_80_columns_without_cutting_words(tmp_path):

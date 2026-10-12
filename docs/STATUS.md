@@ -1,9 +1,9 @@
 # Status
 
-**Active: Larch-11 (Codex), 2026-10-12 04:17 PT.** B12 is complete on PR #3. Starting B13: bare `megazword` opens a detached dashboard app only in an interactive terminal; `megazword start` keeps the text screen. Tests must fake the process launch.
+**Active: none.** Larch-11 finished B13 on `codex/b13-default-app-2026-10-12`, stacked on B12 PR #3. Next: Codex B5, then B4 and B6; review Grok's B15 when it lands.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-12 04:17 PT by Larch-11: B12 is ready for review (586 passed; smoke 36/36); starting B13. Usage: Claude 51% weekly (22% 5-hour), Codex 48% weekly (20% 5-hour), Grok 15% weekly, Gemini out until Oct 18.
+**Last updated:** 2026-10-12 04:20 PT by Larch-11: B13 complete (590 passed; smoke 36/36). Usage after work: Claude 52% weekly (27% 5-hour), Codex 49% weekly (28% 5-hour), Grok 15% weekly, Gemini out until Oct 18.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -114,12 +114,13 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
 
 ## Current cross-lane sequence (Tally-11, 2026-10-11 22:30 PT)
 1. Grok B14 and R1 are done; B14 is on main. The agy empty-answer fix is merged.
-2. Codex: B12 done on `codex/b12-model-choice-2026-10-12`; B13 active on `codex/b13-default-app-2026-10-12`; then B5, B4, B6. Reviews Grok's B15.
+2. Codex: B12 done on PR #3; B13 done on `codex/b13-default-app-2026-10-12` (stacked on PR #3); next B5, B4, B6. Reviews Grok's B15.
 3. Grok: B15 (light rules), then B7 reviews of Codex's branches, B1 second look, STATUS note.
 4. Gemini calendar B10/B11 is parked until Phil asks; agy is out through Oct 18.
 5. Check usage before and after each item; keep branches separate and test with fakes.
 ## Done
 - **B12 Per-task model choice (Larch-11, 2026-10-12):** optional `[claude.<level>]`, `[codex.<level>]`, and `[gemini.<level>]` model/effort overrides for easy/medium/hard tasks. Blank settings preserve each CLI's defaults. Applied to one-shot routing, chat and tabs; labels show configured choices. Dashboard Settings can edit profiles and `doctor` reports the configured count. Tests use fake CLIs only. Branch `codex/b12-model-choice-2026-10-12`, PR pending lead review; 586 passed, smoke 36/36.
+- **B13 Plain `megazword` app launch (Larch-11, 2026-10-12):** in an interactive terminal, starts a detached `dashboard --app` process and prints one line. Redirected output and `MEGAZWORD_NO_APP=1` retain the text screen; `megazword start` always shows it. Launch tests fake the subprocess. Branch `codex/b13-default-app-2026-10-12`, stacked on B12 PR #3; 590 passed, smoke 36/36.
 - **B2 Lessons + summaries (Tally-11, 2026-10-11):** after a room session of 3+ turns (not on Ctrl+C), the cheapest eligible bot gets one short call and writes 3-5 one-line lessons into the primary project's memory (new memory kind `lesson`, also in `megazword export`). The next session's state card shows the latest 3. That call is logged with `lessons: true`. Summary files were already in B1. `room post-summary` now only prints unless you add `--post`, and tests block `gh`, after a test run posted about 12 fake summaries to Q (Ledger's report). 578 passed, smoke 36/36.
 - **B1 Room engine (Atlas-11 / Antigravity, 2026-10-11):** Built `src/megazword/room.py` and CLI commands `megazword room start|stop|say|show|post-summary`. Hive room JSONL storage (`~/.megazword/rooms/<room>.jsonl`), turn loop with `@mentions` targeting, Phil-first priority rule, prime directive prompt, turn cap (default 12), out/over-pace early stops, lean read-only one-shots, and ~80-word replies. Implements token-budget optimizations: state card (<300 words), rolling summary + last 4 messages with automatic condensation after every 6 turns, waking only the needed AI (burn order fallback), CLI session reuse where supported, and per-turn prompt size logging to `log.jsonl`. 541 passed, smoke 31/31. Branch `agy/b1-room`, handed to Tally-11 to merge.
 - **Gemini usage meter (Tally-11, 2026-10-11):** `usage_sources.gemini()` runs `agy -p /usage --output-format json` (Antigravity's quota panel, documented; field shape command.data.groups[].buckets[] with remaining_fraction + reset_time, from a public bug report, not yet seen on Phil's PC). Gemini-group buckets become the 5-hour/weekly meter; other groups shown, never block. No agy: falls back to run counts. Tests never run a real agy (conftest). Verified end to end in the cloud with a fake agy and fake Codex log: `megazword usage`, start screen and dashboard /api/state all show codex 42% and gemini 30%. **Not verified live:** real agy JSON on Phil's PC, and the Claude meter (needs his login). Check: `megazword usage`. If gemini shows an error, paste `agy -p /usage --output-format json` output to fix the parser. 520 passed / 1 skipped, smoke 27/27.

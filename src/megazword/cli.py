@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
+import subprocess
 import sys
 from typing import Callable
 
@@ -17,7 +19,7 @@ from .rater import Rating, rate
 
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room"),
-    "See": ("usage", "stats", "advise", "dashboard", "projects", "history", "export",
+    "See": ("start", "usage", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel"),
     "Set up": ("init", "doctor", "out", "backends"),
     "Memory": ("note", "decide", "import-hive"),
@@ -62,6 +64,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"megazword {__version__}")
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")  # none: start screen
+
+    sub.add_parser("start", help="show the text start screen")
 
     run = sub.add_parser("run", help="run a prompt; picks an AI unless -m is given")
     run.add_argument("prompt", nargs="?", help="the prompt (reads stdin if left out)")
@@ -246,6 +250,19 @@ def main(argv: list[str] | None = None,
                   "then run `megazword doctor`", file=sys.stderr)
             return 2
     if args.command is None:
+        if sys.stdout.isatty() and os.environ.get("MEGAZWORD_NO_APP") != "1":
+            try:
+                _launch_dashboard_app()
+            except OSError as exc:
+                print(f"[megazword] couldn't start the app: {exc}; "
+                      "try `megazword dashboard --app`", file=sys.stderr)
+                return 1
+            print("Started Mega Zword app. Run `megazword start` for the text screen.")
+            return 0
+        from .start import render
+        print(render(cfg))
+        return 0
+    if args.command == "start":
         from .start import render
         print(render(cfg))
         return 0
@@ -432,6 +449,20 @@ def main(argv: list[str] | None = None,
     sent = with_context(prompt, memory.context_block()) if args.context else prompt
     # A forced AI (-m) never escalates; otherwise move up the chain on failure.
     return execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))
+
+
+def _launch_dashboard_app(popen=None) -> None:
+    """Start the dashboard app without tying it to this console window."""
+    popen = popen or subprocess.Popen
+    command = [sys.executable, "-m", "megazword", "dashboard", "--app"]
+    options = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
+               "stderr": subprocess.DEVNULL, "close_fds": True}
+    if os.name == "nt":
+        options["creationflags"] = (subprocess.DETACHED_PROCESS |
+                                    subprocess.CREATE_NEW_PROCESS_GROUP)
+    else:
+        options["start_new_session"] = True
+    popen(command, **options)
 
 
 # The CLIs load their users' global startup rules (e.g. "read the team board

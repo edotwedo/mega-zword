@@ -32,6 +32,11 @@ To install manually instead: `python -m venv .venv`, then
 
 ## Quick start
 
+In an interactive terminal, `megazword` opens the dashboard in an app window.
+Use `megazword start` for the text start screen. When output is redirected,
+Mega Zword keeps the text screen; set `MEGAZWORD_NO_APP=1` to request it in a
+terminal too.
+
 ```text
 megazword init
 megazword backends
