@@ -1,9 +1,9 @@
 # Status
 
-**Active: Tally-11 (lead, Claude Code on Phil's PC), 2026-10-11 ~22:20 PT.** Merged Grok's agy empty-answer fix and Codex's B14 review (Z.ai label). Next: **Grok B15** (Nimbus-12 already queued it; Grok built B14), **Codex B12**, then B13, B5, B4, B6. Calendar B10/B11 parked (Phil). Room summaries now post to Q only with `--post`.
+**Active: Larch-11, 2026-10-12 04:24 PT: B5 New look, branch `codex/b5-new-look-2026-10-12`.** Main already contains B12/B13/B15; doing B5, then B4 and B6. Calendar B10/B11 remain parked. Room summaries post to Q only with `--post`.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-11 22:20 PT by Tally-11. Usage at 22:04 PT (5h/week % used): Claude 0/45, Codex 4/45, Grok -/15, Gemini out until Oct 18.
+**Last updated:** 2026-10-12 04:24 PT by Larch-11: claimed B5. Usage before work: Codex 31% of 5-hour / 49% weekly; Claude 30% of 5-hour / 52% weekly; Grok 15% weekly; Gemini out until Oct 18.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
