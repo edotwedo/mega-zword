@@ -1,6 +1,6 @@
 # Status
 
-**Active: Codex session 01a12d3d (this chat, previously called Kestrel), 2026-10-12 04:28 PT.** Phil requested direct phone access and progress in this chat. Building and testing the Tailscale dashboard launcher on `codex/phone-access-2026-10-12`; no routing changes.
+**Active: none (Codex session 01a12d3d released phone launcher, 2026-10-12 04:33 PT).** Phone launcher finished on `codex/phone-access-2026-10-12`; 616 tests and 36/36 smoke checks passed. Needs lead merge, then Tailscale installation/sign-in on PC and phone. Real phone connection not verified.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
 **Last updated:** 2026-10-11 22:20 PT by Tally-11. Usage at 22:04 PT (5h/week % used): Claude 0/45, Codex 4/45, Grok -/15, Gemini out until Oct 18.
@@ -14,6 +14,10 @@
 - **Logins Mega Zword reads (never committed or printed):** `~\.claude\.credentials.json` (Claude meter), `~\.codex\sessions\` (Codex meter), the `agy` login (Gemini).
 - **Hive coordination:** Q, `edotwedo/workshop` PR #33. Mega Zword's own state stays in this file.
 
+
+## Phone access (2026-10-12, Codex session 01a12d3d)
+
+Phil requested work visible through this chat and direct phone access. Added `megazword dashboard --phone` with Tailscale discovery and actionable connection errors; GUIDE updated. Validation: 616 tests, 36/36 smoke, clean diff check, real missing-installation diagnostic verified. No software installed or network settings changed. Next: lead merges `codex/phone-access-2026-10-12`; Phil installs/signs into Tailscale on PC and phone, then runs `megazword dashboard --phone` and opens the printed private link. B5/B4/B6 remain separate unfinished work.
 
 ## Next (cold start, 2026-10-11 night plan)
 

@@ -123,8 +123,11 @@ def build_parser() -> argparse.ArgumentParser:
     dash.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
     dash.add_argument("--app", action="store_true",
                       help="open in its own app window (Edge/Chrome app mode) instead of a tab")
-    dash.add_argument("--host", default="127.0.0.1",
+    connection = dash.add_mutually_exclusive_group()
+    connection.add_argument("--host", default="127.0.0.1",
                       help="address to listen on; use your Tailscale IP for phone access")
+    connection.add_argument("--phone", action="store_true",
+                            help="check Tailscale and listen on this PC's private phone address")
     init = sub.add_parser("init", help="write a default config file")
     init.add_argument("--force", action="store_true", help="replace an existing config")
 
@@ -347,6 +350,15 @@ def main(argv: list[str] | None = None,
 
     if args.command == "dashboard":
         from .dashboard import serve
+        if args.phone:
+            from .phone import address
+            try:
+                args.host = address()
+            except ValueError as exc:
+                print(f"[megazword] {exc}", file=sys.stderr)
+                return 2
+            print("[megazword] Connect Tailscale on your phone and open the full link below. "
+                  "Keep this terminal and the PC awake while using it.", file=sys.stderr)
         return serve(args.port, args.project, not args.no_browser and args.host == "127.0.0.1",
                      args.host, app_window=args.app)
 
