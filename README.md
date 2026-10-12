@@ -32,6 +32,10 @@ To install manually instead: `python -m venv .venv`, then
 
 ## Quick start
 
+Typing plain `megazword` at a terminal opens the app window (`megazword dashboard --app`), which
+keeps running after the terminal closes. `megazword start` shows the text start screen instead.
+Scripts and pipes, or runs with `MEGAZWORD_NO_APP=1`, get the text screen.
+
 ```text
 megazword init
 megazword backends
@@ -98,6 +102,30 @@ mz> <<<
 
 Chat uses the current repo or folder for its project name. `/retry` uses the last saved run, including a run from outside this chat; it does not use the pinned model.
 
+## Hive room
+
+A group chat between you and the AIs. Mention `@claude`, `@codex`, `@grok` or `@gemini` to pick who
+answers next; your messages always come first.
+
+```text
+megazword room say "plan today's work @claude"
+megazword room start --turns 6
+megazword room show
+megazword room stop
+megazword room post-summary          # prints it; add --post to send it to Q
+```
+
+Each turn is a fresh one-shot that gets a short state card, a rolling summary and the last few
+messages, so long chats stay cheap. Sessions stop at the turn cap (default 12) or when every AI is out
+of usage. Only one session runs per room. After 3 or more turns, one AI writes 3-5 short lessons
+into the project's memory, and the next session starts with them. The dashboard drives the same
+room through `/api/room`.
+
+## Chat tabs
+
+The dashboard can keep several conversations open at once, one per tab, each with its own AI
+(or automatic routing) and project (`/api/tabs`).
+
 ## Let an AI edit files
 
 Run from the folder you want to change:
@@ -144,7 +172,8 @@ Mega Zword rates a prompt as easy, medium, or hard, then follows that level's or
 
 - **Claude:** `megazword usage` asks Anthropic's usage endpoint using the login Claude Code already saved on your computer. The token is sent only to api.anthropic.com and is never printed or logged. This endpoint is unofficial and may change.
 - **Codex:** read from the rate-limit snapshot Codex writes to its own session logs, so it is as fresh as your last Codex run.
-- **Grok:** no meter is available, so Mega Zword reports how many runs it sent to Grok.
+- **Grok:** the weekly credit percentage Grok's CLI logs when it fetches billing (`~/.grok/logs`). Grok has no 5-hour window.
+- **Gemini:** `agy -p /usage` (Antigravity's quota panel). Weekly only.
 
 The 24-hour runs table also shows `est_tokens` per AI. Each attempt logs `(prompt_chars + answer_chars) // 4`. This is a rough size estimate, not billed tokens, money, or remaining quota. It counts the original prompt and returned answer; added memory, chat context, tool calls, and internal reasoning are not measured. Old log entries without an estimate count as zero. Failed and rejected attempts are included. The dashboard shows the same daily total in each chart tooltip and a per-attempt estimate in Recent runs.
 
@@ -160,7 +189,7 @@ rater_model = "qwen2.5:1.5b"
 quality_check = false
 
 [route]
-easy = ["grok", "codex", "claude"]
+easy = ["mistral", "grok", "codex", "claude"]
 medium = ["codex", "claude", "grok"]
 hard = ["claude", "codex", "grok"]
 
@@ -179,6 +208,14 @@ effort = "medium"
 [grok.hard]
 model = "grok-4.7"
 effort = "high"
+
+# Optional, same idea for the other CLIs. Leave out to keep each CLI's default.
+[claude.hard]
+model = "opus"
+effort = "high"
+
+[codex.easy]
+effort = "low"
 ```
 
 | Setting | Meaning |
@@ -188,6 +225,8 @@ effort = "high"
 | `[route]` | Ordered AI names for `easy`, `medium`, and `hard`. Routing considers installation, pacing, and out marks. Failures can move into harder routes. |
 | `[out]` | AI name mapped to a return date or time. Auto selection and retry skip it until then. A bare date such as `2026-10-17` means the start of that day in local time. A time without an offset also uses local time. Remove the entry to clear the mark early. A forced `run -m` bypasses out marks. |
 | `[grok.<level>]` | Grok `model` and `effort` for each difficulty. Missing fields keep their defaults. A forced `run -m grok` uses `medium`; retry promotes `easy` to `medium`. |
+| `[claude.<level>]`, `[codex.<level>]`, `[gemini.<level>]` | Same for the other CLIs (`claude --model --effort`, `codex -m` with `model_reasoning_effort`, `agy --model --effort`). Unset levels keep the CLI's own default. The run line and `megazword doctor` show the choice. |
+| `[room]` | `primary` project, `turn_cap` (default 12) and room `name` for the Hive room. |
 
 ## Files
 
@@ -215,7 +254,18 @@ model = "qwen/qwen3-4b:free"
 model = "llama-3.3-70b-versatile"
 ```
 
-These chat-only backends are excluded from `--edit`. They are registered but
+More optional backends use the same pattern: Cloudflare Workers AI
+(`CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`), Z.ai (`ZAI_API_KEY`), Google AI Studio
+(`GOOGLE_AI_API_KEY`), NVIDIA NIM (`NVIDIA_API_KEY`) and Mistral (`MISTRAL_API_KEY`).
+`megazword backends` marks the ones whose free tier trains on prompts.
+
+**AIs that train on prompts** (Mistral's free tier, Google AI Studio unpaid) get light rules,
+by the owner's choice. Mistral is first in the `easy` route once its key is set, and easy jobs
+try trains-on-data AIs first. Before any prompt goes to one, Mega Zword removes obvious secrets
+(API keys, tokens, passwords, private keys, `KEY=value` lines) and paths under `.claude`,
+`.codex`, `.grok`, `.megazword` or `private` folders. Runs are logged with `trains_on_data`.
+
+These chat-only backends are excluded from `--edit`. Apart from Mistral in `easy`, they
 are not in any default route, including routes created by `megazword init`.
 Availability means a nonempty key is set; it does not verify the key, model,
 or remaining quota. Provider free tiers have limits, and model overrides
