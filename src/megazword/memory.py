@@ -19,7 +19,7 @@ from pathlib import Path
 from .filelock import locked
 from .log import trim_unlocked
 
-KINDS = ("note", "decision", "done")
+KINDS = ("note", "decision", "done", "lesson")
 DEFAULT_MEMORY_LINES = 2000
 
 

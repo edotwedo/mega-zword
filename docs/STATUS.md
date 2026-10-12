@@ -110,16 +110,16 @@ Gemini (lots of room; agy) -> `docs/handoffs/2026-10-11-gemini.md`:
 
 Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
 - Review and merge finished branches; keep STATUS and the lanes true.
-- B2 Lessons + summaries (small): end-of-session lessons into project memory,
-  summary files, `room post-summary`. After B1 lands.
+- B2 Lessons + summaries: **done** (Tally-11, 2026-10-11), see Done.
 
-## Current cross-lane sequence (Tally-11, 2026-10-12)
-1. Grok B14 and R1 are done; B14 is on main.
-2. Codex: B12, then B15, then B13, B5, B4, B6. Grok reviews B15.
-3. Grok round 2: agy empty-answer handling, B7 review, B1 second look, then update STATUS.
+## Current cross-lane sequence (Tally-11, 2026-10-11 22:30 PT)
+1. Grok B14 and R1 are done; B14 is on main. The agy empty-answer fix is merged.
+2. Codex: B12, then B13, B5, B4, B6. Reviews Grok's B15.
+3. Grok: B15 (light rules), then B7 reviews of Codex's branches, B1 second look, STATUS note.
 4. Gemini calendar B10/B11 is parked until Phil asks; agy is out through Oct 18.
 5. Check usage before and after each item; keep branches separate and test with fakes.
 ## Done
+- **B2 Lessons + summaries (Tally-11, 2026-10-11):** after a room session of 3+ turns (not on Ctrl+C), the cheapest eligible bot gets one short call and writes 3-5 one-line lessons into the primary project's memory (new memory kind `lesson`, also in `megazword export`). The next session's state card shows the latest 3. That call is logged with `lessons: true`. Summary files were already in B1. `room post-summary` now only prints unless you add `--post`, and tests block `gh`, after a test run posted about 12 fake summaries to Q (Ledger's report). 578 passed, smoke 36/36.
 - **B1 Room engine (Atlas-11 / Antigravity, 2026-10-11):** Built `src/megazword/room.py` and CLI commands `megazword room start|stop|say|show|post-summary`. Hive room JSONL storage (`~/.megazword/rooms/<room>.jsonl`), turn loop with `@mentions` targeting, Phil-first priority rule, prime directive prompt, turn cap (default 12), out/over-pace early stops, lean read-only one-shots, and ~80-word replies. Implements token-budget optimizations: state card (<300 words), rolling summary + last 4 messages with automatic condensation after every 6 turns, waking only the needed AI (burn order fallback), CLI session reuse where supported, and per-turn prompt size logging to `log.jsonl`. 541 passed, smoke 31/31. Branch `agy/b1-room`, handed to Tally-11 to merge.
 - **Gemini usage meter (Tally-11, 2026-10-11):** `usage_sources.gemini()` runs `agy -p /usage --output-format json` (Antigravity's quota panel, documented; field shape command.data.groups[].buckets[] with remaining_fraction + reset_time, from a public bug report, not yet seen on Phil's PC). Gemini-group buckets become the 5-hour/weekly meter; other groups shown, never block. No agy: falls back to run counts. Tests never run a real agy (conftest). Verified end to end in the cloud with a fake agy and fake Codex log: `megazword usage`, start screen and dashboard /api/state all show codex 42% and gemini 30%. **Not verified live:** real agy JSON on Phil's PC, and the Claude meter (needs his login). Check: `megazword usage`. If gemini shows an error, paste `agy -p /usage --output-format json` output to fix the parser. 520 passed / 1 skipped, smoke 27/27.
 - **Gemini via Antigravity (Tally-11, Claude cloud, 2026-10-11, Phil's request):** Google retired the Gemini CLI for personal accounts; `-m gemini` now runs `agy -p --mode plan --output-format text --disable-slash-commands` (prompt on stdin) when `agy` is on PATH, else the old `gemini` command. Doctor finds agy; login hint says `agy`. Flags from Phil's `agy --help` (1.3.3). Phil installed and signed in to agy on his PC. **Not yet verified live:** that agy print mode reads the prompt from stdin. Check on the PC: `megazword run -m gemini "say hi"`. If agy ignores stdin, switch AGY_ARGS in backends.py to pass `{prompt_file}` or `{prompt}`. 517 passed / 1 skipped, smoke 27/27.

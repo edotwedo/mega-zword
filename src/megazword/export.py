@@ -82,7 +82,8 @@ def render(project: str, log_path: Path, since: str = "7d",
              f"Window (UTC, inclusive): {start.isoformat()} to {now.isoformat()}", "",
              "Decisions include all saved history. Other sections cover the window.",
              "Only retained records are available; older answers and runs may have been trimmed.", ""]
-    for heading, kind in (("Decisions", "decision"), ("Notes", "note"), ("Done", "done")):
+    for heading, kind in (("Decisions", "decision"), ("Notes", "note"), ("Done", "done"),
+                          ("Lessons", "lesson")):
         lines += [f"## {heading}", ""]
         selected = [e for e in entries if e.kind == kind and (kind == "decision" or in_window(e.time))]
         for e in selected:

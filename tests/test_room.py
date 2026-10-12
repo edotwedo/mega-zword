@@ -168,8 +168,10 @@ def test_turn_cap_and_prompt_logging(tmp_path):
     log_file = tmp_path / "log.jsonl"
     assert log_file.exists()
     logged_entries = [json.loads(l) for l in log_file.read_text(encoding="utf-8").splitlines() if l.strip()]
-    assert len(logged_entries) == 3
     assert all(e["room"] == "hivelog" for e in logged_entries)
+    assert sum(1 for e in logged_entries if e.get("lessons")) == 1  # the B2 end-of-session call
+    logged_entries = [e for e in logged_entries if not e.get("lessons")]
+    assert len(logged_entries) == 3
     assert all(e["prompt_chars"] > 0 for e in logged_entries)
 
 
@@ -263,3 +265,37 @@ def test_quiet_mentions_breaks_github_pings():
     out = quiet_mentions("hello @claude, @codex ready; mail a@b")
     assert "@claude" not in out and "@codex" not in out
     assert out.replace("​", "") == "hello @claude, @codex ready; mail a@b"
+
+
+def test_parse_lessons_strips_bullets_and_caps_at_five():
+    text = "Here you go:\n- Lead with usage.\n2) Keep replies short\n* x\n" + "\n".join(
+        f"- lesson number {i}" for i in range(6))
+    lessons = room.parse_lessons(text)
+    assert lessons[:2] == ["Here you go:", "Lead with usage."] or lessons[1] == "Lead with usage."
+    assert "Keep replies short" in lessons
+    assert "x" not in lessons and len(lessons) == 5
+
+
+def test_room_saves_lessons_and_next_card_shows_them(tmp_path):
+    cfg = config.Config(log_path=tmp_path / "log.jsonl")
+    claude = FakeBackend("claude", reply="- Check usage first\n- Mention one bot per reply")
+    backends = {"claude": claude, "codex": FakeBackend("codex", reply="Ready @claude")}
+    room.say("hive", "plan B2 @claude", home=tmp_path, write=lambda s: None)
+    out = []
+    room.run_room("hive", max_turns=3, project="workshop", backends=backends, cfg=cfg,
+                  write=out.append, home=tmp_path)
+    assert any("saved" in line and "lessons" in line for line in out)
+    lessons = [e for e in Memory(tmp_path, "workshop").entries() if e.kind == "lesson"]
+    assert lessons and lessons[-1].text == "Mention one bot per reply"
+    card = room.build_state_card("workshop", tmp_path)
+    assert "Lessons from earlier sessions:" in card and "Check usage first" in card
+
+
+def test_short_room_session_skips_lessons(tmp_path):
+    cfg = config.Config(log_path=tmp_path / "log.jsonl")
+    claude = FakeBackend("claude", reply="- a lesson here")
+    room.say("hive", "hi @claude", home=tmp_path, write=lambda s: None)
+    room.run_room("hive", max_turns=2, project="workshop", backends={"claude": claude},
+                  cfg=cfg, write=lambda s: None, home=tmp_path)
+    assert len(claude.calls) == 2
+    assert not [e for e in Memory(tmp_path, "workshop").entries() if e.kind == "lesson"]

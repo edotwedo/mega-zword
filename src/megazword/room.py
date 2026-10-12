@@ -158,6 +158,7 @@ def build_state_card(project: str, home: Path | None = None) -> str:
     entries = mem.entries()
     decisions = [e for e in entries if e.kind == "decision"][-3:]
     in_progress = [e for e in entries if e.kind in ("note", "done")][-3:]
+    lessons = [e for e in entries if e.kind == "lesson"][-3:]
 
     lines = [
         f"[Hive State Card: {project}]",
@@ -176,6 +177,11 @@ def build_state_card(project: str, home: Path | None = None) -> str:
             lines.append(f"- {item.by}: {_clip_text(item.text)}")
     else:
         lines.append("In progress: none recorded yet.")
+
+    if lessons:
+        lines.append("Lessons from earlier sessions:")
+        for item in lessons:
+            lines.append(f"- {_clip_text(item.text, 120)}")
 
     lines.append("Today's schedule: none")
     card = "\n".join(lines)
@@ -326,6 +332,44 @@ def save_summary_report(room: str, messages: list[RoomMessage],
     return out_path
 
 
+LESSON_MIN_TURNS = 3  # shorter sessions don't teach enough to pay for the extra call
+MAX_LESSONS = 5
+
+
+def parse_lessons(text: str) -> list[str]:
+    """Pull up to MAX_LESSONS one-line lessons out of a bot's answer."""
+    lessons = []
+    for line in text.splitlines():
+        line = re.sub(r"^\s*(?:[-*•]|\d+[.)])\s*", "", line).strip()
+        if len(line) >= 8:
+            lessons.append(_clip_text(line, 160))
+    return lessons[:MAX_LESSONS]
+
+
+def write_lessons(messages: list[RoomMessage], primary: str, speaker: str, backend: Backend,
+                  cfg: config.Config, room: str, home: Path | None = None) -> list[str]:
+    """B2: one cheap call at the end of a session saves 3-5 lessons to the project's memory,
+    which the next session's state card shows. Best effort; a failure saves nothing."""
+    prompt = "\n\n".join([
+        "[Sent by Mega Zword as a one-shot task. Answer it directly. Skip session startup, coordination and check-in routines.]",
+        f"[Room conversation, project '{primary}']\n{format_recent(messages, RECENT_MESSAGES_COUNT)}",
+        "List 3 to 5 short lessons from this conversation: what worked and what to do differently "
+        "next time. One per line, starting with '- ', each under 20 words. No names of people, "
+        "no secrets, nothing else.",
+    ])
+    res = backend.run(prompt)
+    log.append(cfg.log_path, cfg.log_lines, backend=speaker, forced=False, project=primary,
+               room=room, lessons=True, seconds=round(res.seconds, 2), ok=res.ok, prompt_chars=len(prompt),
+               answer_chars=len(res.text or ""), est_tokens=(len(prompt) + len(res.text or "")) // 4)
+    if not res.ok:
+        return []
+    lessons = parse_lessons(res.text or "")
+    mem = Memory(home or config.HOME, primary)
+    for text in lessons:
+        mem.add("lesson", text, by=speaker)
+    return lessons
+
+
 def run_room(room: str = DEFAULT_ROOM,
              max_turns: int | None = None,
              project: str | None = None,
@@ -419,6 +463,16 @@ def run_room(room: str = DEFAULT_ROOM,
             )
 
             write(f"[{speaker}] {text}")
+
+        if turns_taken >= LESSON_MIN_TURNS:
+            cur_statuses = (statuses or (lambda: {}))()
+            eligible = get_eligible_backends(backends, cfg, cur_statuses)
+            order = get_burn_order(eligible, cur_statuses)
+            if order:
+                saved = write_lessons(read_messages(room, home), primary, order[0],
+                                      eligible[order[0]], cfg, room, home)
+                if saved:
+                    write(f"[megazword room] saved {len(saved)} lessons to '{primary}' memory")
 
     except KeyboardInterrupt:
         write("\n[megazword room] paused/interrupted by user")
