@@ -186,6 +186,20 @@ def set_paused(room: str = DEFAULT_ROOM, paused: bool = True, home: Path | None 
     save_state(state, home)
 
 
+def release(room: str, session: str, home: Path | None = None) -> bool:
+    """The host process is exiting mid-session (e.g. Phil closed the app window, which
+    kills the room thread before its cleanup runs). Mark that session paused instead of
+    leaving it 'active', which would refuse Start for 20 minutes. Another session's
+    room is left alone."""
+    state = load_state(room, home)
+    if not state.active or state.session != session:
+        return False
+    state.active = False
+    state.paused = True
+    save_state(state, home)
+    return True
+
+
 def _clip_text(text: str, max_chars: int = 150) -> str:
     return text if len(text) <= max_chars else text[:max_chars - 3].rstrip() + "..."
 
@@ -415,8 +429,10 @@ def run_room(room: str = DEFAULT_ROOM,
              cfg: config.Config | None = None,
              statuses: Callable[[], dict] | None = None,
              write: Callable[[str], None] = print,
-             home: Path | None = None) -> int:
-    """Run the room turn loop with token budgeting and guardrails."""
+             home: Path | None = None,
+             session: str | None = None) -> int:
+    """Run the room turn loop with token budgeting and guardrails. `session` lets a host
+    (the dashboard) know its session id so it can release the room when it exits."""
     cfg = cfg or config.load()
     primary = project or cfg.room_primary or project_name()
     backends = backends or default_backends(edit=False, free_models=cfg.free, lean=cfg.lean)
@@ -426,7 +442,7 @@ def run_room(room: str = DEFAULT_ROOM,
         write(f"[megazword room] room '{room}' is already running in another window; "
               "`megazword room stop` ends it")
         return 1
-    me = uuid.uuid4().hex
+    me = session or uuid.uuid4().hex
     state.session = me
     state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
     resuming = state.paused

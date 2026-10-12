@@ -17,6 +17,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 import webbrowser
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
@@ -159,6 +160,7 @@ class App:
         self._jobs_lock = threading.Lock()
         self._n = 0
         self._room_thread: threading.Thread | None = None
+        self._room_session: tuple[str, str] | None = None  # (room, session id) started here
 
     def project_for(self, value: object) -> str:
         """The project a request asks for (default: the launch project).
@@ -368,12 +370,19 @@ class App:
             raise ValueError("turns must be 1-50")
         project = self.project_for(body.get("project") or self.cfg.room_primary)
         from . import cli
+        self._room_session = (name, uuid.uuid4().hex)
         self._room_thread = threading.Thread(
             target=room.run_room, daemon=True,
             kwargs=dict(room=name, max_turns=turns, project=project, backends=self.backends,
-                        cfg=self.cfg, statuses=cli.plan_statuses, write=lambda s: None))
+                        cfg=self.cfg, statuses=cli.plan_statuses, write=lambda s: None,
+                        session=self._room_session[1]))
         self._room_thread.start()
         return self.room_view(name)
+
+    def shutdown(self) -> None:
+        """The dashboard is closing: a room still running here is paused, not left 'active'."""
+        if self.room_running() and self._room_session:
+            room.release(*self._room_session)
 
     def room_stop(self, body: dict) -> dict:
         name = self._room_name(body.get("room"))
@@ -575,6 +584,7 @@ def serve(port: int = 8765, project: str | None = None, open_browser: bool = Tru
             try:
                 desktop.run_window(url)
             finally:
+                app.shutdown()
                 server.shutdown()
                 server.server_close()
             return 0
@@ -591,5 +601,6 @@ def serve(port: int = 8765, project: str | None = None, open_browser: bool = Tru
     except KeyboardInterrupt:
         pass
     finally:
+        app.shutdown()
         server.server_close()
     return 0

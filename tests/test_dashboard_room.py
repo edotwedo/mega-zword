@@ -56,3 +56,47 @@ def test_bad_input_is_rejected(app):
         app.room_view("../etc")
     with pytest.raises(ValueError):
         app.room_start({"turns": 500})
+
+
+def test_closing_the_dashboard_mid_session_pauses_the_room(app, tmp_path):
+    """Closing the app window kills the room thread before its cleanup; the room must
+    be resumable right away, not refused as 'running in another window' for 20 minutes."""
+    import threading
+    gate, started = threading.Event(), threading.Event()
+
+    @dataclass
+    class Slow(Fake):
+        def _run(self, prompt):
+            started.set()
+            gate.wait(10)
+            return self.reply
+
+    app.backends["claude"] = Slow("claude")
+    app.backends["codex"] = Slow("codex")
+    app.room_say({"text": "go @claude"})
+    app.room_start({"turns": 5})
+    assert started.wait(5)
+    app.shutdown()  # what serve() does when the window closes
+    state = dashboard.room.load_state("hive")
+    assert state.paused and not state.active
+    assert not dashboard.room.other_session_running(state)
+    gate.set()
+    app._room_thread.join(10)
+
+
+def test_release_leaves_another_sessions_room_alone(tmp_path):
+    room = dashboard.room
+    state = room.load_state("hive", tmp_path)
+    state.active, state.session = True, "someone-else"
+    state.heartbeat = "2099-01-01T00:00:00+00:00"
+    room.save_state(state, tmp_path)
+    assert room.release("hive", "mine", tmp_path) is False
+    assert room.load_state("hive", tmp_path).active
+    assert room.release("hive", "someone-else", tmp_path) is True
+    after = room.load_state("hive", tmp_path)
+    assert after.paused and not after.active
+
+
+def test_shutdown_without_a_room_does_nothing(app):
+    app.shutdown()
+    assert not dashboard.room.load_state("hive").active
