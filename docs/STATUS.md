@@ -1,6 +1,6 @@
 # Status
 
-**Active: none.** (Tally-11, Claude Code on Phil's PC, cleared 2026-10-11 ~16:45 PT.)
+**Active: Orbit-1** (Antigravity agy on Phil's PC, 2026-10-11 ~18:25 PT.) Building B1 room engine.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
 **Last updated:** 2026-10-12 by Tally-11 (Claude cloud): lead change; B1 token-budget rules added.
@@ -42,7 +42,7 @@ Grok (available now; Oct 17 is its weekly reset) -> `docs/handoffs/2026-10-11-gr
   accounts). Quote the terms. Mega Zword builds nothing for multiple accounts unless the terms allow it.
 
 Antigravity Claude/GPT pool (unused; `agy` session on Phil's PC) -> `docs/handoffs/2026-10-11-antigravity.md`:
-- B1 Room engine (`src/megazword/room.py`): room file, turn loop with
+- B1 Room engine (`src/megazword/room.py`) — **Orbit-1 (in progress)**: room file, turn loop with
   @mentions, Phil-first rule, prime directive prompt, turn cap, out/pace
   stops, lean read-only one-shots, reply cap. CLI `megazword room
   start|stop|say|show`. Tests with fake CLIs. Includes the token-budget rules
