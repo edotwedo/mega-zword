@@ -111,7 +111,9 @@ def dashboard_checks(env: dict, cwd: Path) -> None:
         token = m.group(1)
         code, body = http(base + "/api/state")
         state = json.loads(body) if code == 200 else {}
-        check("dashboard /api/state", code == 200 and state.get("project") == "smoke", body[:200])
+        check("dashboard /api/state",
+              code == 200 and state.get("project") == "smoke" and "sentinel" in state,
+              body[:200])
         code, _ = http(base + "/api/run", {"prompt": "hi"}, token="wrong")
         check("dashboard rejects a bad token", code == 403)
         code, body = http(base + "/api/run", {"prompt": "dashboard hello"}, token=token)
@@ -128,6 +130,21 @@ def dashboard_checks(env: dict, cwd: Path) -> None:
         check("dashboard run job finishes with an answer",
               view.get("code") == 0 and "ok: dashboard hello" in view.get("out", ""),
               str(view)[:300])
+        code, body = http(base + "/api/tabs", {"ai": "grok", "title": "Grok"}, token=token)
+        tab = json.loads(body) if code == 200 else {}
+        check("dashboard creates a chat tab",
+              code == 200 and tab.get("id") and tab.get("ai") == "grok", body[:200])
+        code, body = http(base + "/api/tabs/send",
+                          {"id": tab.get("id"), "prompt": "tab hello"}, token=token)
+        sent = json.loads(body) if code == 200 else {}
+        check("dashboard tab send answers",
+              sent.get("ok") and "ok: tab hello" in (sent.get("answer") or ""),
+              str(sent)[:300])
+        code, body = http(base + "/api/tabs")
+        listed = json.loads(body) if code == 200 else {}
+        check("dashboard lists tabs with history",
+              code == 200 and any(t.get("id") == tab.get("id") and t.get("history")
+                                  for t in listed.get("tabs", [])), body[:300])
     finally:
         proc.terminate()
         proc.wait(timeout=10)
@@ -247,6 +264,12 @@ def main() -> int:
 
         r = mz(env, work, "usage")
         check("usage runs without real meters", r.returncode == 0 and "Mega Zword runs" in r.stdout,
+              r.stdout + r.stderr)
+
+        r = mz(env, work, "sentinel", "log")
+        check("sentinel log runs", r.returncode == 0, r.stdout + r.stderr)
+        r = mz(env, work, "sentinel", "status")
+        check("sentinel status runs", r.returncode == 0 and "Sentinel" in r.stdout,
               r.stdout + r.stderr)
 
         r = mz(env, work, "chat", stdin="first message\nsecond message\n/usage\n/quit\n")

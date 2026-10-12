@@ -7,14 +7,13 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
 from . import config, failures, log, pacing
-from .backends import Backend, CLIBackend, default_backends
+from .backends import Backend, default_backends
 from .filelock import locked
 from .memory import Memory, project_name
 
@@ -293,26 +292,10 @@ def build_turn_prompt(state_card: str, rolling_summary: str,
 
 def run_speaker(speaker: str, backend: Backend, prompt: str,
                 session_active: bool = False) -> tuple[str, bool, float, str]:
-    """Execute a room turn, attempting session reuse where supported."""
-    start = time.monotonic()
-    # Try session reuse where supported on CLIBackend
-    if session_active and isinstance(backend, CLIBackend):
-        resume_cmd = None
-        if backend.exe == "claude":
-            resume_cmd = [backend.exe, *backend.args, "--continue"]
-        elif backend.exe == "codex":
-            resume_cmd = [backend.exe, "exec", "resume", "--skip-git-repo-check", "-s", "read-only"]
-        elif backend.exe == "agy":
-            resume_cmd = [backend.exe, "--mode", "plan", "--output-format", "text", "--continue", "-p", prompt]
-
-        if resume_cmd:
-            try:
-                stdin = None if "{prompt}" in backend.args or backend.exe == "agy" else prompt
-                out = backend._exec(resume_cmd, stdin)
-                return out.strip(), True, time.monotonic() - start, ""
-            except Exception:
-                pass  # Fall back cleanly to normal one-shot
-
+    """Execute a room turn as a fresh one-shot."""
+    # Session reuse is off: `claude --continue`, `agy --continue` and `codex exec resume`
+    # pick up the most recent conversation in the folder, which can be Phil's own chat
+    # (Easel-11 review, 2026-10-11). Turn it back on only with an explicit session id.
     res = backend.run(prompt)
     return res.text.strip(), res.ok, res.seconds, res.error
 
@@ -482,6 +465,12 @@ def stop(room: str, home: Path | None = None,
     return 0
 
 
+def quiet_mentions(text: str) -> str:
+    """Break @names so a summary posted to GitHub doesn't ping real bots or people
+    (a room summary with @codex woke the Codex connector on 2026-10-12)."""
+    return re.sub(r"@(?=[A-Za-z0-9_-])", "@​", text)
+
+
 def post_summary(room: str, home: Path | None = None,
                  write: Callable[[str], None] = print) -> int:
     """Post session summary to Q (workshop PR #33) or print text if gh is unauthenticated."""
@@ -489,7 +478,7 @@ def post_summary(room: str, home: Path | None = None,
     if not path.exists():
         write(f"[megazword room] no summary found at {path}")
         return 1
-    content = path.read_text(encoding="utf-8")
+    content = quiet_mentions(path.read_text(encoding="utf-8"))
     gh = shutil.which("gh")
     if gh:
         try:

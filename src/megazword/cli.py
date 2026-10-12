@@ -16,7 +16,8 @@ from .rater import Rating, rate
 
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room"),
-    "See": ("usage", "stats", "advise", "dashboard", "projects", "history", "export"),
+    "See": ("usage", "stats", "advise", "dashboard", "projects", "history", "export",
+            "sentinel"),
     "Set up": ("init", "doctor", "out", "backends"),
     "Memory": ("note", "decide", "import-hive"),
 }
@@ -100,6 +101,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("advise", help="suggest a route order from stats and votes (changes nothing)")
     st = sub.add_parser("stats", help="per-day, per-AI table from the run log")
     st.add_argument("--days", type=int, default=7)
+    sent = sub.add_parser("sentinel", help="uptime and security log (reboots, logins, network)")
+    sent.add_argument("action", nargs="?", choices=("status", "log", "check", "install"),
+                      default="status")
+    sent.add_argument("-n", type=int, default=20, help="how many events to show for log")
+    sent.add_argument("--yes", action="store_true",
+                      help="for install: actually create the scheduled task")
 
     out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -290,6 +297,10 @@ def main(argv: list[str] | None = None,
         print(table(daily(cfg.log_path, max(1, args.days))))
         return 0
 
+    if args.command == "sentinel":
+        from . import sentinel
+        return sentinel.command(args)
+
     if args.command == "out":
         return out_command(args, cfg)
 
@@ -425,7 +436,8 @@ ONE_SHOT_NOTE = ("[Sent by Mega Zword as a one-shot task. Answer it directly. Sk
 def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
             memory: Memory, rating: Rating | None, forced: bool,
             start_after: str | None = None, prior_answer: str | None = None,
-            on_answer: Callable[[str], None] | None = None) -> int:
+            on_answer: Callable[[str], None] | None = None,
+            tab_id: str | None = None) -> int:
     """Run the chain with escalation, log every attempt, print the answer,
     and remember the run so `megazword retry` can pick it up."""
     first_line = prompt.strip().splitlines()[0][:80]
@@ -468,7 +480,7 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         return 1
     result = outcome.result
     save_last_run(sent, prompt, [b.name for b in chain], result.backend, result.text,
-                  memory.project, rating.level if rating else None)
+                  memory.project, rating.level if rating else None, tab_id=tab_id)
     if on_answer is None:
         print(result.text)
     else:
@@ -551,15 +563,17 @@ def last_run_path():
     return config.HOME / "last_run.json"
 
 
-def save_last_run(sent, prompt, chain, backend, answer, project, level) -> None:
+def save_last_run(sent, prompt, chain, backend, answer, project, level,
+                  tab_id: str | None = None) -> None:
     import json
     from .filelock import write_atomic
     # Atomic: a parallel job finishing at the same time can't leave half a file.
     write_atomic(last_run_path(), json.dumps({"sent": sent, "prompt": prompt, "chain": chain,
                                               "backend": backend, "answer": answer,
-                                              "project": project, "rating": level}))
+                                              "project": project, "rating": level,
+                                              "tab_id": tab_id}))
     from . import answers
-    answers.add(prompt, answer, backend, project, level)
+    answers.add(prompt, answer, backend, project, level, tab_id=tab_id)
 
 
 def retry_last(args, backends: dict[str, Backend], cfg: config.Config,

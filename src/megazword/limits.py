@@ -8,6 +8,9 @@ Wordings seen or documented:
   2:39 AM." (captured live 2026-10-11; may also carry a date for weekly resets)
 - Claude Code: "Claude AI usage limit reached|1760000000" (epoch seconds) and
   "5-hour limit reached ∙ resets 3am" / "Your limit will reset at 3am".
+- Antigravity (agy, Gemini and its Claude/GPT pool): "Individual quota reached. Please
+  upgrade your subscription to increase your limits. Resets in 165h2m5s." plus an
+  AGY_ERROR line with RESOURCE_EXHAUSTED (code 429) (captured live 2026-10-11).
 - Anything else that says usage limit / quota / rate limit with a time.
 If no reset time can be read, the AI is marked out for FALLBACK.
 """
@@ -22,6 +25,7 @@ FALLBACK = timedelta(hours=1)
 
 LIMIT_WORDS = re.compile(
     r"usage limit|limit reached|hit your (?:usage )?limit|quota (?:exceeded|exhausted)"
+    r"|quota reached|resource_exhausted"
     r"|rate limit exceeded|out of (?:credits|usage)|too many requests|\b429\b", re.I)
 
 _EPOCH = re.compile(r"limit reached\|(\d{10})\b", re.I)
@@ -33,7 +37,8 @@ _WHEN = re.compile(
     r"(?P<hour>\d{1,2})(?::(?P<min>\d{2}))?\s*(?P<ampm>[ap]\.?m\.?)", re.I)
 _IN = re.compile(r"(?:try again|resets?|again)\s+in\s+((?:\d+\s*(?:days?|d|hours?|hrs?|h|"
                  r"minutes?|mins?|m)\s*,?\s*(?:and\s*)?)+)", re.I)
-_PART = re.compile(r"(\d+)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m)\b", re.I)
+# (?![a-z]) rather than \b so run-together units like agy's "165h2m5s" still count.
+_PART = re.compile(r"(\d+)\s*(days?|d|hours?|hrs?|h|minutes?|mins?|m)(?![a-z])", re.I)
 
 
 @dataclass

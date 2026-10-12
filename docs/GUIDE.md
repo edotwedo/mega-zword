@@ -42,6 +42,29 @@ usage meters, timeouts, and whether the run log can be written. It never sends
 an AI prompt. Fix `FAIL` results first. `WARN` usually means an optional tool
 or meter is unavailable.
 
+## Sentinel (one-time, Phil)
+
+Sentinel logs reboots, logins and network changes, and can watch production
+URLs. It uses no AI usage.
+
+1. Collect once: `megazword sentinel status` (then `megazword sentinel log`).
+   Reading the Security log needs your account in the **Event Log Readers**
+   group (one admin command). System and network logs work without that.
+2. Optional phone push: install the **ntfy** app (no account). Then run
+   `megazword sentinel install` — it prints a topic name and saves it in
+   `~/.megazword/config.toml`. Subscribe to that topic in the app. Run
+   `megazword sentinel install --yes` only when you are ready to create the
+   5-minute Windows scheduled task (Phil's call).
+3. Optional "PC went offline" alert: create a free check at healthchecks.io,
+   then set `[sentinel] healthchecks_url` in config.toml to the ping URL.
+   Sentinel pings it every 5 minutes once the task is installed.
+4. Default URLs (tahomatable.org, hive-log.phone-liaison.workers.dev,
+   updawg.co) are in `[sentinel] urls`. After two failures in a row you get
+   an ntfy push; you get another when the site recovers.
+
+`megazword sentinel check` is one round (collect + URL checks). The dashboard
+Home page has a Sentinel panel.
+
 ## Run a task
 
 From the folder you want Mega Zword to use as the project, run:

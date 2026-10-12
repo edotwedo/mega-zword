@@ -234,3 +234,10 @@ def test_room_cli_commands(tmp_path, capsys):
     assert code in (0, 1)
     out = capsys.readouterr().out
     assert "summary for 'hive'" in out or "posted summary" in out
+
+
+def test_quiet_mentions_breaks_github_pings():
+    from megazword.room import quiet_mentions
+    out = quiet_mentions("hello @claude, @codex ready; mail a@b")
+    assert "@claude" not in out and "@codex" not in out
+    assert out.replace("​", "") == "hello @claude, @codex ready; mail a@b"

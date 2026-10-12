@@ -20,13 +20,15 @@ def path() -> Path:
 
 
 def add(prompt: str, answer: str, backend: str, project: str, rating: str | None,
-        keep: int = KEEP) -> None:
+        keep: int = KEEP, tab_id: str | None = None) -> None:
     if keep < 1:
         raise ValueError("keep must be positive")
     p = path()
     record = {"time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
               "backend": backend, "project": project, "rating": rating,
               "prompt": prompt, "answer": answer}
+    if tab_id:
+        record["tab_id"] = tab_id
     with locked(p):  # parallel dashboard jobs can finish at the same moment
         lines = (p.read_text(encoding="utf-8", errors="replace").splitlines()
                  if p.exists() else [])

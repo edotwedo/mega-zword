@@ -153,6 +153,12 @@ input::placeholder, textarea::placeholder { color:var(--dim); opacity:1; }
   </section>
 
   <section>
+    <h2>Sentinel</h2>
+    <div id="sentinel"></div>
+    <div class="note">Reboots, logins and network from the Windows event log. Run <code>megazword sentinel status</code> to collect new events.</div>
+  </section>
+
+  <section>
     <h2>Plans &amp; pace</h2>
     <div id="plans"></div>
     <div class="note">Bar = used. White tick = how much of the window has passed. Bar past the tick means spending faster than the plan refills.</div>
@@ -248,6 +254,21 @@ document.addEventListener("click", async (e) => {
     await load();
   } catch (err) { alert(err.message); } finally { b.disabled = false; }
 });
+
+function renderSentinel(s) {
+  const d = s.sentinel || {};
+  const bit = row => row ? `${esc(String(row.time || "").slice(0, 19).replace("T", " "))} ${esc(row.kind || "")}` : "—";
+  const rows = (d.recent || []).slice(0, 8).map(e =>
+    `<div class="note">${esc(String(e.time || "").slice(0, 19).replace("T", " "))} · ${esc(e.kind)} · ${esc((e.message || "").slice(0, 80))}</div>`
+  ).join("") || '<div class="note">no events yet</div>';
+  const sec = d.security_readable === false ? "security log needs Event Log Readers" : "";
+  const sites = (d.sites || []).map(site =>
+    `<div class="note${site.ok ? "" : " bad"}">${site.ok ? "ok" : "DOWN"} · ${esc(site.url)}</div>`
+  ).join("");
+  $("sentinel").innerHTML =
+    `<div class="note">last boot ${bit(d.last_boot)} · last login ${bit(d.last_login)} · last network ${bit(d.last_network)} · today ${esc(d.today ?? 0)}</div>`
+    + (sec ? `<div class="note bad">${esc(sec)}</div>` : "") + sites + rows;
+}
 
 function renderPlans(s) {
   if ($("plans").contains(document.activeElement)) return;
@@ -596,7 +617,7 @@ async function load(refresh) {
     .map(([n, ok]) => `<option value="${esc(n)}" ${ok ? "" : "disabled"}>${esc(n)}${ok ? "" : " (not installed)"}${state.out[n] ? " (marked out)" : ""}</option>`).join("");
   sel.value = cur;
   $("meta").textContent = `project ${state.project} · ${state.runs.length} runs logged · updated ${new Date().toLocaleTimeString()}`;
-  renderSettings(state.settings); renderPlans(state); renderRoute(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state); renderComparePicks(); renderAdvice(state);
+  renderSettings(state.settings); renderPlans(state); renderSentinel(state); renderRoute(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state); renderComparePicks(); renderAdvice(state);
   for (const j of state.jobs) if (!document.getElementById("job-" + j.id)) {
     renderJob(j); if (!j.done && !watching.has(j.id)) watch(j.id); }
 }

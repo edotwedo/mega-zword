@@ -65,3 +65,14 @@ def test_run_marks_out_and_moves_on(cfg, capsys):
     codex._run = lambda p: called.append(p) or "x"
     assert main(["run", "hi"], backends, config.load(), rated("easy"), dict) == 0
     assert not called
+
+
+def test_agy_quota_message_reads_run_together_reset():
+    # Captured live from agy on Phil's PC, 2026-10-11 (Gemini weekly quota used up).
+    text = ("error: Individual quota reached. Please upgrade your subscription to increase "
+            "your limits. Resets in 165h2m5s.\nAGY_ERROR: {\"short_error\":\"RESOURCE_EXHAUSTED "
+            "(code 429): Individual quota reached.\"}")
+    now = datetime(2026, 10, 11, 19, 0).astimezone()
+    hit = detect(text, now)
+    assert hit and hit.exact
+    assert hit.until == now + timedelta(hours=165, minutes=2)
