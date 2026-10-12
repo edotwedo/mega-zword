@@ -76,7 +76,7 @@ Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
   3. Google AI Studio Gemini API free tier (separate from agy's pool).
   4. NVIDIA NIM free credits.
   5. Mistral "Experiment" tier (~1B tokens/month free). Phil OKed it 2026-10-11 even though it trains on
-     what we send; it goes in with the B15 rules (marked `trains_on_data`, sandbox only for any work).
+     what we send; it goes in with B15's light rules (marked `trains_on_data`; first in line for repetitive jobs).
   Skip: Perplexity (no free API), Qwen Code OAuth (ended 2026-04-15), GitHub Models (closed),
   Cerebras (now a 30-day $5 credit).
 - B15 Light rules for AIs that train on our data (Phil, 2026-10-11, revised the same day: "lightest
