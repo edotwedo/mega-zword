@@ -382,3 +382,31 @@ def test_newer_session_takes_over_and_say_keeps_stop(tmp_path):
 def test_room_names_cannot_leave_the_rooms_folder(tmp_path):
     with pytest.raises(ValueError):
         room.room_path("../evil", tmp_path)
+
+
+def test_state_survives_concurrent_saves_and_extra_keys(tmp_path):
+    import threading
+    state = room.load_state("hive", tmp_path)
+    state.session, state.summary_pad = "me", None  # extra attribute is not a field; ignored
+    room.save_state(state, tmp_path)
+    path = room.state_path("hive", tmp_path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["future_field"] = 1  # a newer Mega Zword may add fields
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert room.load_state("hive", tmp_path).session == "me"
+
+    bad = []
+    def writer():
+        for i in range(200):
+            s = room.RoomState(room="hive", session="me", rolling_summary="x" * (i * 50))
+            room.save_state(s, tmp_path)
+    def reader():
+        for _ in range(200):
+            if room.load_state("hive", tmp_path).session != "me":
+                bad.append(1)
+    threads = [threading.Thread(target=writer), threading.Thread(target=reader)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(30)
+    assert not bad

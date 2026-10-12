@@ -7,7 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -15,7 +15,7 @@ from typing import Callable
 
 from . import config, failures, log, pacing
 from .backends import Backend, default_backends
-from .filelock import locked
+from .filelock import locked, write_atomic
 from .memory import Memory, project_name
 
 DEFAULT_ROOM = "hive"
@@ -150,9 +150,13 @@ def load_state(room: str = DEFAULT_ROOM, home: Path | None = None) -> RoomState:
     path = state_path(room, home)
     if not path.exists():
         return RoomState(room=room)
+    # Read under the same lock save_state holds: a half-written file read as the default
+    # state looked like "a newer session took over" and stopped a running room.
     try:
-        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-        return RoomState(**data)
+        with locked(path):
+            data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        known = {f.name for f in fields(RoomState)}
+        return RoomState(**{k: v for k, v in data.items() if k in known})
     except Exception:
         return RoomState(room=room)
 
@@ -161,7 +165,7 @@ def save_state(state: RoomState, home: Path | None = None) -> None:
     path = state_path(state.room, home)
     path.parent.mkdir(parents=True, exist_ok=True)
     with locked(path):
-        path.write_text(json.dumps(asdict(state), indent=2), encoding="utf-8")
+        write_atomic(path, json.dumps(asdict(state), indent=2))
 
 
 def set_stopped(room: str = DEFAULT_ROOM, stopped: bool = True, home: Path | None = None) -> None:
