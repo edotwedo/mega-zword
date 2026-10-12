@@ -1,3 +1,7 @@
+import sys
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from megazword import config
@@ -15,6 +19,21 @@ def isolated_home(tmp_path, monkeypatch):
     monkeypatch.setattr(usage_sources, "_agy_path", lambda: None)
     # ...or a real Codex app server for its live rate limits.
     monkeypatch.setattr(usage_sources, "_codex_cmd", lambda: None)
+    # ...or run a real AI CLI. Fakes live in this repo or a temp folder; anything else
+    # (the real claude/codex/grok/agy on Phil's PC) is refused. A tab test once sent a
+    # real prompt to Claude (2026-10-12) because claude is installed here.
+    from megazword import backends as _backends
+    real_exec = _backends.CLIBackend._exec
+    allowed = [Path(__file__).resolve().parents[1], Path(tempfile.gettempdir()).resolve(),
+               Path(sys.executable).resolve().parent, tmp_path.resolve()]
+
+    def guarded_exec(self, cmd, stdin):
+        exe = Path(cmd[0]).resolve()
+        if not any(exe.is_relative_to(root) for root in allowed):
+            raise RuntimeError(f"test tried to run a real CLI: {exe}")
+        return real_exec(self, cmd, stdin)
+
+    monkeypatch.setattr(_backends.CLIBackend, "_exec", guarded_exec)
     # ...or open the app window from a plain `megazword` (B13).
     monkeypatch.setenv("MEGAZWORD_NO_APP", "1")
     # ...or the real GitHub CLI, which would post room summaries to Q.

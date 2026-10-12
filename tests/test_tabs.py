@@ -133,3 +133,38 @@ def test_empty_prompt_rejected():
     tab = tabs.create("auto", "alpha")
     with pytest.raises(ValueError, match="empty prompt"):
         tabs.send(tab["id"], "  ", backends(), cfg(), rate(), statuses=dict)
+
+
+def test_changes_during_a_slow_answer_are_kept():
+    """While one tab waits on its AI, another tab answers, one is renamed and one is closed."""
+    bs = backends()
+    a = tabs.create("claude", "alpha", backends=bs)
+    b = tabs.create("cheap", "alpha", backends=bs)
+    c = tabs.create("auto", "alpha", backends=bs)
+
+    class Slow(Capture):
+        def _run(self, prompt):
+            tabs.send(b["id"], "meanwhile", bs, cfg(), rate(), statuses=dict)
+            tabs.rename(a["id"], "Renamed")
+            tabs.close(c["id"])
+            return "slow answer"
+
+    bs["claude"] = Slow("claude")
+    out = tabs.send(a["id"], "take your time", bs, cfg(), rate(), statuses=dict)
+    assert out["ok"] and out["answer"] == "slow answer"
+    saved = {t["id"]: t for t in tabs.list_tabs()}
+    assert set(saved) == {a["id"], b["id"]}                    # the closed tab stays closed
+    assert saved[a["id"]]["title"] == "Renamed"                  # the rename survived
+    assert [h["user"] for h in saved[a["id"]]["history"]] == ["take your time"]
+    assert [h["user"] for h in saved[b["id"]]["history"]] == ["meanwhile"]
+
+
+def test_send_does_not_change_the_shared_backends(monkeypatch):
+    from megazword.backends import CLIBackend
+    # Never run the real Claude CLI installed on this PC: make it look missing.
+    monkeypatch.setattr("megazword.backends.shutil.which", lambda exe: None)
+    shared = {"claude": CLIBackend("claude", exe="claude", args=["-p"])}
+    tab = tabs.create("claude", "alpha", backends=shared)
+    levels = {"claude": {"medium": ("opus", "high")}, "codex": {}, "gemini": {}}
+    tabs.send(tab["id"], "hi", shared, cfg(levels=levels), rate(), statuses=dict)
+    assert shared["claude"].args == ["-p"]

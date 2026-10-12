@@ -31,18 +31,24 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _read_unlocked(p: Path) -> dict:
+    if not p.exists():
+        return {"tabs": []}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"tabs": []}
+    if not isinstance(data, dict) or not isinstance(data.get("tabs"), list):
+        return {"tabs": []}
+    return data
+
+
 def _load() -> dict:
     p = path()
     if not p.exists():
         return {"tabs": []}
     with locked(p):
-        try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {"tabs": []}
-    if not isinstance(data, dict) or not isinstance(data.get("tabs"), list):
-        return {"tabs": []}
-    return data
+        return _read_unlocked(p)
 
 
 def _save(data: dict) -> None:
@@ -50,6 +56,18 @@ def _save(data: dict) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     with locked(p):
         write_atomic(p, json.dumps(data, indent=2) + "\n")
+
+
+def _update(change: Callable[[list[dict]], list[dict]]) -> list[dict]:
+    """Read, change and write tabs.json under one lock, so two tabs answering at once
+    (the dashboard is threaded) can't overwrite each other's history."""
+    p = path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with locked(p):
+        tabs = [t for t in (_tab(raw) for raw in _read_unlocked(p)["tabs"]) if t]
+        out = change(tabs)
+        write_atomic(p, json.dumps({"tabs": out}, indent=2) + "\n")
+    return out
 
 
 def _tab(raw) -> dict | None:
@@ -97,35 +115,42 @@ def create(ai: str = AUTO, project: str | None = None, title: str | None = None,
         (ai or AUTO).strip().lower() or AUTO)
     proj = project or project_name()
     check_project(config.HOME, proj, {proj})
-    tabs = list_tabs()
-    if len(tabs) >= MAX_TABS:
-        raise ValueError(f"at most {MAX_TABS} chat tabs")
-    n = 1
-    ids = {t["id"] for t in tabs}
-    while f"t{n}" in ids:
-        n += 1
     label = (title or ("Auto" if pin == AUTO else pin)).strip()[:TITLE_CHARS] or "Chat"
-    tab = {"id": f"t{n}", "title": label, "ai": pin, "project": proj,
-           "created": _now(), "history": []}
-    _save({"tabs": [*tabs, tab]})
-    return tab
+    made: list[dict] = []
+
+    def add(tabs: list[dict]) -> list[dict]:
+        if len(tabs) >= MAX_TABS:
+            raise ValueError(f"at most {MAX_TABS} chat tabs")
+        n = 1
+        ids = {t["id"] for t in tabs}
+        while f"t{n}" in ids:
+            n += 1
+        made.append({"id": f"t{n}", "title": label, "ai": pin, "project": proj,
+                     "created": _now(), "history": []})
+        return [*tabs, made[0]]
+
+    _update(add)
+    return made[0]
 
 
 def rename(tab_id: str, title: str) -> dict:
     label = title.strip()[:TITLE_CHARS]
     if not label:
         raise ValueError("empty title")
-    tabs = list_tabs()
-    _find(tabs, tab_id)
-    out = [{**t, "title": label} if t["id"] == tab_id else t for t in tabs]
-    _save({"tabs": out})
-    return _find(out, tab_id)
+
+    def change(tabs: list[dict]) -> list[dict]:
+        _find(tabs, tab_id)
+        return [{**t, "title": label} if t["id"] == tab_id else t for t in tabs]
+
+    return _find(_update(change), tab_id)
 
 
 def close(tab_id: str) -> dict:
-    tabs = list_tabs()
-    _find(tabs, tab_id)
-    _save({"tabs": [t for t in tabs if t["id"] != tab_id]})
+    def drop(tabs: list[dict]) -> list[dict]:
+        _find(tabs, tab_id)
+        return [t for t in tabs if t["id"] != tab_id]
+
+    _update(drop)
     return {"ok": True, "id": tab_id}
 
 
@@ -150,8 +175,10 @@ def send(tab_id: str, prompt: str, backends: dict[str, Backend], cfg: config.Con
     message = prompt.strip()
     if not message:
         raise ValueError("empty prompt")
-    tabs = list_tabs()
-    tab = _find(tabs, tab_id)
+    # Our own copy: apply_levels swaps entries, and the dashboard shares one dict
+    # between threads, so another tab's model/effort must not leak into this run.
+    backends = dict(backends)
+    tab = _find(list_tabs(), tab_id)
     memory = Memory(config.HOME, tab["project"], cfg.memory_lines)
     block = memory.context_block() if context else ""
     sent = _conversation_prompt(tab, message, block)
@@ -188,9 +215,15 @@ def send(tab_id: str, prompt: str, backends: dict[str, Backend], cfg: config.Con
         backend = str(last.get("backend") or backend)
     except (OSError, ValueError):
         pass
-    tab = {**tab, "history": [*tab["history"],
-                              {"user": message, "answer": answer, "backend": backend}
-                              ][-chat.HISTORY_TURNS:]}
-    _save({"tabs": [tab if t["id"] == tab_id else t for t in tabs]})
+    turn = {"user": message, "answer": answer, "backend": backend}
+
+    def append(tabs: list[dict]) -> list[dict]:
+        # Re-read at save time: other tabs may have answered, been renamed or closed
+        # during this (possibly minutes-long) call. A tab closed meanwhile stays closed.
+        return [{**t, "history": [*t["history"], turn][-chat.HISTORY_TURNS:]}
+                if t["id"] == tab_id else t for t in tabs]
+
+    tab = next((t for t in _update(append) if t["id"] == tab_id),
+               {**tab, "history": [*tab["history"], turn][-chat.HISTORY_TURNS:]})
     return {"ok": True, "id": tab_id, "answer": answer, "backend": backend,
             "using": using, "tab": tab, "error": None}
