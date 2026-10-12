@@ -12,6 +12,7 @@ import hmac
 import json
 import os
 import secrets
+import socket
 import subprocess
 import sys
 import threading
@@ -509,6 +510,28 @@ def make_handler(app: App, port: int, remote: bool = False):
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
 
+class Server(ThreadingHTTPServer):
+    """One dashboard per port. HTTPServer sets SO_REUSEADDR, which on Windows lets a second
+    server bind a port already in use (checked on Phil's PC, 2026-10-12): the two then answer
+    at random with different tokens. Exclusive use makes the second launch fail cleanly."""
+    allow_reuse_address = os.name != "nt"
+
+    def server_bind(self):
+        if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
+def running_dashboard(host: str, port: int, timeout: float = 2.0) -> bool:
+    """True when a Mega Zword dashboard already answers on host:port."""
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://{host}:{port}/", timeout=timeout) as resp:
+            return b"<title>Mega Zword</title>" in resp.read(4096)
+    except (OSError, ValueError):
+        return False
+
+
 def serve(port: int = 8765, project: str | None = None, open_browser: bool = True,
           host: str = "127.0.0.1", app_window: bool = False) -> int:
     if host in ("0.0.0.0", "::", ""):
@@ -518,8 +541,18 @@ def serve(port: int = 8765, project: str | None = None, open_browser: bool = Tru
     remote = host not in LOOPBACK
     app = App(config.load(), project or project_name())
     try:
-        server = ThreadingHTTPServer((host, port), make_handler(app, port, remote))
+        server = Server((host, port), make_handler(app, port, remote))
     except OSError as exc:
+        if not remote and running_dashboard(host, port):
+            # Already open (e.g. plain `megazword` typed twice): show that one instead.
+            url = f"http://{host}:{port}/"
+            print(f"[megazword] the dashboard is already running at {url}", file=sys.stderr)
+            if open_browser and app_window:
+                from .appwindow import open_app
+                print(f"[megazword] {open_app(url)}", file=sys.stderr)
+            elif open_browser:
+                webbrowser.open(url)
+            return 0
         print(f"[megazword] can't listen on {host}:{port}: {exc}", file=sys.stderr)
         return 1
     url = f"http://{host}:{port}/" + (f"?t={app.token}" if remote else "")
