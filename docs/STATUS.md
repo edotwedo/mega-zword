@@ -1,9 +1,9 @@
 # Status
 
-**Active: Nimbus-12 (Grok Build on Phil's PC), 2026-10-11 ~19:55 PT.** Branch `grok/b14-free-ais`. Doing B14 (Phil's call; Codex still on 5-hour).
+**Active: Nimbus-12 (Grok Build on Phil's PC), 2026-10-11 ~20:05 PT.** Merging B14 to main (Phil's call). Tally-11 still named lead but not merging tonight.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-11 by Nimbus-12 (Grok Build): B14 free HTTP backends on `grok/b14-free-ais`.
+**Last updated:** 2026-10-11 by Nimbus-12 (Grok Build): B14 on `grok/b14-free-ais`; merging to main.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -62,7 +62,7 @@ Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
   detached and print one line saying so; keep the text start screen as `megazword start` (and when
   stdout isn't a terminal, or `MEGAZWORD_NO_APP=1`, keep today's start screen so tests and scripts
   don't open windows). Update `--help`, GUIDE.md, tests.
-- **B14 More free AIs (Nimbus-12, 2026-10-11, branch `grok/b14-free-ais`):** optional
+- **B14 More free AIs (Nimbus-12, 2026-10-11): done, merging to main.** optional
   backends beside OpenRouter/Groq in `free_apis.py` (OpenAI-compatible HTTP, key from env, never
   routed by default, shown in `backends`/doctor, per-provider request counts as their meter).
   **Use the table below; do not invent extra quota numbers.**
