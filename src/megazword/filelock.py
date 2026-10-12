@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -77,6 +78,17 @@ def locked(path: Path, timeout: float = DEFAULT_TIMEOUT) -> Iterator[bool]:
 def write_atomic(path: Path, text: str) -> None:
     """Replace a file in one step so readers never see half of it."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    # pid + thread: the dashboard's threads may write the same file at once (e.g. the meter cache).
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     tmp.write_text(text, encoding="utf-8")
-    os.replace(tmp, path)
+    # Windows refuses a replace while another writer or reader has the file open
+    # ("Access is denied"); that clears in milliseconds, so retry for up to ~2s.
+    for attempt in range(100):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError:
+            if attempt == 99:
+                tmp.unlink(missing_ok=True)
+                raise
+            time.sleep(_POLL)

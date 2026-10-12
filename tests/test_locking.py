@@ -110,3 +110,25 @@ def _hold(path, ready, release):
     with locked(Path(path)):
         ready.set()
         release.wait(30)
+
+
+def test_write_atomic_from_many_threads_at_once(tmp_path):
+    import threading
+    from megazword.filelock import write_atomic
+    target = tmp_path / "cache.json"
+    errors = []
+
+    def worker(n):
+        try:
+            for i in range(50):
+                write_atomic(target, f"{n}-{i}")
+        except OSError as exc:  # same temp name in two threads used to collide on Windows
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(n,)) for n in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(30)
+    assert not errors and target.read_text(encoding="utf-8").count("-") == 1
+    assert not list(tmp_path.glob("*.tmp"))
