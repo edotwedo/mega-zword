@@ -179,3 +179,47 @@ def test_install_yes_creates_tasks(monkeypatch, capsys):
     assert "ntfy topic" in capsys.readouterr().out
     loaded = config.load()
     assert loaded.ntfy_topic.startswith("mz-")
+
+
+def test_task_runs_windowless_python(monkeypatch, capsys):
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr("megazword.desktop.launcher_python", lambda: r"C:\py\pythonw.exe")
+    ran = []
+
+    class R:
+        returncode, stderr, stdout = 0, "", "ok"
+
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: ran.append(args) or R())
+    assert sentinel.install(True) == 0
+    assert all(args[args.index("/TR") + 1].startswith('"C:\\py\\pythonw.exe" -m megazword.cli')
+               for args in ran)
+
+
+def test_powershell_timeout_and_garbage_become_oserror(monkeypatch):
+    import pytest
+    monkeypatch.setattr(os, "name", "nt")
+
+    def slow(*a, **k):
+        raise subprocess.TimeoutExpired("powershell", 30)
+
+    monkeypatch.setattr(subprocess, "run", slow)
+    with pytest.raises(OSError, match="over 30s"):
+        sentinel._powershell("x")
+    monkeypatch.setattr(sentinel, "_powershell", lambda script: "WARNING: not json")
+    with pytest.raises(OSError, match="unreadable System"):
+        sentinel.windows_reader("System", (6005,), None)
+
+
+def test_sentinel_command_survives_a_broken_reader(monkeypatch, capsys):
+    def broken(reader=None):
+        raise OSError("unreadable System event log output")
+
+    monkeypatch.setattr(sentinel, "collect", broken)
+    assert main(["sentinel", "status"]) == 0
+    assert "collect skipped" in capsys.readouterr().err
+
+
+def test_damaged_cursor_does_not_stop_collection():
+    event = {"time": "2026-10-12T10:00:00Z", "record_id": 5}
+    assert sentinel._newer(event, {"time": "2026-10-12T10:00:00Z", "record_id": "oops"})
+    assert not sentinel._newer(event, {"time": "2026-10-12T11:00:00Z", "record_id": 1})

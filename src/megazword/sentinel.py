@@ -88,10 +88,13 @@ def recent(n: int = 40) -> list[dict]:
 def _newer(event: dict, cursor: dict | None) -> bool:
     if not cursor:
         return True
-    et, ct = event.get("time") or "", cursor.get("time") or ""
+    et, ct = str(event.get("time") or ""), str(cursor.get("time") or "")
     if et != ct:
         return et > ct
-    return int(event.get("record_id") or 0) > int(cursor.get("record_id") or 0)
+    try:  # a hand-edited or damaged cursor file must not stop collection
+        return int(event.get("record_id") or 0) > int(cursor.get("record_id") or 0)
+    except (TypeError, ValueError):
+        return True
 
 
 def _record(raw: dict, channel: str) -> dict | None:
@@ -123,10 +126,13 @@ def _record(raw: dict, channel: str) -> dict | None:
 def _powershell(script: str) -> str:
     if os.name != "nt":
         return ""
-    result = subprocess.run(
-        ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=30)
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=30)
+    except subprocess.TimeoutExpired:  # callers handle OSError ("collect skipped")
+        raise OSError("reading the event log took over 30s") from None
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "powershell failed").strip()
         raise OSError(err[:300])
@@ -154,7 +160,10 @@ def windows_reader(channel: str, ids: tuple[int, ...], since: dict | None) -> li
         raise
     if not text:
         return []
-    data = json.loads(text)
+    try:
+        data = json.loads(text)
+    except ValueError:
+        raise OSError(f"unreadable {channel} event log output") from None
     rows = data if isinstance(data, list) else [data]
     out = []
     for raw in rows:
@@ -397,7 +406,9 @@ def install(yes: bool = False) -> int:
         print(f"[megazword] ntfy topic already set in {path}")
     print("[megazword] subscribe to that topic in the ntfy app (no account).")
     print("[megazword] optional: set [sentinel] healthchecks_url to a healthchecks.io ping URL")
-    cmd = f'"{sys.executable}" -m megazword.cli sentinel check'
+    # pythonw: no console window flashing up every 5 minutes.
+    from .desktop import launcher_python
+    cmd = f'"{launcher_python()}" -m megazword.cli sentinel check'
     print(f"[megazword] task command: {cmd}")
     if os.name != "nt":
         print("[megazword] scheduled tasks are Windows-only; run `megazword sentinel check` from cron")
