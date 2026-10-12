@@ -22,6 +22,10 @@ Example config.toml:
     [grok.hard]
     model = "grok-4.7"
     effort = "high"
+
+    [claude.hard]
+    model = "opus"
+    effort = "high"
 """
 
 from __future__ import annotations
@@ -45,6 +49,15 @@ DEFAULT_GROK = {
     "medium": ("grok-4.6", "medium"),
     "hard": ("grok-4.7", "high"),
 }
+
+MODEL_AIS = ("claude", "codex", "gemini")
+MODEL_LEVELS = ("easy", "medium", "hard")
+MODEL_EFFORTS = ("low", "medium", "high")
+
+
+def _default_model_profiles() -> dict[str, dict[str, tuple[str, str]]]:
+    # Empty strings mean "leave this CLI's own model/effort unchanged".
+    return {ai: {level: ("", "") for level in MODEL_LEVELS} for ai in MODEL_AIS}
 
 DEFAULT_ROUTE = {
     # First installed AI in each list wins. Placeholder order until usage
@@ -76,6 +89,8 @@ class Config:
     rater_model: str = "qwen2.5:1.5b"
     route: dict[str, list[str]] = field(default_factory=lambda: dict(DEFAULT_ROUTE))
     grok: dict[str, tuple[str, str]] = field(default_factory=lambda: dict(DEFAULT_GROK))
+    model_profiles: dict[str, dict[str, tuple[str, str]]] = field(
+        default_factory=_default_model_profiles)
     # Looked up when a Config is made (not at import) so tests can redirect HOME.
     log_path: Path = field(default_factory=lambda: HOME / "log.jsonl")
     # How many lines log.jsonl and each project's memory.jsonl keep ([limits]).
@@ -147,6 +162,26 @@ def load(path: Path | None = None) -> Config:
                 cfg.grok[level] = (str(block.get("model", model)),
                                    str(block.get("effort", effort)))
 
+        for ai in MODEL_AIS:
+            provider = data.get(ai, {})
+            if not isinstance(provider, dict):
+                raise ValueError(f"{ai} settings must be tables")
+            for level, block in provider.items():
+                if level not in MODEL_LEVELS or not isinstance(block, dict):
+                    raise ValueError(f"{ai}.{level} must be an easy, medium or hard table")
+                model, effort = cfg.model_profiles[ai][level]
+                if "model" in block:
+                    value = block["model"]
+                    if not isinstance(value, str) or not value.strip():
+                        raise ValueError(f"{ai}.{level}.model must be a nonempty string")
+                    model = value.strip()
+                if "effort" in block:
+                    value = block["effort"]
+                    if not isinstance(value, str) or value not in MODEL_EFFORTS:
+                        raise ValueError(f"{ai}.{level}.effort must be low, medium or high")
+                    effort = value
+                cfg.model_profiles[ai][level] = (model, effort)
+
         room_block = data.get("room", {})
         if isinstance(room_block, dict):
             if "primary" in room_block and isinstance(room_block["primary"], str) and room_block["primary"].strip():
@@ -177,6 +212,9 @@ def render_default(installed: list[str]) -> str:
         values = ", ".join(f'"{name}"' for name in choices)
         lines.extend([f"# AIs to try for {level} tasks, in order.", f"{level} = [{values}]"])
     lines.extend([
+        "",
+        "# Optional provider difficulty tables set per-task models and effort.",
+        "# Omitted model/effort values keep that CLI's own defaults.",
         "",
         "# Sentinel production checks. ntfy_topic is filled by `megazword sentinel install`.",
         "[sentinel]",
@@ -269,7 +307,18 @@ def _edit_key(text: str, table: str, key: str, value: str | None) -> str:
     """Preserve untouched bytes; refuse unusual layouts rather than rewrite them."""
     original = tomllib.loads(text)
     expected = deepcopy(original)
-    target = expected.setdefault(table, {}) if table else expected
+    target = expected
+    exists = True
+    if table:
+        for part in table.split("."):
+            if part not in target:
+                exists = False
+                if value is None:
+                    return text
+                target[part] = {}
+            if not isinstance(target[part], dict):
+                raise ValueError(f"{table} must be a table")
+            target = target[part]
     if not isinstance(target, dict):
         raise ValueError(f"{table} must be a table")
     if value is None:
@@ -289,7 +338,7 @@ def _edit_key(text: str, table: str, key: str, value: str | None) -> str:
             while isinstance(probe, dict) and "__mz_marker__" not in probe and len(probe) == 1:
                 name, probe = next(iter(probe.items()))
                 path.append(name)
-            section = path[0] if len(path) == 1 and isinstance(probe, dict) else None
+            section = ".".join(path) if probe == {"__mz_marker__": True} else None
         if section == table:
             insert = end
             if key in parsed and not stripped.startswith("["):
@@ -313,7 +362,7 @@ def _edit_key(text: str, table: str, key: str, value: str | None) -> str:
     elif value is not None:
         # Existing dotted/inline target layouts are intentionally refused below.
         entry = f"{key} = {value}{newline}"
-        if table and table not in original:
+        if table and not exists:
             result = text + (newline if text and not text.endswith("\n") else "")
             result += f"{newline}[{table}]{newline}" + entry
         else:
@@ -413,3 +462,23 @@ def set_flag(name: str, value: bool, path: Path | None = None) -> None:
     if name != "quality_check" or type(value) is not bool:
         raise ValueError("quality_check must be true or false")
     _set_key(path or HOME / "config.toml", "", name, str(value).lower())
+
+
+def set_model_profile(ai: str, level: str, model: str, effort: str,
+                      path: Path | None = None) -> None:
+    """Set per-difficulty model/effort overrides; blanks restore CLI defaults."""
+    if ai not in MODEL_AIS:
+        raise ValueError("AI must be claude, codex or gemini")
+    if level not in MODEL_LEVELS:
+        raise ValueError("level must be easy, medium or hard")
+    if not isinstance(model, str) or not isinstance(effort, str):
+        raise ValueError("model and effort must be text")
+    model, effort = model.strip(), effort.strip()
+    if model and len(model) > 200:
+        raise ValueError("model name is too long")
+    if effort and effort not in MODEL_EFFORTS:
+        raise ValueError("effort must be blank, low, medium or high")
+    dest = path or HOME / "config.toml"
+    table = f"{ai}.{level}"
+    _set_key(dest, table, "model", json.dumps(model) if model else None)
+    _set_key(dest, table, "effort", json.dumps(effort) if effort else None)

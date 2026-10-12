@@ -98,6 +98,12 @@ def checks(home: Path | None = None) -> list[Check]:
     found.append(Check("WARN" if active else "OK", "out marks",
                        ", ".join(sorted(active)) if active else "none active",
                        "review [out] in config.toml" if active else ""))
+    profile_count = sum(bool(model or effort)
+                        for levels in cfg.model_profiles.values()
+                        for model, effort in levels.values())
+    found.append(Check("OK", "model profiles",
+                       f"{profile_count} override(s) configured" if profile_count else
+                       "using each CLI's defaults"))
     from .backends import DEFAULT_TIMEOUT
     waits = ", ".join(f"{n} {cfg.timeouts.get(n, DEFAULT_TIMEOUT)}s"
                       for n in ("claude", "codex", "grok", "gemini"))

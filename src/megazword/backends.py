@@ -225,12 +225,78 @@ def apply_grok_effort(backends: dict[str, Backend], level: str,
 
 def grok_label(backend: Backend) -> str:
     """'grok (grok-4.6 medium)' when those flags are present."""
-    if not isinstance(backend, CLIBackend) or "--effort" not in backend.args:
+    return backend_label(backend)
+
+
+def apply_model_profiles(backends: dict[str, Backend], level: str,
+                         profiles: dict[str, dict[str, tuple[str, str]]]) -> None:
+    """Apply configured model/effort overrides without replacing test fakes."""
+    for name in ("claude", "codex", "gemini"):
+        current = backends.get(name)
+        if not isinstance(current, CLIBackend):
+            continue
+        model, effort = profiles.get(name, {}).get(level, ("", ""))
+        if isinstance(current, GeminiBackend):
+            current.profile_model, current.profile_effort = model, effort
+            current._pick()
+            continue
+        # Chat reuses its backends between messages; clear the previous
+        # difficulty's overrides before applying this message's settings.
+        clean: list[str] = []
+        i = 0
+        while i < len(current.args):
+            arg = current.args[i]
+            if name == "codex" and arg == "-c" and i + 1 < len(current.args) and (
+                    current.args[i + 1].startswith("model=") or
+                    current.args[i + 1].startswith("model_reasoning_effort=")):
+                i += 2
+                continue
+            if name == "claude" and arg in ("--model", "--effort"):
+                i += 2
+                continue
+            clean.append(arg)
+            i += 1
+        current.args = clean
+        if model:
+            if name == "codex":
+                current.args += ["-c", f"model={json.dumps(model)}"]
+            else:
+                current.args += ["--model", model]
+        if effort:
+            if name == "codex":
+                current.args += ["-c", f"model_reasoning_effort={json.dumps(effort)}"]
+            else:
+                current.args += ["--effort", effort]
+
+
+def backend_label(backend: Backend) -> str:
+    """Show selected model and effort on the run's one-line receipt."""
+    if not isinstance(backend, CLIBackend):
         return backend.name
     args = backend.args
-    model = args[args.index("-m") + 1] if "-m" in args else ""
-    effort = args[args.index("--effort") + 1]
-    extra = " ".join(p for p in (model, effort) if p)
+    model = effort = ""
+    if isinstance(backend, GeminiBackend):
+        model, effort = backend.profile_model, backend.profile_effort
+    elif backend.name == "codex":
+        for arg in args:
+            if arg.startswith("model="):
+                try:
+                    model = json.loads(arg.split("=", 1)[1])
+                except ValueError:
+                    pass
+            elif arg.startswith("model_reasoning_effort="):
+                try:
+                    effort = json.loads(arg.split("=", 1)[1])
+                except ValueError:
+                    pass
+    else:
+        if "--model" in args:
+            model = args[args.index("--model") + 1]
+        if "--effort" in args:
+            effort = args[args.index("--effort") + 1]
+        if backend.name == "grok":
+            model = args[args.index("-m") + 1] if "-m" in args else model
+    extra = " ".join(value for value in (model, effort) if value)
     return f"{backend.name} ({extra})" if extra else backend.name
 
 
@@ -271,12 +337,20 @@ class GeminiBackend(CLIBackend):
 
     exe: str = "gemini"
     args: list[str] = field(default_factory=lambda: list(OLD_GEMINI_ARGS))
+    profile_model: str = ""
+    profile_effort: str = ""
 
     def _pick(self) -> None:
         if shutil.which("agy"):
             self.exe, self.args = "agy", list(AGY_ARGS)
+            if self.profile_model:
+                self.args += ["--model", self.profile_model]
+            if self.profile_effort:
+                self.args += ["--effort", self.profile_effort]
         else:
             self.exe, self.args = "gemini", list(OLD_GEMINI_ARGS)
+            if self.profile_model:
+                self.args += ["--model", self.profile_model]
 
     def available(self) -> bool:
         self._pick()

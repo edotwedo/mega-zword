@@ -179,6 +179,11 @@ effort = "medium"
 [grok.hard]
 model = "grok-4.7"
 effort = "high"
+
+# Optional provider overrides. Blank or omitted fields keep CLI defaults.
+[claude.hard]
+model = "opus"
+effort = "high"
 ```
 
 | Setting | Meaning |
@@ -188,6 +193,7 @@ effort = "high"
 | `[route]` | Ordered AI names for `easy`, `medium`, and `hard`. Routing considers installation, pacing, and out marks. Failures can move into harder routes. |
 | `[out]` | AI name mapped to a return date or time. Auto selection and retry skip it until then. A bare date such as `2026-10-17` means the start of that day in local time. A time without an offset also uses local time. Remove the entry to clear the mark early. A forced `run -m` bypasses out marks. |
 | `[grok.<level>]` | Grok `model` and `effort` for each difficulty. Missing fields keep their defaults. A forced `run -m grok` uses `medium`; retry promotes `easy` to `medium`. |
+| `[claude.<level>]`, `[codex.<level>]`, `[gemini.<level>]` | Optional `model` and `effort` overrides per difficulty. Omitted settings leave each CLI's own defaults unchanged. Dashboard Settings can edit them; `doctor` reports how many overrides are set. |
 
 ## Files
 

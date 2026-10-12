@@ -182,6 +182,7 @@ input::placeholder, textarea::placeholder { color:var(--dim); opacity:1; }
     <div class="settings-grid">
       <div><h3>Routes · first choice at the top</h3><div id="settings-routes"></div></div>
       <div><h3>Timeouts · seconds</h3><p class="note">Leave blank to use the AI's default timeout.</p><div id="settings-timeouts"></div></div>
+      <div><h3>Models by task difficulty</h3><p class="note">Blank fields keep that AI's defaults.</p><div id="settings-models"></div></div>
       <div><h3>History limits &amp; quality</h3><div id="settings-other"></div></div>
     </div>
     <p class="note">Save each row separately. Changes apply to new tasks. Lower line limits take effect when new entries are written.</p>
@@ -329,6 +330,13 @@ function renderSettings(settings) {
   }
   ais.forEach((name, i) => settingRow("settings-timeouts", "setting-timeout-" + i, "timeout", name,
     `<label>${esc(name)} <input type="number" min="1" step="1" value="${esc(settings.timeouts[name] ?? "")}" placeholder="default"></label>`));
+  for (const ai of ["claude", "codex", "gemini"]) {
+    for (const level of ["easy", "medium", "hard"]) {
+      const profile = (settings.model_profiles || {})[ai]?.[level] || {model: "", effort: ""};
+      settingRow("settings-models", `setting-model-${ai}-${level}`, "model", `${ai}.${level}`,
+        `<b>${esc(ai)} - ${esc(level)}</b><label>Model <input type="text" maxlength="200" aria-label="${esc(ai)} ${esc(level)} model" value="${esc(profile.model)}" placeholder="CLI default"></label> <label>Effort <select aria-label="${esc(ai)} ${esc(level)} effort"><option value="" ${profile.effort === "" ? "selected" : ""}>CLI default</option>${["low", "medium", "high"].map(v => `<option value="${v}" ${profile.effort === v ? "selected" : ""}>${v}</option>`).join("")}</select></label>`);
+    }
+  }
   for (const [name, label] of [["log_lines", "Log lines"], ["memory_lines", "Memory lines per project"]]) {
     settingRow("settings-other", "setting-" + name, "limit", name,
       `<label>${esc(label)} <input type="number" min="1" step="1" required value="${esc(settings.limits[name])}"></label>`);
@@ -350,7 +358,7 @@ function updateMoveButtons(row) {
   });
 }
 
-for (const container of ["settings-routes", "settings-timeouts", "settings-other"]) {
+for (const container of ["settings-routes", "settings-timeouts", "settings-models", "settings-other"]) {
   $(container).addEventListener("input", e => {
     const row = e.target.closest(".setting"); if (row) markSettingDirty(row);
   });
@@ -375,6 +383,11 @@ for (const container of ["settings-routes", "settings-timeouts", "settings-other
         .filter(el => el.querySelector("input").checked).map(el => el.dataset.ai);
     } else if (kind === "flag") {
       body.name = name; body.value = row.querySelector("input").checked;
+    } else if (kind === "model") {
+      const [ai, level] = name.split(".");
+      body.ai = ai; body.level = level;
+      body.model = row.querySelector('input[type="text"]').value.trim();
+      body.effort = row.querySelector("select").value;
     } else {
       const input = row.querySelector("input"), value = input.value.trim();
       if (!input.reportValidity()) return;

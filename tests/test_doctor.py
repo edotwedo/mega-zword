@@ -26,6 +26,7 @@ def test_doctor_healthy(tmp_path, monkeypatch, capsys):
     assert cli.main(["doctor"]) == 0
     output = capsys.readouterr().out
     assert "OK config: parses" in output
+    assert "OK model profiles: using each CLI's defaults" in output
     assert "OK rater model: qwen2.5:1.5b present" in output
     assert "OK log: writable" in output
     assert "FAIL" not in output

@@ -206,6 +206,9 @@ class App:
                 "limits": {"log_lines": self.cfg.log_lines,
                            "memory_lines": self.cfg.memory_lines},
                 "quality_check": self.cfg.quality_check,
+                "model_profiles": {ai: {level: {"model": values[0], "effort": values[1]}
+                                        for level, values in levels.items()}
+                                   for ai, levels in self.cfg.model_profiles.items()},
                 "ais": list(default_backends())}
 
     def settings(self, body: dict) -> dict:
@@ -213,13 +216,15 @@ class App:
             raise ValueError("settings must be an object")
         kind = body.get("kind")
         fields = {"route": ("level", "names"), "timeout": ("ai", "seconds"),
-                  "limit": ("name", "n"), "flag": ("name", "value")}
+                  "limit": ("name", "n"), "flag": ("name", "value"),
+                  "model": ("ai", "level", "model", "effort")}
         if not isinstance(kind, str) or kind not in fields:
             raise ValueError("unknown settings kind")
         if any(key not in body for key in fields[kind]):
             raise ValueError("missing settings field")
         writer = {"route": config.set_route, "timeout": config.set_timeout,
-                  "limit": config.set_limit, "flag": config.set_flag}[kind]
+                  "limit": config.set_limit, "flag": config.set_flag,
+                  "model": config.set_model_profile}[kind]
         with config._WRITE_LOCK:
             writer(*(body[key] for key in fields[kind]))
             self.cfg = config.load()

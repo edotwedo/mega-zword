@@ -236,6 +236,7 @@ def test_settings_requires_token(server, token):
     {'kind': 'timeout', 'ai': 'claude', 'seconds': 180},
     {'kind': 'limit', 'name': 'log_lines', 'n': 123},
     {'kind': 'flag', 'name': 'quality_check', 'value': True},
+    {'kind': 'model', 'ai': 'claude', 'level': 'hard', 'model': 'sonnet-test', 'effort': 'high'},
 ])
 def test_settings_api_saves_and_exposes_values(server, body):
     base, app = server
@@ -248,13 +249,18 @@ def test_settings_api_saves_and_exposes_values(server, body):
     assert state['settings']['timeouts'] == cfg.timeouts
     assert state['settings']['limits'] == {'log_lines': cfg.log_lines, 'memory_lines': cfg.memory_lines}
     assert state['settings']['quality_check'] == cfg.quality_check
+    assert state['settings']['model_profiles'] == {
+        ai: {level: {'model': model, 'effort': effort} for level, (model, effort) in levels.items()}
+        for ai, levels in cfg.model_profiles.items()}
 
 
 @pytest.mark.parametrize('body', [[], None, {'kind': []}, {'kind': 'unknown'},
     {'kind': 'timeout', 'ai': 'claude'},
     {'kind': 'flag', 'name': 'quality_check', 'value': 'true'},
     {'kind': 'limit', 'name': 'log_lines', 'n': 0},
-    {'kind': 'route', 'level': 'easy', 'names': ['bogus']}])
+    {'kind': 'route', 'level': 'easy', 'names': ['bogus']},
+    {'kind': 'model', 'ai': 'unknown', 'level': 'hard', 'model': 'x', 'effort': 'high'},
+    {'kind': 'model', 'ai': 'codex', 'level': 'easy', 'model': 'x', 'effort': 'wild'}])
 def test_settings_api_rejects_bad_input(server, body):
     base, app = server
     with pytest.raises(urllib.error.HTTPError) as exc:

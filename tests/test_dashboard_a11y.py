@@ -32,7 +32,7 @@ def test_landmarks_labels_and_live_regions():
     assert tags.count('header') == tags.count('main') == tags.count('h1') == 1
     headings = [int(tag[1]) for tag in tags if re.fullmatch(r'h[1-6]', tag)]
     assert all(b <= a + 1 for a, b in zip(headings, headings[1:]))
-    assert headings.count(3) == 3
+    assert headings.count(3) == 4
     for name in ('prompt', 'note'):
         assert page.by_id(name)['aria-label']
     for name in ('jobs', 'toast'):

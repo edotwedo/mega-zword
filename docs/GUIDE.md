@@ -218,9 +218,10 @@ sources immediately.
   and rough token estimates.
 - **Compare and votes:** compare answers appear side by side. Vote for the
   answer you prefer; the vote is included in later route advice.
-- **Settings:** adjust route order, per-tool timeouts, log and memory history
-  limits, and the optional quality check. Changes are validated and saved to
-  your local config. Blank timeout means use the tool's default.
+- **Settings:** adjust route order, per-tool timeouts, Claude/Codex/Gemini model
+  and effort by task difficulty, log and memory history limits, and the optional
+  quality check. Changes are validated and saved to your local config. Blank
+  model or effort keeps that CLI's default; blank timeout uses its default.
 - **Project memory and past answers:** add a note or decision and inspect saved
   context or the last 50 prompt/answer pairs for the selected project. Copy
   buttons copy an answer when your browser grants clipboard access.
