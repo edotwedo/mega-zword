@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import webbrowser
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 # Relative to Program Files, Program Files (x86) and the user's AppData\Local.
 _WINDOWS_PATHS = (
@@ -39,7 +40,15 @@ def find_app_browser(env: dict | None = None, exists=os.path.isfile,
 
 
 def app_command(browser: str, url: str) -> list[str]:
-    return [browser, f"--app={url}", "--new-window"]
+    return [browser, f"--app={app_url(url)}", "--new-window"]
+
+
+def app_url(url: str) -> str:
+    """Mark the app presentation without losing remote tokens or a view fragment."""
+    parts = urlsplit(url)
+    query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k != "app"]
+    query.append(("app", "1"))
+    return urlunsplit(parts._replace(query=urlencode(query)))
 
 
 def open_app(url: str, browser: str | None = None, popen=subprocess.Popen,

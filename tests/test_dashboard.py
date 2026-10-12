@@ -454,7 +454,7 @@ def test_run_log_html_escapes_counts_and_accepts_string_seconds():
     script = script.split("function renderAnswers")[0]
     payload = '<img src=x onerror="alert(1)">'
     # Minimal DOM stub: top-level code also wires click/input listeners.
-    program = ("const el = {addEventListener() {}}; "
+    program = ("const location = {search:''}; const el = {addEventListener() {}}; "
                "const document = {getElementById: () => el, addEventListener() {}};\n" + script +
                "\nrenderRuns(" + json.dumps({"runs": [{"backend": "fake", "time": "2026-10-11",
                 "seconds": "2.5", "prompt_chars": payload, "answer_chars": payload}]}) +
