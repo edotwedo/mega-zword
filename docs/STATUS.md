@@ -1,9 +1,9 @@
 # Status
 
-**Active: none.** Larch-11 completed B5 on `codex/b5-new-look-2026-10-12` (598 tests passed, smoke 36/36). Next: B4 Hive tab UI, then B6 title bar and docs. Main already contains B12/B13/B15. Calendar B10/B11 remain parked.
+**Active: Larch-11, 2026-10-12 04:37 PT: B4 Hive tab UI, branch `codex/b4-hive-ui-2026-10-12`.** B5 is complete on its own branch; next B6 title bar and docs. Main already contains B12/B13/B15. Calendar B10/B11 remain parked.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-12 04:36 PT by Larch-11: B5 complete; Codex usage after work 71% of 5-hour / 56% weekly; Claude 35% of 5-hour / 53% weekly; Grok 15% weekly; Gemini out until Oct 18.
+**Last updated:** 2026-10-12 04:37 PT by Larch-11: claimed B4. Usage before work: Codex 73% of 5-hour / 56% weekly; Claude 38% of 5-hour / 53% weekly; Grok 15% weekly; Gemini out until Oct 18.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
