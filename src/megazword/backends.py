@@ -35,6 +35,7 @@ class Backend:
 
     name: str
     timeout: int = DEFAULT_TIMEOUT
+    trains_on_data: bool = False
 
     def available(self) -> bool:
         return True

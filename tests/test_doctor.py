@@ -69,6 +69,8 @@ def test_doctor_free_keys_and_routes(tmp_path, monkeypatch):
     lines = [item.line() for item in doctor.checks(tmp_path)]
     assert lines.count("OK openrouter: key set") == 1
     assert lines.count("WARN groq: key not set") == 1
+    assert lines.count("WARN cloudflare: key not set") == 1
+    assert lines.count("WARN mistral: key not set") == 1
     assert "OK routes: known backends only" in lines
     assert "secret-test-credential" not in "\n".join(lines)
 

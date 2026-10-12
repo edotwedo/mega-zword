@@ -254,7 +254,9 @@ def main(argv: list[str] | None = None,
 
     if args.command == "backends":
         for name, b in backends.items():
-            print(f"{name:10} {'installed' if b.available() else 'not found'}")
+            mark = "installed" if b.available() else "not found"
+            trains = "  (trains on prompts)" if getattr(b, "trains_on_data", False) else ""
+            print(f"{name:12} {mark}{trains}")
         return 0
 
     if args.command == "init":
@@ -450,12 +452,14 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         failure = None
         if not result.ok:
             failure = explain_failure(name, result.error, cfg)
+        trains = any(getattr(x, "trains_on_data", False) for x in chain if x.name == name)
         log.append(cfg.log_path, cfg.log_lines, backend=name, forced=forced, project=memory.project,
                    rating=rating.level if rating else None,
                    rater=rating.source if rating else None,
                    seconds=round(result.seconds, 2), ok=result.ok and not reason,
                    rejected=reason, prompt_chars=len(prompt), answer_chars=len(result.text),
-                   est_tokens=(len(prompt) + len(result.text)) // 4)
+                   est_tokens=(len(prompt) + len(result.text)) // 4,
+                   trains_on_data=trains)
         memory.add("done", f"{'REJECTED (' + reason + ')' if reason else 'ok'}: {first_line}",
                    by=name)
         if reason and not failure:

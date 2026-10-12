@@ -21,6 +21,11 @@ LOGIN_FIX = {
     "gemini": "run `agy` once and sign in",
     "openrouter": "set OPENROUTER_API_KEY (see `megazword doctor`)",
     "groq": "set GROQ_API_KEY (see `megazword doctor`)",
+    "cloudflare": "set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID (see `megazword doctor`)",
+    "zai": "set ZAI_API_KEY (see `megazword doctor`)",
+    "gemini-api": "set GOOGLE_AI_API_KEY (see `megazword doctor`)",
+    "nvidia": "set NVIDIA_API_KEY (see `megazword doctor`)",
+    "mistral": "set MISTRAL_API_KEY (see `megazword doctor`)",
 }
 
 _AUTH = re.compile(

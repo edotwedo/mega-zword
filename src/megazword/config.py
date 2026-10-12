@@ -57,6 +57,11 @@ DEFAULT_ROUTE = {
 DEFAULT_FREE = {
     "openrouter": "qwen/qwen3-4b:free",
     "groq": "llama-3.3-70b-versatile",
+    "cloudflare": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "zai": "glm-4.5-flash",
+    "gemini-api": "gemini-2.0-flash",
+    "nvidia": "meta/llama-3.1-8b-instruct",
+    "mistral": "mistral-small-latest",
 }
 
 DEFAULT_SENTINEL_URLS = [

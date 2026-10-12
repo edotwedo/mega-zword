@@ -127,6 +127,60 @@ def test_cli_forced_and_edit_exclusion(name, key_env, monkeypatch, capsys):
     assert "secret-test-credential" not in output
 
 
+NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "mistral")
+
+
+def test_b14_backends_exist_off_route_and_train_flags():
+    backends = default_backends()
+    for name in NEW_FREE:
+        assert name in backends
+        for names in config.DEFAULT_ROUTE.values():
+            assert name not in names
+        assert name not in default_backends(edit=True)
+    assert backends["zai"].trains_on_data
+    assert backends["gemini-api"].trains_on_data
+    assert backends["mistral"].trains_on_data
+    assert not backends["cloudflare"].trains_on_data
+    assert not backends["nvidia"].trains_on_data
+    assert not backends["openrouter"].trains_on_data
+
+
+def test_cloudflare_needs_account_id_and_puts_it_in_url(monkeypatch):
+    from megazword.free_apis import free_backends
+    b = {x.name: x for x in free_backends(config.DEFAULT_FREE)}["cloudflare"]
+    monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "secret-test-credential")
+    assert not b.available()
+    monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "acct123")
+    assert b.available()
+    seen = []
+
+    def fake(request, timeout):
+        seen.append(request.full_url)
+        return reply()
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    result = b.run("hello")
+    assert result.ok
+    assert seen[0] == ("https://api.cloudflare.com/client/v4/accounts/"
+                       "acct123/ai/v1/chat/completions")
+
+
+@pytest.mark.parametrize("name, key_env", [
+    ("zai", "ZAI_API_KEY"),
+    ("gemini-api", "GOOGLE_AI_API_KEY"),
+    ("mistral", "MISTRAL_API_KEY"),
+    ("nvidia", "NVIDIA_API_KEY"),
+])
+def test_new_free_forced_run(name, key_env, monkeypatch, capsys):
+    monkeypatch.setenv(key_env, "secret-test-credential")
+    def fake(request, **kwargs):
+        return reply()
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    assert cli.main(["run", "hello", "-m", name], cfg=config.Config()) == 0
+    out = capsys.readouterr().out
+    assert "answer" in out
+    assert "secret-test-credential" not in out
+
+
 @pytest.mark.parametrize("model", ['""', '123'])
 def test_bad_model_config(tmp_path, model):
     path = tmp_path / "config.toml"

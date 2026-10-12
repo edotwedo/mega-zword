@@ -68,8 +68,11 @@ def checks(home: Path | None = None) -> list[Check]:
             found.append(Check("WARN", name, "found, version unavailable",
                                f"check {name} --version"))
 
-    for name, key_env in (("openrouter", "OPENROUTER_API_KEY"), ("groq", "GROQ_API_KEY")):
+    from .free_apis import FREE_KEYS
+    for name, key_env in FREE_KEYS:
         present = bool(os.environ.get(key_env))
+        if name == "cloudflare":
+            present = present and bool(os.environ.get("CLOUDFLARE_ACCOUNT_ID"))
         found.append(Check("OK" if present else "WARN", name,
                            "key set" if present else "key not set"))
 
