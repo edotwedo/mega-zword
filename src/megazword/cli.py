@@ -383,7 +383,8 @@ ONE_SHOT_NOTE = ("[Sent by Mega Zword as a one-shot task. Answer it directly. Sk
 def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
             memory: Memory, rating: Rating | None, forced: bool,
             start_after: str | None = None, prior_answer: str | None = None,
-            on_answer: Callable[[str], None] | None = None) -> int:
+            on_answer: Callable[[str], None] | None = None,
+            tab_id: str | None = None) -> int:
     """Run the chain with escalation, log every attempt, print the answer,
     and remember the run so `megazword retry` can pick it up."""
     first_line = prompt.strip().splitlines()[0][:80]
@@ -426,7 +427,7 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         return 1
     result = outcome.result
     save_last_run(sent, prompt, [b.name for b in chain], result.backend, result.text,
-                  memory.project, rating.level if rating else None)
+                  memory.project, rating.level if rating else None, tab_id=tab_id)
     if on_answer is None:
         print(result.text)
     else:
@@ -509,15 +510,17 @@ def last_run_path():
     return config.HOME / "last_run.json"
 
 
-def save_last_run(sent, prompt, chain, backend, answer, project, level) -> None:
+def save_last_run(sent, prompt, chain, backend, answer, project, level,
+                  tab_id: str | None = None) -> None:
     import json
     from .filelock import write_atomic
     # Atomic: a parallel job finishing at the same time can't leave half a file.
     write_atomic(last_run_path(), json.dumps({"sent": sent, "prompt": prompt, "chain": chain,
                                               "backend": backend, "answer": answer,
-                                              "project": project, "rating": level}))
+                                              "project": project, "rating": level,
+                                              "tab_id": tab_id}))
     from . import answers
-    answers.add(prompt, answer, backend, project, level)
+    answers.add(prompt, answer, backend, project, level, tab_id=tab_id)
 
 
 def retry_last(args, backends: dict[str, Backend], cfg: config.Config,

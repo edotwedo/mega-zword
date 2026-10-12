@@ -1,9 +1,9 @@
 # Status
 
-**Active: Nimbus-12 (Grok Build on Phil's PC), 2026-10-12 ~afternoon PT.** Branch `grok/beta2-2026-10-11`. Doing R1 (free-tier re-check), then B3.
+**Active: Nimbus-12 (Grok Build on Phil's PC), 2026-10-12 ~afternoon PT.** Branch `grok/beta2-2026-10-11`. B3 done; next B8 Sentinel collector.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-12 by Nimbus-12 (Grok Build): claimed R1 + posted today's free-tier table under B14.
+**Last updated:** 2026-10-12 by Nimbus-12 (Grok Build): B3 tabs backend on this branch.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -30,9 +30,9 @@ Antigravity Claude/GPT pool -/0.
 
 Grok (available now; Oct 17 is its weekly reset) -> `docs/handoffs/2026-10-11-grok.md`:
 - **R1 (Nimbus-12, 2026-10-12): done.** Table under B14. Codex can start B14.
-- **B3 Tabs backend (Nimbus-12, next):** `tabs.json`, per-tab AI/project/history, dashboard API for
-  list/create/rename/close/send; reuse chat's lean flags and failure text.
-- B8 Sentinel collector: event-log reader (reboots, logins, network),
+- **B3 Tabs backend (Nimbus-12, 2026-10-12): done.** `tabs.json`, per-tab AI/project/history,
+  dashboard API list/create/rename/close/send. Codex B4 can wire the UI.
+- **B8 Sentinel collector (Nimbus-12, next):** event-log reader (reboots, logins, network),
   `sentinel.jsonl`, `megazword sentinel status|log`, dashboard panel. Fake
   event data in tests; no admin needed to run tests.
 - B9 Sentinel alerts: production URL checks, ntfy push, healthchecks.io ping,

@@ -314,6 +314,42 @@ def test_remote_header_works_despite_stale_cookie(remote_server):
     assert urllib.request.urlopen(req, timeout=5).status == 200
 
 
+def test_tabs_http_list_create_rename_close_send(server, monkeypatch):
+    from megazword.backends import Backend
+
+    class RunFake(Backend):
+        def _run(self, prompt: str) -> str:
+            return f"ok: {prompt.splitlines()[-1][:40]}"
+
+    base, app = server
+    app.backends = {"claude": RunFake("claude"), "grok": RunFake("grok")}
+    app.cfg = config.Config(log_path=config.HOME / "log.jsonl",
+                            route={"easy": ["claude"], "medium": ["claude"], "hard": ["claude"]})
+    listed = json.loads(urllib.request.urlopen(base + "/api/tabs", timeout=5).read())
+    assert listed["tabs"] == []
+    created = json.loads(_post(base + "/api/tabs",
+                               {"ai": "claude", "title": "Work"}, app.token).read())
+    assert created["id"] == "t1" and created["ai"] == "claude"
+    renamed = json.loads(_post(base + "/api/tabs/rename",
+                               {"id": "t1", "title": "Desk"}, app.token).read())
+    assert renamed["title"] == "Desk"
+    sent = json.loads(_post(base + "/api/tabs/send",
+                            {"id": "t1", "prompt": "hello tab"}, app.token).read())
+    assert sent["ok"] and sent["backend"] == "claude" and "hello tab" in sent["answer"]
+    auto = json.loads(_post(base + "/api/tabs", {"ai": "auto"}, app.token).read())
+    from megazword.rater import Rating
+    monkeypatch.setattr("megazword.rater.rate",
+                        lambda prompt, model=None: Rating("easy", "test", "fake"))
+    auto_sent = json.loads(_post(base + "/api/tabs/send",
+                                 {"id": auto["id"], "prompt": "auto hi"}, app.token).read())
+    assert auto_sent["ok"] and auto_sent["backend"] == "claude"
+    closed = json.loads(_post(base + "/api/tabs/close", {"id": "t1"}, app.token).read())
+    assert closed["ok"]
+    left = json.loads(urllib.request.urlopen(base + "/api/tabs", timeout=5).read())["tabs"]
+    assert [t["id"] for t in left] == [auto["id"]]
+    assert "tabs" in app.state()
+
+
 def test_remote_malformed_cookie_returns_forbidden(remote_server):
     base, app = remote_server
     req = urllib.request.Request(base + "/api/state", headers={"Cookie": "bad@name=value"})

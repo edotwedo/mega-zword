@@ -25,7 +25,7 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from . import advise, stats, answers, config, runlog
+from . import advise, stats, answers, config, runlog, tabs
 from .backends import _kill_tree, default_backends, process_group
 from .meters import STALE, summarize_all
 from .memory import Memory, check_project, list_projects, project_name
@@ -196,6 +196,7 @@ class App:
             "memory": [asdict(e) for e in reversed(memory.recent(40))],
             "answers": answers.recent(20, project),
             "jobs": [j.view() for j in reversed(jobs)][:10],
+            "tabs": tabs.list_tabs(),
         }
 
     # --- actions ---------------------------------------------------------
@@ -305,6 +306,28 @@ class App:
                self.cfg.memory_lines).add(kind, text, "phil")
         return {"ok": True}
 
+    def tabs_list(self) -> dict:
+        return {"tabs": tabs.list_tabs()}
+
+    def tabs_create(self, body: dict) -> dict:
+        project = self.project_for(body.get("project") or self.project)
+        return tabs.create(str(body.get("ai") or tabs.AUTO), project,
+                           body.get("title"), self.backends)
+
+    def tabs_rename(self, body: dict) -> dict:
+        return tabs.rename(str(body.get("id") or ""), str(body.get("title") or ""))
+
+    def tabs_close(self, body: dict) -> dict:
+        return tabs.close(str(body.get("id") or ""))
+
+    def tabs_send(self, body: dict) -> dict:
+        from . import cli
+        from .rater import rate
+        return tabs.send(str(body.get("id") or ""), str(body.get("prompt") or ""),
+                         self.backends, self.cfg,
+                         lambda p: rate(p, self.cfg.rater_model),
+                         cli.plan_statuses, bool(body.get("context")))
+
 
 def page(token: str) -> bytes:
     html = resources.files("megazword").joinpath("dashboard.html").read_text("utf-8")
@@ -383,6 +406,8 @@ def make_handler(app: App, port: int, remote: bool = False):
             if path.startswith("/api/job/"):
                 job = app.jobs.get(path.rsplit("/", 1)[-1])
                 return self._json(200, job.view()) if job else self._json(404, {})
+            if path == "/api/tabs":
+                return self._json(200, app.tabs_list())
             return self._json(404, {"error": "not found"})
 
         def do_POST(self):
@@ -399,7 +424,11 @@ def make_handler(app: App, port: int, remote: bool = False):
                     raise ValueError("request body must be a JSON object")
                 action = {"/api/run": app.run, "/api/retry": app.retry,
                           "/api/note": app.note, "/api/vote": app.vote, "/api/cancel": app.cancel,
-                          "/api/settings": app.settings}.get(self.path)
+                          "/api/settings": app.settings,
+                          "/api/tabs": app.tabs_create,
+                          "/api/tabs/rename": app.tabs_rename,
+                          "/api/tabs/close": app.tabs_close,
+                          "/api/tabs/send": app.tabs_send}.get(self.path)
                 if action is None:
                     return self._json(404, {"error": "not found"})
                 return self._json(200, action(body))
