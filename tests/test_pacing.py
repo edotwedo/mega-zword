@@ -107,3 +107,14 @@ def test_burn_only_near_reset_with_leftover():
 def test_rank_preserves_candidate_order_for_equal_pace():
     same = PlanStatus("same", -5, 40, "free", [])
     assert rank({"a": same, "b": same}, ["b", "a"], "medium") == ["b", "a"]
+
+
+def test_a_reading_from_before_the_reset_no_longer_blocks():
+    from datetime import datetime, timedelta, timezone
+    from megazword.pacing import status
+    from megazword.usage_sources import PlanUsage, Window
+    now = datetime(2026, 10, 18, 16, 0, tzinfo=timezone.utc)
+    stale = PlanUsage("gemini", [Window("weekly", 100.0, now - timedelta(minutes=3))], "test")
+    assert status(stale, now).verdict == "free"
+    live = PlanUsage("gemini", [Window("weekly", 100.0, now + timedelta(days=6))], "test")
+    assert status(live, now).verdict == "out"

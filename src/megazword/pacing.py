@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 
 from .usage_sources import PlanUsage, Window
@@ -58,7 +58,7 @@ def status(usage: PlanUsage, now: datetime | None = None) -> PlanStatus:
         return PlanStatus(usage.service, 0.0, 0.0, "unknown", [])
     # Unrecognized windows (e.g. Claude's "iguana_necktie", which Phil says is
     # his Claude Cloud credit) are reported but never block a plan.
-    known = [w for w in usage.windows if window_length(w.name)[1]]
+    known = [_after_reset(w, now) for w in usage.windows if window_length(w.name)[1]]
     unknown = [w.name for w in usage.windows if not window_length(w.name)[1]]
     if not known:
         return PlanStatus(usage.service, 0.0, 0.0, "unknown", unknown)
@@ -74,11 +74,24 @@ def status(usage: PlanUsage, now: datetime | None = None) -> PlanStatus:
                       burn=verdict == "free" and any(_near_reset(w, now) for w in known))
 
 
+def _aware(t: datetime) -> datetime:
+    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+
+
+def _after_reset(window: Window, now: datetime | None = None) -> Window:
+    """A reading taken before its window reset says nothing about the new window: count it
+    as unused, so a stale '100%, resets Sun 3:57 PM' stops blocking the AI once Sunday 3:57 passes."""
+    now = now or datetime.now(timezone.utc)
+    if window.resets_at is not None and _aware(window.resets_at) < now:
+        return replace(window, used_percent=0.0, resets_at=None)
+    return window
+
+
 def _near_reset(window: Window, now: datetime | None = None) -> bool:
     if window.resets_at is None or 100.0 - window.used_percent < LEFTOVER_MIN:
         return False
     now = now or datetime.now(timezone.utc)
-    reset = window.resets_at if window.resets_at.tzinfo else         window.resets_at.replace(tzinfo=timezone.utc)
+    reset = _aware(window.resets_at)
     key = "5-hour" if window.name == "5-hour" else "weekly"
     return timedelta(0) <= reset - now <= BURN_BEFORE_RESET[key]
 
