@@ -298,12 +298,15 @@ There is no phone-model answering backend yet.
 
 ## Other commands
 
-- `megazword backends` lists supported AI tools and whether they are available.
 - `megazword init [--force]` creates a config using installed tools; `--force`
   replaces the existing config.
 - `megazword backends` lists CLIs and optional HTTP AIs (openrouter, groq,
   cloudflare, zai, gemini-api, nvidia, mistral). Force one with
   `megazword run "..." -m zai` (they are off the default route).
+- `megazword plan` ranks the AIs for new work by live spare usage. Run it
+  before handing out work.
+- `megazword app install` (or `remove`) adds or removes the Start menu
+  shortcut for the desktop window.
 - `megazword doctor` checks local setup without sending a prompt.
 - `megazword export [-p PROJECT] [--since 7d] [--out FILE] [--force]` writes
   project memory, answers and run totals as Markdown. By default it prints to

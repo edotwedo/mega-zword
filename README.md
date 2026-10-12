@@ -6,7 +6,23 @@ Mega Zword is a Python command line tool that routes prompts to installed AI com
 
 Gemini is optional: use `megazword run -m gemini` with a prompt on stdin. Google retired the Gemini CLI for personal accounts on 2026-06-18, so Mega Zword uses its successor, the Antigravity CLI (`agy`), when it is on PATH, and falls back to an old `gemini` install otherwise. Install agy, run `agy` once to sign in, then check with `megazword doctor`. It runs read-only (`agy -p --mode plan`), is excluded from `--edit` and default routes, and `megazword usage` reads its quota from `agy -p /usage --output-format json` (the Gemini models pool drives the meter; Antigravity's Claude/GPT pool is shown but ignored).
 
-**Status:** Beta 1 (v0.1.0b1, 2026-10-11). Tested on Windows; CI runs on Windows and Linux.
+**Status:** Beta 3.0 (v0.3.0b1, 2026-10-12). Tested on Windows; CI runs on Windows and Linux.
+
+## What's new in Beta 3.0
+
+Everything since Beta 1. Beta 2 never had its own release, so its work ships here too.
+Details are in [docs/GUIDE.md](docs/GUIDE.md).
+
+- **An app of its own.** Plain `megazword` opens Mega Zword in its own desktop window. If that window can't start, it falls back to a browser window. `megazword app install` adds a Start menu shortcut. The old text screen is now `megazword start`.
+- **New look and chat tabs.** The dashboard was restyled. Chat tabs keep a separate AI, project and history per tab. Answers, renames and closes are no longer lost when several tabs answer at once.
+- **Hive room.** A group chat between you and the bots (`megazword room`, plus a Hive tab in the dashboard). If a bot runs out of usage mid-session, the others carry on. Each session saves 3-5 lessons to project memory. Summaries post to Q only when you add `--post`.
+- **Live usage for all four AIs.** Claude, Codex, Grok and Gemini meters, shared with the status bar and desktop widget. `megazword plan` ranks the AIs by how much room they have left. A reading from before a reset no longer marks an AI as out.
+- **Gemini through Antigravity (`agy`)**, since the Gemini CLI was retired. An empty "success" from agy now counts as a failure.
+- **Model and effort per difficulty level** for Claude, Codex and Gemini (`[claude.hard]` and so on), applied on every chat turn.
+- **More free AIs (optional):** Cloudflare, Z.ai, Gemini API, NVIDIA and Mistral. They're off the default route. Mistral goes first for easy jobs, with a guard that keeps secrets and private paths away from AIs that train on your data.
+- **Sentinel.** An uptime and security log of reboots, logins and network events (`megazword sentinel status|log|check|install`). It also offers optional URL checks and ntfy/healthchecks alerts.
+- **Phone access.** `megazword dashboard --phone` serves the dashboard privately over Tailscale.
+- **Sturdier on Windows.** Atomic writes with retries, locked state files, one dashboard server per port (a second launch opens the running one), and no crashes on damaged logs or odd numbers.
 
 ## Requirements
 
