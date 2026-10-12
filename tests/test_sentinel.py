@@ -1,7 +1,6 @@
 """Sentinel collector and alerts: fake events/HTTP only; no admin, no real ntfy."""
 
 import json
-import os
 import subprocess
 
 from megazword import config, sentinel
@@ -153,7 +152,7 @@ def test_single_failure_does_not_alert():
 
 
 def test_install_dry_run_does_not_create_task(capsys, monkeypatch):
-    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(sentinel, "_is_windows", lambda: True)
     ran = []
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: ran.append(a) or type(
         "R", (), {"returncode": 0, "stderr": "", "stdout": ""})())
@@ -163,8 +162,18 @@ def test_install_dry_run_does_not_create_task(capsys, monkeypatch):
     assert "install --yes" in out and "ntfy" in out
 
 
+def test_install_yes_on_unix_skips_schtasks(monkeypatch, capsys):
+    monkeypatch.setattr(sentinel, "_is_windows", lambda: False)
+    ran = []
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: ran.append(a) or type(
+        "R", (), {"returncode": 0, "stderr": "", "stdout": ""})())
+    assert sentinel.install(True) == 2
+    assert ran == []
+    assert "Windows-only" in capsys.readouterr().out
+
+
 def test_install_yes_creates_tasks(monkeypatch, capsys):
-    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(sentinel, "_is_windows", lambda: True)
     ran = []
 
     class R:
@@ -182,7 +191,7 @@ def test_install_yes_creates_tasks(monkeypatch, capsys):
 
 
 def test_task_runs_windowless_python(monkeypatch, capsys):
-    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(sentinel, "_is_windows", lambda: True)
     monkeypatch.setattr("megazword.desktop.launcher_python", lambda: r"C:\py\pythonw.exe")
     ran = []
 
@@ -197,7 +206,7 @@ def test_task_runs_windowless_python(monkeypatch, capsys):
 
 def test_powershell_timeout_and_garbage_become_oserror(monkeypatch):
     import pytest
-    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(sentinel, "_is_windows", lambda: True)
 
     def slow(*a, **k):
         raise subprocess.TimeoutExpired("powershell", 30)

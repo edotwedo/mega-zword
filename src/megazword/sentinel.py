@@ -18,6 +18,11 @@ from .filelock import locked, write_atomic
 KEEP = 2000
 MSG_CHARS = 300
 
+
+def _is_windows() -> bool:
+    """Tests patch this. Do not patch os.name: pathlib then becomes WindowsPath and Linux CI crashes."""
+    return os.name == "nt"
+
 # channel -> event ids (Kernel-Power 41 lives in the System log)
 SOURCES = (
     ("System", (6005, 6006, 6008, 1074, 41)),
@@ -124,7 +129,7 @@ def _record(raw: dict, channel: str) -> dict | None:
 
 
 def _powershell(script: str) -> str:
-    if os.name != "nt":
+    if not _is_windows():
         return ""
     try:
         result = subprocess.run(
@@ -410,7 +415,7 @@ def install(yes: bool = False) -> int:
     from .desktop import launcher_python
     cmd = f'"{launcher_python()}" -m megazword.cli sentinel check'
     print(f"[megazword] task command: {cmd}")
-    if os.name != "nt":
+    if not _is_windows():
         print("[megazword] scheduled tasks are Windows-only; run `megazword sentinel check` from cron")
         return 0 if not yes else 2
     if not yes:
