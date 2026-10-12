@@ -14,7 +14,8 @@ repo is the only handoff. Nothing lives only in a chat.
   (on Phil's PC) or read the usage board in Q
   (https://github.com/edotwedo/workshop/pull/33#issuecomment-6115098816; over 30 minutes old means the
   PC is asleep, so say so). Then write a labor plan: which AI does which part, by spare usage and fit,
-  with the reading quoted. Do this before any work, not partway through.
+  with the reading quoted. `megazword plan` ranks them. Plans and lanes follow the live reading: re-plan
+  when it changes; nothing in STATUS is fixed. Do this before any work, not partway through.
 - **One AI at a time.** Before editing, put your tool name and the time in the
   "Active" line of `docs/STATUS.md`, then commit and push it. If that line names
   another AI and is less than 2 hours old, stop and ask Phil before continuing.

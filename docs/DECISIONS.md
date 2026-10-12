@@ -3,6 +3,7 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-12
+- Phil: labor rules follow live usage and are re-planned whenever it changes; nothing is fixed (replaces the "lanes frozen" rule). Tools: `megazword plan`, the usage hook, and `scripts/install_usage_hook.py` for his PC.
 - Phil lost Kestrel's chat. Tally-11 (Claude cloud chat) takes Kestrel's seat as Mega Zword lead: owns main, merges and assignments. Other Claude sessions pick their own designation.
 - Phil: the Hive room must not waste tokens re-reading everything to get the bots on the same page. Efficiency rules are part of B1 (SPEC section R, "Token budget").
 
