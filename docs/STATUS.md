@@ -1,6 +1,6 @@
 # Status
 
-**Active: none.** Larch-11 completed B4 on `codex/b4-hive-ui-2026-10-12`, stacked on B5 (601 tests passed, smoke 36/36). Next: B6 custom title bar, icons and docs. Main already contains B12/B13/B15; B5 and B4 are pending lead review. Calendar B10/B11 remain parked.
+**Active: Tally-11 (lead), 2026-10-12 ~05:00 PT.** Merged B5 + B4 (Larch-11) and the phone launcher (`megazword dashboard --phone`, Codex). Next: Codex B6 (title bar, icons); Grok B7 reviews. Main has B12/B13/B15; `codex/b12-model-choice` and `codex/b13-default-app` are duplicates, not merged.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
 **Last updated:** 2026-10-12 04:48 PT by Larch-11: B4 complete; Codex usage after work 82% of 5-hour / 57% weekly; Claude 43% of 5-hour / 54% weekly; Grok 15% weekly; Gemini out until Oct 18. Codex crossed the 80% marker; next step is B6 after a fresh usage check.
@@ -14,6 +14,10 @@
 - **Logins Mega Zword reads (never committed or printed):** `~\.claude\.credentials.json` (Claude meter), `~\.codex\sessions\` (Codex meter), the `agy` login (Gemini).
 - **Hive coordination:** Q, `edotwedo/workshop` PR #33. Mega Zword's own state stays in this file.
 
+
+## Phone access (2026-10-12, Codex session 01a12d3d)
+
+Phil requested work visible through this chat and direct phone access. Added `megazword dashboard --phone` with Tailscale discovery and actionable connection errors; GUIDE updated. Validation: 616 tests, 36/36 smoke, clean diff check, real missing-installation diagnostic verified. No software installed or network settings changed. Next: lead merges `codex/phone-access-2026-10-12`; Phil installs/signs into Tailscale on PC and phone, then runs `megazword dashboard --phone` and opens the printed private link. B5/B4/B6 remain separate unfinished work.
 
 ## Next (cold start, 2026-10-11 night plan)
 

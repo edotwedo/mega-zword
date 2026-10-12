@@ -244,15 +244,18 @@ sources immediately.
 
 ### Phone access over Tailscale
 
-The dashboard can listen on a Tailscale address. Install and sign in to
-Tailscale on the PC and phone, then find the PC address with `tailscale ip -4`.
-Start the server with that address:
+Install [Tailscale](https://tailscale.com/download) on the PC and phone and
+sign in to the same account on both. Then run on the PC:
 
 ```text
-megazword dashboard --host 100.101.102.103
+megazword dashboard --phone
 ```
 
-Replace the example address. Open the full URL printed in the terminal on the
+This checks Tailscale and selects the PC's private IPv4 address. If installation,
+sign-in or connection is missing, it explains what to do and does not start a server.
+It does not install software or change firewall/network settings. For a manual
+address, `--host <address>` still works; it cannot be combined with `--phone`.
+Keep the terminal open and the PC awake. Open the full URL printed in the terminal on the
 phone. It contains a per-launch token. Only devices that can reach the PC over
 your Tailscale network can use it; anyone with both tailnet access and the link
 can run your AIs, so keep the link private. Remote mode requires the token for reads and changes, and
