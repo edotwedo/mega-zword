@@ -77,7 +77,8 @@ def import_hive(repo: Path, memory: Memory) -> tuple[int, int]:
     decisions = handoffs = 0
     decisions_file = repo / "DECISIONS.md"
     if decisions_file.exists():
-        for date, text in parse_decisions(decisions_file.read_text(encoding="utf-8")):
+        raw = decisions_file.read_text(encoding="utf-8", errors="replace")
+        for date, text in parse_decisions(raw):
             entry = f"{date}: {text}"
             if entry not in existing:
                 memory.add("decision", entry, by="hive-import", time=f"{date}T00:00:00+00:00")

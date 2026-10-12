@@ -72,3 +72,30 @@ def test_context_block_caps_decisions():
     block = mem.context_block(max_decisions=5, max_chars=50)
     assert block.count("- rule") == 5 and "..." in block
     assert len(block) < 600
+
+
+def test_import_hive_end_to_end_is_rerun_safe_and_read_only(tmp_path):
+    from megazword.hive_import import import_hive
+    from megazword.memory import Memory
+    repo = tmp_path / "workshop"
+    (repo / "handoffs").mkdir(parents=True)
+    (repo / "DECISIONS.md").write_bytes(
+        "# Decisions\n- 2026-10-11: **Truth only.** Check sources.\n- 2026-10-01: Old call\n".encode()
+        + b"- 2026-10-02: bad byte \xff here\n")
+    (repo / "handoffs" / "a.md").write_text(
+        "# Handoff: Build it\n- **For:** codex\n- **Status:** open\n\n## The job\nDo the thing.\n",
+        encoding="utf-8")
+    (repo / "handoffs" / "b.md").write_text("# Done one\n- **Status:** done 2026-10-01\n", encoding="utf-8")
+    (repo / "handoffs" / "TEMPLATE.md").write_text("# T\n- **Status:** open\n", encoding="utf-8")
+    before = {p: p.read_bytes() for p in repo.rglob("*") if p.is_file()}
+    mem = Memory(tmp_path / "home", "workshop")
+
+    assert import_hive(repo, mem) == (3, 1)
+    assert import_hive(repo, mem) == (0, 0)  # second run adds nothing
+    entries = mem.entries()
+    decisions = [e for e in entries if e.kind == "decision"]
+    assert decisions[0].text.startswith("2026-10-01") and decisions[0].time.startswith("2026-10-01")
+    assert any("Truth only. Check sources." in e.text for e in decisions)
+    note = next(e for e in entries if e.kind == "note")
+    assert "Build it" in note.text and "for codex" in note.text and "Do the thing." in note.text
+    assert {p: p.read_bytes() for p in repo.rglob("*") if p.is_file()} == before

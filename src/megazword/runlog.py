@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -76,7 +77,9 @@ def summarize(path: Path, window: timedelta, now: datetime | None = None,
 
 
 def _number(value) -> float:
+    """A finite number or 0. JSON's NaN/Infinity would crash int() in the totals."""
     try:
-        return float(value)
+        number = float(value)
     except (TypeError, ValueError):
         return 0.0
+    return number if math.isfinite(number) else 0.0

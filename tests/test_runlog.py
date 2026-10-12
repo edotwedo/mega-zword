@@ -44,3 +44,26 @@ def test_token_totals_include_all_outcomes_and_legacy_zero(tmp_path):
     totals = summarize(path, timedelta(hours=24), now)
     assert {name: item.est_tokens for name, item in totals.items()} == {
         "claude": 12, "codex": 5, "grok": 0}
+
+
+def test_nan_and_infinity_in_the_log_count_as_zero(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    log = tmp_path / "log.jsonl"
+    now = datetime(2026, 10, 12, 12, tzinfo=timezone.utc)
+    log.write_text('{"time": "2026-10-12T11:00:00+00:00", "backend": "grok", "ok": true, '
+                   '"seconds": NaN, "prompt_chars": Infinity, "est_tokens": "-Infinity"}\n'
+                   '{"time": "2026-10-12T11:30:00Z", "backend": "grok", "ok": false, "prompt_chars": 40}\n',
+                   encoding="utf-8")
+    s = summarize(log, timedelta(hours=24), now)["grok"]
+    assert (s.runs, s.ok, s.failed) == (2, 1, 1)
+    assert s.seconds == 0 and s.prompt_chars == 40 and s.est_tokens == 0
+
+
+def test_stats_survive_bad_numbers(tmp_path):
+    from datetime import date
+    from megazword.stats import daily
+    log = tmp_path / "log.jsonl"
+    log.write_text('{"time": "2026-10-12T18:00:00+00:00", "backend": "codex", "ok": true, '
+                   '"seconds": "abc", "est_tokens": Infinity}\n', encoding="utf-8")
+    [s] = daily(log, 1, date(2026, 10, 12))
+    assert (s.runs, s.seconds, s.est_tokens) == (1, 0, 0)
