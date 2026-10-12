@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from . import config
-from .backends import Backend
+from .backends import Backend, apply_levels, grok_label
 from .memory import Memory, project_name
 from .rater import Rating
 
@@ -161,7 +161,7 @@ def run(backends: dict[str, Backend], cfg: config.Config,
                     class Args:
                         model = None
                     answer: list[str] = []
-                    code = cli.retry_last(Args(), backends, cfg,
+                    code = cli.retry_last(Args(), dict(backends), cfg,
                                           on_answer=lambda text: (answer.append(text), write(text)))
                     try:
                         import json
@@ -185,17 +185,23 @@ def run(backends: dict[str, Backend], cfg: config.Config,
             sections.extend(("[New message]", message))
             sent = "\n\n".join(sections)
             rating = None
+            # B12 model/effort for this turn's level, on a copy so one turn's
+            # choice doesn't stick to the next (same as one-shots and tabs).
+            turn_backends = dict(backends)
             if pinned:
-                chain = [backends[pinned]]
-                write(f"[megazword] using {pinned} (pinned)")
+                apply_levels(turn_backends, "medium", cfg.grok, cfg.levels)
+                chain = [turn_backends[pinned]]
+                write(f"[megazword] using {grok_label(chain[0])} (pinned)")
             else:
                 rating = rater(message)  # rate the new message, not the whole chat
-                chain = cli.candidates(rating, cfg.route, backends,
+                apply_levels(turn_backends, rating.level, cfg.grok, cfg.levels)
+                chain = cli.candidates(rating, cfg.route, turn_backends,
                                        (statuses or cli.plan_statuses)(), cfg.out_now())
                 if not chain:
                     write(f"[megazword] no installed AI for a {rating.level} task")
                     continue
-                write(f"[megazword] rated {rating.level} ({rating.reason}) -> using {chain[0].name}")
+                write(f"[megazword] rated {rating.level} ({rating.reason}) -> "
+                      f"using {grok_label(chain[0])}")
             answer: list[str] = []
             code = cli.execute(sent, prompt, chain, cfg, memory, rating, forced=bool(pinned),
                                on_answer=lambda text: (answer.append(text), write(text)))
