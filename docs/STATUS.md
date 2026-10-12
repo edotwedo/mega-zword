@@ -1,6 +1,6 @@
 # Status
 
-**Active: Tally-11 (lead, Claude Code on Phil's PC), 2026-10-11 ~22:20 PT.** Merged Grok's agy empty-answer fix and Codex's B14 review (Z.ai label). Next: **Grok B15** (Nimbus-12 already queued it; Grok built B14), **Codex B12**, then B13, B5, B4, B6. Calendar B10/B11 parked (Phil). Room summaries now post to Q only with `--post`.
+**Active: Codex session 01a12d3d (this chat, previously called Kestrel), 2026-10-12 04:28 PT.** Phil requested direct phone access and progress in this chat. Building and testing the Tailscale dashboard launcher on `codex/phone-access-2026-10-12`; no routing changes.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
 **Last updated:** 2026-10-11 22:20 PT by Tally-11. Usage at 22:04 PT (5h/week % used): Claude 0/45, Codex 4/45, Grok -/15, Gemini out until Oct 18.
