@@ -30,6 +30,8 @@ All five Beta 1 PC steps are done: reinstalled from main (0.1.0b1), Claude meter
 Each lane has a handoff in `docs/handoffs/2026-10-11-*.md` with everything needed to start cold.
 **Lanes follow live usage (Phil, 2026-10-12):** the lanes below are a starting point, not a rule. Before taking or handing out an item, run `megazword plan` (or read the Q usage board) and give unstarted items to whoever has the most room now. Keep an item already in progress with its bot unless that bot runs out.
 
+**Re-plan (Tally-11 cloud, 2026-10-12 12:50 PT, from the last reading in this file, Larch-11 04:48 PT; Q board is ~20h old):** weekly used: Grok 15%, Claude 54%, Codex 57%, Gemini 100% until Oct 18. Grok has the most room, so B10/B11 (calendar) move from Gemini to Grok, plus fixing the 3 Windows-only tests that fail on Linux (test_no_real_cli, 2 in test_sentinel; CI's Ubuntu job). Codex keeps tab order, then B6 .exe. Claude reviews and merges only. Re-check `megazword plan` before starting; if Grok is low, take the next bot down.
+
 **Lane update (Tally-11, 2026-10-12):** Gemini/agy is at 100% in both pools until Oct 18; park B10/B11. B12, B13 and B15 are on main. Codex completed B5 and B4; B6 is next. Grok round 2 fixed the agy empty-answer bug and reviews B7 and B1. B14 and Grok B3/B8/B9 plus Antigravity B1 are already on main. Finish and push each item before starting another. Claude (Tally-11) is lead and merges/reconciles lanes.
 Rules: put your name on an item here, own branch, small pushes, tests + smoke pass, no paid calls in
 tests, hand finished branches to the lead (Tally-11) to merge; post the branch name in Q. Lane empty? Take the next
