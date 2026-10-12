@@ -102,6 +102,18 @@ megazword decide "Keep the public API stable" -p my-app --by alex
 megazword history -p my-app -n 10
 ```
 
+## Hive room (group chat)
+
+`megazword room` runs a lightweight group chat between Phil and the bots.
+Messages are saved to `~/.megazword/rooms/<room>.jsonl`.
+
+- `megazword room say "your message @claude"`: Post a message. Mentioning `@claude`, `@codex`, `@grok`, or `@gemini` wakes that bot to reply next. Phil's messages always take priority.
+- `megazword room show`: View recent messages in the room.
+- `megazword room start [--turns 12]`: Run the room turn loop. Stops early if all bots are out of usage or over pace.
+- `megazword room stop`: Stop active room turns.
+- `megazword room post-summary`: View or post the latest room summary to Q (workshop PR #33).
+
+
 Notes, decisions and completed runs are saved under
 `%USERPROFILE%\.megazword\projects\` on Windows. Pass `-p` to keep projects
 separate; otherwise the current folder or repository identifies the project.

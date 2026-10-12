@@ -80,6 +80,9 @@ class Config:
     # AI name -> when its usage comes back. Set by hand for plans with no meter.
     out_until: dict[str, datetime] = field(default_factory=dict)
     free: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_FREE))
+    room_primary: str = "workshop"
+    room_turn_cap: int = 12
+    room_name: str = "hive"
 
     def out_now(self, now: datetime | None = None) -> set[str]:
         """AIs marked out whose return time hasn't passed yet."""
@@ -129,6 +132,15 @@ def load(path: Path | None = None) -> Config:
                 model, effort = cfg.grok[level]
                 cfg.grok[level] = (str(block.get("model", model)),
                                    str(block.get("effort", effort)))
+
+        room_block = data.get("room", {})
+        if isinstance(room_block, dict):
+            if "primary" in room_block and isinstance(room_block["primary"], str) and room_block["primary"].strip():
+                cfg.room_primary = room_block["primary"].strip()
+            if "turn_cap" in room_block and isinstance(room_block["turn_cap"], int) and room_block["turn_cap"] > 0:
+                cfg.room_turn_cap = room_block["turn_cap"]
+            if "name" in room_block and isinstance(room_block["name"], str) and room_block["name"].strip():
+                cfg.room_name = room_block["name"].strip()
     return cfg
 
 

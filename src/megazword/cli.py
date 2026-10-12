@@ -15,7 +15,7 @@ from .rater import Rating, rate
 
 
 COMMAND_GROUPS = {
-    "Ask": ("run", "chat", "retry"),
+    "Ask": ("run", "chat", "retry", "room"),
     "See": ("usage", "stats", "advise", "dashboard", "projects", "history", "export"),
     "Set up": ("init", "doctor", "out", "backends"),
     "Memory": ("note", "decide", "import-hive"),
@@ -29,7 +29,7 @@ class CLIParser(argparse.ArgumentParser):
     def format_help(self):
         sub = next((a for a in self._actions
                     if isinstance(a, argparse._SubParsersAction)), None)
-        if sub is None:
+        if sub is None or self.prog != "megazword":
             return super().format_help()
         formatter = self._get_formatter()
         formatter.add_usage(self.usage, self._actions, self._mutually_exclusive_groups)
@@ -121,6 +121,30 @@ def build_parser() -> argparse.ArgumentParser:
     retry = sub.add_parser("retry", help="last answer not good enough: ask a stronger AI")
     retry.add_argument("-m", "--model", help="force which AI tries next")
     sub.add_parser("chat", help="start an interactive conversation")
+
+    room = sub.add_parser("room", help="Hive bot room: group chat between Phil and the bots")
+    room_sub = room.add_subparsers(dest="action", metavar="ACTION")
+
+    room_start = room_sub.add_parser("start", help="start or resume a room session")
+    room_start.add_argument("--room", default="hive", help="room name (default: hive)")
+    room_start.add_argument("--turns", type=int, help="max turns to run (default: 12)")
+    room_start.add_argument("-p", "--project", help="primary project override")
+
+    room_stop = room_sub.add_parser("stop", help="stop active room session")
+    room_stop.add_argument("--room", default="hive", help="room name (default: hive)")
+
+    room_say = room_sub.add_parser("say", help="post a message into the room")
+    room_say.add_argument("text", help="message to post")
+    room_say.add_argument("--room", default="hive", help="room name (default: hive)")
+    room_say.add_argument("--by", default="phil", help="author name (default: phil)")
+
+    room_show = room_sub.add_parser("show", help="show recent room messages")
+    room_show.add_argument("--room", default="hive", help="room name (default: hive)")
+    room_show.add_argument("-n", type=int, default=20, help="number of messages to show")
+
+    room_post = room_sub.add_parser("post-summary", help="post room summary to Q (PR #33)")
+    room_post.add_argument("--room", default="hive", help="room name (default: hive)")
+
     for action in sub._choices_actions:
         sub.choices[action.dest].description = action.help
     return parser
@@ -303,6 +327,24 @@ def main(argv: list[str] | None = None,
     if args.command == "chat":
         from .chat import run
         return run(backends, cfg, rater, statuses or plan_statuses)
+
+    if args.command == "room":
+        from . import room
+        action = getattr(args, "action", None)
+        if not action:
+            print("Usage: megazword room start|stop|say|show|post-summary", file=sys.stderr)
+            return 2
+        if action == "start":
+            return room.run_room(args.room, args.turns, args.project, backends=backends, cfg=cfg,
+                                 statuses=statuses or plan_statuses)
+        if action == "stop":
+            return room.stop(args.room)
+        if action == "say":
+            return room.say(args.room, args.text, author=args.by)
+        if action == "show":
+            return room.show(args.room, n=args.n)
+        if action == "post-summary":
+            return room.post_summary(args.room)
 
     # command == "run"
     try:

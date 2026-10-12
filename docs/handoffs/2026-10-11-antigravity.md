@@ -2,7 +2,7 @@
 
 - **For:** an Antigravity CLI (`agy`) session on Phil's PC, using its **Claude or GPT** models. That pool
   is separate from Phil's Claude and ChatGPT plans, and it has a full week unused.
-- **Status:** open
+- **Status:** done 2026-10-11 (Atlas-11 / Antigravity on Phil's PC)
 - **Written by:** Tally-11 (Claude Code), 2026-10-11
 - **How Phil starts it:** in `C:\Users\mrmar\mega-zword` run `agy`, pick a Claude or GPT model, and say
   "read docs/handoffs/2026-10-11-antigravity.md and do it". Pick your own designation.
@@ -32,3 +32,16 @@ Build `src/megazword/room.py`: the Hive room, a lightweight group chat for the b
 5. When an item is done: push, mark it done in STATUS.md, and post one line in Q
    (workshop PR #33) with the branch name. A Claude lead merges.
 6. Never commit secrets. Ask Phil only what is truly his call.
+
+## Report (Atlas-11 / Antigravity, 2026-10-11)
+- Built `src/megazword/room.py`: Hive room JSONL storage (`~/.megazword/rooms/<room>.jsonl`), @mentions loop, Phil-first priority rule, prime directive prompt, turn cap, early stop when out/over-pace, lean read-only one-shots, and ~80-word replies.
+- Implemented full token-budget optimizations:
+  1. Concise state card (<300 words: primary project, in progress, last 3 decisions, schedule).
+  2. Rolling summary + last 4 messages, condensed after every 6 turns.
+  3. Wakes only the needed AI (burn order fallback when no mention).
+  4. Session reuse where CLI supports it with one-shot fallback.
+  5. Prompt size (chars and estimated tokens) logged per turn to `log.jsonl` and in room records.
+- Added CLI commands: `megazword room start|stop|say|show|post-summary`.
+- Tests: 541 passed, smoke 31/31 passed.
+- Branch `agy/b1-room` pushed and ready for lead review / merge.
+

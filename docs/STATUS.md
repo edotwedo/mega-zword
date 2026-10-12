@@ -1,9 +1,9 @@
 # Status
 
-**Active:** Atlas-11 (Antigravity on Phil's PC), working on B1 Room Engine, 2026-10-11 ~18:36 PT.
+**Active: none.** (Atlas-11 / Antigravity on Phil's PC finished B1 room engine, cleared 2026-10-11 ~18:46 PT.)
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-11 by Atlas-11 (Antigravity): claimed B1 room engine.
+**Last updated:** 2026-10-11 by Atlas-11 (Antigravity): B1 room engine finished on branch agy/b1-room.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -41,13 +41,10 @@ Grok (available now; Oct 17 is its weekly reset) -> `docs/handoffs/2026-10-11-gr
   each provider's rule on one person holding several accounts (Phil asked about using several Gmail
   accounts). Quote the terms. Mega Zword builds nothing for multiple accounts unless the terms allow it.
 
-Antigravity Claude/GPT pool (Atlas-11 claimed B1; `agy` session on Phil's PC) -> `docs/handoffs/2026-10-11-antigravity.md`:
-- B1 Room engine (`src/megazword/room.py`): room file, turn loop with
-  @mentions, Phil-first rule, prime directive prompt, turn cap, out/pace
-  stops, lean read-only one-shots, reply cap. CLI `megazword room
-  start|stop|say|show`. Tests with fake CLIs. Includes the token-budget rules
-  (SPEC R "Token budget"): state card, rolling summary, wake only who's needed,
-  session reuse, prompt size logged per turn.
+Antigravity Claude/GPT pool (Atlas-11; B1 done on branch agy/b1-room) -> `docs/handoffs/2026-10-11-antigravity.md`:
+- B1 Room engine (DONE, 2026-10-11, Atlas-11): `src/megazword/room.py`, CLI `megazword room
+  start|stop|say|show|post-summary`. Branch `agy/b1-room` ready for lead to merge.
+  Tests: 541 passed, smoke 31/31. Token-budget rules verified.
 
 Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
 - First: push the unsaved Tahoma Table board (workshop handoff 2026-10-11-unsaved-work-audit.md).
@@ -113,6 +110,7 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
 5. Each step: check `megazword usage` first, claim the item here, post one line in Q when done.
    If a bot runs low, the next one with room takes over its item.
 ## Done
+- **B1 Room engine (Atlas-11 / Antigravity, 2026-10-11):** Built `src/megazword/room.py` and CLI commands `megazword room start|stop|say|show|post-summary`. Hive room JSONL storage (`~/.megazword/rooms/<room>.jsonl`), turn loop with `@mentions` targeting, Phil-first priority rule, prime directive prompt, turn cap (default 12), out/over-pace early stops, lean read-only one-shots, and ~80-word replies. Implements token-budget optimizations: state card (<300 words), rolling summary + last 4 messages with automatic condensation after every 6 turns, waking only the needed AI (burn order fallback), CLI session reuse where supported, and per-turn prompt size logging to `log.jsonl`. 541 passed, smoke 31/31. Branch `agy/b1-room`, handed to Tally-11 to merge.
 - **Gemini usage meter (Tally-11, 2026-10-11):** `usage_sources.gemini()` runs `agy -p /usage --output-format json` (Antigravity's quota panel, documented; field shape command.data.groups[].buckets[] with remaining_fraction + reset_time, from a public bug report, not yet seen on Phil's PC). Gemini-group buckets become the 5-hour/weekly meter; other groups shown, never block. No agy: falls back to run counts. Tests never run a real agy (conftest). Verified end to end in the cloud with a fake agy and fake Codex log: `megazword usage`, start screen and dashboard /api/state all show codex 42% and gemini 30%. **Not verified live:** real agy JSON on Phil's PC, and the Claude meter (needs his login). Check: `megazword usage`. If gemini shows an error, paste `agy -p /usage --output-format json` output to fix the parser. 520 passed / 1 skipped, smoke 27/27.
 - **Gemini via Antigravity (Tally-11, Claude cloud, 2026-10-11, Phil's request):** Google retired the Gemini CLI for personal accounts; `-m gemini` now runs `agy -p --mode plan --output-format text --disable-slash-commands` (prompt on stdin) when `agy` is on PATH, else the old `gemini` command. Doctor finds agy; login hint says `agy`. Flags from Phil's `agy --help` (1.3.3). Phil installed and signed in to agy on his PC. **Not yet verified live:** that agy print mode reads the prompt from stdin. Check on the PC: `megazword run -m gemini "say hi"`. If agy ignores stdin, switch AGY_ARGS in backends.py to pass `{prompt_file}` or `{prompt}`. 517 passed / 1 skipped, smoke 27/27.
 - **Beta 1 (2026-10-11, Tally-11, Claude cloud, Phil's call):** merged `codex/guide` (C7 user guide + SPEC status, Cedar-7 Tailscale note), version 0.1.0b1, marker branch `release/beta-1` (tag push blocked from the cloud; Next up item 5). 515 passed / 1 skipped, smoke 27/27. Anything still only on a PC was not in the remote; push it and it goes into beta 2.
