@@ -1,6 +1,6 @@
 # Status
 
-**Active: Tally-11 (lead, Claude Code on Phil's PC), 2026-10-11 ~22:20 PT.** Merged Grok's agy empty-answer fix and Codex's B14 review (Z.ai label). Next: **Grok B15** (Nimbus-12 already queued it; Grok built B14), **Codex B12**, then B13, B5, B4, B6. Calendar B10/B11 parked (Phil). Room summaries now post to Q only with `--post`.
+**Active: Larch-11 (Codex), 2026-10-12 04:06 PT.** Implementing B12 per-task model and effort choices for Claude, Codex, and Gemini. Start with provider argument handling and config, then run required fake-only tests and smoke. Next after B12: review Grok B15, then B13.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
 **Last updated:** 2026-10-11 22:20 PT by Tally-11. Usage at 22:04 PT (5h/week % used): Claude 0/45, Codex 4/45, Grok -/15, Gemini out until Oct 18.
@@ -57,7 +57,7 @@ Codex (Larch-11) -> `docs/handoffs/2026-10-11-codex.md`:
 - B4 Hive tab UI: room stream, Phil's input box, Start/Pause/Stop, primary
   project, who is talking, turns left. Needs B1's and B3's APIs.
 - B6 Custom title bar and icons for `--app`; GUIDE.md and README for tabs and the room.
-- **B12 next:** per-task model choice for every AI (extends Grok's `[grok.easy|medium|hard]`): add
+- **B12 (Larch-11, active 2026-10-12):** per-task model choice for Claude, Codex, and Gemini (extends Grok's `[grok.easy|medium|hard]`): add
   `[claude.<level>]`, `[codex.<level>]`, `[gemini.<level>]` with model + effort. Flags: `claude --model
   --effort`, `codex -m` and `-c model_reasoning_effort=...`, `agy --model --effort`. Unset level =
   that CLI's own default (keep Phil's Codex model unless he sets one). Show the choice in the run
