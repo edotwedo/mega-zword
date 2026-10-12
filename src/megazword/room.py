@@ -8,7 +8,8 @@ import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -45,6 +46,28 @@ class RoomState:
     last_speaker: str | None = None
     rolling_summary: str = ""
     summarized_count: int = 0
+    # One running session per room (B1 second look, Tally-11): its id and last sign of life.
+    session: str = ""
+    heartbeat: str = ""
+
+
+STALE_AFTER = timedelta(minutes=20)  # longer than one slow turn (the CLI timeout is 10 min)
+
+
+def _valid_room(room: str) -> str:
+    if not room or not all(c.isalnum() or c in "-_" for c in room):
+        raise ValueError(f"room name {room!r}: use letters, digits, - and _")
+    return room
+
+
+def other_session_running(state: RoomState, now: datetime | None = None) -> bool:
+    if not state.active or not state.heartbeat:
+        return False
+    try:
+        beat = datetime.fromisoformat(state.heartbeat)
+    except ValueError:
+        return False
+    return (now or datetime.now(timezone.utc)) - beat < STALE_AFTER
 
 
 def room_dir(home: Path | None = None) -> Path:
@@ -52,11 +75,11 @@ def room_dir(home: Path | None = None) -> Path:
 
 
 def room_path(room: str = DEFAULT_ROOM, home: Path | None = None) -> Path:
-    return room_dir(home) / f"{room}.jsonl"
+    return room_dir(home) / f"{_valid_room(room)}.jsonl"
 
 
 def state_path(room: str = DEFAULT_ROOM, home: Path | None = None) -> Path:
-    return room_dir(home) / f"{room}.state.json"
+    return room_dir(home) / f"{_valid_room(room)}.state.json"
 
 
 def summary_dir(home: Path | None = None) -> Path:
@@ -384,6 +407,13 @@ def run_room(room: str = DEFAULT_ROOM,
     backends = backends or default_backends(edit=False, free_models=cfg.free, lean=cfg.lean)
 
     state = load_state(room, home)
+    if other_session_running(state):
+        write(f"[megazword room] room '{room}' is already running in another window; "
+              "`megazword room stop` ends it")
+        return 1
+    me = uuid.uuid4().hex
+    state.session = me
+    state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
     state.primary = primary
     state.active = True
     state.stopped = False
@@ -402,6 +432,10 @@ def run_room(room: str = DEFAULT_ROOM,
             if state.stopped:
                 write(f"[megazword room] session stopped on command")
                 break
+            if state.session != me:  # stopped and restarted elsewhere: the newer one wins
+                write("[megazword room] a newer session took over this room; stopping")
+                break
+            state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
             messages = read_messages(room, home)
             last_msg = messages[-1] if messages else None
@@ -449,9 +483,13 @@ def run_room(room: str = DEFAULT_ROOM,
             # Save message
             appended = append_message(room, speaker, text, prompt_chars=prompt_chars, home=home)
             turns_taken += 1
-            state.turn_count += 1
-            state.last_speaker = speaker
-            save_state(state, home)
+            # Reload: a Stop or a newer session may have changed the state during the turn.
+            state = load_state(room, home)
+            if state.session == me:
+                state.turn_count += 1
+                state.last_speaker = speaker
+                state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                save_state(state, home)
 
             # Log to run log
             log.append(
@@ -464,7 +502,7 @@ def run_room(room: str = DEFAULT_ROOM,
 
             write(f"[{speaker}] {text}")
 
-        if turns_taken >= LESSON_MIN_TURNS:
+        if turns_taken >= LESSON_MIN_TURNS and load_state(room, home).session == me:
             cur_statuses = (statuses or (lambda: {}))()
             eligible = get_eligible_backends(backends, cfg, cur_statuses)
             order = get_burn_order(eligible, cur_statuses)
@@ -480,8 +518,9 @@ def run_room(room: str = DEFAULT_ROOM,
         messages = read_messages(room, home)
         save_summary_report(room, messages, primary, home)
         state = load_state(room, home)
-        state.active = False
-        save_state(state, home)
+        if state.session == me:  # don't mark a newer session's room idle
+            state.active = False
+            save_state(state, home)
         write(f"[megazword room] session finished ({turns_taken} turns)")
 
     return 0
@@ -489,10 +528,8 @@ def run_room(room: str = DEFAULT_ROOM,
 
 def say(room: str, text: str, author: str = "phil",
         home: Path | None = None, write: Callable[[str], None] = print) -> int:
-    """Post a message to the room. Clears any stop flag."""
-    state = load_state(room, home)
-    state.stopped = False
-    save_state(state, home)
+    """Post a message to the room. It doesn't clear a stop: a message typed after Stop
+    must not restart a session that is still finishing its turn (`room start` does that)."""
     msg = append_message(room, author, text, home=home)
     write(f"[{msg.author}] {msg.text}")
     return 0

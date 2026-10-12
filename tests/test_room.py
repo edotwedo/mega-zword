@@ -299,3 +299,56 @@ def test_short_room_session_skips_lessons(tmp_path):
                   cfg=cfg, write=lambda s: None, home=tmp_path)
     assert len(claude.calls) == 2
     assert not [e for e in Memory(tmp_path, "workshop").entries() if e.kind == "lesson"]
+
+
+def test_second_session_is_refused_while_first_is_alive(tmp_path):
+    from datetime import datetime, timezone
+    state = room.load_state("hive", tmp_path)
+    state.active, state.session = True, "other"
+    state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    room.save_state(state, tmp_path)
+    out = []
+    code = room.run_room("hive", max_turns=1, project="workshop",
+                         backends={"claude": FakeBackend("claude")},
+                         cfg=config.Config(log_path=tmp_path / "log.jsonl"),
+                         write=out.append, home=tmp_path)
+    assert code == 1 and "already running" in out[-1]
+    assert room.load_state("hive", tmp_path).session == "other"
+
+
+def test_stale_session_does_not_block(tmp_path):
+    state = room.load_state("hive", tmp_path)
+    state.active, state.session, state.heartbeat = True, "dead", "2026-01-01T00:00:00+00:00"
+    room.save_state(state, tmp_path)
+    room.say("hive", "hi @claude", home=tmp_path, write=lambda s: None)
+    code = room.run_room("hive", max_turns=1, project="workshop",
+                         backends={"claude": FakeBackend("claude")},
+                         cfg=config.Config(log_path=tmp_path / "log.jsonl"),
+                         write=lambda s: None, home=tmp_path)
+    assert code == 0 and not room.load_state("hive", tmp_path).active
+
+
+def test_newer_session_takes_over_and_say_keeps_stop(tmp_path):
+    room.set_stopped("hive", True, tmp_path)
+    room.say("hive", "one more thing @claude", home=tmp_path, write=lambda s: None)
+    assert room.load_state("hive", tmp_path).stopped  # typing after Stop doesn't un-stop
+
+    class Takeover(FakeBackend):
+        def _run(self, prompt):
+            s = room.load_state("hive", tmp_path)
+            s.session = "newer"
+            room.save_state(s, tmp_path)
+            return super()._run(prompt)
+
+    bot = Takeover("claude", reply="hi")
+    out = []
+    room.run_room("hive", max_turns=5, project="workshop", backends={"claude": bot},
+                  cfg=config.Config(log_path=tmp_path / "log.jsonl"), write=out.append,
+                  home=tmp_path)
+    assert len(bot.calls) == 1 and any("newer session" in line for line in out)
+    assert room.load_state("hive", tmp_path).session == "newer"
+
+
+def test_room_names_cannot_leave_the_rooms_folder(tmp_path):
+    with pytest.raises(ValueError):
+        room.room_path("../evil", tmp_path)
