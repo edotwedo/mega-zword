@@ -26,8 +26,18 @@ def run(cmd, timeout):
     return (out.stdout or out.stderr).strip()
 
 
+def find_megazword() -> str | None:
+    """PATH first; else Phil's install (Claude Code's PATH on his PC doesn't include
+    the venv, checked 2026-10-12)."""
+    found = shutil.which("megazword")
+    if found:
+        return found
+    venv = Path.home() / "mega-zword" / ".venv" / "Scripts" / "megazword.exe"
+    return str(venv) if venv.is_file() else None
+
+
 def reading() -> str:
-    exe = shutil.which("megazword")
+    exe = find_megazword()
     if not exe:
         return "megazword is not on PATH here, so read the usage board in Q now."
     try:
