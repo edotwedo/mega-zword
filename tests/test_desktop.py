@@ -131,3 +131,30 @@ def test_failed_shortcut_raises(tmp_path):
     import pytest
     with pytest.raises(OSError, match="access denied"):
         desktop.install_shortcut(run=lambda cmd, **kw: Failed(), env={"APPDATA": str(tmp_path)})
+
+
+def test_broken_desktop_window_falls_back_to_the_browser_window(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setattr(dashboard.config, "load",
+                        lambda: config.Config(log_path=tmp_path / "log.jsonl"))
+    port = free_port()
+
+    def no_webview2(url, on_closed=None):
+        raise RuntimeError("WebView2 runtime not found")
+
+    opened = []
+
+    def browser_window(url):
+        # The server is back up for the fallback window; then stop it like Ctrl+C would.
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            opened.append((url, resp.status))
+        import _thread
+        _thread.interrupt_main()
+        return "ok"
+
+    monkeypatch.setattr(desktop, "available", lambda: True)
+    monkeypatch.setattr(desktop, "run_window", no_webview2)
+    monkeypatch.setattr("megazword.appwindow.open_app", browser_window)
+    assert dashboard.serve(port, project="proj", open_browser=True, app_window=True) == 0
+    assert opened == [(f"http://127.0.0.1:{port}/", 200)]
+    assert "desktop window failed (RuntimeError: WebView2 runtime not found)" in capsys.readouterr().err

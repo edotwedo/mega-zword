@@ -583,11 +583,16 @@ def serve(port: int = 8765, project: str | None = None, open_browser: bool = Tru
             worker.start()
             try:
                 desktop.run_window(url)
-            finally:
+            except Exception as exc:  # e.g. no WebView2 runtime: use the browser window
+                server.shutdown()
+                worker.join(5)
+                print(f"[megazword] desktop window failed ({type(exc).__name__}: "
+                      f"{str(exc)[:120]}); using a browser app window", file=sys.stderr)
+            else:
                 app.shutdown()
                 server.shutdown()
                 server.server_close()
-            return 0
+                return 0
     if open_browser and app_window:
         from .appwindow import open_app
 
