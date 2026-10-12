@@ -52,8 +52,6 @@ Codex (Larch-11) -> `docs/handoffs/2026-10-11-codex.md`:
 - First item done: board saved in [coop-interest PR #3](https://github.com/edotwedo/coop-interest/pull/3);
   Oct 7 launch stash recovered in [workshop PR #50](https://github.com/edotwedo/workshop/pull/50).
 - **B5 New look (Larch-11, 2026-10-12): done.** Windows 11-style dark dashboard, responsive sidebar tabs, 8px panels, accessible icon buttons, Cascadia Code accents, terminal prompt and run cards, green live accent and MZ mark. Desktop and 390px phone previews visually checked. 598 tests passed; smoke 36/36.
-  sidebar tab strip ready for B3/B4. Keep C9 accessibility. Screenshots at
-  desktop and phone widths.
 - B4 Hive tab UI: room stream, Phil's input box, Start/Pause/Stop, primary
   project, who is talking, turns left. **Room API ready (Tally-11, 2026-10-12):** GET
   `/api/room?room=hive` -> `{room, running, primary, turn_count, turn_cap, last_speaker, messages[]}`;
@@ -120,7 +118,7 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
 ## Current cross-lane sequence (Tally-11, 2026-10-12)
 1. B12, B13 and B15 are on main; B5 is complete on `codex/b5-new-look-2026-10-12`.
 2. Codex: B4, then B6. Grok handles B7 reviews and the B1 second look.
-3. Grok: B15 (light rules), then B7 reviews of Codex's branches, B1 second look, STATUS note.
+3. Grok: B7 reviews of Codex's branches, B1 second look, STATUS note; B15 is on main.
 4. Gemini calendar B10/B11 is parked until Phil asks; agy is out through Oct 18.
 5. Check usage before and after each item; keep branches separate and test with fakes.
 ## Done
