@@ -134,8 +134,9 @@ def test_b14_backends_exist_off_route_and_train_flags():
     backends = default_backends()
     for name in NEW_FREE:
         assert name in backends
-        for names in config.DEFAULT_ROUTE.values():
-            assert name not in names
+        for level, names in config.DEFAULT_ROUTE.items():
+            # B15 (Phil): only Mistral is routed by default, first in `easy`.
+            assert name not in names or (name, level) == ("mistral", "easy")
         assert name not in default_backends(edit=True)
     assert not backends["zai"].trains_on_data
     assert backends["gemini-api"].trains_on_data

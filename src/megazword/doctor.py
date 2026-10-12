@@ -115,7 +115,8 @@ def checks(home: Path | None = None) -> list[Check]:
     found.append(Check("WARN" if odd else "OK", "model levels",
                        ", ".join(picks) if picks else "CLI defaults",
                        f"unknown effort: {', '.join(odd)}" if odd else ""))
-    known = {"claude", "codex", "grok", "gemini", "openrouter", "groq"}
+    from .config import DEFAULT_FREE
+    known = {"claude", "codex", "grok", "gemini", *DEFAULT_FREE}
     unknown = sorted({name for route in cfg.route.values() for name in route
                       if name not in known})
     found.append(Check("WARN" if unknown else "OK", "routes",

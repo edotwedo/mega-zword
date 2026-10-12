@@ -223,8 +223,12 @@ def candidates(rating: Rating, route: dict[str, list[str]],
         if statuses is not None:
             level_names = rank(statuses, level_names, rating.level)
         names += [n for n in level_names if n not in names]
-    return [backends[n] for n in names
-            if n in backends and n not in out and backends[n].available()]
+    chain = [backends[n] for n in names
+             if n in backends and n not in out and backends[n].available()]
+    if rating.level == "easy":
+        # B15 (Phil): AIs that train on prompts go first for small repetitive jobs.
+        chain.sort(key=lambda b: not getattr(b, "trains_on_data", False))
+    return chain
 
 
 def opens_app() -> bool:

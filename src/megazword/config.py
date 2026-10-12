@@ -57,7 +57,9 @@ DEFAULT_GROK = {
 DEFAULT_ROUTE = {
     # First installed AI in each list wins. Placeholder order until usage
     # tracking (build step 2) can rank them by remaining usage.
-    "easy": ["grok", "codex", "claude"],
+    # Mistral first for small repetitive jobs (B15, Phil 2026-10-11); it is only
+    # used when MISTRAL_API_KEY is set.
+    "easy": ["mistral", "grok", "codex", "claude"],
     "medium": ["codex", "claude", "grok"],
     "hard": ["claude", "codex", "grok"],
 }

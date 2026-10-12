@@ -44,6 +44,9 @@ class Backend:
     def run(self, prompt: str) -> Result:
         start = time.monotonic()
         try:
+            if self.trains_on_data:  # B15: the one light guard for AIs that train on prompts
+                from .guard import scrub
+                prompt = scrub(prompt)
             text = self._run(prompt)
             return Result(self.name, text.strip(), True, time.monotonic() - start)
         except Exception as exc:  # report any failure as a result, never crash the router
