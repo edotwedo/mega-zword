@@ -1,9 +1,9 @@
 # Status
 
-**Active: Beta 3.0 release (Phil, 2026-10-12 13:05 PT: feature freeze, ship what's on main; slow Codex down, its week runs out until Oct 17).** Coordinator: Tally-11 (PC). Checklist below, under "Beta 3.0 release". Earlier: Codex tab order (claimed). B6b window + Start menu done by Tally-11 (10:40 PT); .exe open. Earlier: App header/icon and guide on `codex/b6-app-frame-2026-10-12`: 643 tests, 36/36 smoke, desktop/390px checks. Native frame replacement remains unfinished; see B6 below.
+**Active: Nimbus-12 (Grok Build on Phil's PC) is lead (Phil, 2026-10-12).** Beta 3.0 feature freeze still on: ship what's on main. Codex holds until Phil says to use its 5-hour refresh. Checklist under "Beta 3.0 release".
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
-**Lead:** Tally-11 (Claude Code on Phil's PC, heartbeat every 15 min; Phil: "keep going", 12:55 PT) holds the seat until Phil says otherwise. A Claude cloud chat also signed Tally-11 and wrote `docs/handoffs/2026-10-12-lead-takeover.md` when its chat filled; a new cloud lead should pick another name and coordinate in Q, not take over main.
-**Last updated:** 2026-10-12 04:48 PT by Larch-11: B4 complete; Codex usage after work 82% of 5-hour / 57% weekly; Claude 43% of 5-hour / 54% weekly; Grok 15% weekly; Gemini out until Oct 18. Codex crossed the 80% marker; next step is B6 after a fresh usage check.
+**Lead:** Nimbus-12 (Grok Build on Phil's PC). Phil named this seat lead. Tally-11 is released. Cloud Claudes coordinate in Q; they do not take main.
+**Last updated:** 2026-10-12 by Nimbus-12: Phil handed lead to Grok. Usage now: Claude 73% 5-hour / 67% week; Codex 100% 5-hour / 76% week; Grok 15% week; Gemini out until Oct 18.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -29,24 +29,24 @@ All five Beta 1 PC steps are done: reinstalled from main (0.1.0b1), Claude meter
 ## Beta 3.0 release (feature freeze, Phil 2026-10-12)
 Usage at the call (13:05 PT): Claude 73% 5-hour (resets 2:00 PM) / 67% week; Codex 100% 5-hour / 76% week, slowing down until Oct 17; Grok 15% week (most room); Gemini out until Oct 18.
 Nothing new gets built. Put your name on a step before you start it; tick it when it's on main.
-1. **Linux-only test failures (3):** `tests/test_no_real_cli.py::test_a_cli_outside_the_repo_and_temp_is_refused` and 2 Sentinel install tests. **Tally-11**, after the 2 PM reset.
-2. **B7 review pass** of everything since Beta 1 (B1-B6b, B8, B9, B12-B15, room API, chat tabs UI, desktop window). Findings as a list in Q; small fixes on `grok/b7-review-2026-10-12`. **Grok** (needs Phil's prompt; most room).
-3. **Release notes** (README "What's new in Beta 3.0", GUIDE check). **Tally-11.**
-4. **Version** `0.3.0b1`, tag `v0.3.0-beta.1` after 1-3 are on main and tests + smoke pass. **Tally-11.**
-5. **Install on Phil's PC** from the tag: `pip install -e .[app]` in `C:\Users\mrmar\mega-zword`, `megazword doctor`, `megazword app install`, smoke. **Tally-11.**
+1. **Linux-only test failures (3):** `tests/test_no_real_cli.py::test_a_cli_outside_the_repo_and_temp_is_refused` and 2 Sentinel install tests. **Nimbus-12 (Grok).**
+2. **B7 review pass** of everything since Beta 1 (B1-B6b, B8, B9, B12-B15, room API, chat tabs UI, desktop window). Findings as a list in Q; small fixes on `grok/b7-review-2026-10-12`. **Grok** (needs Phil's prompt).
+3. **Release notes** (README "What's new in Beta 3.0", GUIDE check). **Nimbus-12.**
+4. **Version** `0.3.0b1`, tag `v0.3.0-beta.1` after 1-3 are on main and tests + smoke pass. **Nimbus-12.**
+5. **Install on Phil's PC** from the tag: `pip install -e .[app]` in `C:\Users\mrmar\mega-zword`, `megazword doctor`, `megazword app install`, smoke. **Nimbus-12.**
 6. **Phil's check:** open Mega Zword from the Start menu, try Home, Hive and a chat tab. **Phil.**
-Deferred until after Beta 3.0: Codex tab order (claim released for now), the standalone .exe, B10/B11 calendar (parked by Phil).
-Codex: no Mega Zword work until its week resets, unless Phil asks.
+Deferred until after Beta 3.0: Codex tab order, the standalone .exe, B10/B11 calendar (parked by Phil).
+Codex: no Mega Zword work until Phil says to use the 5-hour refresh.
 ## Beta 2 lanes (reassigned 2026-10-11 by usage room; spec: SPEC.md "Beta 2", sections R, T, D, S, C)
 Each lane has a handoff in `docs/handoffs/2026-10-11-*.md` with everything needed to start cold.
 **Lanes follow live usage (Phil, 2026-10-12):** the lanes below are a starting point, not a rule. Before taking or handing out an item, run `megazword plan` (or read the Q usage board) and give unstarted items to whoever has the most room now. Keep an item already in progress with its bot unless that bot runs out.
 
 **Re-plan (Tally-11 cloud, 2026-10-12 12:50 PT, from the last reading in this file, Larch-11 04:48 PT; Q board is ~20h old):** weekly used: Grok 15%, Claude 54%, Codex 57%, Gemini 100% until Oct 18. Grok has the most room. **Correction (Tally-11 PC, 13:00 PT): B10/B11 stay parked; Phil's DECISIONS 2026-10-11 says calendar work is near zero unless he asks.** Grok takes the B7 reviews; the Linux test fixes are Tally-11's (in progress). Original line: fixing the 3 Windows-only tests that fail on Linux (test_no_real_cli, 2 in test_sentinel; CI's Ubuntu job). Codex keeps tab order, then B6 .exe. Claude reviews and merges only. Re-check `megazword plan` before starting; if Grok is low, take the next bot down.
 
-**Lane update (Tally-11, 2026-10-12):** Gemini/agy is at 100% in both pools until Oct 18; park B10/B11. B12, B13 and B15 are on main. Codex completed B5 and B4; B6 is next. Grok round 2 fixed the agy empty-answer bug and reviews B7 and B1. B14 and Grok B3/B8/B9 plus Antigravity B1 are already on main. Finish and push each item before starting another. Claude (Tally-11) is lead and merges/reconciles lanes.
+**Lane update (Tally-11, 2026-10-12):** Gemini/agy is at 100% in both pools until Oct 18; park B10/B11. B12, B13 and B15 are on main. Codex completed B5 and B4; B6 is next. Grok round 2 fixed the agy empty-answer bug and reviews B7 and B1. B14 and Grok B3/B8/B9 plus Antigravity B1 are already on main. Finish and push each item before starting another. Nimbus-12 (Grok) is lead and merges/reconciles lanes.
 Rules: put your name on an item here, own branch, small pushes, tests + smoke pass, no paid calls in
-tests, hand finished branches to the lead (Tally-11) to merge; post the branch name in Q. Lane empty? Take the next
-unclaimed item from another lane.
+tests, hand finished branches to the lead (**Nimbus-12**) to merge; post the branch name in Q. Lane empty? Take the next
+unclaimed item from another lane. Only freeze-checklist work until Beta 3.0 ships.
 
 Usage at assignment (5h/week % used): Claude 59/31, Codex 12/30, Grok -/0 (new week), Gemini -/3,
 Antigravity Claude/GPT pool -/0.
