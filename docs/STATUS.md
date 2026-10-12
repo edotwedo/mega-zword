@@ -1,9 +1,9 @@
 # Status
 
-**Active: none.** (Tally-11, Claude Code on Phil's PC, cleared 2026-10-11 ~16:45 PT.)
+**Active: Nimbus-12 (Grok Build on Phil's PC), 2026-10-12 ~afternoon PT.** Branch `grok/beta2-2026-10-11`. Doing R1 (free-tier re-check), then B3.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-12 by Tally-11 (Claude cloud): lead change; B1 token-budget rules added.
+**Last updated:** 2026-10-12 by Nimbus-12 (Grok Build): claimed R1 + posted today's free-tier table under B14.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -29,17 +29,14 @@ Usage at assignment (5h/week % used): Claude 59/31, Codex 12/30, Grok -/0 (new w
 Antigravity Claude/GPT pool -/0.
 
 Grok (available now; Oct 17 is its weekly reset) -> `docs/handoffs/2026-10-11-grok.md`:
-- B3 Tabs backend: `tabs.json`, per-tab AI/project/history, dashboard API for
+- **R1 (Nimbus-12, 2026-10-12): done.** Table under B14. Codex can start B14.
+- **B3 Tabs backend (Nimbus-12, next):** `tabs.json`, per-tab AI/project/history, dashboard API for
   list/create/rename/close/send; reuse chat's lean flags and failure text.
 - B8 Sentinel collector: event-log reader (reboots, logins, network),
   `sentinel.jsonl`, `megazword sentinel status|log`, dashboard panel. Fake
   event data in tests; no admin needed to run tests.
 - B9 Sentinel alerts: production URL checks, ntfy push, healthchecks.io ping,
   `megazword sentinel install`, docs for Phil's one-time setup.
-- R1 (do first, it's quick): re-check the free tiers in B14 against each provider's own pricing page
-  today; post a table (limits, signup needs, data-training terms) in STATUS under B14. Also record
-  each provider's rule on one person holding several accounts (Phil asked about using several Gmail
-  accounts). Quote the terms. Mega Zword builds nothing for multiple accounts unless the terms allow it.
 
 Antigravity Claude/GPT pool (unused; `agy` session on Phil's PC) -> `docs/handoffs/2026-10-11-antigravity.md`:
 - B1 Room engine (`src/megazword/room.py`): room file, turn loop with
@@ -67,18 +64,27 @@ Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
   detached and print one line saying so; keep the text start screen as `megazword start` (and when
   stdout isn't a terminal, or `MEGAZWORD_NO_APP=1`, keep today's start screen so tests and scripts
   don't open windows). Update `--help`, GUIDE.md, tests.
-- B14 More free AIs (research 2026-10-11; Grok re-checks limits first, see R1). Add as optional
+- B14 More free AIs (research 2026-10-11; **R1 table 2026-10-12 by Nimbus-12**). Add as optional
   backends beside OpenRouter/Groq in `free_apis.py` (OpenAI-compatible HTTP, key from env, never
-  routed by default, shown in `backends`/doctor, per-provider request counts as their meter):
-  1. Cloudflare Workers AI: 10,000 Neurons/day free, no card; Kimi K2.5, Qwen3, gpt-oss-120b,
-     Llama 3.3 70B. Phil already has a Cloudflare account (needs an account id + API token).
-  2. Z.ai GLM Flash (GLM-4.7-Flash listed free on the price sheet).
-  3. Google AI Studio Gemini API free tier (separate from agy's pool).
-  4. NVIDIA NIM free credits.
-  5. Mistral "Experiment" tier (~1B tokens/month free). Phil OKed it 2026-10-11 even though it trains on
-     what we send; it goes in with B15's light rules (marked `trains_on_data`; first in line for repetitive jobs).
+  routed by default, shown in `backends`/doctor, per-provider request counts as their meter).
+  **Codex: use the table below; do not invent extra quota numbers.**
   Skip: Perplexity (no free API), Qwen Code OAuth (ended 2026-04-15), GitHub Models (closed),
   Cerebras (now a 30-day $5 credit).
+
+### R1 free-tier check (Nimbus-12, 2026-10-12)
+Read from each provider's own pricing/terms pages today. **Several Gmail/email accounts to stack free quota: do not build.** None of these terms allow Mega Zword to rotate extra personal accounts to multiply the free pool.
+
+| Provider | Today's free limit | Signup | Trains on our data? | Several accounts (one person)? |
+|---|---|---|---|---|
+| **Cloudflare Workers AI** | **10,000 Neurons/day** on Workers Free and Workers Paid; resets 00:00 UTC. Over that needs Workers Paid ($0.011 / 1,000 Neurons). Some models need Paid or AI Gateway credits: Kimi K2.6 / K2.7-code, GLM-5.2 / 5.3 / 5.3-flash, DeepSeek v4. Still free-catalog: Kimi K2.5, Qwen3, gpt-oss-120b, Llama 3.3 70B. Text gen ~300 req/min (Paid-only models 20/min). | Cloudflare account (Phil has one). Account id + API token. No card for Workers Free. | **No (default).** Service-specific terms: "Unless otherwise agreed, Cloudflare does not use any Customer Content to train generative AI tools." | Cloudflare now lets one login create extra **accounts** (dashboard New Account) for project/team split, independently billed. That is not a license to farm extra daily Neurons with throwaway emails; abuse is blocked. **One Cloudflare account is enough.** |
+| **Z.ai GLM Flash** | **GLM-4.7-Flash, GLM-4.5-Flash, GLM-4.6V-Flash listed Free** (in/out/cached). GLM-5.3-Flash is **paid** ($0.15 / $0.50 per 1M). Rate limits are account-side, not printed as a monthly token cap on the price sheet. | Z.ai account + API key. | **Individuals: yes.** Terms IV.3.a: for individual users they process User Content "to improve our existing Services and/or to develop new products," including "developing and improving our machine learning and artificial intelligence technologies." **API enterprises/developers: no unless they opt in** ("we will not use your User Content for developing or improving Services unless you explicitly agree"). | Campaign rules: "Each natural person may only use **one platform account**." Coding Plan is "tied to a single account" and "You shall not share your account." Circumventing security measures is banned. **Do not stack Gmails.** |
+| **Google AI Studio / Gemini API** (not agy) | Many Flash models **free of charge** within project rate limits, including Gemini 3.8 Flash. Google **does not publish** free-tier RPM/TPM/RPD on the pricing page (Sept 2026); numbers live in AI Studio per project. Grounding Search is not on the free API tier for Gemini 3.x. | Google account; AI Studio API key. No card for Free. | **Yes on unpaid quota.** Pricing page: "Content used to improve our products." Terms: "When you use Unpaid Services, including… Google AI Studio and the unpaid quota on Gemini API, Google uses the content you submit… and any generated responses to provide, improve, and develop Google products… and machine learning technologies." "Do not submit sensitive, confidential, or personal information to the Unpaid Services." Paid (Cloud Billing on the project): not used to improve products. EEA/UK/CH unpaid follows Paid data rules. | Google APIs Terms §2.d: "You agree to, and **will not attempt to circumvent**, such limitations." Gemini Additional Terms: unpaid Studio/API is Unpaid Services. Staff on the Antigravity forum (consumer AI Pro, same Google identity rules): cycling several accounts to pool quota is a ToS violation. **Do not stack Gmails. One API key / one project.** |
+| **NVIDIA NIM** (build.nvidia.com) | **No published credit dollar amount on the NIM docs today.** Official line: NVIDIA Developer Program members have **free access to hosted NIM API endpoints for prototyping**; downloadable NIM for research/dev/test on up to 16 GPUs; **production needs NVIDIA AI Enterprise**. Product page: "unlimited prototyping" / "Start Prototyping for Free." Per-model rate limits live in the catalog UI, not a single public RPM/RPD table. | NVIDIA Developer Program account (email; phone verification is commonly required). No card for the prototype endpoints. | **Hosted prototype endpoints: NVIDIA says data is not used for model training.** Product page: "Ensure your data isn't used for model training." NIM *containers* may collect telemetry (settings/usage/hardware) unless `NIM_TELEMETRY_MODE=0`. | Developer Program access is a **personal** non-production license. No NIM pricing page authorizes extra accounts to multiply hosted quota. **Do not stack emails.** |
+| **Mistral** (was "Experiment") | Now called **Free mode** (default). Help center: lowest RPS / tokens-per-minute / **tokens-per-month**, "intended for evaluation and prototyping." **The old ~1B tokens/month figure is no longer published**; live numbers are on Admin → Limits. The $10/month API-credit line was removed from the pricing page (~2026-10-07). No card to create a Studio API key. | Mistral account; Studio API key (not a Vibe Code CLI plan key). | **Yes on Free mode, unless Phil opts out.** Help: "As stated during subscription, we may use your data (input and output) to train our artificial intelligence models." Opt out: Admin → Privacy → disable **Anonymous improvement data**. Preview/Labs models can still train even with opt-out (Commercial ToS). Goes in with B15 `trains_on_data`. | Limits are **organization-level** across workspaces. No published permission to multiply Free mode with extra emails. **Do not stack.** |
+
+Sources (opened 2026-10-12): [Cloudflare Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/) (updated 2026-10-09); [Cloudflare Workers AI service terms](https://www.cloudflare.com/service-specific-terms-developer-platform/); [Z.ai pricing](https://docs.z.ai/guides/overview/pricing); [Z.ai Terms of Use](https://docs.z.ai/legal-agreement/terms-of-use) (2026-04-14); [Gemini Developer API pricing](https://ai.google.dev/gemini-api/docs/pricing); [Gemini API Additional Terms](https://ai.google.dev/gemini-api/terms) (effective 2026-03-23); [Google APIs Terms](https://developers.google.com/terms) §2.d; [NVIDIA Run NIM Anywhere / Pricing](https://docs.api.nvidia.com/nim/docs/run-anywhere); [NVIDIA NIM product page](https://www.nvidia.com/en-gb/ai-data-science/products/nim-microservices/); [Mistral rate-limit help](https://help.mistral.ai/en/articles/698531-why-am-i-hitting-api-rate-limits-and-how-do-i-increase-them); [Mistral training help](https://help.mistral.ai/en/articles/347617-do-you-use-my-user-data-to-train-your-artificial-intelligence-models).
+
+**For Codex (B14):** Cloudflare, Z.ai Flash (free models only), Gemini API unpaid, NVIDIA NIM prototype, Mistral Free mode. Mark Gemini unpaid + Z.ai individual + Mistral Free mode `trains_on_data=true` (Mistral first for repetitive jobs per B15). Cloudflare and NVIDIA hosted NIM default off. Env keys only; never default-routed.
 - B15 Light rules for AIs that train on our data (Phil, 2026-10-11, revised the same day: "lightest
   setting"; first user: Mistral Experiment). Any backend marked `trains_on_data = true`:
   1. **Routed normally, and first in line for small repetitive jobs.** Add it to the front of the
@@ -181,7 +187,7 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
   - 516+ tests, 27/27 smoke checks pass.
 
 ## In progress
-- Nothing claimed. C7 (codex/guide) is merged in Beta 1. Agy stdin and the real agy /usage output are unverified until someone runs Next up item 4 on the PC.
+- **Nimbus-12 (Grok Build):** R1 table is in this file under B14. Next: B3 tabs backend on `grok/beta2-2026-10-11`. Agy stdin and the real agy /usage output are unverified until someone runs Next up item 4 on the PC.
 
 ## Overnight backlog (2026-10-11; some items are done, so check Done first)
 Rules: take the top unclaimed item in your lane, write your name next to it,
