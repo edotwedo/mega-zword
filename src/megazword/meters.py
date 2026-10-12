@@ -69,3 +69,27 @@ def summarize_all(plans: list[PlanUsage], out_until: dict[str, datetime],
         if name not in seen and until > now:
             found.append(Summary(name, "out", out_until=until))
     return found
+
+
+def labor_order(summaries: list[Summary]) -> list[tuple[str, str]]:
+    """Rank AIs for new work by spare usage right now: most room first, unknown
+    meters next, out AIs last. Returns (service, reason) pairs. It is a reading,
+    not a rule: re-run it before each piece of work."""
+    def key(s: Summary):
+        if s.state == "out":
+            return (2, 0.0)
+        if s.state == "meter":
+            return (0, s.used or 0.0)
+        return (1, 0.0)
+    out = []
+    for s in sorted(summaries, key=key):
+        if s.state == "out":
+            reason = f"out until {s.out_until.astimezone():%a %I:%M %p}; skip"
+        elif s.state == "meter":
+            reason = f"{100 - (s.used or 0):.0f}% left in its {s.window} window"
+            if s.stale:
+                reason += " (old reading)"
+        else:
+            reason = "no meter; check by hand"
+        out.append((s.service, reason))
+    return out

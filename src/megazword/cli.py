@@ -18,7 +18,7 @@ from .rater import Rating, rate
 
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room"),
-    "See": ("start", "usage", "stats", "advise", "dashboard", "projects", "history", "export",
+    "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel"),
     "Set up": ("init", "doctor", "out", "backends", "app"),
     "Memory": ("note", "decide", "import-hive"),
@@ -99,6 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+    sub.add_parser("plan", help="rank the AIs for new work by live spare usage")
     sub.add_parser("start", help="text start screen (plain `megazword` opens the app window)")
     sub.add_parser("projects", help="list projects with memory entries and last activity")
     sub.add_parser("advise", help="suggest a route order from stats and votes (changes nothing)")
@@ -164,6 +165,25 @@ def build_parser() -> argparse.ArgumentParser:
     for action in sub._choices_actions:
         sub.choices[action.dest].description = action.help
     return parser
+
+
+def show_plan() -> int:
+    """Labor plan from live usage. Re-run before each piece of work (Phil)."""
+    from .meters import labor_order, summarize_all
+    from .usage_sources import all_usage
+    try:
+        out_until = config.load().out_until
+    except (ValueError, TypeError, OSError):
+        out_until = {}
+    order = labor_order(summarize_all(all_usage(config.HOME / "log.jsonl"), out_until))
+    print("Labor plan from live usage (most room first). A reading, not a rule:")
+    for i, (name, reason) in enumerate(order, 1):
+        print(f"  {i}. {name:7} {reason}")
+    if order and "left in its" in order[0][1]:
+        print(f"New work goes to {order[0][0]} first; keep work already in progress where it is.")
+    else:
+        print("No live meter readings; check usage by hand before assigning work.")
+    return 0
 
 
 def show_usage() -> int:
@@ -332,6 +352,9 @@ def main(argv: list[str] | None = None,
             last = p.last[:16].replace("T", " ") if p.last else "-"
             print(f"{p.name[:20]:20} {p.entries:7}  {p.decisions:9}  {last}")
         return 0
+
+    if args.command == "plan":
+        return show_plan()
 
     if args.command == "advise":
         from . import advise

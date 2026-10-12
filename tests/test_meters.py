@@ -76,3 +76,41 @@ def test_dashboard_state_has_summaries(tmp_path):
     s = app.state()
     assert s["summaries"][0]["state"] == "out"
     assert s["usage"][0]["stale"] is True and s["usage"][0]["as_of"]
+
+
+def test_labor_order_most_room_first_out_last():
+    from datetime import datetime, timedelta, timezone
+    from megazword.meters import Summary, labor_order
+    later = datetime.now(timezone.utc) + timedelta(hours=3)
+    order = labor_order([
+        Summary("claude", "meter", 70.0, "weekly"),
+        Summary("codex", "out", out_until=later),
+        Summary("grok", "none", note="no plan meter"),
+        Summary("gemini", "meter", 5.0, "weekly", stale=True),
+    ])
+    assert [name for name, _ in order] == ["gemini", "claude", "grok", "codex"]
+    assert "95% left" in order[0][1] and "old reading" in order[0][1]
+    assert order[-1][1].startswith("out until")
+
+
+def test_plan_command_prints_order(monkeypatch, capsys):
+    from megazword import cli, usage_sources
+    from megazword.usage_sources import PlanUsage, Window
+    monkeypatch.setattr(usage_sources, "all_usage", lambda path=None: [
+        PlanUsage("claude", [Window("weekly", 80.0, None)], "test"),
+        PlanUsage("codex", [Window("weekly", 10.0, None)], "test"),
+    ])
+    assert cli.main(["plan"]) == 0
+    out = capsys.readouterr().out
+    assert out.index("codex") < out.index("claude")
+    assert "New work goes to codex first" in out
+
+
+def test_plan_without_meters_does_not_pick(monkeypatch, capsys):
+    from megazword import cli, usage_sources
+    from megazword.usage_sources import PlanUsage
+    monkeypatch.setattr(usage_sources, "all_usage", lambda path=None: [
+        PlanUsage("claude", [], "error", note="FileNotFoundError: x")])
+    assert cli.main(["plan"]) == 0
+    out = capsys.readouterr().out
+    assert "New work goes to" not in out and "check usage by hand" in out
