@@ -36,6 +36,9 @@ def isolated_home(tmp_path, monkeypatch):
     monkeypatch.setattr(_backends.CLIBackend, "_exec", guarded_exec)
     # ...or open the app window from a plain `megazword` (B13).
     monkeypatch.setenv("MEGAZWORD_NO_APP", "1")
+    # ...or a real pywebview desktop window (B6b); tests that need it pass a fake.
+    from megazword import desktop
+    monkeypatch.setattr(desktop, "available", lambda: False)
     # ...or the real GitHub CLI, which would post room summaries to Q.
     from megazword import room
     monkeypatch.setattr(room, "_gh_path", lambda: None)

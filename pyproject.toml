@@ -13,6 +13,8 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# B6b: the desktop window (WebView2 on Windows). Without it, an Edge/Chrome app window.
+app = ["pywebview>=5"]
 
 [project.scripts]
 megazword = "megazword.cli:main"
@@ -21,7 +23,7 @@ megazword = "megazword.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-megazword = ["dashboard.html"]
+megazword = ["dashboard.html", "mz.ico"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

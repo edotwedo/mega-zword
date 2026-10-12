@@ -548,6 +548,10 @@ def serve(port: int = 8765, project: str | None = None, open_browser: bool = Tru
             url = f"http://{host}:{port}/"
             print(f"[megazword] the dashboard is already running at {url}", file=sys.stderr)
             if open_browser and app_window:
+                from . import desktop
+                if desktop.available():
+                    desktop.run_window(url)  # another window onto the running one
+                    return 0
                 from .appwindow import open_app
                 print(f"[megazword] {open_app(url)}", file=sys.stderr)
             elif open_browser:
@@ -561,6 +565,19 @@ def serve(port: int = 8765, project: str | None = None, open_browser: bool = Tru
               "Keep it private; it changes every launch.", file=sys.stderr)
     print(f"[megazword] dashboard at {url}  (project: {app.project}; Ctrl+C to stop)",
           file=sys.stderr)
+    if open_browser and app_window and not remote:
+        from . import desktop
+        if desktop.available():
+            # B6b: a real window. It needs the main thread, so the server moves to a
+            # thread, and closing the window stops the dashboard.
+            worker = threading.Thread(target=server.serve_forever, daemon=True)
+            worker.start()
+            try:
+                desktop.run_window(url)
+            finally:
+                server.shutdown()
+                server.server_close()
+            return 0
     if open_browser and app_window:
         from .appwindow import open_app
 

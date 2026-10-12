@@ -20,7 +20,7 @@ COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room"),
     "See": ("start", "usage", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel"),
-    "Set up": ("init", "doctor", "out", "backends"),
+    "Set up": ("init", "doctor", "out", "backends", "app"),
     "Memory": ("note", "decide", "import-hive"),
 }
 
@@ -122,7 +122,9 @@ def build_parser() -> argparse.ArgumentParser:
     dash.add_argument("-p", "--project")
     dash.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
     dash.add_argument("--app", action="store_true",
-                      help="open in its own app window (Edge/Chrome app mode) instead of a tab")
+                      help="open in its own desktop window (pywebview; else Edge/Chrome app mode)")
+    appc = sub.add_parser("app", help="Start menu shortcut for the Mega Zword desktop window")
+    appc.add_argument("action", choices=["install", "remove"])
     connection = dash.add_mutually_exclusive_group()
     connection.add_argument("--host", default="127.0.0.1",
                       help="address to listen on; use your Tailscale IP for phone access")
@@ -361,6 +363,27 @@ def main(argv: list[str] | None = None,
                   "Keep this terminal and the PC awake while using it.", file=sys.stderr)
         return serve(args.port, args.project, not args.no_browser and args.host == "127.0.0.1",
                      args.host, app_window=args.app)
+
+    if args.command == "app":
+        from . import desktop
+        if args.action == "remove":
+            gone = desktop.remove_shortcut()
+            print("[megazword] Start menu shortcut removed" if gone
+                  else "[megazword] no Start menu shortcut to remove", file=sys.stderr)
+            return 0
+        if os.name != "nt":
+            print("[megazword] the Start menu shortcut is Windows only", file=sys.stderr)
+            return 2
+        try:
+            link = desktop.install_shortcut()
+        except (OSError, subprocess.SubprocessError) as exc:
+            print(f"[megazword] couldn't make the shortcut: {exc}", file=sys.stderr)
+            return 1
+        print(f"[megazword] Start menu: 'Mega Zword' ({link})", file=sys.stderr)
+        if not desktop.available():
+            print("[megazword] tip: `pip install pywebview` for the real desktop window; "
+                  "without it the shortcut opens an Edge/Chrome app window", file=sys.stderr)
+        return 0
 
     if args.command == "import-hive":
         from .hive_import import import_hive

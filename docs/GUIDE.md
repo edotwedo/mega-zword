@@ -211,8 +211,14 @@ review it and edit `[route]` in the config or use Dashboard Settings.
 Run `megazword dashboard`. By default it serves only this PC at
 `http://127.0.0.1:8765`, and opens a browser tab. Use `--port`, `-p` or
 `--no-browser` to choose another local port, project, or skip opening the tab.
-`--app` opens an Edge or Chrome app window when available. Ctrl+C in the
-terminal stops the server.
+`--app` opens Mega Zword in its own desktop window (pywebview on Windows'
+built-in WebView2: no address bar, no browser tabs, MZ icon in the title bar and
+taskbar). Closing that window stops the dashboard. Without pywebview
+(`pip install pywebview`, or `pip install megazword[app]`) it falls back to an
+Edge or Chrome app window. Ctrl+C in the terminal stops the server.
+
+`megazword app install` puts **Mega Zword** in the Start menu (MZ icon, no
+console window); `megazword app remove` takes it out.
 
 The app window has an MZ icon and a compact branded title strip showing the
 selected view and project. Its window title follows Home/Hive and the project,
