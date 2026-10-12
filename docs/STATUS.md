@@ -1,6 +1,6 @@
 # Status
 
-**Active: Codex tab order (claimed). B6b window + Start menu done by Tally-11 (10:40 PT); .exe open.** Earlier: App header/icon and guide on `codex/b6-app-frame-2026-10-12`: 643 tests, 36/36 smoke, desktop/390px checks. Native frame replacement remains unfinished; see B6 below.
+**Active: Beta 3.0 release (Phil, 2026-10-12 13:05 PT: feature freeze, ship what's on main; slow Codex down, its week runs out until Oct 17).** Coordinator: Tally-11 (PC). Checklist below, under "Beta 3.0 release". Earlier: Codex tab order (claimed). B6b window + Start menu done by Tally-11 (10:40 PT); .exe open. Earlier: App header/icon and guide on `codex/b6-app-frame-2026-10-12`: 643 tests, 36/36 smoke, desktop/390px checks. Native frame replacement remains unfinished; see B6 below.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude Code on Phil's PC, heartbeat every 15 min; Phil: "keep going", 12:55 PT) holds the seat until Phil says otherwise. A Claude cloud chat also signed Tally-11 and wrote `docs/handoffs/2026-10-12-lead-takeover.md` when its chat filled; a new cloud lead should pick another name and coordinate in Q, not take over main.
 **Last updated:** 2026-10-12 04:48 PT by Larch-11: B4 complete; Codex usage after work 82% of 5-hour / 57% weekly; Claude 43% of 5-hour / 54% weekly; Grok 15% weekly; Gemini out until Oct 18. Codex crossed the 80% marker; next step is B6 after a fresh usage check.
@@ -26,6 +26,17 @@ Current main contains the agy empty-answer fix, B12, B13 and B15. B5 and B4 are 
 ## Next up (from Tally-11, 2026-10-11): done
 All five Beta 1 PC steps are done: reinstalled from main (0.1.0b1), Claude meter readable, Gemini verified live (`agy` answered in plan mode), Beta 1 tagged. Older worktree folders were not certified safe to remove; check each before cleanup.
 
+## Beta 3.0 release (feature freeze, Phil 2026-10-12)
+Usage at the call (13:05 PT): Claude 73% 5-hour (resets 2:00 PM) / 67% week; Codex 100% 5-hour / 76% week, slowing down until Oct 17; Grok 15% week (most room); Gemini out until Oct 18.
+Nothing new gets built. Put your name on a step before you start it; tick it when it's on main.
+1. **Linux-only test failures (3):** `tests/test_no_real_cli.py::test_a_cli_outside_the_repo_and_temp_is_refused` and 2 Sentinel install tests. **Tally-11**, after the 2 PM reset.
+2. **B7 review pass** of everything since Beta 1 (B1-B6b, B8, B9, B12-B15, room API, chat tabs UI, desktop window). Findings as a list in Q; small fixes on `grok/b7-review-2026-10-12`. **Grok** (needs Phil's prompt; most room).
+3. **Release notes** (README "What's new in Beta 3.0", GUIDE check). **Tally-11.**
+4. **Version** `0.3.0b1`, tag `v0.3.0-beta.1` after 1-3 are on main and tests + smoke pass. **Tally-11.**
+5. **Install on Phil's PC** from the tag: `pip install -e .[app]` in `C:\Users\mrmar\mega-zword`, `megazword doctor`, `megazword app install`, smoke. **Tally-11.**
+6. **Phil's check:** open Mega Zword from the Start menu, try Home, Hive and a chat tab. **Phil.**
+Deferred until after Beta 3.0: Codex tab order (claim released for now), the standalone .exe, B10/B11 calendar (parked by Phil).
+Codex: no Mega Zword work until its week resets, unless Phil asks.
 ## Beta 2 lanes (reassigned 2026-10-11 by usage room; spec: SPEC.md "Beta 2", sections R, T, D, S, C)
 Each lane has a handoff in `docs/handoffs/2026-10-11-*.md` with everything needed to start cold.
 **Lanes follow live usage (Phil, 2026-10-12):** the lanes below are a starting point, not a rule. Before taking or handing out an item, run `megazword plan` (or read the Q usage board) and give unstarted items to whoever has the most room now. Keep an item already in progress with its bot unless that bot runs out.
