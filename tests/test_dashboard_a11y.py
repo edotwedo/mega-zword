@@ -42,6 +42,32 @@ def test_landmarks_labels_and_live_regions():
     assert not any(int(a.get('tabindex', '0')) > 0 for _, a in page.elements)
 
 
+def test_new_dashboard_shell_keeps_navigation_and_icon_controls_accessible():
+    page = Markup(HTML)
+    links = [attrs for tag, attrs in page.elements if tag == 'a' and attrs.get('href', '').startswith('#')]
+    ids = {attrs.get('id') for _, attrs in page.elements}
+    assert links and all(attrs['href'][1:] in ids for attrs in links)
+    assert page.by_id('refresh')['aria-label'] == 'Refresh usage meters'
+    assert page.by_id('send')['aria-label'] == 'Send task'
+    assert page.by_id('retry')['aria-label'] == 'Retry with a stronger AI'
+    assert page.by_id('home')
+    assert page.by_id('hive')['aria-labelledby'] == 'hive-title'
+    assert '--radius: 8px' in CSS
+    assert '"Cascadia Code"' in CSS and '&gt;_' in HTML and '[MZ]' in HTML
+
+
+def test_hive_tab_exposes_room_controls_and_status():
+    page = Markup(HTML)
+    assert page.by_id('tab-home')['aria-pressed'] == 'true'
+    assert page.by_id('tab-hive')['aria-pressed'] == 'false'
+    assert page.by_id('room-input')['aria-label'] == 'Your message to the room'
+    assert page.by_id('room-turn-cap')['aria-label'] == 'Room turn limit'
+    assert page.by_id('room-messages')['role'] == 'region'
+    assert page.by_id('room-status')['role'] == 'status'
+    button_text = [attrs.get('id') for tag, attrs in page.elements if tag == 'button']
+    assert {'room-send', 'room-start', 'room-pause', 'room-stop'} <= set(button_text)
+
+
 @pytest.fixture(scope='module')
 def rendered():
     node = shutil.which('node')

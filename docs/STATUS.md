@@ -1,9 +1,9 @@
 # Status
 
-**Active: Tally-11 (lead, Claude Code on Phil's PC), 2026-10-11 ~22:20 PT.** Merged Grok's agy empty-answer fix and Codex's B14 review (Z.ai label). Next: **Grok B15** (Nimbus-12 already queued it; Grok built B14), **Codex B12**, then B13, B5, B4, B6. Calendar B10/B11 parked (Phil). Room summaries now post to Q only with `--post`.
+**Active: none.** Larch-11 completed B4 on `codex/b4-hive-ui-2026-10-12`, stacked on B5 (601 tests passed, smoke 36/36). Next: B6 custom title bar, icons and docs. Main already contains B12/B13/B15; B5 and B4 are pending lead review. Calendar B10/B11 remain parked.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-11 22:20 PT by Tally-11. Usage at 22:04 PT (5h/week % used): Claude 0/45, Codex 4/45, Grok -/15, Gemini out until Oct 18.
+**Last updated:** 2026-10-12 04:48 PT by Larch-11: B4 complete; Codex usage after work 82% of 5-hour / 57% weekly; Claude 43% of 5-hour / 54% weekly; Grok 15% weekly; Gemini out until Oct 18. Codex crossed the 80% marker; next step is B6 after a fresh usage check.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -17,14 +17,14 @@
 
 ## Next (cold start, 2026-10-11 night plan)
 
-From current main: **Step 1 done** (`grok/agy-empty-success`): agy exit 0 with blank/SUCCESS stdout or a tool denial on stderr is ok=false. Next Grok from this branch or main after merge: **step 2 B15**. Codex, own branch, B5 then B4/B6/B13; do not touch routing. Claude after Sun 10:00 PM PT merges only. Gemini nothing until 2026-10-18 15:57 PT. Do not post room summaries to Q.
+Current main contains the agy empty-answer fix, B12, B13 and B15. B5 and B4 are pushed on separate Codex branches; next is B6. Calendar B10/B11 remain parked until Phil asks. Do not post room summaries to Q.
 
 ## Next up (from Tally-11, 2026-10-11): done
 All five Beta 1 PC steps are done: reinstalled from main (0.1.0b1), Claude meter readable, Gemini verified live (`agy` answered in plan mode), Beta 1 tagged. Older worktree folders were not certified safe to remove; check each before cleanup.
 
 ## Beta 2 lanes (reassigned 2026-10-11 by usage room; spec: SPEC.md "Beta 2", sections R, T, D, S, C)
 Each lane has a handoff in `docs/handoffs/2026-10-11-*.md` with everything needed to start cold.
-**Lane update (Tally-11, 2026-10-12; handoff `2026-10-11-gemini-lane-moved.md`):** Gemini/agy is at 100% in both pools until Oct 18; park B10/B11. Codex takes B12, then B15, B13, B5, B4, B6. Grok round 2 skips B10, fixes the agy empty-answer bug, reviews B7 and B1, and updates STATUS. B14 and Grok B3/B8/B9 plus Antigravity B1 are already on main. Finish and push each item before starting another. Claude (Tally-11) is lead and merges/reconciles lanes.
+**Lane update (Tally-11, 2026-10-12):** Gemini/agy is at 100% in both pools until Oct 18; park B10/B11. B12, B13 and B15 are on main. Codex completed B5 and B4; B6 is next. Grok round 2 fixed the agy empty-answer bug and reviews B7 and B1. B14 and Grok B3/B8/B9 plus Antigravity B1 are already on main. Finish and push each item before starting another. Claude (Tally-11) is lead and merges/reconciles lanes.
 Rules: put your name on an item here, own branch, small pushes, tests + smoke pass, no paid calls in
 tests, hand finished branches to the lead (Tally-11) to merge; post the branch name in Q. Lane empty? Take the next
 unclaimed item from another lane.
@@ -51,14 +51,8 @@ Antigravity Claude/GPT pool (Atlas-11; B1 done on branch agy/b1-room) -> `docs/h
 Codex (Larch-11) -> `docs/handoffs/2026-10-11-codex.md`:
 - First item done: board saved in [coop-interest PR #3](https://github.com/edotwedo/coop-interest/pull/3);
   Oct 7 launch stash recovered in [workshop PR #50](https://github.com/edotwedo/workshop/pull/50).
-- B5 New look (SPEC "D. New look"): Windows 11 style with the 1337 accents;
-  sidebar tab strip ready for B3/B4. Keep C9 accessibility. Screenshots at
-  desktop and phone widths.
-- B4 Hive tab UI: room stream, Phil's input box, Start/Pause/Stop, primary
-  project, who is talking, turns left. **Room API ready (Tally-11, 2026-10-12):** GET
-  `/api/room?room=hive` -> `{room, running, primary, turn_count, turn_cap, last_speaker, messages[]}`;
-  POST `/api/room/say {text}`, `/api/room/start {turns?, project?}` (runs turns in a background
-  thread), `/api/room/stop`. All need the usual X-MZ-Token. Poll GET every few seconds while running.
+- **B5 New look (Larch-11, 2026-10-12): done.** Windows 11-style dark dashboard, responsive sidebar tabs, 8px panels, accessible icon buttons, Cascadia Code accents, terminal prompt and run cards, green live accent and MZ mark. Desktop and 390px phone previews visually checked. 598 tests passed; smoke 36/36.
+- **B4 Hive tab UI (Larch-11, 2026-10-12): done.** Home/Hive navigation and a room screen with messages, Phil's input box, Start/Pause/Stop, primary project, last speaker and turns left. GET `/api/room?room=hive` also reports `paused`; POST endpoints are `/api/room/say`, `/api/room/start`, `/api/room/pause`, and `/api/room/stop`. Pause completes the current reply, and Resume continues to the selected turn cap. Poll GET every few seconds while running.
 - B6 Custom title bar and icons for `--app`; GUIDE.md and README for tabs and the room.
 - **B12 done (Tally-11, 2026-10-12, Codex was idle):** `[claude|codex|gemini.<level>]` model + effort
   in config.toml, applied on every route like Grok's; shown in the run line and in `doctor`. Flags checked
@@ -117,14 +111,16 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
 - Review and merge finished branches; keep STATUS and the lanes true.
 - B2 Lessons + summaries: **done** (Tally-11, 2026-10-11), see Done.
 
-## Current cross-lane sequence (Tally-11, 2026-10-11 22:30 PT)
-1. Grok B14 and R1 are done; B14 is on main. The agy empty-answer fix is merged.
-2. Codex: B12, then B13, B5, B4, B6. Reviews Grok's B15.
-3. Grok: B15 (light rules), then B7 reviews of Codex's branches, B1 second look, STATUS note.
+## Current cross-lane sequence (Tally-11, 2026-10-12)
+1. B12, B13 and B15 are on main; B5 is complete on `codex/b5-new-look-2026-10-12`.
+2. Codex: B6. Grok handles B7 reviews and the B1 second look.
+3. Grok: B7 reviews of Codex's branches, B1 second look, STATUS note; B15 is on main.
 4. Gemini calendar B10/B11 is parked until Phil asks; agy is out through Oct 18.
 5. Check usage before and after each item; keep branches separate and test with fakes.
 ## Done
 - **B1 second look (Tally-11, 2026-10-12, Grok idle):** one session per room (session id + heartbeat; a second `room start` is refused while the first is alive, stale after 20 min; an old loop exits when a newer one takes over, and no longer overwrites its state); `room say` no longer clears a Stop; room names are checked (no `../`). Earlier fixes: no `--continue` reuse (Easel-11), Q posts only with `--post`. 601 passed, smoke 36/36.
+- **B4 Hive tab UI (Larch-11, 2026-10-12):** added the Home/Hive navigation and Hive screen on the B5 shell. It shows the room stream, primary project, turn count/cap, last speaker and idle/running/paused state; supports Phil messages, Start, cooperative Pause (after the current reply), Resume and Stop. Added a pause endpoint and preserved pause state across a reply so resume continues to the chosen turn cap. 601 tests passed; smoke 36/36. Fake backends only. Branch `codex/b4-hive-ui-2026-10-12`, stacked on B5 PR #6.
+- **B5 New look (Larch-11, 2026-10-12):** restyled the dashboard as a dark Windows-style workspace with a responsive sidebar linking Home and Hive, eight-pixel panels, icon-only refresh/send/retry buttons with accessible names, Cascadia Code prompt and run cards, green live marker, and ASCII MZ mark. Preserved C9 contrast, focus, reduced-motion and touch-target requirements. Desktop (1440px) and phone (390px) previews verified. 598 tests passed; smoke 36/36. Branch `codex/b5-new-look-2026-10-12`. B4+B5 merged by Tally-11 together with the one-session-per-room guard (Pause kept; lessons wait until a paused session really ends).
 - **B2 Lessons + summaries (Tally-11, 2026-10-11):** after a room session of 3+ turns (not on Ctrl+C), the cheapest eligible bot gets one short call and writes 3-5 one-line lessons into the primary project's memory (new memory kind `lesson`, also in `megazword export`). The next session's state card shows the latest 3. That call is logged with `lessons: true`. Summary files were already in B1. `room post-summary` now only prints unless you add `--post`, and tests block `gh`, after a test run posted about 12 fake summaries to Q (Ledger's report). 578 passed, smoke 36/36.
 - **B1 Room engine (Atlas-11 / Antigravity, 2026-10-11):** Built `src/megazword/room.py` and CLI commands `megazword room start|stop|say|show|post-summary`. Hive room JSONL storage (`~/.megazword/rooms/<room>.jsonl`), turn loop with `@mentions` targeting, Phil-first priority rule, prime directive prompt, turn cap (default 12), out/over-pace early stops, lean read-only one-shots, and ~80-word replies. Implements token-budget optimizations: state card (<300 words), rolling summary + last 4 messages with automatic condensation after every 6 turns, waking only the needed AI (burn order fallback), CLI session reuse where supported, and per-turn prompt size logging to `log.jsonl`. 541 passed, smoke 31/31. Branch `agy/b1-room`, handed to Tally-11 to merge.
 - **Gemini usage meter (Tally-11, 2026-10-11):** `usage_sources.gemini()` runs `agy -p /usage --output-format json` (Antigravity's quota panel, documented; field shape command.data.groups[].buckets[] with remaining_fraction + reset_time, from a public bug report, not yet seen on Phil's PC). Gemini-group buckets become the 5-hour/weekly meter; other groups shown, never block. No agy: falls back to run counts. Tests never run a real agy (conftest). Verified end to end in the cloud with a fake agy and fake Codex log: `megazword usage`, start screen and dashboard /api/state all show codex 42% and gemini 30%. **Not verified live:** real agy JSON on Phil's PC, and the Claude meter (needs his login). Check: `megazword usage`. If gemini shows an error, paste `agy -p /usage --output-format json` output to fix the parser. 520 passed / 1 skipped, smoke 27/27.

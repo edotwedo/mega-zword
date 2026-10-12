@@ -40,6 +40,7 @@ class RoomState:
     room: str = DEFAULT_ROOM
     active: bool = False
     stopped: bool = False
+    paused: bool = False
     turn_count: int = 0
     turn_cap: int = DEFAULT_TURN_CAP
     primary: str = "workshop"
@@ -168,6 +169,14 @@ def set_stopped(room: str = DEFAULT_ROOM, stopped: bool = True, home: Path | Non
     state.stopped = stopped
     if stopped:
         state.active = False
+        state.paused = False
+    save_state(state, home)
+
+
+def set_paused(room: str = DEFAULT_ROOM, paused: bool = True, home: Path | None = None) -> None:
+    """Ask a running room to pause after its current bot reply."""
+    state = load_state(room, home)
+    state.paused = paused
     save_state(state, home)
 
 
@@ -414,16 +423,20 @@ def run_room(room: str = DEFAULT_ROOM,
     me = uuid.uuid4().hex
     state.session = me
     state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    resuming = state.paused
+    if not resuming:
+        state.turn_count = 0
     state.primary = primary
     state.active = True
     state.stopped = False
+    state.paused = False
     turn_cap = max_turns if max_turns is not None else cfg.room_turn_cap
     state.turn_cap = turn_cap
     save_state(state, home)
 
     write(f"[megazword room] started room '{room}' for project '{primary}' (turn cap: {turn_cap})")
 
-    turns_taken = 0
+    turns_taken = state.turn_count if resuming else 0
     session_active: dict[str, bool] = {name: False for name in backends}
 
     try:
@@ -434,6 +447,9 @@ def run_room(room: str = DEFAULT_ROOM,
                 break
             if state.session != me:  # stopped and restarted elsewhere: the newer one wins
                 write("[megazword room] a newer session took over this room; stopping")
+                break
+            if state.paused:
+                write("[megazword room] paused after current reply")
                 break
             state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -483,7 +499,7 @@ def run_room(room: str = DEFAULT_ROOM,
             # Save message
             appended = append_message(room, speaker, text, prompt_chars=prompt_chars, home=home)
             turns_taken += 1
-            # Reload: a Stop or a newer session may have changed the state during the turn.
+            # Reload: a Pause, Stop or newer session may have changed the state during the turn.
             state = load_state(room, home)
             if state.session == me:
                 state.turn_count += 1
@@ -502,7 +518,8 @@ def run_room(room: str = DEFAULT_ROOM,
 
             write(f"[{speaker}] {text}")
 
-        if turns_taken >= LESSON_MIN_TURNS and load_state(room, home).session == me:
+        final = load_state(room, home)
+        if turns_taken >= LESSON_MIN_TURNS and final.session == me and not final.paused:
             cur_statuses = (statuses or (lambda: {}))()
             eligible = get_eligible_backends(backends, cfg, cur_statuses)
             order = get_burn_order(eligible, cur_statuses)
