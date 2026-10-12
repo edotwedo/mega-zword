@@ -1,9 +1,9 @@
 # Status
 
-**Active: Nimbus-12 (Grok Build on Phil's PC), 2026-10-11 ~20:05 PT.** Merging B14 to main (Phil's call). Tally-11 still named lead but not merging tonight.
+**Active: Nimbus-12 (Grok Build on Phil's PC), 2026-10-11 ~20:35 PT.** Step 1 done on `grok/agy-empty-success` (needs merge). Next Grok: step 2 B15. Codex may start B5 in parallel.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-11 by Nimbus-12 (Grok Build): B14 on `grok/b14-free-ais`; merging to main.
+**Last updated:** 2026-10-11 by Nimbus-12 (Grok Build): step 1 agy empty SUCCESS on `grok/agy-empty-success`.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -14,6 +14,10 @@
 - **Logins Mega Zword reads (never committed or printed):** `~\.claude\.credentials.json` (Claude meter), `~\.codex\sessions\` (Codex meter), the `agy` login (Gemini).
 - **Hive coordination:** Q, `edotwedo/workshop` PR #33. Mega Zword's own state stays in this file.
 
+
+## Next (cold start, 2026-10-11 night plan)
+
+From current main: **Step 1 done** (`grok/agy-empty-success`): agy exit 0 with blank/SUCCESS stdout or a tool denial on stderr is ok=false. Next Grok from this branch or main after merge: **step 2 B15**. Codex, own branch, B5 then B4/B6/B13; do not touch routing. Claude after Sun 10:00 PM PT merges only. Gemini nothing until 2026-10-18 15:57 PT. Do not post room summaries to Q.
 
 ## Next up (from Tally-11, 2026-10-11): done
 All five PC steps are done: reinstalled from main (0.1.0b1), no local-only branches left (every `mz-*` branch is in main; the folders can be removed), Claude meter readable, Gemini verified live (`agy` answered in plan mode), Beta 1 tagged.
