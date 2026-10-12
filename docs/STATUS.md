@@ -37,7 +37,9 @@ Grok (available now; Oct 17 is its weekly reset) -> `docs/handoffs/2026-10-11-gr
 - B9 Sentinel alerts: production URL checks, ntfy push, healthchecks.io ping,
   `megazword sentinel install`, docs for Phil's one-time setup.
 - R1 (do first, it's quick): re-check the free tiers in B14 against each provider's own pricing page
-  today; post a table (limits, signup needs, data-training terms) in STATUS under B14.
+  today; post a table (limits, signup needs, data-training terms) in STATUS under B14. Also record
+  each provider's rule on one person holding several accounts (Phil asked about using several Gmail
+  accounts). Quote the terms. Mega Zword builds nothing for multiple accounts unless the terms allow it.
 
 Antigravity Claude/GPT pool (unused; `agy` session on Phil's PC) -> `docs/handoffs/2026-10-11-antigravity.md`:
 - B1 Room engine (`src/megazword/room.py`): room file, turn loop with
