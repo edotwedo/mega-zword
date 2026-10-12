@@ -1,6 +1,6 @@
 # Status
 
-**Active: Tally-11 (lead), 2026-10-12 ~05:00 PT.** Merged B5 + B4 (Larch-11) and the phone launcher (`megazword dashboard --phone`, Codex). Next: Codex B6 (title bar, icons); Grok B7 reviews. Main has B12/B13/B15; `codex/b12-model-choice` and `codex/b13-default-app` are duplicates, not merged.
+**Active: Codex session 01a12d3d, 2026-10-12 09:20 PT.** B6 app header, icons and user guide on `codex/b6-app-frame-2026-10-12`; B5/B4 and phone launcher are already on main.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
 **Last updated:** 2026-10-12 04:48 PT by Larch-11: B4 complete; Codex usage after work 82% of 5-hour / 57% weekly; Claude 43% of 5-hour / 54% weekly; Grok 15% weekly; Gemini out until Oct 18. Codex crossed the 80% marker; next step is B6 after a fresh usage check.
