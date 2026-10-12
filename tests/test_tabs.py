@@ -168,3 +168,31 @@ def test_send_does_not_change_the_shared_backends(monkeypatch):
     levels = {"claude": {"medium": ("opus", "high")}, "codex": {}, "gemini": {}}
     tabs.send(tab["id"], "hi", shared, cfg(levels=levels), rate(), statuses=dict)
     assert shared["claude"].args == ["-p"]
+
+
+def test_damaged_tabs_file_reads_as_empty_and_bad_entries_are_dropped():
+    tabs.path().parent.mkdir(parents=True, exist_ok=True)
+    tabs.path().write_text("{not json", encoding="utf-8")
+    assert tabs.list_tabs() == []
+    tabs.path().write_text('["a list"]', encoding="utf-8")
+    assert tabs.list_tabs() == []
+    tabs.path().write_text('{"tabs": [5, {"title": "no id"}, {"id": "t1", "history": "x"}]}',
+                           encoding="utf-8")
+    assert [t["id"] for t in tabs.list_tabs()] == ["t1"]
+    # Writing on top of a damaged file starts it fresh.
+    made = tabs.create("claude", "default")
+    assert made["id"] == "t2" and len(tabs.list_tabs()) == 2
+
+
+def test_tab_pinned_to_an_uninstalled_ai_is_refused():
+    tab = tabs.create("gone", "default")  # no backends given: any name is kept
+    with pytest.raises(ValueError, match="unknown AI 'gone'"):
+        tabs.send(tab["id"], "hi", backends(), cfg(), rate(), statuses=dict)
+
+
+def test_auto_tab_with_no_ai_for_the_level_says_so():
+    tab = tabs.create("auto", "default")
+    result = tabs.send(tab["id"], "hi", backends(), cfg(route={"easy": [], "medium": [], "hard": []}),
+                       rate(), statuses=dict)
+    assert result["ok"] is False and "no installed AI for a easy task" in result["error"]
+    assert tabs.list_tabs()[0]["history"] == []

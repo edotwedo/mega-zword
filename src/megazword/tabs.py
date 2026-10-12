@@ -51,13 +51,6 @@ def _load() -> dict:
         return _read_unlocked(p)
 
 
-def _save(data: dict) -> None:
-    p = path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with locked(p):
-        write_atomic(p, json.dumps(data, indent=2) + "\n")
-
-
 def _update(change: Callable[[list[dict]], list[dict]]) -> list[dict]:
     """Read, change and write tabs.json under one lock, so two tabs answering at once
     (the dashboard is threaded) can't overwrite each other's history."""
