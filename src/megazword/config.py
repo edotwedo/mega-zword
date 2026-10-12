@@ -59,6 +59,12 @@ DEFAULT_FREE = {
     "groq": "llama-3.3-70b-versatile",
 }
 
+DEFAULT_SENTINEL_URLS = [
+    "https://tahomatable.org",
+    "https://hive-log.phone-liaison.workers.dev",
+    "https://updawg.co",
+]
+
 
 @dataclass
 class Config:
@@ -80,6 +86,9 @@ class Config:
     # AI name -> when its usage comes back. Set by hand for plans with no meter.
     out_until: dict[str, datetime] = field(default_factory=dict)
     free: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_FREE))
+    sentinel_urls: list[str] = field(default_factory=lambda: list(DEFAULT_SENTINEL_URLS))
+    ntfy_topic: str = ""
+    healthchecks_url: str = ""
 
     def out_now(self, now: datetime | None = None) -> set[str]:
         """AIs marked out whose return time hasn't passed yet."""
@@ -129,6 +138,16 @@ def load(path: Path | None = None) -> Config:
                 model, effort = cfg.grok[level]
                 cfg.grok[level] = (str(block.get("model", model)),
                                    str(block.get("effort", effort)))
+        sent = data.get("sentinel", {})
+        if isinstance(sent, dict):
+            urls = sent.get("urls")
+            if isinstance(urls, list):
+                cfg.sentinel_urls = [u.strip() for u in urls
+                                     if isinstance(u, str) and u.strip().startswith("http")]
+            if isinstance(sent.get("ntfy_topic"), str):
+                cfg.ntfy_topic = sent["ntfy_topic"].strip()
+            if isinstance(sent.get("healthchecks_url"), str):
+                cfg.healthchecks_url = sent["healthchecks_url"].strip()
     return cfg
 
 
@@ -140,6 +159,14 @@ def render_default(installed: list[str]) -> str:
         choices = [name for name in names if name in installed]
         values = ", ".join(f'"{name}"' for name in choices)
         lines.extend([f"# AIs to try for {level} tasks, in order.", f"{level} = [{values}]"])
+    lines.extend([
+        "",
+        "# Sentinel production checks. ntfy_topic is filled by `megazword sentinel install`.",
+        "[sentinel]",
+        "urls = [" + ", ".join(f'"{u}"' for u in DEFAULT_SENTINEL_URLS) + "]",
+        '# ntfy_topic = ""',
+        '# healthchecks_url = ""',
+    ])
     return "\n".join(lines) + "\n"
 
 

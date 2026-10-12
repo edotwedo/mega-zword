@@ -1,6 +1,8 @@
-"""Sentinel collector: fake events only; no admin, no real Windows log."""
+"""Sentinel collector and alerts: fake events/HTTP only; no admin, no real ntfy."""
 
 import json
+import os
+import subprocess
 
 from megazword import config, sentinel
 from megazword.cli import main
@@ -108,3 +110,72 @@ def test_dashboard_state_includes_sentinel(tmp_path, monkeypatch):
     s = app.state()
     assert s["sentinel"]["last_boot"]["kind"] == "boot"
     assert s["sentinel"]["recent"]
+
+
+def test_two_failures_alert_then_recovery():
+    cfg = config.Config(sentinel_urls=["https://ex.test/a"], ntfy_topic="mz-test",
+                        healthchecks_url="https://hc.test/ping")
+    calls = []
+    down = {"https://ex.test/a"}
+
+    def getter(url, data=None, headers=None):
+        calls.append((url, data is not None))
+        if data is not None:
+            return 200
+        if url in down:
+            raise OSError("down")
+        return 200
+
+    first = sentinel.check_sites(cfg, getter)
+    assert first["alerts"] == []
+    second = sentinel.check_sites(cfg, getter)
+    assert any("down: https://ex.test/a" in a for a in second["alerts"])
+    assert ("https://ntfy.sh/mz-test", True) in calls
+    assert ("https://hc.test/ping", False) in calls
+    down.clear()
+    third = sentinel.check_sites(cfg, getter)
+    assert any("back up: https://ex.test/a" in a for a in third["alerts"])
+    assert sum(1 for u, posted in calls if u.startswith("https://ntfy.sh/") and posted) == 2
+
+
+def test_single_failure_does_not_alert():
+    cfg = config.Config(sentinel_urls=["https://ex.test/b"], ntfy_topic="mz-test")
+    ntfy = []
+
+    def getter(url, data=None, headers=None):
+        if data is not None:
+            ntfy.append(url)
+            return 200
+        raise OSError("down")
+
+    sentinel.check_sites(cfg, getter)
+    assert ntfy == []
+
+
+def test_install_dry_run_does_not_create_task(capsys, monkeypatch):
+    monkeypatch.setattr(os, "name", "nt")
+    ran = []
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: ran.append(a) or type(
+        "R", (), {"returncode": 0, "stderr": "", "stdout": ""})())
+    assert sentinel.install(False) == 0
+    assert ran == []
+    out = capsys.readouterr().out
+    assert "install --yes" in out and "ntfy" in out
+
+
+def test_install_yes_creates_tasks(monkeypatch, capsys):
+    monkeypatch.setattr(os, "name", "nt")
+    ran = []
+
+    class R:
+        returncode = 0
+        stderr = ""
+        stdout = "ok"
+
+    monkeypatch.setattr(subprocess, "run", lambda args, **k: ran.append(args) or R())
+    assert sentinel.install(True) == 0
+    names = [args[args.index("/TN") + 1] for args in ran]
+    assert names == ["MegaZword-Sentinel", "MegaZword-Sentinel-Logon"]
+    assert "ntfy topic" in capsys.readouterr().out
+    loaded = config.load()
+    assert loaded.ntfy_topic.startswith("mz-")

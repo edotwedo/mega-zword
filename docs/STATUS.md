@@ -1,9 +1,9 @@
 # Status
 
-**Active: Nimbus-12 (Grok Build on Phil's PC), 2026-10-12 ~afternoon PT.** Branch `grok/beta2-2026-10-11`. B8 done; next B9 Sentinel alerts.
+**Active: Nimbus-12 (Grok Build on Phil's PC), 2026-10-12 ~afternoon PT.** Branch `grok/beta2-2026-10-11`. B9 done. Waiting to review Gemini B15 if it lands.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-12 by Nimbus-12 (Grok Build): B8 Sentinel collector on this branch.
+**Last updated:** 2026-10-12 by Nimbus-12 (Grok Build): B9 Sentinel alerts on this branch.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -35,8 +35,9 @@ Grok (available now; Oct 17 is its weekly reset) -> `docs/handoffs/2026-10-11-gr
 - **B8 Sentinel collector (Nimbus-12, 2026-10-12): done.** Event-log reader (reboots,
   logins, network), `sentinel.jsonl`, `megazword sentinel status|log`, dashboard panel.
   Fake event data in tests; no admin needed to run tests.
-- **B9 Sentinel alerts (Nimbus-12, next):** production URL checks, ntfy push, healthchecks.io ping,
-  `megazword sentinel install`, docs for Phil's one-time setup.
+- **B9 Sentinel alerts (Nimbus-12, 2026-10-12): done.** URL checks, ntfy after 2 failures
+  and on recovery, healthchecks.io ping, `megazword sentinel install --yes` (Phil
+  approves the task), GUIDE.md one-time setup. Not installed on this PC yet.
 
 Antigravity Claude/GPT pool (unused; `agy` session on Phil's PC) -> `docs/handoffs/2026-10-11-antigravity.md`:
 - B1 Room engine (`src/megazword/room.py`): room file, turn loop with

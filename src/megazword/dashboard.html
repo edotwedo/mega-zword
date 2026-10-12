@@ -262,9 +262,12 @@ function renderSentinel(s) {
     `<div class="note">${esc(String(e.time || "").slice(0, 19).replace("T", " "))} · ${esc(e.kind)} · ${esc((e.message || "").slice(0, 80))}</div>`
   ).join("") || '<div class="note">no events yet</div>';
   const sec = d.security_readable === false ? "security log needs Event Log Readers" : "";
+  const sites = (d.sites || []).map(site =>
+    `<div class="note${site.ok ? "" : " bad"}">${site.ok ? "ok" : "DOWN"} · ${esc(site.url)}</div>`
+  ).join("");
   $("sentinel").innerHTML =
     `<div class="note">last boot ${bit(d.last_boot)} · last login ${bit(d.last_login)} · last network ${bit(d.last_network)} · today ${esc(d.today ?? 0)}</div>`
-    + (sec ? `<div class="note bad">${esc(sec)}</div>` : "") + rows;
+    + (sec ? `<div class="note bad">${esc(sec)}</div>` : "") + sites + rows;
 }
 
 function renderPlans(s) {

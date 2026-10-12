@@ -102,8 +102,11 @@ def build_parser() -> argparse.ArgumentParser:
     st = sub.add_parser("stats", help="per-day, per-AI table from the run log")
     st.add_argument("--days", type=int, default=7)
     sent = sub.add_parser("sentinel", help="uptime and security log (reboots, logins, network)")
-    sent.add_argument("action", nargs="?", choices=("status", "log"), default="status")
+    sent.add_argument("action", nargs="?", choices=("status", "log", "check", "install"),
+                      default="status")
     sent.add_argument("-n", type=int, default=20, help="how many events to show for log")
+    sent.add_argument("--yes", action="store_true",
+                      help="for install: actually create the scheduled task")
 
     out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")

@@ -225,6 +225,10 @@ def summary(n: int = 12) -> dict:
         "security_readable": bool(cursor.get("security_readable", True)),
         "recent": events[:n],
         "count": len(events),
+        "sites": [
+            {"url": url, **row} for url, row in (_load_checks().get("sites") or {}).items()
+            if isinstance(row, dict)
+        ],
     }
 
 
@@ -243,6 +247,9 @@ def format_status() -> str:
         line("last network", s["last_network"]),
         f"{'today':16} {s['today']} events",
         f"{'security log':16} {sec}",
+    ] + [
+        f"{'site':16} {'ok' if row.get('ok') else 'DOWN'}  {row.get('url')}"
+        for row in s.get("sites") or []
     ])
 
 
@@ -259,11 +266,178 @@ def format_log(n: int = 20) -> str:
     return "\n".join(lines)
 
 
+def checks_path() -> Path:
+    return config.HOME / "sentinel.checks.json"
+
+
+def _load_checks() -> dict:
+    p = checks_path()
+    if not p.exists():
+        return {"sites": {}}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"sites": {}}
+    if not isinstance(data, dict) or not isinstance(data.get("sites"), dict):
+        return {"sites": {}}
+    return data
+
+
+def _save_checks(data: dict) -> None:
+    p = checks_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with locked(p):
+        write_atomic(p, json.dumps(data, indent=2) + "\n")
+
+
+def _http_get(url: str, timeout: int = 10, data: bytes | None = None,
+              headers: dict | None = None) -> int:
+    from urllib.request import Request, urlopen
+    req = Request(url, data=data, method="POST" if data is not None else "GET",
+                  headers={"User-Agent": "megazword-sentinel", **(headers or {})})
+    with urlopen(req, timeout=timeout) as resp:
+        return int(resp.status)
+
+
+def probe(url: str, getter=None) -> bool:
+    getter = getter or _http_get
+    try:
+        status = getter(url)
+        return 200 <= int(status) < 400
+    except (OSError, ValueError, TimeoutError):
+        return False
+
+
+def _ntfy(topic: str, title: str, body: str, getter=None) -> None:
+    if not topic:
+        return
+    getter = getter or _http_get
+    getter(f"https://ntfy.sh/{topic}", data=body.encode("utf-8"),
+           headers={"Title": title})
+
+
+def check_sites(cfg: config.Config | None = None, getter=None) -> dict:
+    """One round of production URL checks. ntfy after two failures in a row
+    and again on recovery. Always pings healthchecks.io when a URL is set."""
+    cfg = cfg or config.load()
+    getter = getter or _http_get
+    state = _load_checks()
+    sites = state.setdefault("sites", {})
+    alerts: list[str] = []
+    results = []
+    for url in cfg.sentinel_urls:
+        row = sites.get(url) if isinstance(sites.get(url), dict) else {}
+        fails = int(row.get("fails") or 0)
+        down = bool(row.get("down"))
+        ok = probe(url, getter)
+        if ok:
+            if down:
+                msg = f"back up: {url}"
+                alerts.append(msg)
+                try:
+                    _ntfy(cfg.ntfy_topic, "Sentinel recovery", msg, getter)
+                except (OSError, ValueError, TimeoutError):
+                    pass
+            fails, down = 0, False
+        else:
+            fails += 1
+            if fails >= 2 and not down:
+                down = True
+                msg = f"down: {url} ({fails} failures)"
+                alerts.append(msg)
+                try:
+                    _ntfy(cfg.ntfy_topic, "Sentinel down", msg, getter)
+                except (OSError, ValueError, TimeoutError):
+                    pass
+        sites[url] = {"ok": ok, "fails": fails, "down": down,
+                      "time": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        results.append({"url": url, "ok": ok, "fails": fails, "down": down})
+    if cfg.healthchecks_url:
+        try:
+            getter(cfg.healthchecks_url)
+            state["healthchecks"] = "ok"
+        except (OSError, ValueError, TimeoutError):
+            state["healthchecks"] = "failed"
+    state["sites"] = sites
+    _save_checks(state)
+    return {"sites": results, "alerts": alerts,
+            "healthchecks": state.get("healthchecks")}
+
+
+def format_check(result: dict) -> str:
+    lines = ["Sentinel checks"]
+    for row in result.get("sites") or []:
+        mark = "ok" if row.get("ok") else "DOWN"
+        extra = f"  ({row['fails']} in a row)" if not row.get("ok") else ""
+        lines.append(f"  {mark:4}  {row['url']}{extra}")
+    hc = result.get("healthchecks")
+    if hc:
+        lines.append(f"  healthchecks.io  {hc}")
+    for alert in result.get("alerts") or []:
+        lines.append(f"  alert  {alert}")
+    return "\n".join(lines)
+
+
+def install(yes: bool = False) -> int:
+    """Register a 5-minute scheduled task. Prints the plan; `--yes` creates it.
+    Phil approves by passing --yes."""
+    import secrets
+    import sys
+    path = config.HOME / "config.toml"
+    cfg = config.load(path) if path.exists() else config.Config()
+    topic = cfg.ntfy_topic
+    if not topic:
+        topic = "mz-" + secrets.token_urlsafe(12)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            path.write_text("[sentinel]\n", encoding="utf-8")
+        config._set_key(path, "sentinel", "ntfy_topic", json.dumps(topic))
+        print(f"[megazword] ntfy topic: {topic}  (saved in {path})")
+    else:
+        print(f"[megazword] ntfy topic already set in {path}")
+    print("[megazword] subscribe to that topic in the ntfy app (no account).")
+    print("[megazword] optional: set [sentinel] healthchecks_url to a healthchecks.io ping URL")
+    cmd = f'"{sys.executable}" -m megazword.cli sentinel check'
+    print(f"[megazword] task command: {cmd}")
+    if os.name != "nt":
+        print("[megazword] scheduled tasks are Windows-only; run `megazword sentinel check` from cron")
+        return 0 if not yes else 2
+    if not yes:
+        print("[megazword] run `megazword sentinel install --yes` to create the 5-minute task (Phil's call)")
+        return 0
+    create = [
+        "schtasks", "/Create", "/TN", "MegaZword-Sentinel", "/SC", "MINUTE", "/MO", "5",
+        "/TR", cmd, "/F",
+    ]
+    logon = [
+        "schtasks", "/Create", "/TN", "MegaZword-Sentinel-Logon", "/SC", "ONLOGON",
+        "/TR", cmd, "/F",
+    ]
+    for args in (create, logon):
+        result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8",
+                                errors="replace")
+        if result.returncode != 0:
+            print(f"[megazword] schtasks failed: {(result.stderr or result.stdout).strip()[:300]}",
+                  file=sys.stderr)
+            return 1
+    print("[megazword] scheduled MegaZword-Sentinel every 5 minutes and at logon")
+    return 0
+
+
 def command(args) -> int:
     import sys
     action = getattr(args, "action", "status") or "status"
     if action == "log":
         print(format_log(max(1, getattr(args, "n", 20) or 20)))
+        return 0
+    if action == "install":
+        return install(bool(getattr(args, "yes", False)))
+    if action == "check":
+        try:
+            collect()
+        except OSError as exc:
+            print(f"[megazword] sentinel collect skipped: {exc}", file=sys.stderr)
+        print(format_check(check_sites()))
         return 0
     try:
         collect()
@@ -271,3 +445,4 @@ def command(args) -> int:
         print(f"[megazword] sentinel collect skipped: {exc}", file=sys.stderr)
     print(format_status())
     return 0
+
