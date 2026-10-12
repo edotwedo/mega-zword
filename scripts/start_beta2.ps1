@@ -67,4 +67,4 @@ foreach ($name in $lanes.Keys) {
   Start-Process wt -ArgumentList "-w 0 new-tab --title `"MZ $name`" -d `"$dir`" pwsh -NoExit -EncodedCommand $encoded"
   Write-Host "started $name in $dir ($($lane.branch))"
 }
-Write-Host 'Claude stays the lead in your main window. Mistral joins once B14 plugs it in.'
+Write-Host 'Claude stays the lead in your main window. Mistral is routed by Mega Zword (B14), not a terminal lane.'
