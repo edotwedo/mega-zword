@@ -229,11 +229,33 @@ def test_room_cli_commands(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "stopped room 'hive'" in out
 
-    # post-summary
+    # post-summary only prints unless --post is given (and conftest blocks gh anyway)
     code = main(["room", "post-summary"], backends=backends, cfg=cfg)
     assert code in (0, 1)
     out = capsys.readouterr().out
-    assert "summary for 'hive'" in out or "posted summary" in out
+    assert "add --post to send it" in out or "no summary found" in out
+
+
+def test_post_summary_posts_only_with_post(tmp_path, monkeypatch):
+    import subprocess
+    from megazword import room
+    calls = []
+    monkeypatch.setattr(room, "_gh_path", lambda: "gh")
+    monkeypatch.setattr(room.subprocess, "run", lambda cmd, **kw: calls.append(cmd)
+                        or subprocess.CompletedProcess(cmd, 0, "", ""))
+    path = room.summary_path("hive", tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("Highlights: ready @codex", encoding="utf-8")
+    lines = []
+
+    assert room.post_summary("hive", home=tmp_path, write=lines.append) == 0
+    assert calls == []
+    assert "add --post" in lines[-1]
+
+    assert room.post_summary("hive", home=tmp_path, write=lines.append, post=True) == 0
+    assert calls and calls[0][:3] == ["gh", "pr", "comment"]
+    assert "@codex" not in calls[0][-1]
+    assert "posted summary" in lines[-1]
 
 
 def test_quiet_mentions_breaks_github_pings():

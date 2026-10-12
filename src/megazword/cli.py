@@ -149,8 +149,9 @@ def build_parser() -> argparse.ArgumentParser:
     room_show.add_argument("--room", default="hive", help="room name (default: hive)")
     room_show.add_argument("-n", type=int, default=20, help="number of messages to show")
 
-    room_post = room_sub.add_parser("post-summary", help="post room summary to Q (PR #33)")
+    room_post = room_sub.add_parser("post-summary", help="show the room summary; --post sends it to Q (PR #33)")
     room_post.add_argument("--room", default="hive", help="room name (default: hive)")
+    room_post.add_argument("--post", action="store_true", help="actually post it to Q with gh")
 
     for action in sub._choices_actions:
         sub.choices[action.dest].description = action.help
@@ -357,7 +358,7 @@ def main(argv: list[str] | None = None,
         if action == "show":
             return room.show(args.room, n=args.n)
         if action == "post-summary":
-            return room.post_summary(args.room)
+            return room.post_summary(args.room, post=args.post)
 
     # command == "run"
     try:

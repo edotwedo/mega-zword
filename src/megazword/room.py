@@ -471,15 +471,21 @@ def quiet_mentions(text: str) -> str:
     return re.sub(r"@(?=[A-Za-z0-9_-])", "@​", text)
 
 
+def _gh_path() -> str | None:
+    """The real GitHub CLI; tests replace this so they can never post to Q."""
+    return shutil.which("gh")
+
+
 def post_summary(room: str, home: Path | None = None,
-                 write: Callable[[str], None] = print) -> int:
-    """Post session summary to Q (workshop PR #33) or print text if gh is unauthenticated."""
+                 write: Callable[[str], None] = print, post: bool = False) -> int:
+    """Print the session summary; with post=True (`--post`) also post it to Q (workshop PR #33).
+    Posting is opt-in: a test run posted about 12 fake summaries to Q on 2026-10-12."""
     path = summary_path(room, home)
     if not path.exists():
         write(f"[megazword room] no summary found at {path}")
         return 1
     content = quiet_mentions(path.read_text(encoding="utf-8"))
-    gh = shutil.which("gh")
+    gh = _gh_path() if post else None
     if gh:
         try:
             res = subprocess.run([gh, "pr", "comment", "33", "--repo", "edotwedo/workshop", "--body", content],
@@ -490,5 +496,6 @@ def post_summary(room: str, home: Path | None = None,
         except Exception:
             pass
 
-    write(f"[megazword room] summary for '{room}' (paste to Q PR #33):\n\n{content}")
+    hint = "" if post else " (add --post to send it)"
+    write(f"[megazword room] summary for '{room}' (paste to Q PR #33{hint}):\n\n{content}")
     return 0

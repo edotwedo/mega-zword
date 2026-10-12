@@ -15,6 +15,9 @@ def isolated_home(tmp_path, monkeypatch):
     monkeypatch.setattr(usage_sources, "_agy_path", lambda: None)
     # ...or a real Codex app server for its live rate limits.
     monkeypatch.setattr(usage_sources, "_codex_cmd", lambda: None)
+    # ...or the real GitHub CLI, which would post room summaries to Q.
+    from megazword import room
+    monkeypatch.setattr(room, "_gh_path", lambda: None)
     for var in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "CLOUDFLARE_API_TOKEN",
                 "CLOUDFLARE_ACCOUNT_ID", "ZAI_API_KEY", "GOOGLE_AI_API_KEY",
                 "NVIDIA_API_KEY", "MISTRAL_API_KEY"):
