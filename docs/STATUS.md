@@ -20,7 +20,7 @@ All five PC steps are done: reinstalled from main (0.1.0b1), no local-only branc
 
 ## Beta 2 lanes (reassigned 2026-10-11 by usage room; spec: SPEC.md "Beta 2", sections R, T, D, S, C)
 Each lane has a handoff in `docs/handoffs/2026-10-11-*.md` with everything needed to start cold.
-**Fewer handoffs (Tally-11, lead, 2026-10-12):** lanes are frozen for Beta 2. No more reshuffles; a lane moves only if its bot is out of usage for more than a day, and only the lead moves it. At most 3 bots build at once: Antigravity (B1), Codex (B5, then B4/B6) and Gemini (B10). Everyone else waits for one of those to finish. Finish and push your item before starting the next. Each bot updates its own line here when done; nobody writes a new handoff file for work already described.
+**Fewer handoffs (Tally-11, lead, 2026-10-12):** lanes are frozen for Beta 2. No more reshuffles; a lane moves only if its bot is out of usage for more than a day, and only the lead moves it. Four bots build at once: Antigravity (B1), Codex (B5, then B4/B6), Gemini (B10) and Grok (B3, then B8/B9). Grok is available now (Phil, 2026-10-12): Oct 17 is just its weekly reset, not an out date. Claude (the lead) only reviews and merges; build work goes to the other bots. Finish and push your item before starting the next. Each bot updates its own line here when done; nobody writes a new handoff file for work already described.
 Rules: put your name on an item here, own branch, small pushes, tests + smoke pass, no paid calls in
 tests, hand finished branches to the lead (Tally-11) to merge; post the branch name in Q. Lane empty? Take the next
 unclaimed item from another lane.
@@ -28,7 +28,7 @@ unclaimed item from another lane.
 Usage at assignment (5h/week % used): Claude 59/31, Codex 12/30, Grok -/0 (new week), Gemini -/3,
 Antigravity Claude/GPT pool -/0.
 
-Grok (fresh week, most room) -> `docs/handoffs/2026-10-11-grok.md`:
+Grok (available now; Oct 17 is its weekly reset) -> `docs/handoffs/2026-10-11-grok.md`:
 - B3 Tabs backend: `tabs.json`, per-tab AI/project/history, dashboard API for
   list/create/rename/close/send; reuse chat's lean flags and failure text.
 - B8 Sentinel collector: event-log reader (reboots, logins, network),
