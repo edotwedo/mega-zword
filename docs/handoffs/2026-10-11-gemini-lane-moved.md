@@ -15,12 +15,12 @@
 ## Who takes what
 | Item | Owner | Order | Why |
 |---|---|---|---|
-| B15 light rules for trains-on-data AIs | **Codex** | right after B12 | Small; it sits on B14's backends. Grok reviews it (security second look). |
+| B15 light rules for trains-on-data AIs | **Grok** | next | Grok built B14 and had already queued B15 (changed 22:20 PT by Tally-11 to avoid double work). Codex reviews it. |
 | B7 reviews of Codex's branches | **Grok** | as they land | Already in round 2. |
 | B10, B11 calendar | nobody | parked | Phil: near zero unless needed. |
 
-Codex's order becomes: B12, **B15**, B13, B5, B4, B6. Grok's: round 2 without B10 (agy bug, B7,
-B1 review, STATUS note).
+Codex's order: B12, B13, B5, B4, B6. Grok's: B15, then the rest of round 2 without B10 (B7, B1
+review, STATUS note). The agy empty-answer fix is merged (main).
 
 ## B15 notes
 Spec is STATUS.md "B15". Since Phil's revision it is light: route normally, Mistral first for small
