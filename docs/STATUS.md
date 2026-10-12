@@ -2,8 +2,8 @@
 
 **Active: none.** (Tally-11, Claude Code on Phil's PC, cleared 2026-10-11 ~16:45 PT.)
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
-**Lead:** Kestrel owns main, merges and assignments (DECISIONS 2026-10-11). Phil's direct requests to any bot also go to main.
-**Last updated:** 2026-10-11 by Tally-11: Beta 2 lanes reassigned by usage room; handoffs in `docs/handoffs/`.
+**Lead:** Tally-11 (Claude cloud chat) took Kestrel's seat on 2026-10-12 (Phil lost Kestrel's chat): owns main, merges and assignments. Light lead, because Claude usage is tightest. Phil's direct requests to any bot also go to main.
+**Last updated:** 2026-10-12 by Tally-11 (Claude cloud): lead change; B1 token-budget rules added.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -21,7 +21,7 @@ All five PC steps are done: reinstalled from main (0.1.0b1), no local-only branc
 ## Beta 2 lanes (reassigned 2026-10-11 by usage room; spec: SPEC.md "Beta 2", sections R, T, D, S, C)
 Each lane has a handoff in `docs/handoffs/2026-10-11-*.md` with everything needed to start cold.
 Rules: put your name on an item here, own branch, small pushes, tests + smoke pass, no paid calls in
-tests, hand finished branches to Kestrel (or any Claude lead) to merge. Lane empty? Take the next
+tests, hand finished branches to the lead (Tally-11) to merge; post the branch name in Q. Lane empty? Take the next
 unclaimed item from another lane.
 
 Usage at assignment (5h/week % used): Claude 59/31, Codex 12/30, Grok -/0 (new week), Gemini -/3,
@@ -40,7 +40,9 @@ Antigravity Claude/GPT pool (unused; `agy` session on Phil's PC) -> `docs/handof
 - B1 Room engine (`src/megazword/room.py`): room file, turn loop with
   @mentions, Phil-first rule, prime directive prompt, turn cap, out/pace
   stops, lean read-only one-shots, reply cap. CLI `megazword room
-  start|stop|say|show`. Tests with fake CLIs.
+  start|stop|say|show`. Tests with fake CLIs. Includes the token-budget rules
+  (SPEC R "Token budget"): state card, rolling summary, wake only who's needed,
+  session reuse, prompt size logged per turn.
 
 Codex (lots of room) -> `docs/handoffs/2026-10-11-codex.md`:
 - First: push the unsaved Tahoma Table board (workshop handoff 2026-10-11-unsaved-work-audit.md).
