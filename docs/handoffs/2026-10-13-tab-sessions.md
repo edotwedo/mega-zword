@@ -93,3 +93,27 @@ Next for Sorrel-12: inspect this worktree's diff and Report, stage the changed
 files plus `src/megazword/tab_sessions.py`, `tests/test_tab_sessions.py` and this
 handoff, commit on the existing branch, then perform the lead's review/merge
 workflow. Do not replace STATUS's Active line with this finished worker.
+
+## Fix pass 2 (Sorrel-12, from Grok's review, 2026-10-13)
+1. tab_sessions.py ~84 (med): after a good Claude/Codex answer, a missing/unparsed session_id / thread.started raises, so the answer is dropped. Fix: return the answer anyway, store no session id, next turn starts fresh with history. Test it.
+2. tab_sessions.py ~33 (med): with a saved session, only the raw user line is sent, so "include project memory" (context) never reaches the CLI on follow-ups. Fix: resume with the same new-turn payload (context block + message) the first turn would get, minus the old history. Test it.
+Add "Report 2" when done.
+
+## Report 2
+
+Worker: **Juniper-13 (Codex)**. Completed Fix pass 2 in this folder.
+
+- Claude/Codex answers survive missing, blank or invalid session metadata. The
+  saved session is cleared; the next turn starts fresh with recent tab history.
+  Empty answers and malformed Claude answer JSON still fail normally.
+- Resumed Claude/Codex/Grok turns receive current project memory when requested,
+  followed by the new message, without the old conversation history. Recovery
+  after an unavailable session still uses the full recent history.
+- Regression tests cover metadata loss on both first and resumed turns, history
+  restoration, refreshed memory on follow-ups, and disabling memory again.
+- Validation: **55 passed** in the session/tab suite; **113 passed, 3 deselected**
+  across session, tab and dashboard integration/UI tests (`-k 'not cancel'`,
+  excluding the environment's known cancellation failures). `git diff --check`
+  passed. All CLI calls used fakes; no real AI prompts.
+- Changes remain **uncommitted**, as Phil requested. Startup/coordination steps
+  were skipped; no commit or push was attempted.

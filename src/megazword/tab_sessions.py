@@ -65,7 +65,7 @@ class SessionBackend(Backend):
                 events = cli._exec([*cmd, "-o", output, "-"], stdin)
                 with open(output, encoding="utf-8", errors="replace") as f:
                     text = f.read().strip()
-                session = resume
+                session = ""
                 for line in events.splitlines():
                     try:
                         event = json.loads(line)
@@ -81,9 +81,9 @@ class SessionBackend(Backend):
             text = cli._run(prompt).strip()
         if not text:
             raise RuntimeError(f"{cli.name} returned no answer")
-        if not isinstance(session, str) or not session.strip():
-            raise RuntimeError(f"{cli.name} returned no session id")
-        self.session_id = session
+        # Keep usable answers even when session metadata is missing. Clear the
+        # saved id so the next turn restores the tab's recent history.
+        self.session_id = session.strip() if isinstance(session, str) else ""
         return text
 
 

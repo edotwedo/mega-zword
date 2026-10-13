@@ -241,7 +241,7 @@ def _send(tab_id: str, prompt: str, backends: dict[str, Backend], cfg: config.Co
         forced = False
     chain = [SessionBackend(b.name, timeout=b.timeout, cli=b,
                             session_id=tab["session_id"] if tab["session_backend"] == b.name else "",
-                            message=message)
+                            message=_conversation_prompt({"history": []}, message, block))
              if supports_sessions(b) else b for b in chain]
     captured: list[str] = []
     results = []

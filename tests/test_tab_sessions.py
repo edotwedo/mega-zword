@@ -55,7 +55,8 @@ def test_persist_resume_and_reset(name, fake_cli):
     second = tabs.send(tab["id"], "What fruit?", default_backends(free_models={}),
                        cfg(), rate(), statuses=dict, context=True)
     assert second["ok"] and second["tab"]["session_id"] == session
-    assert calls[1][2] == "What fruit?"  # no history, context, or one-shot note
+    assert calls[1][2].endswith("[New message]\n\nWhat fruit?")
+    assert "[Conversation so far]" not in calls[1][2]
     resume_flag = "resume" if name == "codex" else "--resume"
     assert calls[1][1][calls[1][1].index(resume_flag) + 1] == session
     assert bs[name].args == original_args
@@ -86,7 +87,7 @@ def test_missing_session_retries_once_with_history(name, fake_cli):
     assert second["ok"] and len(calls) == 3
     assert second["tab"]["session_id"] != first["tab"]["session_id"]
     assert "started a new session" in second["tab"]["session_note"]
-    assert calls[1][2] == "What fruit?"
+    assert calls[1][2] == "[New message]\n\nWhat fruit?"
     assert "User: Remember apples" in calls[2][2]
 
 
@@ -183,7 +184,7 @@ def test_real_subprocess_with_repository_fake_cli(name, monkeypatch):
     assert second["ok"] and second["tab"]["session_id"] == session
     record = config.HOME / "fake-sessions" / (session + ".json")
     prompts = json.loads(record.read_text())["prompts"]
-    assert prompts[1] == 'Fruit? & "special" π'
+    assert prompts[1] == '[New message]\n\nFruit? & "special" π'
     record.unlink()  # an expired session in the fake's own persistence store
     recovered = tabs.send(tab["id"], "Recover please", bs, cfg(), rate(), statuses=dict)
     assert recovered["ok"] and recovered["tab"]["session_id"] != session
@@ -191,8 +192,7 @@ def test_real_subprocess_with_repository_fake_cli(name, monkeypatch):
 
 
 @pytest.mark.parametrize("output", ['{bad json', '{}',
-                                    '{"session_id":"abc","result":"","is_error":false}',
-                                    '{"result":"Useful answer","is_error":false}'])
+                                    '{"session_id":"abc","result":"","is_error":false}'])
 def test_malformed_claude_answer_does_not_save_a_session(output, fake_cli, monkeypatch):
     monkeypatch.setattr(CLIBackend, "_exec", lambda *args: output)
     bs = default_backends(free_models={})
@@ -200,6 +200,59 @@ def test_malformed_claude_answer_does_not_save_a_session(output, fake_cli, monke
     result = tabs.send(tab["id"], "hello", bs, cfg(), rate(), statuses=dict)
     assert not result["ok"]
     assert not tabs.list_tabs()[0]["session_id"] and tabs.list_tabs()[0]["history"] == []
+
+
+@pytest.mark.parametrize("name", ["claude", "codex"])
+@pytest.mark.parametrize("metadata", [None, "", "   ", 123])
+@pytest.mark.parametrize("resume", [False, True])
+def test_answer_without_session_metadata_keeps_history(name, metadata, resume,
+                                                       fake_cli, monkeypatch):
+    calls, _ = fake_cli
+    bs = default_backends(free_models={})
+    tab = tabs.create(name, "alpha", backends=bs)
+    if resume:
+        assert tabs.send(tab["id"], "Earlier turn", bs, cfg(), rate(), statuses=dict)["ok"]
+    old_exec = CLIBackend._exec
+
+    def execute(cli, cmd, stdin):
+        old_exec(cli, cmd, stdin)
+        if name == "claude":
+            data = {"result": "Useful answer", "is_error": False}
+            if metadata is not None:
+                data["session_id"] = metadata
+            return json.dumps(data)
+        if metadata is None:
+            return '{bad event\n' + json.dumps({"type": "item.completed"})
+        return json.dumps({"type": "thread.started", "thread_id": metadata})
+
+    monkeypatch.setattr(CLIBackend, "_exec", execute)
+    result = tabs.send(tab["id"], "Remember apples", bs, cfg(), rate(), statuses=dict)
+    assert result["ok"] and result["answer"] == "Useful answer"
+    saved = tabs.list_tabs()[0]
+    assert not saved["session_id"] and not saved["session_backend"]
+    assert saved["history"][-1]["answer"] == "Useful answer"
+    monkeypatch.setattr(CLIBackend, "_exec", old_exec)
+    following = tabs.send(tab["id"], "What fruit?", bs, cfg(), rate(), statuses=dict)
+    assert following["ok"] and following["tab"]["session_id"]
+    assert "User: Remember apples" in calls[-1][2]
+    assert "AI: Useful answer" in calls[-1][2]
+    assert ("resume" if name == "codex" else "--resume") not in calls[-1][1]
+
+
+@pytest.mark.parametrize("name", ["claude", "codex", "grok"])
+def test_resume_includes_current_project_memory_without_history(name, fake_cli, monkeypatch):
+    calls, _ = fake_cli
+    bs = default_backends(free_models={})
+    tab = tabs.create(name, "alpha", backends=bs)
+    monkeypatch.setattr(tabs.Memory, "context_block", lambda self: "[Project memory]\nOld memory")
+    first = tabs.send(tab["id"], "Remember apples", bs, cfg(), rate(), statuses=dict, context=True)
+    monkeypatch.setattr(tabs.Memory, "context_block", lambda self: "[Project memory]\nFresh memory")
+    second = tabs.send(tab["id"], "What fruit?", bs, cfg(), rate(), statuses=dict, context=True)
+    assert second["ok"] and second["tab"]["session_id"] == first["tab"]["session_id"]
+    assert calls[1][2] == "[Project memory]\nFresh memory\n\n[New message]\n\nWhat fruit?"
+    assert "Remember apples" not in calls[1][2] and "Old memory" not in calls[1][2]
+    third = tabs.send(tab["id"], "Next", bs, cfg(), rate(), statuses=dict, context=False)
+    assert third["ok"] and calls[2][2] == "[New message]\n\nNext"
 
 
 def test_two_tabs_never_resume_each_others_session(fake_cli):
