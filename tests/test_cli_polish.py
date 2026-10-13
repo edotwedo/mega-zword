@@ -30,6 +30,16 @@ def test_help_lists_mcp(capsys):
     assert "mcp" in capsys.readouterr().out.split("See:\n", 1)[1].split("\n\n", 1)[0]
 
 
+def test_help_mentions_floor_suggest(capsys):
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    see = capsys.readouterr().out.split("See:\n", 1)[1].split("\n\n", 1)[0]
+    assert "suggest" in next(line for line in see.splitlines() if line.split()[0] == "floor")
+    with pytest.raises(SystemExit):
+        main(["floor", "--help"])
+    assert "seated model" in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("command", [n for ns in COMMAND_GROUPS.values() for n in ns])
 def test_subcommand_help_has_description(command, capsys):
     parser = build_parser()
