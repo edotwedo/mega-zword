@@ -141,7 +141,8 @@ After a session of 3 or more turns, one bot writes 3-5 short lessons into the
 project's memory, and the next session starts with the latest ones. Each turn
 sends a short state card, a rolling summary and the last few messages, not the
 whole history, to keep usage down. The dashboard reads and drives the same room
-through `/api/room` (view) and `/api/room/say`, `/api/room/start` and `/api/room/stop`.
+through `/api/room` (view) and `/api/room/say`, `/api/room/start`, `/api/room/pause`
+and `/api/room/stop`.
 
 ### Hive floor
 
@@ -152,7 +153,7 @@ in the Hive.
 - `megazword floor`: Show each seat as seated, empty (no key or install) or out, and whether the minimum crew is ready. Saves `~/.megazword/floor.json`.
 - `megazword floor introduce [--room hive]`: Post the floor roll call to the room. It has no `@names`, so nobody wakes up until Phil assigns work.
 - `megazword floor peek [-n 10]`: Print the latest Hive messages (the shared log).
-- `megazword floor wait [--timeout 120]`: Block until a new Hive message lands. This Grok session and the other seats read the same file; they still cannot type into each other's CLI windows.
+- `megazword floor wait [--timeout 120]`: Block until a new Hive message lands. Every seat reads the same file; seats still cannot type into each other's CLI windows.
 - `megazword floor suggest bulk|edit|decide|review`: Print which seated model should take that kind of job. Empty and out seats are skipped. It prints `(no seat)` and exits 1 when nobody fits. It suggests only; nothing is sent.
   - `megazword floor suggest bulk` → `groq` (first seated HTTP seat: groq, mistral, cloudflare, zai, gemini-api, then any other HTTP seat)
   - `megazword floor suggest edit` → `codex` (then claude)
@@ -161,8 +162,12 @@ in the Hive.
 
 ### Hive MCP (inside each seat's chat)
 
-`python -m megazword.mcp_hive` is a stdio MCP server on the same Hive log
-(`~/.megazword/rooms/hive.jsonl`). Tools: `hive_read`, `hive_say`, `hive_wait`.
+`megazword mcp` (or `python -m megazword.mcp_hive`) is a stdio MCP server on
+the same Hive log (`~/.megazword/rooms/hive.jsonl`). Tools: `hive_read`,
+`hive_say`, `hive_wait`. Register it once in each CLI's own MCP config with
+command `megazword` and args `["mcp"]`, and set `MEGAZWORD_SEAT` to that seat's
+name (`claude`, `codex`, `grok`) in the same entry. `hive_say` posts as
+`$MEGAZWORD_SEAT` (or `bot` if unset), and a seat can't post as `phil`.
 `hive_read` and `hive_wait` end with `(after=N)`; pass `after: N` to the next
 `hive_wait` (or `floor wait --after N`) so nothing posted in between is missed.
 Claude, Codex and Grok call these from inside their own session. This is not
@@ -327,11 +332,11 @@ There is no phone-model answering backend yet.
 
 ## Other commands
 
-- `megazword backends` lists supported AI tools and whether they are available.
 - `megazword init [--force]` creates a config using installed tools; `--force`
   replaces the existing config.
-- `megazword backends` lists CLIs and optional HTTP AIs (openrouter, groq,
-  cloudflare, zai, gemini-api, nvidia, mistral). Force one with
+- `megazword backends` lists the AI CLIs and optional HTTP AIs (openrouter, groq,
+  cloudflare, zai, gemini-api, nvidia, mistral), and whether each is
+  available. Force one with
   `megazword run "..." -m zai`. They are off the default route, except Mistral,
   which is first in `easy` once `MISTRAL_API_KEY` is set.
 - `megazword doctor` checks local setup without sending a prompt.
@@ -342,7 +347,8 @@ There is no phone-model answering backend yet.
 - `megazword import-hive PATH [-p PROJECT]` copies decisions and open handoffs
   from a local Workshop clone into project memory. It leaves the old clone
   unchanged; repeated imports do not add duplicates.
-- `megazword --version` prints the installed version. Add `--help` to the main
+- `megazword --version` prints the installed version. `python -m megazword`
+  runs the same CLI when `megazword` isn't on PATH. Add `--help` to the main
   command or any command, such as `megazword dashboard --help`, for exact
   options.
 
