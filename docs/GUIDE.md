@@ -153,6 +153,14 @@ in the Hive.
 - `megazword floor peek [-n 10]`: Print the latest Hive messages (the shared log).
 - `megazword floor wait [--timeout 120]`: Block until a new Hive message lands. This Grok session and the other seats read the same file; they still cannot type into each other's CLI windows.
 
+### Hive MCP (inside each seat's chat)
+
+`python -m megazword.mcp_hive` is a stdio MCP server on the same Hive log
+(`~/.megazword/rooms/hive.jsonl`). Tools: `hive_read`, `hive_say`, `hive_wait`.
+Claude, Codex and Grok call these from inside their own session. This is not
+`megazword room start`, which spawns new one-shots. Gemini sits until its week
+is back. Groq/Mistral are HTTP stand-ins, not MCP seats.
+
 See `docs/FLOOR.md` for the full layout.
 
 
