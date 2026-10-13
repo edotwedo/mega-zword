@@ -233,7 +233,8 @@ main[hidden], #hive[hidden] { display:none; }
       <button class="go" id="send" aria-label="Send task" title="Send task">↗</button>
       <button id="retry" aria-label="Retry with a stronger AI" title="Last answer not good enough: give it to a stronger AI">↻</button>
     </div>
-    <div id="jobs" aria-label="Job output" aria-live="polite" aria-relevant="additions text" style="margin-top:10px"></div>
+    <div id="jobs" aria-label="Job output" style="margin-top:10px"></div>
+    <div id="job-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   </section>
 
   <section>
@@ -615,13 +616,37 @@ function renderJob(j) {
   if (!el) { el = document.createElement("div"); el.className = "job"; el.id = "job-" + j.id;
     $("jobs").prepend(el); }
   const secs = Math.max(0, Math.round((Date.now() - new Date(j.started)) / 1000));
-  const focusedCancel = el.contains(document.activeElement) && document.activeElement.classList.contains("cancel");
+  const ae = document.activeElement;
+  let restore = null;
+  if (el.contains(ae)) {
+    restore = {
+      cancel: ae.classList.contains("cancel"),
+      copy: ae.classList.contains("copy"),
+      vote: ae.classList.contains("vote"),
+      voteAi: ae.dataset ? ae.dataset.ai : "",
+      ans: ae.classList.contains("ans") && ae.getAttribute("tabindex") === "0"
+    };
+  }
   el.innerHTML = `<div class="err"><span class="sr-only">${j.done ? (j.code === 0 ? "Completed" : "Failed") : "Running"}: </span><span aria-hidden="true">${j.done ? (j.code === 0 ? "✓" : "✗") : '<span class="spin"></span>'}</span>
     <b>${esc(j.label)}</b>${j.done ? "" : ` <span class="t">${secs}s</span>
     <button class="cancel" data-job="${esc(j.id)}" style="padding:1px 8px;font-size:12px">Cancel</button>`}
     <pre>${esc(j.err.trim())}</pre></div>
     ${j.out ? renderAnswer(j) : ""}`;
-  if (focusedCancel) (el.querySelector("button.cancel, button.copy") || $("prompt")).focus();
+  if (restore) {
+    let t = null;
+    if (restore.cancel) t = el.querySelector("button.cancel");
+    else if (restore.copy) t = el.querySelector("button.copy");
+    else if (restore.vote) t = el.querySelector("button.vote[data-ai=\"" + CSS.escape(restore.voteAi) + "\"]") || el.querySelector("button.vote");
+    else if (restore.ans) t = el.querySelector(".ans[tabindex]");
+    (t || $("prompt")).focus();
+  }
+}
+
+function announceJob(j) {
+  if (!j.done) return;
+  const box = $("job-status");
+  if (!box) return;
+  box.textContent = (j.label || "job") + (j.code === 0 ? " completed" : " failed");
 }
 
 // Compare jobs print "=== name · 4.2s ===" before each answer; show them as
@@ -725,7 +750,7 @@ async function watch(id) {
   while (true) {
     const j = await (await fetch("/api/job/" + id)).json();
     renderJob(j);
-    if (j.done) { notifyDone(j); break; }
+    if (j.done) { announceJob(j); notifyDone(j); break; }
     await new Promise(r => setTimeout(r, 800));
   }
   watching.delete(id);
@@ -764,9 +789,11 @@ async function load(refresh) {
     updateWindowTitle();
   } catch { $("meta").textContent = "dashboard server stopped"; return; }
   const sel = $("model"), cur = sel.value;
-  sel.innerHTML = '<option value="">auto (route + pacing)</option>' + Object.entries(state.backends)
-    .map(([n, ok]) => `<option value="${esc(n)}" ${ok ? "" : "disabled"}>${esc(n)}${ok ? "" : " (not installed)"}${state.out[n] ? " (marked out)" : ""}</option>`).join("");
-  sel.value = cur;
+  if (document.activeElement !== sel) {
+    sel.innerHTML = '<option value="">auto (route + pacing)</option>' + Object.entries(state.backends)
+      .map(([n, ok]) => `<option value="${esc(n)}" ${ok ? "" : "disabled"}>${esc(n)}${ok ? "" : " (not installed)"}${state.out[n] ? " (marked out)" : ""}</option>`).join("");
+    sel.value = cur;
+  }
   $("meta").textContent = `project ${state.project} · ${state.runs.length} runs logged · updated ${new Date().toLocaleTimeString()}`;
   renderSettings(state.settings); renderPlans(state); renderSentinel(state); renderRoute(state); renderFloor(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state); renderComparePicks(); renderAdvice(state);
   for (const j of state.jobs) if (!document.getElementById("job-" + j.id)) {
