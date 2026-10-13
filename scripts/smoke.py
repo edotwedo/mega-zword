@@ -48,7 +48,8 @@ def make_env(tmp: Path) -> dict:
     env = dict(os.environ)
     # No real API keys (any *_API_KEY, so future HTTP backends are covered too):
     # nothing here may reach a paid or rate-limited API.
-    for key in [k for k in env if k.upper().endswith("_API_KEY")]:
+    for key in [k for k in env if k.upper().endswith(("_API_KEY", "_API_TOKEN"))
+                or k.upper() == "CLOUDFLARE_ACCOUNT_ID"]:
         del env[key]
     home = tmp / "home"
     home.mkdir()
@@ -58,6 +59,8 @@ def make_env(tmp: Path) -> dict:
         "MEGAZWORD_HOME": str(tmp / "mz"),
         # Refused instantly: the rater falls back to its rule, no local model.
         "MEGAZWORD_OLLAMA_URL": "http://127.0.0.1:9",
+        # ...and don't refill the removed keys from the Windows User environment.
+        "MEGAZWORD_NO_USER_ENV": "1",
         # No CLI logins or logs here, so usage meters can't reach the network.
         "USERPROFILE": str(home), "HOME": str(home),
         "PYTHONPATH": str(REPO / "src"),

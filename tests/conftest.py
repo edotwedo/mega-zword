@@ -42,6 +42,14 @@ def isolated_home(tmp_path, monkeypatch):
     # ...or the real GitHub CLI, which would post room summaries to Q.
     from megazword import room
     monkeypatch.setattr(room, "_gh_path", lambda: None)
+    # ...or Night Shift's: no Q posts and no real scheduled task from a test.
+    from megazword import night
+    monkeypatch.setattr(night, "_gh_path", lambda: None)
+
+    def no_schtasks(args):
+        raise RuntimeError(f"test tried to run real schtasks: {args}")
+
+    monkeypatch.setattr(night, "_schtasks", no_schtasks)
     # ...or inherit a bot's seat, which would block posting as phil (B7).
     monkeypatch.delenv("MEGAZWORD_SEAT", raising=False)
     for var in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "CLOUDFLARE_API_TOKEN",

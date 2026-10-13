@@ -17,7 +17,7 @@ from .rater import Rating, rate
 
 
 COMMAND_GROUPS = {
-    "Ask": ("run", "chat", "retry", "room"),
+    "Ask": ("run", "chat", "retry", "room", "night"),
     "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor"),
     "Set up": ("init", "doctor", "out", "backends", "app", "mcp"),
@@ -123,6 +123,8 @@ def build_parser() -> argparse.ArgumentParser:
     floor.add_argument("--after", type=int, default=None,
                        help="wait: message count from peek's (after=N); returns anything newer")
     sub.add_parser("mcp", help="Hive MCP server on stdio (for AI CLIs to connect to)")
+    from .night import add_parser as add_night_parser
+    add_night_parser(sub)
 
     out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -330,6 +332,9 @@ def main(argv: list[str] | None = None,
         print("[megazword] opening the Mega Zword app window "
               "(`megazword start` shows the text start screen)")
         return 0
+    if args.command == "night":
+        from .night import command
+        return command(args, cfg)
     if args.command in (None, "start"):
         from .start import render
         print(render(cfg))

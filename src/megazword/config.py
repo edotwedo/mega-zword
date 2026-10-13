@@ -99,6 +99,8 @@ def load_user_env(read=None, env=None) -> list[str]:
     """Copy known keys missing from env (os.environ) out of the Windows User
     environment. Already-set vars are left alone. Returns the names copied."""
     env = os.environ if env is None else env
+    if env.get("MEGAZWORD_NO_USER_ENV"):  # smoke/live-check: keys were removed on purpose
+        return []
     if read is None:
         if os.name != "nt":
             return []
