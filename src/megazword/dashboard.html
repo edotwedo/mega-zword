@@ -250,6 +250,7 @@ main[hidden], #hive[hidden] { display:none; }
 
   <section>
     <h2>Routing</h2>
+    <div id="floor" class="note" role="status" style="margin:0 0 8px"></div>
     <div class="scroll" tabindex="0" role="region" aria-label="Routing table"><table class="route" id="route"></table></div>
     <div class="note" style="margin-top:8px">Easy tasks try the first AI in the row; failures move right, then up to harder rows. Struck out = not installed or marked out.</div>
     <h2 style="margin-top:16px">Suggestions</h2>
@@ -430,6 +431,15 @@ function renderRoute(s) {
     `<tr><td>${esc(lvl)}</td><td>${names.map(n => {
       const x = !s.backends[n] || out[n];
       return `<span class="${x ? "x" : ""}">${aiTag(n)}</span>`; }).join(" → ")}</td></tr>`).join("");
+}
+
+// Read-only view of `megazword floor`: ready flag + who is seated right now.
+function renderFloor(s) {
+  const f = s.floor;
+  if (!f) { $("floor").innerHTML = ""; return; }
+  const seated = (f.seats || []).filter(x => x.status === "seated").map(x => x.name);
+  $("floor").innerHTML = `Floor: <b class="${f.ready ? "ok" : "warn"}">${f.ready ? "ready" : "not ready"}</b>`
+    + ` · seated ${seated.length ? seated.map(aiTag).join(", ") : '<span class="empty">none</span>'}`;
 }
 
 function settingRow(parent, id, kind, name, content) {
@@ -754,7 +764,7 @@ async function load(refresh) {
     .map(([n, ok]) => `<option value="${esc(n)}" ${ok ? "" : "disabled"}>${esc(n)}${ok ? "" : " (not installed)"}${state.out[n] ? " (marked out)" : ""}</option>`).join("");
   sel.value = cur;
   $("meta").textContent = `project ${state.project} · ${state.runs.length} runs logged · updated ${new Date().toLocaleTimeString()}`;
-  renderSettings(state.settings); renderPlans(state); renderSentinel(state); renderRoute(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state); renderComparePicks(); renderAdvice(state);
+  renderSettings(state.settings); renderPlans(state); renderSentinel(state); renderRoute(state); renderFloor(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state); renderComparePicks(); renderAdvice(state);
   for (const j of state.jobs) if (!document.getElementById("job-" + j.id)) {
     renderJob(j); if (!j.done && !watching.has(j.id)) watch(j.id); }
 }
