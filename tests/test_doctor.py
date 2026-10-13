@@ -28,6 +28,8 @@ def test_doctor_healthy(tmp_path, monkeypatch, capsys):
     assert "OK config: parses" in output
     assert "OK rater model: qwen2.5:1.5b present" in output
     assert "OK log: writable" in output
+    assert "megazword floor (seats)" in output
+    assert "megazword floor suggest" in output
     assert "FAIL" not in output
 
 

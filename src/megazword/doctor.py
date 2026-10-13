@@ -166,4 +166,5 @@ def run() -> int:
     results = checks()
     for item in results:
         print(item.line())
+    print("Hive: megazword floor (seats) | megazword floor suggest (who should take a job)")
     return 1 if any(item.level == "FAIL" for item in results) else 0
