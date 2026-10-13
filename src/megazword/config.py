@@ -74,6 +74,46 @@ DEFAULT_FREE = {
     "mistral": "mistral-small-latest",
 }
 
+# API keys Mega Zword reads. On Windows a key set with
+# SetEnvironmentVariable(..., "User") is missing from shells and subprocesses
+# started before it was set, so load_user_env() fills these in from the registry.
+USER_ENV_KEYS = (
+    "GROQ_API_KEY", "OPENROUTER_API_KEY", "CLOUDFLARE_API_TOKEN",
+    "CLOUDFLARE_ACCOUNT_ID", "ZAI_API_KEY", "GOOGLE_AI_API_KEY",
+    "NVIDIA_API_KEY", "MISTRAL_API_KEY",
+)
+
+
+def _windows_user_env(name: str) -> str | None:
+    """HKCU\\Environment value for name, or None. Never logged."""
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+            value, _ = winreg.QueryValueEx(key, name)
+    except OSError:
+        return None
+    return value if isinstance(value, str) else None
+
+
+def load_user_env(read=None, env=None) -> list[str]:
+    """Copy known keys missing from env (os.environ) out of the Windows User
+    environment. Already-set vars are left alone. Returns the names copied."""
+    env = os.environ if env is None else env
+    if read is None:
+        if os.name != "nt":
+            return []
+        read = _windows_user_env
+    copied = []
+    for name in USER_ENV_KEYS:
+        if env.get(name):
+            continue
+        value = read(name)
+        if value:
+            env[name] = value
+            copied.append(name)
+    return copied
+
+
 DEFAULT_SENTINEL_URLS = [
     "https://tahomatable.org",
     "https://hive-log.phone-liaison.workers.dev",
