@@ -286,14 +286,15 @@ def get_burn_order(eligible: dict[str, Backend], statuses: dict | None = None) -
 def pick_next_speaker(last_msg: RoomMessage | None, eligible: list[str],
                       burn_order: list[str], last_speaker: str | None = None) -> str | None:
     """Pick the next AI to speak:
-    1. If the last message @mentioned eligible bots, pick the first mentioned.
+    1. If Phil @mentioned eligible bots, pick the first mentioned.
+       Mentions in bot/floor lines are ignored (they used to spawn extra one-shots).
     2. Otherwise, pick from burn order, alternating away from last_speaker when possible.
     3. Return None if no eligible bot exists.
     """
     if not eligible:
         return None
 
-    if last_msg and last_msg.mentions:
+    if last_msg and last_msg.author == "phil" and last_msg.mentions:
         for m in last_msg.mentions:
             if m in eligible:
                 return m
@@ -344,14 +345,15 @@ def build_turn_prompt(state_card: str, rolling_summary: str,
     # `others`: bots that can actually speak next. Mentioning one that is saving usage
     # or out gets no answer, and the speaker ends up talking to itself.
     if others is None:
-        handoff = "Mention another bot (@claude, @codex, @grok, @gemini) to hand off or ask a question."
+        handoff = ("Do not @mention other bots; that starts extra one-shot workers. "
+                   "Phil's live sessions read this log.")
     elif others:
-        handoff = ("Mention another bot in the room right now ("
+        handoff = ("Live seats read this log. Do not @mention other bots ("
                    + ", ".join(f"@{b}" for b in others)
-                   + ") to hand off or ask a question; the others are saving usage or out.")
+                   + "); that starts extra one-shot workers.")
     else:
-        handoff = ("You are the only bot in the room right now (the others are saving usage or out). "
-                   "Don't hand off to another bot; answer Phil yourself.")
+        handoff = ("You are the only one-shot in the room right now. "
+                   "Don't @mention another bot; answer Phil yourself.")
     parts.append(
         f"[Your Turn: @{speaker}]\n"
         f"{lead_in} Keep your answer friendly, concise, and under {reply_words} words. "
@@ -490,6 +492,12 @@ def run_room(room: str = DEFAULT_ROOM,
 
             messages = read_messages(room, home)
             last_msg = messages[-1] if messages else None
+
+            # One-shots answer Phil. Bot-to-bot @mentions used to keep Start running
+            # until the turn cap and look like extra live sessions.
+            if last_msg and last_msg.author != "phil":
+                write("[megazword room] waiting for Phil; live seats read the log")
+                break
 
             # Guard rail: check eligible AIs
             cur_statuses = (statuses or (lambda: {}))()

@@ -92,6 +92,11 @@ def test_pick_next_speaker_mentions():
     # Falls back to burn order avoiding last_speaker grok -> codex
     assert speaker_fallback == "codex"
 
+    # A bot @mention must not start another one-shot (falls back to burn order)
+    bot = room.RoomMessage(time="", author="codex", text="hey @grok identify", mentions=["grok"])
+    speaker_bot = room.pick_next_speaker(bot, eligible, burn_order, last_speaker="grok")
+    assert speaker_bot == "codex"
+
 
 def test_pick_next_speaker_alternates_away_from_last_speaker():
     eligible = ["claude", "codex"]
@@ -154,25 +159,20 @@ def test_turn_cap_and_prompt_logging(tmp_path):
     )
     assert code == 0
     messages = room.read_messages("hivelog", home=tmp_path)
-    # Phil's 1 message + 3 bot turns = 4 messages
-    assert len(messages) == 4
+    # Phil's 1 message + one one-shot. Bot @mentions do not take further turns.
+    assert len(messages) == 2
     assert messages[1].author == "claude"
-    assert messages[2].author == "codex"
-    assert messages[3].author == "claude"
-
-    # Verify prompt_chars is logged
     assert messages[1].prompt_chars > 0
-    assert messages[2].prompt_chars > 0
+    assert any("waiting for Phil" in line for line in output)
 
-    # Verify log.jsonl received room turns
     log_file = tmp_path / "log.jsonl"
     assert log_file.exists()
     logged_entries = [json.loads(l) for l in log_file.read_text(encoding="utf-8").splitlines() if l.strip()]
     assert all(e["room"] == "hivelog" for e in logged_entries)
-    assert sum(1 for e in logged_entries if e.get("lessons")) == 1  # the B2 end-of-session call
+    assert sum(1 for e in logged_entries if e.get("lessons")) == 0
     logged_entries = [e for e in logged_entries if not e.get("lessons")]
-    assert len(logged_entries) == 3
-    assert all(e["prompt_chars"] > 0 for e in logged_entries)
+    assert len(logged_entries) == 1
+    assert logged_entries[0]["prompt_chars"] > 0
 
 
 def test_room_stop_command(tmp_path):
@@ -208,6 +208,7 @@ def test_room_pause_waits_for_current_fake_reply(tmp_path, monkeypatch):
         "Please reply @codex", "finished this reply"]
     assert any("paused after current reply" in line for line in output)
 
+    room.say("pauseroom", "one more @codex", home=tmp_path)
     room.run_room("pauseroom", max_turns=2, project="sample",
                   backends={"codex": FakeBackend("codex")}, cfg=cfg,
                   statuses=lambda: {}, write=output.append, home=tmp_path)
@@ -248,12 +249,13 @@ def test_room_cli_commands(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "hello room @claude" in out
 
-    # start for 2 turns
+    # start: one one-shot answers Phil; bot @mentions do not take more turns
     code = main(["room", "start", "--turns", "2"], backends=backends, cfg=cfg)
     assert code == 0
     out = capsys.readouterr().out
     assert "[claude] Understood @codex" in out
-    assert "[codex] Ready @claude" in out
+    assert "[codex] Ready @claude" not in out
+    assert "waiting for Phil" in out
 
     # stop
     code = main(["room", "stop"], backends=backends, cfg=cfg)
@@ -314,11 +316,9 @@ def test_room_saves_lessons_and_next_card_shows_them(tmp_path):
     out = []
     room.run_room("hive", max_turns=3, project="workshop", backends=backends, cfg=cfg,
                   write=out.append, home=tmp_path)
-    assert any("saved" in line and "lessons" in line for line in out)
-    lessons = [e for e in Memory(tmp_path, "workshop").entries() if e.kind == "lesson"]
-    assert lessons and lessons[-1].text == "Mention one bot per reply"
-    card = room.build_state_card("workshop", tmp_path)
-    assert "Lessons from earlier sessions:" in card and "Check usage first" in card
+    assert any("waiting for Phil" in line for line in out)
+    assert not any("saved" in line and "lessons" in line for line in out)
+    assert not [e for e in Memory(tmp_path, "workshop").entries() if e.kind == "lesson"]
 
 
 def test_short_room_session_skips_lessons(tmp_path):
@@ -327,7 +327,7 @@ def test_short_room_session_skips_lessons(tmp_path):
     room.say("hive", "hi @claude", home=tmp_path, write=lambda s: None)
     room.run_room("hive", max_turns=2, project="workshop", backends={"claude": claude},
                   cfg=cfg, write=lambda s: None, home=tmp_path)
-    assert len(claude.calls) == 2
+    assert len(claude.calls) == 1
     assert not [e for e in Memory(tmp_path, "workshop").entries() if e.kind == "lesson"]
 
 
@@ -426,7 +426,7 @@ def test_bot_out_of_usage_mid_session_is_marked_out_and_others_continue(tmp_path
     out = []
     room.run_room("hive", max_turns=2, project="workshop", backends={"claude": claude, "codex": codex},
                   cfg=cfg, write=out.append, home=tmp_path)
-    assert len(claude.calls) == 1 and len(codex.calls) == 2
+    assert len(claude.calls) == 1 and len(codex.calls) == 1
     assert "claude" in cfg.out_now()
     assert any("out of usage" in line for line in out)
     logged = [json.loads(l) for l in (tmp_path / "log.jsonl").read_text(encoding="utf-8").splitlines()]
@@ -466,13 +466,12 @@ def test_long_session_condenses_older_messages_into_the_prompt(tmp_path):
     cfg = config.Config(log_path=tmp_path / "log.jsonl", room_turn_cap=10)
     claude = FakeBackend("claude", reply="claude turn @codex")
     codex = FakeBackend("codex", reply="codex turn @claude")
-    room.say("long", "kick off @claude", home=tmp_path)
-    code = room.run_room(room="long", max_turns=10, project="workshop",
-                         backends={"claude": claude, "codex": codex}, cfg=cfg,
-                         statuses=lambda: {}, write=lambda s: None, home=tmp_path)
-    assert code == 0
-    turns = [p for p in claude.calls + codex.calls if "[Sent by Mega Zword" in p]
-    # Early turns fit in the recent window; later ones carry a rolling summary instead.
+    for n in range(room.RECENT_MESSAGES_COUNT + 3):
+        room.say("long", f"kick off {n} @claude", home=tmp_path)
+        room.run_room(room="long", max_turns=1, project="workshop",
+                      backends={"claude": claude, "codex": codex}, cfg=cfg,
+                      statuses=lambda: {}, write=lambda s: None, home=tmp_path)
+    turns = [p for p in claude.calls if "[Sent by Mega Zword" in p]
     assert "[Earlier room summary]" not in turns[0]
     assert any("[Earlier room summary]" in p for p in turns)
     state = room.load_state("long", tmp_path)
@@ -485,12 +484,13 @@ def test_show_empty_room(tmp_path):
     assert out == ["[megazword room] room 'empty' has no messages yet"]
 
 
-def test_turn_prompt_names_only_bots_that_can_answer():
-    """A bot alone in the room (others saving usage) must not hand off to bots that never reply."""
+def test_turn_prompt_does_not_ask_for_bot_mentions():
+    """@mentions in a one-shot reply used to spawn extra workers."""
     from megazword.room import build_turn_prompt
     alone = build_turn_prompt("card", "", "phil: hi", "grok", "workshop", "phil", others=[])
-    assert "only bot in the room" in alone and "@claude" not in alone
+    assert "Don't @mention another bot" in alone and "@claude" not in alone
     two = build_turn_prompt("card", "", "phil: hi", "grok", "workshop", "phil", others=["codex"])
-    assert "@codex" in two and "@claude" not in two
+    assert "Do not @mention" in two and "@codex" in two and "@claude" not in two
     legacy = build_turn_prompt("card", "", "phil: hi", "grok", "workshop", "phil")
-    assert "@claude, @codex, @grok, @gemini" in legacy
+    assert "Do not @mention other bots" in legacy
+    assert "extra one-shot" in legacy

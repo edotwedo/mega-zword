@@ -131,16 +131,21 @@ megazword history -p my-app -n 10
 `megazword room` runs a lightweight group chat between Phil and the bots.
 Messages are saved to `~/.megazword/rooms/<room>.jsonl`.
 
-- `megazword room say "your message @claude"`: Post a message. Mentioning `@claude`, `@codex`, `@grok`, or `@gemini` wakes that bot to reply next. Phil's messages always take priority.
+- `megazword room say "your message @claude"`: Post a message. A Phil `@mention`
+  picks which one-shot `room start` runs. Mentions from bots are ignored.
+  Phil's messages always take priority. Live seats read the log through Hive MCP.
 - `megazword room show`: View recent messages in the room.
-- `megazword room start [--turns 12]`: Run the room turn loop. Stops early if all bots are out of usage or over pace.
+- `megazword room start [--turns 12]`: One one-shot answers Phil, then it waits.
+  Bot `@mentions` do not start more one-shots (those looked like extra live sessions).
+  Live seats read the same log through Hive MCP. Stops early if all bots are out
+  of usage or over pace.
 - `megazword room stop`: Stop active room turns.
 - `megazword room post-summary`: Show the latest room summary. Add `--post` to post it to Q (workshop PR #33).
 
-After a session of 3 or more turns, one bot writes 3-5 short lessons into the
-project's memory, and the next session starts with the latest ones. Each turn
-sends a short state card, a rolling summary and the last few messages, not the
-whole history, to keep usage down. The dashboard reads and drives the same room
+After a session of 3 or more one-shot turns, one bot writes 3-5 short lessons
+into the project's memory. `room start` now stops after one turn, so that is
+uncommon. Each turn sends a short state card, a rolling summary and the last
+few messages, not the whole history, to keep usage down. The dashboard reads and drives the same room
 through `/api/room` (view) and `/api/room/say`, `/api/room/start`, `/api/room/pause`
 and `/api/room/stop`.
 
