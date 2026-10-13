@@ -58,6 +58,8 @@ def make_env(tmp: Path) -> dict:
         "MEGAZWORD_HOME": str(tmp / "mz"),
         # Refused instantly: the rater falls back to its rule, no local model.
         "MEGAZWORD_OLLAMA_URL": "http://127.0.0.1:9",
+        # ...and don't refill the removed keys from the Windows User environment.
+        "MEGAZWORD_NO_USER_ENV": "1",
         # No CLI logins or logs here, so usage meters can't reach the network.
         "USERPROFILE": str(home), "HOME": str(home),
         "PYTHONPATH": str(REPO / "src"),

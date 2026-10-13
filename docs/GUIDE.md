@@ -325,6 +325,33 @@ installation and phone sign-in are not configured by Mega Zword. OpenSSH is
 needed only for a phone terminal connection, not for the dashboard in a browser.
 There is no phone-model answering backend yet.
 
+## Night Shift
+
+Night Shift does real work while you sleep. It reads `docs/QUEUE.md` on GitHub
+(`edotwedo/mega-zword` main) and runs each open line as a job:
+
+1. Reads usage. An AI with less than 15% left, no meter, or an old reading gets
+   no night work. Claude and Codex can take jobs (they can edit files on Windows).
+2. Makes a fresh copy of the job's repo under `~\.megazword\night\`, never your
+   own working folders.
+3. The AI with the most room edits files there. If it changes nothing, the next
+   AI tries.
+4. Mega Zword (not the AI) checks for secrets, commits, runs the tests and
+   pushes the branch `night/<date>-<n>`. It never pushes to main.
+5. Ticks the boxes in QUEUE.md on one more `night/` branch, then posts one
+   summary to Q with no @-tags.
+
+- Run now: `megazword night run` (`--max 3` jobs, `--job-minutes 30` per job,
+  `--floor 15` percent).
+- Turn on every night: `megazword night install --at 01:00 --yes`. It's a
+  Windows scheduled task that runs as you, with no window. It only runs while
+  you're signed in (a locked PC is fine) and won't start on battery.
+- Turn off: `megazword night stop` stops after the current job and skips future
+  runs; `megazword night resume` turns it back on. `megazword night remove`
+  deletes the scheduled task.
+- The log is `~\.megazword\night\night.log`; each night's summary is
+  `~\.megazword\night\summary-<date>.md`.
+
 ## Other commands
 
 - `megazword backends` lists supported AI tools and whether they are available.

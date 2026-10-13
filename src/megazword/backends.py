@@ -65,6 +65,7 @@ class CLIBackend(Backend):
 
     exe: str = ""
     args: list[str] = field(default_factory=list)
+    cwd: str = ""  # folder the CLI works in; "" = this process's folder (night jobs set it)
 
     def available(self) -> bool:
         return shutil.which(self.exe) is not None
@@ -83,7 +84,7 @@ class CLIBackend(Backend):
         # pipes open and hang us after the shim itself is killed.
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True, encoding="utf-8",
-                                errors="replace", **process_group())
+                                errors="replace", cwd=self.cwd or None, **process_group())
         try:
             out, err = proc.communicate(stdin, timeout=self.timeout)
         except KeyboardInterrupt:
