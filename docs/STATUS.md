@@ -210,8 +210,9 @@ local-model answering without Phil.
   (a) #jobs no longer has aria-live; `#job-status` announces only when a watched job finishes.
   (b) renderJob restores focus on Cancel, copy, vote, and the answer region.
   (c) load() skips rebuilding `#model` while that select is `document.activeElement`.
-- Flaky: one dashboard test failed once with a connection error, passed on rerun.
+- Flaky: dashboard urlopen timeout raised 5s → 10s (connection error once, passed on rerun).
 - GitHub Actions: jobs do not start (account payments / spending limit). Local pytest is the check until Phil fixes billing.
+- B7 #24: `mcp` is under Set up in `--help` (this branch).
 
 ## Next step (needs Phil)
 - Morning live check (costs a few dozen tokens per AI): from C:\Users\mrmar\mega-zword run `.venv\Scripts\python scripts\live_check.py --yes-spend`. Runs doctor (stops on FAIL), sends "Reply with exactly: pong" once to each installed, not-out AI via `megazword run -m`, then once via auto-pick, and prints AI / ok / seconds / answer length. Without --yes-spend it only explains itself. Never run by the bots.
