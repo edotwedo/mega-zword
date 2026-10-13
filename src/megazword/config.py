@@ -65,6 +65,7 @@ DEFAULT_ROUTE = {
 }
 
 DEFAULT_FREE = {
+    "ollama": "qwen2.5-coder:7b",
     "openrouter": "qwen/qwen3-4b:free",
     "groq": "llama-3.3-70b-versatile",
     "cloudflare": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
@@ -125,6 +126,7 @@ DEFAULT_SENTINEL_URLS = [
 
 @dataclass
 class Config:
+    agent: dict = field(default_factory=dict)
     rater_model: str = "qwen2.5:1.5b"
     route: dict[str, list[str]] = field(default_factory=lambda: dict(DEFAULT_ROUTE))
     grok: dict[str, tuple[str, str]] = field(default_factory=lambda: dict(DEFAULT_GROK))
@@ -189,6 +191,24 @@ def load(path: Path | None = None) -> Config:
                 setattr(cfg, key, limits[key])
         cfg.timeouts = {name: int(v) for name, v in data.get("timeouts", {}).items()
                         if isinstance(v, (int, float)) and v > 0}
+        agent = data.get("agent", {})
+        if not isinstance(agent, dict):
+            raise ValueError("agent must be a table")
+        for key, value in agent.items():
+            if key in ("max_steps", "max_chars", "call_timeout", "wall_timeout", "test_timeout"):
+                if type(value) is not int or value <= 0:
+                    raise ValueError(f"agent.{key} must be a positive whole number")
+            elif key == "text_protocol":
+                if type(value) is not bool:
+                    raise ValueError("agent.text_protocol must be true or false")
+            elif key == "test_command":
+                if not isinstance(value, list) or not value or not all(
+                        isinstance(v, str) and v for v in value):
+                    raise ValueError("agent.test_command must be a nonempty argv list")
+                value = tuple(value)
+            else:
+                raise ValueError(f"unknown agent setting: {key}")
+            cfg.agent[key] = value
 
         for name, block in data.get("free", {}).items():
             if name in cfg.free and isinstance(block, dict) and "model" in block:

@@ -51,9 +51,10 @@ def daily(path: Path, days: int = 7, today: date | None = None) -> list[DayStat]
             continue
         key = (day.isoformat(), str(r["backend"]))
         s = found.setdefault(key, DayStat(*key))
-        s.runs += 1
-        s.ok += bool(r.get("ok"))
-        s.moved_on += not r.get("ok")
+        requests = max(1, int(runlog._number(r.get("requests", 1))))
+        s.runs += requests
+        s.ok += requests * bool(r.get("ok"))
+        s.moved_on += requests * (not r.get("ok"))
         s.seconds += runlog._number(r.get("seconds"))  # bad values count as 0, never crash
         s.est_tokens += int(runlog._number(r.get("est_tokens")))
     return sorted(found.values(), key=lambda s: (s.day, s.backend))

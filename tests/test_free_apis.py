@@ -122,12 +122,13 @@ def test_presets_config_and_routes(monkeypatch):
     assert cfg.route == config.DEFAULT_ROUTE
     generated = config.render_default(list(backends))
     assert "openrouter" not in generated and "groq" not in generated
-    assert not {"openrouter", "groq"} & default_backends(edit=True).keys()
+    assert {"openrouter", "groq"} <= default_backends(edit=True).keys()
 
 
 @pytest.mark.parametrize("name, key_env", [("openrouter", "OPENROUTER_API_KEY"),
                                            ("groq", "GROQ_API_KEY")])
-def test_cli_forced_and_edit_exclusion(name, key_env, monkeypatch, capsys):
+def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
+    monkeypatch.setattr("megazword.ollama.reachable", lambda *a, **k: False)
     monkeypatch.setenv(key_env, "secret-test-credential")
     calls = []
     def fake(request, **kwargs):
@@ -139,8 +140,13 @@ def test_cli_forced_and_edit_exclusion(name, key_env, monkeypatch, capsys):
     assert cli.main(["run", "hello", "-m", name], cfg=cfg) == 0
     assert calls[0]["model"] == "override-model"
     assert "answer" in capsys.readouterr().out
-    assert cli.main(["run", "hello", "-m", name, "--edit"], cfg=cfg) == 2
-    assert len(calls) == 1
+    def finish_reply(request, **kwargs):
+        calls.append(json.loads(request.data))
+        return reply(json.dumps({"tool": "finish", "arguments": {"summary": "done"}}))
+    monkeypatch.setattr(urllib.request, "urlopen", finish_reply)
+    assert cli.main(["run", "hello", "-m", name, "--edit"], cfg=cfg) == 0
+    assert "tools" in calls[-1]
+    assert len(calls) == 2
     assert cli.main(["backends"], cfg=cfg) == 0
     output = capsys.readouterr().out
     assert "openrouter" in output and "groq" in output
@@ -157,7 +163,7 @@ def test_b14_backends_exist_off_route_and_train_flags():
         for level, names in config.DEFAULT_ROUTE.items():
             # B15 (Phil): only Mistral is routed by default, first in `easy`.
             assert name not in names or (name, level) == ("mistral", "easy")
-        assert name not in default_backends(edit=True)
+        assert name in default_backends(edit=True)
     assert not backends["zai"].trains_on_data
     assert backends["gemini-api"].trains_on_data
     assert backends["mistral"].trains_on_data

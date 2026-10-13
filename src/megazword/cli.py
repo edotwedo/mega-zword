@@ -558,8 +558,26 @@ def main(argv: list[str] | None = None,
 
     memory = Memory(config.HOME, args.project or project_name(), cfg.memory_lines)
     sent = with_context(prompt, memory.context_block()) if args.context else prompt
+    if args.edit:
+        from .agent import wrap
+        from .backends import OllamaBackend
+        from .free_apis import OpenAICompatibleBackend
+        chain = [wrap(b, cfg.agent) if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))
+                 else b for b in chain]
     # A forced AI (-m) never escalates; otherwise move up the chain on failure.
-    return execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))
+    code = execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))
+    if args.edit:
+        from .agent import AgentBackend
+        if any(isinstance(b, AgentBackend) for b in chain):
+            import subprocess
+            from .backends import run_quick
+            try:
+                diff = run_quick(["git", "diff", "--stat"], timeout=10)
+                print((diff.stdout.strip() or "[megazword] no tracked diff") if diff.returncode == 0
+                      else "[megazword] git diff --stat unavailable", file=sys.stderr)
+            except (OSError, subprocess.SubprocessError):
+                print("[megazword] git diff --stat unavailable", file=sys.stderr)
+    return code
 
 
 # The CLIs load their users' global startup rules (e.g. "read the team board
@@ -587,12 +605,16 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         if not result.ok:
             failure = explain_failure(name, result.error, cfg)
         trains = any(getattr(x, "trains_on_data", False) for x in chain if x.name == name)
+        agent = next((x for x in chain if x.name == name and hasattr(x, "request_count")), None)
         log.append(cfg.log_path, cfg.log_lines, backend=name, forced=forced, project=memory.project,
                    rating=rating.level if rating else None,
                    rater=rating.source if rating else None,
                    seconds=round(result.seconds, 2), ok=result.ok and not reason,
-                   rejected=reason, prompt_chars=len(prompt), answer_chars=len(result.text),
-                   est_tokens=(len(prompt) + len(result.text)) // 4,
+                   rejected=reason, prompt_chars=agent.prompt_chars if agent else len(prompt),
+                   answer_chars=agent.answer_chars if agent else len(result.text),
+                   requests=agent.request_count if agent else 1,
+                   est_tokens=(agent.prompt_chars + agent.answer_chars) // 4 if agent else
+                              (len(prompt) + len(result.text)) // 4,
                    trains_on_data=trains)
         memory.add("done", f"{'REJECTED (' + reason + ')' if reason else 'ok'}: {first_line}",
                    by=name)

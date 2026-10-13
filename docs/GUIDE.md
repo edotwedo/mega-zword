@@ -423,3 +423,52 @@ Start with `megazword doctor`; each line below matches one of its check names.
 | Phone cannot open dashboard | Confirm both devices are on the same Tailscale account, use the PC's Tailscale IP, keep the dashboard terminal open, and copy the full token URL from that launch. |
 
 For the available commands and options on this version, use `megazword --help`.
+
+## Free AIs that code
+
+Free API models can edit files through Mega Zword's own coding loop:
+
+```powershell
+megazword run -e -m groq "Fix the failing test in this folder. Run tests and summarize the change."
+```
+
+Set the provider's API key as described below. This also works with `openrouter`,
+`gemini-api`, `mistral`, `cloudflare`, `zai`, and `nvidia`. Availability and quota
+still depend on the provider. No live API call was used to test this feature.
+For local Ollama, pull the configured model, then use `-m ollama`. Its default is
+`qwen2.5-coder:7b`; change it under `[free.ollama]` with `model = "your-model"`.
+
+With just `-e`, the normal route picks the AI. API models on that route use the
+coding loop. Claude, Codex and Grok keep their existing CLI paths and restrictions.
+
+The loop can list, read, write and replace files, run one configured test command,
+and finish with a summary. Replacements must match once. It refuses paths outside
+the current folder, `.git`, `.env` files and hard links. It never commits. It prints
+the summary and `git diff --stat`; new untracked files do not appear in that stat.
+Review the files after a run, including one that stops early.
+
+Native tool calls are preferred. If the provider rejects them or the model replies
+with text, the loop switches to JSON tool replies. Set `text_protocol = true` to
+start with JSON. Models that train on data receive the existing secret scrub on
+prompts and file/test results before every call.
+
+Optional settings in `~/.megazword/config.toml`:
+
+```toml
+[agent]
+max_steps = 30
+max_chars = 12000
+call_timeout = 60
+wall_timeout = 600
+test_timeout = 120
+text_protocol = false
+test_command = ["python", "-m", "pytest", "-q", "-x"]
+```
+
+The model cannot change the test command or add shell commands. Set the command
+yourself for the project. Tests execute project code with your normal permissions;
+the file tools' path rules do not sandbox that code. Each call's timeout is also
+bounded by the time left in the run and the backend's `[timeouts]` setting.
+Runs stop on a cap or error and leave edits for review. The normal run log records
+the request count and estimated tokens. Stats count those model requests and use
+the coding run's final outcome for their success rate.

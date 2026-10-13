@@ -11,6 +11,10 @@ from dataclasses import dataclass, field
 from .backends import Backend
 
 
+class ToolsUnsupported(RuntimeError):
+    """Backend rejected the native tool schema; retry using text JSON."""
+
+
 @dataclass
 class OpenAICompatibleBackend(Backend):
     base_url: str = ""
@@ -33,27 +37,39 @@ class OpenAICompatibleBackend(Backend):
         return url.rstrip("/") + "/chat/completions"
 
     def _run(self, prompt: str) -> str:
+        message = self.chat([{"role": "user", "content": prompt}])
+        content = message.get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise RuntimeError("API returned an invalid or empty chat response")
+        return content
+
+    def chat(self, messages: list[dict], tools: list[dict] | None = None,
+             timeout: float | None = None) -> dict:
+        """One OpenAI chat turn, preserving native tool calls."""
         key = os.environ.get(self.key_env)
         if not key or not self._env_ok():
             raise RuntimeError("API key not set")
         try:
             headers = {"Authorization": f"Bearer {key}",
                        "Content-Type": "application/json", **self.extra_headers}
+            body = {"model": self.model, "messages": messages, "stream": False}
+            if tools is not None:
+                body["tools"] = tools
             request = urllib.request.Request(
                 self._endpoint(),
-                data=json.dumps({"model": self.model,
-                                 "messages": [{"role": "user", "content": prompt}],
-                                 "stream": False}).encode("utf-8"),
+                data=json.dumps(body).encode("utf-8"),
                 headers=headers,
                 method="POST",
             )
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:
                 payload = json.loads(response.read().decode("utf-8"))
-            content = payload["choices"][0]["message"]["content"]
-            if not isinstance(content, str) or not content.strip():
+            message = payload["choices"][0]["message"]
+            if not isinstance(message, dict):
                 raise ValueError("missing answer")
-            return content.replace(key, "[REDACTED]")
+            return json.loads(json.dumps(message).replace(key, "[REDACTED]"))
         except urllib.error.HTTPError as exc:
+            if tools is not None and exc.code in (400, 422):
+                raise ToolsUnsupported("API rejected native tools") from None
             # Response bodies, reasons and URLs can echo credentials. Never
             # propagate them into Result.error (which the CLI prints/logs).
             raise RuntimeError(http_error_message(exc.code, exc.headers)) from None

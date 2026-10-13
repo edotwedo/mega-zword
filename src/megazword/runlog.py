@@ -65,10 +65,11 @@ def summarize(path: Path, window: timedelta, now: datetime | None = None,
             continue
         backend = str(record["backend"])
         item = summaries.setdefault(backend, RunSummary(backend))
-        item.runs += 1
-        item.ok += bool(record.get("ok"))
-        item.rejected += bool(record.get("rejected"))
-        item.failed += not record.get("ok") and not record.get("rejected")
+        requests = max(1, int(_number(record.get("requests", 1))))
+        item.runs += requests
+        item.ok += requests * bool(record.get("ok"))
+        item.rejected += requests * bool(record.get("rejected"))
+        item.failed += requests * (not record.get("ok") and not record.get("rejected"))
         item.seconds += _number(record.get("seconds"))
         item.prompt_chars += int(_number(record.get("prompt_chars")))
         item.answer_chars += int(_number(record.get("answer_chars")))
