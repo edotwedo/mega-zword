@@ -141,6 +141,50 @@ def test_save_snapshot_writes_floor_json(tmp_path, codex_available):
     assert saved["groq"]["trains_on_data"] is True
 
 
+def _seats(**statuses):
+    kinds = {name: "cli" for name in floor.CLI_SEATS}
+    kinds.update({name: "http" for name in floor.HTTP_SEATS})
+    return [floor.Seat(name, kind, statuses.get(name.replace("-", "_"), "empty"))
+            for name, kind in kinds.items()]
+
+
+def test_suggest_bulk_prefers_groq_then_mistral_skipping_out_and_cli():
+    seats = _seats(claude="seated", groq="out", mistral="seated", cloudflare="seated")
+    assert floor.suggest_seat("bulk", seats) == "mistral"
+    seats = _seats(claude="seated", groq="seated", mistral="seated")
+    assert floor.suggest_seat("bulk", seats) == "groq"
+    assert floor.suggest_seat("bulk", _seats(claude="seated")) is None
+
+
+def test_suggest_edit_prefers_codex_then_claude():
+    assert floor.suggest_seat("edit", _seats(codex="seated", claude="seated")) == "codex"
+    assert floor.suggest_seat("edit", _seats(codex="out", claude="seated")) == "claude"
+    assert floor.suggest_seat("edit", _seats(grok="seated", groq="seated")) is None
+
+
+def test_suggest_decide_prefers_claude_grok_codex():
+    assert floor.suggest_seat("decide", _seats(claude="seated", grok="seated")) == "claude"
+    assert floor.suggest_seat("decide", _seats(claude="out", grok="seated")) == "grok"
+    assert floor.suggest_seat("decide", _seats(claude="empty", codex="seated")) == "codex"
+
+
+def test_suggest_review_skips_empty_and_out():
+    assert floor.suggest_seat("review", _seats(claude="out", grok="empty",
+                                               codex="seated")) == "codex"
+    assert floor.suggest_seat("review", _seats(groq="seated")) is None
+
+
+def test_floor_suggest_command_prints_name(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: tmp_path / "floor.json")
+    backends = {"groq": FakeBackend("groq"), "claude": FakeBackend("claude")}
+    cfg = SimpleNamespace(out_until={})
+    out: list[str] = []
+    args = SimpleNamespace(action="suggest", kind="bulk", room=None)
+    assert floor.command(args, backends, cfg, write=out.append) == 0
+    assert out == ["groq"]
+
+
 def test_peek_and_wait_share_the_hive_log(tmp_path, monkeypatch):
     from megazword import room
     monkeypatch.setattr(floor, "sleep", lambda _s: None)

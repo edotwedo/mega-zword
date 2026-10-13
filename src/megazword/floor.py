@@ -72,6 +72,28 @@ def ready(seats: list[Seat]) -> bool:
     return True
 
 
+BULK_ORDER = ("groq", "mistral", "cloudflare", "zai", "gemini-api")
+JOB_ORDER = {
+    "edit": ("codex", "claude"),
+    "decide": ("claude", "grok", "codex"),
+    "review": ("claude", "grok", "codex"),
+}
+JOB_KINDS = ("bulk", "edit", "decide", "review")
+
+
+def suggest_seat(job_kind: str, seats: list[Seat]) -> str | None:
+    """Conductor: which seated model should take this kind of job. Skips empty and out."""
+    seated = {s.name: s for s in seats if s.status == "seated"}
+    if job_kind == "bulk":
+        http = [s.name for s in seats if s.status == "seated" and s.kind == "http"]
+        order = [n for n in BULK_ORDER if n in http] + [n for n in http if n not in BULK_ORDER]
+        return order[0] if order else None
+    for name in JOB_ORDER.get(job_kind, ()):
+        if name in seated:
+            return name
+    return None
+
+
 def format_roster(seats: list[Seat]) -> str:
     flag = "yes" if ready(seats) else "no — seat the missing CLI windows"
     lines = ["Hive floor", f"ready: {flag}", ""]
@@ -176,5 +198,16 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
             return 1
         write("\n".join(format_msg(m) for m in new))
         return 0
-    write("Usage: megazword floor [status|introduce|peek|wait]")
+    if action == "suggest":
+        kind = getattr(args, "kind", None)
+        if kind not in JOB_KINDS:
+            write("Usage: megazword floor suggest bulk|edit|decide|review")
+            return 2
+        name = suggest_seat(kind, seats)
+        if name is None:
+            write("(no seat)")
+            return 1
+        write(name)
+        return 0
+    write("Usage: megazword floor [status|introduce|peek|wait|suggest]")
     return 2
