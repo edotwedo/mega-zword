@@ -150,6 +150,8 @@ in the Hive.
 
 - `megazword floor`: Show each seat as seated, empty (no key or install) or out, and whether the minimum crew is ready. Saves `~/.megazword/floor.json`.
 - `megazword floor introduce [--room hive]`: Post the floor roll call to the room. It has no `@names`, so nobody wakes up until Phil assigns work.
+- `megazword floor peek [-n 10]`: Print the latest Hive messages (the shared log).
+- `megazword floor wait [--timeout 120]`: Block until a new Hive message lands. This Grok session and the other seats read the same file; they still cannot type into each other's CLI windows.
 
 See `docs/FLOOR.md` for the full layout.
 

@@ -139,3 +139,14 @@ def test_save_snapshot_writes_floor_json(tmp_path, codex_available):
     assert saved["claude"]["until"] is None
     assert saved["groq"]["kind"] == "http"
     assert saved["groq"]["trains_on_data"] is True
+
+
+def test_peek_and_wait_share_the_hive_log(tmp_path, monkeypatch):
+    from megazword import room
+    monkeypatch.setattr(floor, "sleep", lambda _s: None)
+    room.append_message("hive", "phil", "seat up", home=tmp_path)
+    assert "[phil] seat up" in floor.peek_text("hive", n=5, home=tmp_path)
+    already = floor.wait_for("hive", home=tmp_path, after=0, timeout=0, pause=0)
+    assert len(already) == 1
+    none = floor.wait_for("hive", home=tmp_path, after=1, timeout=0, pause=0)
+    assert none == []

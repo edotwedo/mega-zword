@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from time import sleep, monotonic
 from typing import Callable
 
 from . import config
@@ -120,20 +121,60 @@ def introduce_text(seats: list[Seat]) -> str:
     return "\n".join(lines)
 
 
+def format_msg(msg) -> str:
+    return f"[{msg.author}] {msg.text}"
+
+
+def peek_text(room_name: str, n: int = 10, home: Path | None = None) -> str:
+    from . import room
+    msgs = room.read_messages(room_name, home)
+    if not msgs:
+        return "(hive empty)"
+    return "\n".join(format_msg(m) for m in msgs[-max(1, n):])
+
+
+def wait_for(room_name: str, home: Path | None = None, after: int | None = None,
+             timeout: float = 120, pause: float = 0.25) -> list:
+    """Block until hive has more than `after` messages. after=None means current count."""
+    from . import room
+    msgs = room.read_messages(room_name, home)
+    baseline = len(msgs) if after is None else after
+    if len(msgs) > baseline:
+        return msgs[baseline:]
+    deadline = monotonic() + max(0.0, timeout)
+    while monotonic() < deadline:
+        sleep(pause)
+        msgs = room.read_messages(room_name, home)
+        if len(msgs) > baseline:
+            return msgs[baseline:]
+    return []
+
+
 def command(args, backends: dict[str, Backend], cfg: config.Config,
             write: Callable[[str], None] = print) -> int:
     from . import room
     seats = roster(backends, cfg.out_until)
     save_snapshot(seats)
     action = getattr(args, "action", None) or "status"
+    room_name = getattr(args, "room", None) or "hive"
     if action == "status":
         write(format_roster(seats))
         return 0
     if action == "introduce":
-        room_name = getattr(args, "room", None) or "hive"
         text = introduce_text(seats)
         room.say(room_name, text, author="floor")
         write(format_roster(seats))
         return 0
-    write("Usage: megazword floor [status|introduce]")
+    if action == "peek":
+        write(peek_text(room_name, n=getattr(args, "n", 10) or 10))
+        return 0
+    if action == "wait":
+        timeout = float(getattr(args, "timeout", 120) or 120)
+        new = wait_for(room_name, timeout=timeout)
+        if not new:
+            write("(no new hive message)")
+            return 1
+        write("\n".join(format_msg(m) for m in new))
+        return 0
+    write("Usage: megazword floor [status|introduce|peek|wait]")
     return 2

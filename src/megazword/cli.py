@@ -111,9 +111,12 @@ def build_parser() -> argparse.ArgumentParser:
     sent.add_argument("-n", type=int, default=20, help="how many events to show for log")
     sent.add_argument("--yes", action="store_true",
                       help="for install: actually create the scheduled task")
-    floor = sub.add_parser("floor", help="Hive floor: which AI seats are filled; introduce posts it")
-    floor.add_argument("action", nargs="?", choices=("status", "introduce"), default="status")
-    floor.add_argument("--room", default="hive", help="room for introduce (default: hive)")
+    floor = sub.add_parser("floor", help="Hive floor: seats, introduce, peek/wait on the shared hive log")
+    floor.add_argument("action", nargs="?", choices=("status", "introduce", "peek", "wait"),
+                       default="status")
+    floor.add_argument("--room", default="hive", help="hive room name (default: hive)")
+    floor.add_argument("-n", type=int, default=10, help="peek: how many messages")
+    floor.add_argument("--timeout", type=int, default=120, help="wait: seconds to block")
 
     out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
