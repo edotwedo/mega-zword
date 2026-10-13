@@ -142,6 +142,17 @@ sends a short state card, a rolling summary and the last few messages, not the
 whole history, to keep usage down. The dashboard reads and drives the same room
 through `/api/room` (view) and `/api/room/say`, `/api/room/start` and `/api/room/stop`.
 
+### Hive floor
+
+The floor has one seat per AI: one CLI window each for claude, codex and grok
+(gemini when its week is back). HTTP models like groq have no window; they wait
+in the Hive.
+
+- `megazword floor`: Show each seat as seated, empty (no key or install) or out, and whether the minimum crew is ready. Saves `~/.megazword/floor.json`.
+- `megazword floor introduce [--room hive]`: Post the floor roll call to the room. It has no `@names`, so nobody wakes up until Phil assigns work.
+
+See `docs/FLOOR.md` for the full layout.
+
 
 Notes, decisions and completed runs are saved under
 `%USERPROFILE%\.megazword\projects\` on Windows. Pass `-p` to keep projects

@@ -1,6 +1,6 @@
 # Status
 
-**Active: Nimbus-12 (Grok Build on Phil's PC) is lead (Phil, 2026-10-12).** Beta 3.0 feature freeze still on: ship what's on main. Codex holds until Phil says to use its 5-hour refresh. Checklist under "Beta 3.0 release".
+**Active: Nimbus-12 (Grok Build on Phil's PC) is lead (Phil, 2026-10-12).** **Feature freeze off (Phil, 2026-10-12):** the Hive floor (`megazword floor`) is the next layer; split in `docs/handoffs/2026-10-12-floor.md`. The Beta 3.0 checklist below still stands but no longer blocks features.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Nimbus-12 (Grok Build on Phil's PC). Phil named this seat lead. Tally-11 is released. Cloud Claudes coordinate in Q; they do not take main.
 **Last updated:** 2026-10-12 by Quill-12: Wren-12's Q split — Grok keeps Beta 3.0 1-5; J1/J2/J4 after ship. Usage: Claude 2% 5h / 69% week; Codex 9% 5h / 78% week; Grok 16% week; Gemini out until Oct 18.
@@ -26,9 +26,9 @@ Current main contains the agy empty-answer fix, B12, B13 and B15. B5 and B4 are 
 ## Next up (from Tally-11, 2026-10-11): done
 All five Beta 1 PC steps are done: reinstalled from main (0.1.0b1), Claude meter readable, Gemini verified live (`agy` answered in plan mode), Beta 1 tagged. Older worktree folders were not certified safe to remove; check each before cleanup.
 
-## Beta 3.0 release (feature freeze, Phil 2026-10-12)
+## Beta 3.0 release (freeze lifted by Phil 2026-10-12; checklist kept, not blocking)
 Usage at the call (13:05 PT): Claude 73% 5-hour (resets 2:00 PM) / 67% week; Codex 100% 5-hour / 76% week, slowing down until Oct 17; Grok 15% week (most room); Gemini out until Oct 18.
-Nothing new gets built. Put your name on a step before you start it; tick it when it's on main.
+Put your name on a step before you start it; tick it when it's on main.
 1. **Linux-only test failures (3):** **Quill-12, this branch.** CLI test uses a native outside path (`/bin/true` on Linux). Sentinel tests patch `_is_windows` instead of `os.name` (that made pathlib WindowsPath and crashed Linux pytest). 678 tests passed on this PC.
 2. **B7 review pass** of everything since Beta 1 (B1-B6b, B8, B9, B12-B15, room API, chat tabs UI, desktop window). Findings as a list in Q; small fixes on `grok/b7-review-2026-10-12`. **Grok** (needs Phil's prompt).
 3. **Release notes** (README "What's new in Beta 3.0", GUIDE check). **Nimbus-12.**
@@ -46,7 +46,7 @@ Each lane has a handoff in `docs/handoffs/2026-10-11-*.md` with everything neede
 **Lane update (Tally-11, 2026-10-12):** Gemini/agy is at 100% in both pools until Oct 18; park B10/B11. B12, B13 and B15 are on main. Codex completed B5 and B4; B6 is next. Grok round 2 fixed the agy empty-answer bug and reviews B7 and B1. B14 and Grok B3/B8/B9 plus Antigravity B1 are already on main. Finish and push each item before starting another. Nimbus-12 (Grok) is lead and merges/reconciles lanes.
 Rules: put your name on an item here, own branch, small pushes, tests + smoke pass, no paid calls in
 tests, hand finished branches to the lead (**Nimbus-12**) to merge; post the branch name in Q. Lane empty? Take the next
-unclaimed item from another lane. Only freeze-checklist work until Beta 3.0 ships.
+unclaimed item from another lane.
 
 Usage at assignment (5h/week % used): Claude 59/31, Codex 12/30, Grok -/0 (new week), Gemini -/3,
 Antigravity Claude/GPT pool -/0.

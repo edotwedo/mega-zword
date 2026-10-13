@@ -117,7 +117,7 @@ def introduce_text(seats: list[Seat]) -> str:
         lines.append(f"Out: {', '.join(out)}.")
     if empty:
         lines.append(f"Empty (need a key or install): {', '.join(empty)}.")
-    return " ".join(lines) if False else "\n".join(lines)
+    return "\n".join(lines)
 
 
 def command(args, backends: dict[str, Backend], cfg: config.Config,
