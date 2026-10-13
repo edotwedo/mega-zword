@@ -175,6 +175,27 @@ def test_handle_hive_wait_negative_after_is_clamped(monkeypatch):
         "[reed-12] one\n(after=1)"
 
 
+@pytest.mark.parametrize("timeout, expected", [
+    (1e9, 300.0),
+    (float("inf"), 300.0),
+    (300, 300.0),
+    (45, 45.0),
+    (-5, 0.0),
+])
+def test_handle_hive_wait_timeout_is_capped(monkeypatch, timeout, expected):
+    seen = []
+    monkeypatch.setattr(floor, "wait_for",
+                        lambda room_name, after, timeout: seen.append(timeout) or [])
+    text_result(call_tool("hive_wait", {"timeout": timeout}))
+    assert seen == [expected]
+
+
+def test_handle_hive_wait_nan_timeout_is_error(monkeypatch):
+    monkeypatch.setattr(floor, "wait_for", lambda *a, **k: pytest.fail("must not wait"))
+    result = call_tool("hive_wait", {"timeout": float("nan")})
+    assert result["isError"] is True
+
+
 def test_hive_wait_schema_has_after():
     tools = {t["name"]: t for t in mcp_hive.TOOLS}
     assert tools["hive_wait"]["inputSchema"]["properties"]["after"]["type"] == "integer"
@@ -210,3 +231,101 @@ def test_serve_newline_initialize_roundtrip():
     assert response["result"]["protocolVersion"] == "2024-11-05"
     assert response["result"]["capabilities"]["tools"] == {}
     assert response["result"]["serverInfo"]["name"] == "megazword-hive"
+
+
+def frame(message):
+    body = message if isinstance(message, bytes) else json.dumps(message).encode("utf-8")
+    return f"Content-Length: {len(body)}\r\n\r\n".encode("ascii") + body
+
+
+def framed_replies(raw):
+    stream = BytesIO(raw)
+    replies = []
+    while (got := mcp_hive.read_message(stream)) is not None:
+        message, framed = got
+        assert framed is True
+        replies.append(message)
+    return replies
+
+
+def serve_bytes(data):
+    stdout = BytesIO()
+    assert mcp_hive.serve(stdin=BytesIO(data), stdout=stdout) == 0
+    return stdout.getvalue()
+
+
+PING = {"jsonrpc": "2.0", "id": 9, "method": "ping"}
+
+
+def test_serve_batch_bad_item_gets_error_and_server_keeps_going():
+    batch = [
+        {"jsonrpc": "2.0", "id": 1, "method": "ping"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": ["positional"]},
+        "not an object",
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": 3, "method": "tools/list"},
+    ]
+    replies = framed_replies(serve_bytes(frame(batch) + frame(PING)))
+    assert len(replies) == 2
+    by_id = {r["id"]: r for r in replies[0]}
+    assert len(replies[0]) == 4
+    assert by_id[1]["result"] == {}
+    assert by_id[2]["error"]["code"] == -32602
+    assert by_id[None]["error"]["code"] == -32600
+    assert by_id[3]["result"]["tools"]
+    assert replies[1] == {"jsonrpc": "2.0", "id": 9, "result": {}}
+
+
+def test_serve_batch_item_that_crashes_handler_gets_internal_error(monkeypatch):
+    def boom(request):
+        if request.get("id") == 1:
+            raise RuntimeError("kaboom")
+        return {"jsonrpc": "2.0", "id": request["id"], "result": {}}
+
+    monkeypatch.setattr(mcp_hive, "handle", boom)
+    batch = [{"jsonrpc": "2.0", "id": 1, "method": "ping"},
+             {"jsonrpc": "2.0", "id": 2, "method": "ping"}]
+    [replies] = framed_replies(serve_bytes(frame(batch)))
+    assert replies[0]["id"] == 1
+    assert replies[0]["error"] == {"code": -32603, "message": "kaboom"}
+    assert replies[1] == {"jsonrpc": "2.0", "id": 2, "result": {}}
+
+
+def test_serve_empty_batch_is_invalid_request():
+    [reply] = framed_replies(serve_bytes(frame([])))
+    assert reply["error"]["code"] == -32600
+
+
+def test_serve_newline_batch():
+    raw = serve_bytes((json.dumps([PING, {"jsonrpc": "2.0", "id": 10, "method": "nope"}])
+                       + "\n").encode("utf-8"))
+    replies = json.loads(raw.decode("utf-8"))
+    assert replies[0]["result"] == {}
+    assert replies[1]["error"]["code"] == -32601
+
+
+def test_serve_framed_roundtrip():
+    [reply] = framed_replies(serve_bytes(frame(PING)))
+    assert reply == {"jsonrpc": "2.0", "id": 9, "result": {}}
+
+
+def test_serve_negative_content_length_is_protocol_error():
+    # read(-5) would swallow the rest of stdin (and block on a real pipe), losing the ping.
+    replies = framed_replies(serve_bytes(b"Content-Length: -5\r\n\r\n" + frame(PING)))
+    assert replies[0]["error"]["code"] == -32700
+    assert replies[1] == {"jsonrpc": "2.0", "id": 9, "result": {}}
+
+
+def test_serve_oversized_content_length_is_skipped(monkeypatch):
+    monkeypatch.setattr(mcp_hive, "MAX_BODY_BYTES", 200)
+    big = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping", "pad": "x" * 400})
+    replies = [r for r in framed_replies(serve_bytes(frame(big.encode("utf-8")) + frame(PING)))
+               if r is not None]
+    assert replies[0]["error"]["code"] == -32700
+    assert replies[1] == {"jsonrpc": "2.0", "id": 9, "result": {}}
+
+
+@pytest.mark.parametrize("header", [b"Content-Length: nope", b"X-Other: 1"])
+def test_serve_bad_content_length_header_is_protocol_error(header):
+    [reply] = framed_replies(serve_bytes(header + b"\r\n\r\n"))
+    assert reply["error"]["code"] == -32700
