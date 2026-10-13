@@ -153,7 +153,8 @@ def _kill_tree(proc: subprocess.Popen, reap: bool = True) -> None:
     try:
         if os.name == "nt":
             subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                           capture_output=True, timeout=15)
+                           capture_output=True, timeout=15,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
         else:
             import signal
             os.killpg(proc.pid, signal.SIGKILL)
