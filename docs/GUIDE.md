@@ -330,6 +330,10 @@ installation and phone sign-in are not configured by Mega Zword. OpenSSH is
 needed only for a phone terminal connection, not for the dashboard in a browser.
 There is no phone-model answering backend yet.
 
+## Night Shift
+
+- `megazword night status` shows whether the STOP file is set, whether a run is going, the last 10 jobs, and where the last summary is.
+
 ## Other commands
 
 - `megazword init [--force]` creates a config using installed tools; `--force`
