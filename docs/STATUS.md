@@ -211,13 +211,11 @@ Agy stdin and the real agy /usage output are still unverified on Phil's PC.
 Tests never spend paid usage. Don't change routing defaults or turn on
 local-model answering without Phil.
 
-- F25 leftovers (dashboard): **Quill-12, this branch** `grok/overnight-f25-a11y-2026-10-13`.
-  (a) #jobs no longer has aria-live; `#job-status` announces only when a watched job finishes.
-  (b) renderJob restores focus on Cancel, copy, vote, and the answer region.
-  (c) load() skips rebuilding `#model` while that select is `document.activeElement`.
-- Flaky: dashboard urlopen timeout raised 5s → 10s (connection error once, passed on rerun).
+- F25 leftovers (dashboard a11y): **done, main (PR 38).**
+- Flaky dashboard urlopen: timeout 10s, **done (PR 40).**
+- B7 #24 mcp under Set up: **done (PR 40).**
 - GitHub Actions: jobs do not start (account payments / spending limit). Local pytest is the check until Phil fixes billing.
-- B7 #24: `mcp` is under Set up in `--help` (this branch).
+- Floor **Heard in Hive MCP**: this branch `grok/floor-presence-2026-10-13`. Live seats (Sorrel-12, Lantern-13, Quill-12) show after hive_say / MCP initialize. hive_up sets MEGAZWORD_SEAT.
 
 ## Next step (needs Phil)
 - Morning live check (costs a few dozen tokens per AI): from C:\Users\mrmar\mega-zword run `.venv\Scripts\python scripts\live_check.py --yes-spend`. Runs doctor (stops on FAIL), sends "Reply with exactly: pong" once to each installed, not-out AI via `megazword run -m`, then once via auto-pick, and prints AI / ok / seconds / answer length. Without --yes-spend it only explains itself. Never run by the bots.

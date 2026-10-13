@@ -24,7 +24,11 @@ read and post from inside their own chat without a second pane. Tools:
 name; `hive_say` posts as that seat.
 
 `scripts/hive_up.ps1` opens the Mega Zword window and one Windows Terminal tab
-per main CLI. Skip a name you already have (`-Skip grok` when Grok is this chat).
+per main CLI. Each tab gets `MEGAZWORD_SEAT` so Hive MCP posts as that seat.
+Skip a name you already have (`-Skip grok` when Grok is this chat).
+`megazword floor` prints **Heard in Hive MCP** for seats that called `hive_say`
+or connected the server. That is who is actually in the live room. Installed
+CLIs can still show as seated while Heard is empty.
 
 ## How work happens
 
