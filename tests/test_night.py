@@ -173,6 +173,7 @@ def test_stop_file_and_job_cap(origin):
 def test_refuses_secrets(origin):
     def leak(folder, prompt):
         (folder / ".env").write_text("X=1\n", encoding="utf-8")
+        return "added .env"
     n = night.Night(fakes(("codex", leak)), usage=meters(codex=10), date="2026-10-13")
     o = n.run_job(night.parse_queue(QUEUE.format(repo=origin))[0])
     assert o.status == "failed" and "secrets file" in o.reason and not o.branch
@@ -210,3 +211,39 @@ def test_summary_post_is_off_in_tests(origin):
     lines = []
     night.run_night(n, queue=str(origin), max_jobs=1, post=True, write=lines.append)
     assert any("NOT posted" in line for line in lines)
+
+
+def test_failed_ai_partial_edits_are_discarded(origin):
+    """Codex review P1: an AI that errors (e.g. timeout) after editing must not be committed."""
+    def half_then_crash(folder, prompt):
+        (folder / "README.md").write_text("half\n", encoding="utf-8")
+        raise TimeoutError("no answer within 1800s")
+    ais = fakes(("codex", half_then_crash), ("claude", typo_fix))
+    n = night.Night(ais, usage=meters(codex=10, claude=60), date="2026-10-13")
+    o = n.run_job(night.parse_queue(QUEUE.format(repo=origin))[0])
+    assert o.status == "done" and o.ai == "claude"
+    assert show(origin, o.branch, "README.md") == "receive\n"
+
+    n = night.Night(fakes(("codex", half_then_crash)), usage=meters(codex=10), date="2026-10-14")
+    o = n.run_job(night.parse_queue(QUEUE.format(repo=origin))[0])
+    assert o.status == "failed" and "partial edits were discarded" in o.reason and not o.branch
+
+
+def test_job_tests_get_no_keys_or_git_login(monkeypatch, tmp_path):
+    """Codex review P1: job tests are AI-written code; they get no tokens and can't push."""
+    for var in ("GH_TOKEN", "GITHUB_TOKEN", "XAI_API_KEY", "CLOUDFLARE_API_TOKEN", "MY_SECRET"):
+        monkeypatch.setenv(var, "x")
+    env = night.test_env(tmp_path)
+    assert not {"GH_TOKEN", "GITHUB_TOKEN", "XAI_API_KEY", "CLOUDFLARE_API_TOKEN", "MY_SECRET"} & set(env)
+    assert env["GIT_TERMINAL_PROMPT"] == "0" and env["GIT_CONFIG_KEY_0"] == "credential.helper"
+    assert env["MEGAZWORD_NO_USER_ENV"] == "1" and "PATH" in env
+
+
+def test_tests_that_move_head_are_not_pushed(origin):
+    """Codex review P1: the tests ran after the secret scan, so a test that commits is refused."""
+    job = night.Job(0, " ", str(origin), "Fix the typo", "receive",
+                    test="git commit -q --allow-empty -m sneaky")
+    n = night.Night(fakes(("codex", typo_fix)), usage=meters(codex=10), date="2026-10-13")
+    o = n.run_job(job)
+    assert o.status == "failed" and "HEAD moved" in o.reason and not o.branch
+    assert "night/2026-10-13-1" not in heads(origin)

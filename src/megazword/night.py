@@ -213,23 +213,41 @@ def push_branch(work: Path, branch: str) -> str:
     return sha
 
 
-def secret_problem(work: Path) -> str:
-    """Why this change must not be committed, or "" if it looks clean."""
-    names = _check(git(["diff", "--cached", "--name-only"], work), "git diff").splitlines()
+def secret_problem(work: Path, since: str = "") -> str:
+    """Why this change must not be committed or pushed, or "" if it looks clean.
+    Checks the staged change, or with `since` everything from that commit to HEAD."""
+    span = [since, "HEAD"] if since else ["--cached"]
+    names = _check(git(["diff", *span, "--name-only"], work), "git diff").splitlines()
     for name in names:
         if SECRET_FILES.search(name.replace("\\", "/")):
             return f"refused to commit {name} (looks like a secrets file)"
-    diff = _check(git(["diff", "--cached", "-U0"], work), "git diff")
+    diff = _check(git(["diff", *span, "-U0"], work), "git diff")
     for line in diff.splitlines():
         if line.startswith("+") and not line.startswith("+++") and SECRET.search(line):
             return "refused to commit: the change contains something that looks like a key"
     return ""
 
 
+SECRET_ENV = re.compile(r"(_API_KEY|_API_TOKEN|_TOKEN|_SECRET|_PASSWORD|_ACCOUNT_ID)$|^(GH_|GITHUB_)", re.I)
+
+
+def test_env(work: Path) -> dict:
+    """Environment for a job's tests. Not a sandbox: the tests are code an AI just
+    wrote and run as Phil. They get no API keys or tokens, a scratch Mega Zword
+    home, and git with no stored login, so they can't spend usage or push."""
+    env = {k: v for k, v in os.environ.items() if not SECRET_ENV.search(k)}
+    env.update({"MEGAZWORD_NO_USER_ENV": "1", "MEGAZWORD_NO_APP": "1",
+                "MEGAZWORD_HOME": str(home() / "test-home"),
+                "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never",
+                "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "credential.helper",
+                "GIT_CONFIG_VALUE_0": ""})
+    return env
+
+
 def test_command(work: Path, job: Job) -> tuple[list[str] | None, dict | None]:
     """The job's own test command, else pytest for a Python repo. The checkout's
     src/ goes first on PYTHONPATH so tests import this branch, not Phil's install."""
-    env = dict(os.environ)
+    env = test_env(work)
     if (work / "src").is_dir():
         env["PYTHONPATH"] = os.pathsep.join([str(work / "src"), env.get("PYTHONPATH", "")]).strip(os.pathsep)
     if job.test:
@@ -335,6 +353,7 @@ class Night:
 
     def _work(self, job: Job, out: Outcome, names: list[str], work: Path, branch: str) -> Outcome:
         prompt = PROMPT.format(repo=job.repo, task=job.task, done=job.done_when)
+        base = _check(git(["rev-parse", "HEAD"], work), "git rev-parse").strip()
         for name in names:
             out.tried.append(name)
             backend = replace(self.backends[name], cwd=str(work), timeout=int(self.job_seconds))
@@ -342,10 +361,13 @@ class Night:
             result = backend.run(prompt)
             git(["add", "-A"], work)
             changed = git(["diff", "--cached", "--quiet"], work).returncode != 0
-            if changed:
+            if changed and result.ok:
                 out.ai = name
                 break
+            # A timeout or crash can leave half an edit behind: never commit that.
             reason = result.error or "made no changes"
+            if changed:
+                reason += " (its partial edits were discarded)"
             self.log(f"{branch}: {name} {reason[:200]}")
             out.reason = f"{name}: {reason[:200]}"
             git(["reset", "--hard", "--quiet"], work)
@@ -359,6 +381,7 @@ class Night:
         # Commit the AI's change before the tests, so files the tests write stay out of it.
         msg = f"night: {job.task[:60]}\n\nNight Shift job by {out.ai}. Done when: {job.done_when}"
         _check(git(["-c", "core.hooksPath=", "commit", "--quiet", "-m", msg], work), "git commit")
+        tested = _check(git(["rev-parse", "HEAD", "HEAD^{tree}"], work), "git rev-parse").split()
         cmd, env = test_command(work, job)
         if cmd is None:
             out.tests = "none"
@@ -369,8 +392,20 @@ class Night:
             self.log(f"{branch}: tests {out.tests}: {tail[0][:200]}")
             if out.tests == "failed":
                 out.reason = f"tests failed: {tail[0][:200]}"
+        # The tests are code too: they must not have moved HEAD or changed what gets pushed.
+        if _check(git(["rev-parse", "HEAD"], work), "git rev-parse").strip() != tested[0]:
+            out.reason = "the tests changed the commit (HEAD moved); not pushed"
+            return out
+        git(["reset", "--quiet"], work)  # unstage anything the tests added
         _check(git(["-c", "core.hooksPath=", "commit", "--quiet", "--amend", "-m",
                     f"{msg}\nTests: {out.tests}"], work), "git commit --amend")
+        if _check(git(["rev-parse", "HEAD^{tree}"], work), "git rev-parse").strip() != tested[1]:
+            out.reason = "the files changed after the tests; not pushed"
+            return out
+        problem = secret_problem(work, since=base)  # once more, on exactly what gets pushed
+        if problem:
+            out.reason = problem
+            return out
         try:
             push_branch(work, branch)
         except RuntimeError as exc:
