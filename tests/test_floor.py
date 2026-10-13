@@ -216,6 +216,49 @@ def test_floor_suggest_command_prints_name(monkeypatch, tmp_path):
     assert out == ["groq"]
 
 
+def _log(path, *records):
+    with path.open("a", encoding="utf-8") as f:
+        for backend, ok, rejected in records:
+            f.write(json.dumps({"time": "2026-10-13T02:00:00+00:00", "backend": backend,
+                                "ok": ok, "rejected": rejected}) + "\n")
+
+
+def test_auth_failed_uses_latest_run_per_backend(tmp_path):
+    log = tmp_path / "log.jsonl"
+    _log(log,
+         ("groq", False, "failed: API HTTP error 403: forbidden (auth rejected, check the API key or model access)"),
+         ("mistral", False, "failed: API HTTP error 401: unauthorized (auth failed, check the API key)"),
+         ("mistral", True, None),  # fixed since: latest run wins
+         ("zai", False, "failed: API connection failed: unable to connect (network or DNS)"),
+         ("claude", False, "failed: Error: Not logged in. Please run /login"),
+         ("codex", False, "too short (mentions 401)"))  # judge rejection, not a failed call
+    assert floor.auth_failed(log) == {"groq", "claude"}
+    assert floor.auth_failed(tmp_path / "missing.jsonl") == set()
+    assert floor.auth_failed(None) == set()
+
+
+def test_suggest_skips_auth_failed_without_marking_out(tmp_path):
+    seats = _seats(claude="seated", grok="seated", groq="seated", mistral="seated")
+    assert floor.suggest_seat("bulk", seats, {"groq"}) == "mistral"
+    assert floor.suggest_seat("decide", seats, {"claude"}) == "grok"
+    assert floor.suggest_seat("bulk", seats, {"groq", "mistral"}) is None
+    assert {s.name: s.status for s in seats}["groq"] == "seated"
+
+
+def test_floor_suggest_command_skips_groq_after_403(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: tmp_path / "floor.json")
+    log = tmp_path / "log.jsonl"
+    _log(log, ("groq", False, "failed: API HTTP error 403: forbidden (auth rejected, check the API key or model access)"))
+    backends = {"groq": FakeBackend("groq"), "mistral": FakeBackend("mistral")}
+    cfg = SimpleNamespace(out_until={}, log_path=log)
+    out: list[str] = []
+    args = SimpleNamespace(action="suggest", kind="bulk", room=None)
+    assert floor.command(args, backends, cfg, write=out.append) == 0
+    assert out == ["mistral"]
+    assert cfg.out_until == {}
+
+
 def test_peek_and_wait_share_the_hive_log(tmp_path, monkeypatch):
     from megazword import room
     monkeypatch.setattr(floor, "sleep", lambda _s: None)

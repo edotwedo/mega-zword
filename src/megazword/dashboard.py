@@ -207,10 +207,11 @@ class App:
 
     def floor_state(self, now: datetime | None = None) -> dict:
         seats = floor.roster(self.backends, self.cfg.out_until, now)
+        skip = floor.auth_failed(self.cfg.log_path)
         return {
             "seats": [{"name": s.name, "kind": s.kind, "status": s.status} for s in seats],
             "ready": floor.ready(seats),
-            "suggest": {k: floor.suggest_seat(k, seats) for k in floor.JOB_KINDS},
+            "suggest": {k: floor.suggest_seat(k, seats, skip) for k in floor.JOB_KINDS},
         }
 
     # --- actions ---------------------------------------------------------
