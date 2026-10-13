@@ -54,6 +54,21 @@ def test_handle_initialize():
     assert result["serverInfo"]["version"]
 
 
+@pytest.mark.parametrize("asked", ["2099-01-01", None, 42])
+def test_handle_initialize_unknown_version_answers_ours(asked):
+    from megazword import __version__
+    params = {} if asked is None else {"protocolVersion": asked}
+    response = mcp_hive.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                                "params": params})
+    assert response["result"]["protocolVersion"] == mcp_hive.PROTOCOL_VERSION
+    assert response["result"]["serverInfo"]["version"] == __version__
+
+
+def test_hive_say_description_warns_mentions_still_wake():
+    tools = {t["name"]: t for t in mcp_hive.TOOLS}
+    assert "room start" in tools["hive_say"]["description"]
+
+
 def test_handle_tools_list():
     response = mcp_hive.handle({
         "jsonrpc": "2.0", "id": 2, "method": "tools/list",
@@ -87,7 +102,8 @@ def test_handle_hive_say_and_read(isolated_home):
 @pytest.mark.parametrize("n, expected", [
     (1, "[quill-12] second\n(after=2)"),
     (2, "[reed-12] first\n[quill-12] second\n(after=2)"),
-    (0, "(no messages yet)\n(after=2)"),
+    (0, "(after=2)"),  # cursor only, like `floor peek -n 0`
+    (-3, "(after=2)"),
 ])
 def test_handle_hive_read_recent(n, expected):
     room.append_message("hive", "reed-12", "first")

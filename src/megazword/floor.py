@@ -135,8 +135,9 @@ def snapshot_path(home: Path | None = None) -> Path:
 
 
 def save_snapshot(seats: list[Seat], home: Path | None = None) -> Path:
+    import json
+    from .filelock import write_atomic
     path = snapshot_path(home)
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "ready": ready(seats),
         "seats": [
@@ -146,7 +147,7 @@ def save_snapshot(seats: list[Seat], home: Path | None = None) -> Path:
             for s in seats
         ],
     }
-    path.write_text(__import__("json").dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_atomic(path, json.dumps(payload, indent=2) + "\n")  # readers never see half a file
     return path
 
 
@@ -212,7 +213,8 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
             write(f"floor: {e}")
             return 2
     seats = roster(backends, cfg.out_until)
-    save_snapshot(seats)
+    if action in ("status", "introduce"):  # peek/wait poll often; don't rewrite floor.json
+        save_snapshot(seats)
     if action == "status":
         write(format_roster(seats))
         return 0

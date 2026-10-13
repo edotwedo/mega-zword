@@ -310,6 +310,24 @@ def test_floor_peek_n0_and_wait_timeout0_are_not_defaults(monkeypatch, tmp_path)
     assert out == ["(no new hive message)\n(after=2)"]
 
 
+def test_floor_snapshot_only_on_status_and_introduce(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from megazword import room
+    monkeypatch.setattr(room.config, "HOME", tmp_path)
+    monkeypatch.setattr(floor, "sleep", lambda _s: None)
+    saved = []
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: saved.append(1))
+    cfg = SimpleNamespace(out_until={})
+    for action in ("peek", "wait", "suggest"):
+        args = SimpleNamespace(action=action, room=None, n=None, timeout=0, after=None,
+                               kind="bulk")
+        floor.command(args, {}, cfg, write=lambda s: None)
+    assert saved == []
+    for action in ("status", "introduce"):
+        floor.command(SimpleNamespace(action=action, room=None), {}, cfg, write=lambda s: None)
+    assert saved == [1, 1]
+
+
 def test_floor_bad_room_is_one_line_exit_2(monkeypatch, tmp_path):
     from types import SimpleNamespace
     monkeypatch.setattr(floor, "save_snapshot", lambda seats: pytest.fail("no snapshot"))
