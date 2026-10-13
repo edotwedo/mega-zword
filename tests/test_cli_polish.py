@@ -44,7 +44,7 @@ def test_python_dash_m_megazword_runs_cli(monkeypatch, capsys):
 def test_help_lists_mcp(capsys):
     with pytest.raises(SystemExit):
         main(["--help"])
-    assert "mcp" in capsys.readouterr().out.split("See:\n", 1)[1].split("\n\n", 1)[0]
+    assert "mcp" in capsys.readouterr().out.split("Set up:\n", 1)[1].split("\n\n", 1)[0]
 
 
 def test_help_mentions_floor_suggest(capsys):
