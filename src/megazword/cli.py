@@ -297,6 +297,8 @@ def main(argv: list[str] | None = None,
          cfg: config.Config | None = None,
          rater: Callable[[str], Rating] | None = None,
          statuses: Callable[[], dict] | None = None) -> int:
+    if argv is None:  # real CLI run, not a test calling main([...])
+        config.load_user_env()
     args = build_parser().parse_args(argv)
     if args.command == "doctor":
         from .doctor import run
