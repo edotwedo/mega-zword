@@ -40,7 +40,8 @@ replace it. `backends` lists detected tools. `doctor` checks Python, tool
 versions, keys for optional providers, config, Ollama and its rating model,
 usage meters, timeouts, and whether the run log can be written. It never sends
 an AI prompt. Fix `FAIL` results first. `WARN` usually means an optional tool
-or meter is unavailable.
+or meter is unavailable. Doctor also prints a `Hive:` line pointing at
+`megazword floor` (seats) and `megazword floor suggest` (who should take a job).
 
 ## Sentinel (one-time, Phil)
 

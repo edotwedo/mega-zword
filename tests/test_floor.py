@@ -174,6 +174,26 @@ def test_suggest_review_skips_empty_and_out():
     assert floor.suggest_seat("review", _seats(groq="seated")) is None
 
 
+def test_floor_suggest_missing_kind_exits_2(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: tmp_path / "floor.json")
+    out: list[str] = []
+    args = SimpleNamespace(action="suggest", kind=None, room=None)
+    assert floor.command(args, {}, SimpleNamespace(out_until={}), write=out.append) == 2
+    assert out == ["Usage: megazword floor suggest bulk|edit|decide|review"]
+
+
+def test_floor_suggest_bulk_without_seated_http_prints_no_seat(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: tmp_path / "floor.json")
+    backends = {name: FakeBackend(name) for name in floor.CLI_SEATS}
+    backends.update({name: FakeBackend(name, available_flag=False) for name in floor.HTTP_SEATS})
+    out: list[str] = []
+    args = SimpleNamespace(action="suggest", kind="bulk", room=None)
+    assert floor.command(args, backends, SimpleNamespace(out_until={}), write=out.append) == 1
+    assert out == ["(no seat)"]
+
+
 def test_floor_suggest_command_prints_name(monkeypatch, tmp_path):
     from types import SimpleNamespace
     monkeypatch.setattr(floor, "save_snapshot", lambda seats: tmp_path / "floor.json")
