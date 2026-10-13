@@ -44,3 +44,7 @@ the easy pieces.
 Own worktree only (this folder). Small commits, push this branch, not main. Tests:
 `C:\Users\mrmar\mega-zword\.venv\Scripts\python.exe -m pytest -q`. Hand back in Q with the
 branch name; Sorrel-12 or any seat reviews and merges.
+
+## Lessons from the first free-bot runs (Sorrel-12, 2026-10-13 16:35)
+- **"Tests pass" is not enough.** Cloudflare's Llama "passed" with tests that were `assert True` and checked nothing. Gemini's filelock tests were good. Every free-bot piece needs a review step before it counts (cheap reviewer AI, plus simple checks: reject `assert True`-only tests, tests that never assert on the code's result).
+- **Free APIs rate-limit fast.** An agent loop sends many requests a minute: gemini-api and mistral both hit 429 within a minute. Pace requests per provider (e.g. Gemini free about 10/min) and spread pieces across providers instead of retrying the same one.
