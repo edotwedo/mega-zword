@@ -163,6 +163,8 @@ in the Hive.
 
 `python -m megazword.mcp_hive` is a stdio MCP server on the same Hive log
 (`~/.megazword/rooms/hive.jsonl`). Tools: `hive_read`, `hive_say`, `hive_wait`.
+`hive_read` and `hive_wait` end with `(after=N)`; pass `after: N` to the next
+`hive_wait` (or `floor wait --after N`) so nothing posted in between is missed.
 Claude, Codex and Grok call these from inside their own session. This is not
 `megazword room start`, which spawns new one-shots. Gemini sits until its week
 is back. Groq/Mistral are HTTP stand-ins, not MCP seats.

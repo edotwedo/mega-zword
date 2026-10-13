@@ -120,6 +120,8 @@ def build_parser() -> argparse.ArgumentParser:
     floor.add_argument("--room", default="hive", help="hive room name (default: hive)")
     floor.add_argument("-n", type=int, default=10, help="peek: how many messages")
     floor.add_argument("--timeout", type=int, default=120, help="wait: seconds to block")
+    floor.add_argument("--after", type=int, default=None,
+                       help="wait: message count from peek's (after=N); returns anything newer")
     sub.add_parser("mcp", help="Hive MCP server on stdio (for AI CLIs to connect to)")
 
     out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")

@@ -154,8 +154,9 @@ def peek_text(room_name: str, n: int = 10, home: Path | None = None) -> str:
     from . import room
     msgs = room.read_messages(room_name, home)
     if not msgs:
-        return "(hive empty)"
-    return "\n".join(format_msg(m) for m in msgs[-max(1, n):])
+        return "(hive empty)\n(after=0)"
+    lines = [format_msg(m) for m in msgs[-max(1, n):]]
+    return "\n".join(lines + [f"(after={len(msgs)})"])
 
 
 def wait_for(room_name: str, home: Path | None = None, after: int | None = None,
@@ -195,11 +196,15 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
         return 0
     if action == "wait":
         timeout = float(getattr(args, "timeout", 120) or 120)
-        new = wait_for(room_name, timeout=timeout)
+        after = getattr(args, "after", None)
+        if after is None:
+            after = len(room.read_messages(room_name))
+        after = max(0, after)
+        new = wait_for(room_name, after=after, timeout=timeout)
         if not new:
-            write("(no new hive message)")
+            write(f"(no new hive message)\n(after={after})")
             return 1
-        write("\n".join(format_msg(m) for m in new))
+        write("\n".join([format_msg(m) for m in new] + [f"(after={after + len(new)})"]))
         return 0
     if action == "suggest":
         kind = getattr(args, "kind", None)
