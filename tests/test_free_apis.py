@@ -72,6 +72,26 @@ def test_failures_are_safe_results(api, monkeypatch, error, message):
     assert "secret-test-credential" not in repr(result)
 
 
+@pytest.mark.parametrize("code, word", [(401, "unauthorized"), (403, "forbidden")])
+def test_auth_errors_are_plain_and_never_leak_key(api, monkeypatch, code, word):
+    from megazword import failures
+    body = json.dumps({"error": {"message": "Forbidden: key secret-test-credential "
+                                            "has no access", "code": code}}).encode()
+    def fail(*args, **kwargs):
+        raise urllib.error.HTTPError(
+            "https://example.test/v1/chat/completions?key=secret-test-credential", code,
+            "Forbidden secret-test-credential", {"X-Key": "secret-test-credential"},
+            io.BytesIO(body))
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    result = api.run("hi")
+    assert not result.ok and result.text == ""
+    assert result.error.startswith(f"API HTTP error {code}: {word}")
+    assert "auth" in result.error
+    assert "Traceback" not in result.error
+    assert "secret-test-credential" not in repr(result)
+    assert failures.classify("groq", result.error).kind == "auth"
+
+
 @pytest.mark.parametrize("body", [b"not json", b"{}", b'{"choices":[]}',
                                      b'{"choices":[{"message":{"content":null}}]}',
                                      b'{"choices":[{"message":{"content":" "}}]}'])
