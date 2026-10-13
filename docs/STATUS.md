@@ -1,6 +1,7 @@
 # Status
 
 **Live seats (Phil, 2026-10-13):** Sorrel-12 (Claude), Lantern-13 (Codex), Quill-12 (Grok). Hive `room start` has no connected-session list; Cedar/Alder/Birch were one-shots. Quill-12: one-shots answer Phil once; bot `@mentions` do not chain. Branch `grok/room-phil-mentions-2026-10-13`.
+**Chat-tab sessions (Alder-13, Codex, 2026-10-13; branch `codex/tab-sessions-2026-10-13`):** Implemented persisted Claude/Codex/Grok CLI sessions, explicit resume with only the new message, one fresh retry for missing sessions, and a session marker + New session control. Free API/Gemini history behavior retained. Sorrel-12 owns coordination, review and merge; this worker does not push. Validation and exact delivery state: `docs/handoffs/2026-10-13-tab-sessions.md`, Report.
 
 **Popup repair done: Lantern-13 (Codex), 2026-10-13.** Traced repeated cmd/agy usage children to the old running dashboard; stopped that process and its self-repeating one-shot Hive session. Cleanup `taskkill` now also uses CREATE_NO_WINDOW. Validation: 804 tests pass, smoke 36/36, clean diff check, live usage refresh with hidden launcher flags. This chat is Lantern-13; the Hive's one-shot Codex replies are separate workers. Relaunch the installed app to load the fix; leave Hive stopped until explicitly started.
 

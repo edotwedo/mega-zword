@@ -335,6 +335,9 @@ class App:
     def tabs_close(self, body: dict) -> dict:
         return tabs.close(str(body.get("id") or ""))
 
+    def tabs_new_session(self, body: dict) -> dict:
+        return tabs.new_session(str(body.get("id") or ""))
+
     def tabs_send(self, body: dict) -> dict:
         from . import cli
         from .rater import rate
@@ -517,6 +520,7 @@ def make_handler(app: App, port: int, remote: bool = False):
                           "/api/tabs/rename": app.tabs_rename,
                           "/api/tabs/close": app.tabs_close,
                           "/api/tabs/send": app.tabs_send,
+                          "/api/tabs/new-session": app.tabs_new_session,
                           "/api/room/say": app.room_say,
                           "/api/room/start": app.room_start,
                           "/api/room/pause": app.room_pause,

@@ -572,7 +572,8 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
             memory: Memory, rating: Rating | None, forced: bool,
             start_after: str | None = None, prior_answer: str | None = None,
             on_answer: Callable[[str], None] | None = None,
-            tab_id: str | None = None) -> int:
+            tab_id: str | None = None,
+            on_result: Callable | None = None) -> int:
     """Run the chain with escalation, log every attempt, print the answer,
     and remember the run so `megazword retry` can pick it up."""
     first_line = prompt.strip().splitlines()[0][:80]
@@ -616,6 +617,8 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         print("[megazword] no AI gave a usable answer", file=sys.stderr)
         return 1
     result = outcome.result
+    if on_result is not None:
+        on_result(result)
     save_last_run(sent, prompt, [b.name for b in chain], result.backend, result.text,
                   memory.project, rating.level if rating else None, tab_id=tab_id)
     if on_answer is None:

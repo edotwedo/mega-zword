@@ -322,12 +322,13 @@ main[hidden], #hive[hidden] { display:none; }
       <span class="note" id="chat-info"></span>
       <input id="chat-rename" aria-label="Chat tab name" maxlength="80" style="flex:1 1 160px;min-width:0">
       <button id="chat-rename-save" type="button">Rename</button>
+      <button id="chat-new-session" type="button">New session</button>
       <button id="chat-close" type="button">Close tab</button>
     </div>
     <div class="room-messages" id="chat-messages" role="region" aria-label="Chat messages" aria-live="polite" tabindex="0"></div>
     <label class="prompt-label" for="chat-input">&gt;_ <span class="sr-only">Your message</span></label>
     <div class="row room-compose">
-      <textarea id="chat-input" aria-label="Your message" placeholder="Message this tab's AI. Ctrl+Enter sends. It remembers the last few turns."></textarea>
+      <textarea id="chat-input" aria-label="Your message" placeholder="Message this tab's AI. Ctrl+Enter sends. Your conversation stays in this tab."></textarea>
       <button id="chat-send" type="button" class="go">Send</button>
     </div>
     <div class="row"><label><input type="checkbox" id="chat-context"> include project memory</label>
@@ -868,11 +869,13 @@ function renderChatAis() {
 }
 function renderChat(tab) {
   $("chat-title").textContent = tab.title;
-  $("chat-info").textContent = `AI: ${tab.ai} · project: ${tab.project}`;
+  $("chat-info").textContent = `AI: ${tab.ai} · project: ${tab.project}`
+    + (tab.session_id ? ` · session kept (${tab.session_backend})` : "");
   if (document.activeElement !== $("chat-rename")) $("chat-rename").value = tab.title;
   const busy = chatBusy.has(tab.id);
   $("chat-send").disabled = busy;
-  $("chat-status").textContent = busy ? "Waiting for the AI…" : "";
+  $("chat-new-session").disabled = busy;
+  $("chat-status").textContent = busy ? "Waiting for the AI…" : (tab.session_note || "");
   const turns = tab.history || [];
   const signature = tab.id + JSON.stringify(turns);
   if ($("chat-messages").dataset.signature === signature) return;
@@ -969,6 +972,17 @@ $("new-tab").onclick = async () => {
   } catch (e) { toast(e.message); }
 };
 $("chat-send").onclick = sendChat;
+$("chat-new-session").onclick = async () => {
+  if (!currentView.startsWith("tab:")) return;
+  const id = currentView.slice(4);
+  if (chatBusy.has(id)) return;
+  chatBusy.add(id); setView(currentView);
+  try {
+    await post("/api/tabs/new-session", {id});
+    if (currentView === "tab:" + id) $("chat-input").value = "";
+  } catch (e) { toast(e.message); }
+  finally { chatBusy.delete(id); await reloadChatTabs(); }
+};
 $("chat-input").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) sendChat(); });
 $("chat-rename-save").onclick = async () => {
   const title = $("chat-rename").value.trim(); if (!title || !currentView.startsWith("tab:")) return;

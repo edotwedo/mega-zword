@@ -280,6 +280,22 @@ new chat tab. Each tab keeps its AI, project and last few turns across restarts.
 Ctrl+Enter sends; **Rename** changes the name; **Close tab** needs two clicks.
 Links: `#hive` opens the Hive, `#tab-t1` opens tab t1. Tabs can't be reordered yet.
 
+### Continuing chat-tab sessions
+
+Claude, Codex and Grok chat tabs save their CLI session ID in `tabs.json` and
+resume that conversation, including after an app restart. **session kept** marks
+a saved session. Resumed turns send only your new message. If the session is
+missing or expired, Mega Zword tries a fresh session once with the tab's recent
+history and shows a short note. Login, quota and network errors do not trigger
+that retry.
+
+**New session** clears this tab's saved session and recent conversation. It is
+disabled while an answer is running. Saved answers remain in answer history.
+Auto tabs resume when the answering AI matches the saved session; switching AI
+starts with recent history. Free API backends and Gemini keep receiving recent
+history; they do not use this CLI-session feature. Grok's installed CLI supports
+`--session-id` and `--resume`, so Grok tabs keep real sessions too.
+
 ### Home controls
 
 The project selector switches the memory, notes, runs and answers shown. The

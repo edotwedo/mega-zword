@@ -347,6 +347,8 @@ def test_tabs_http_list_create_rename_close_send(server, monkeypatch):
     sent = json.loads(_post(base + "/api/tabs/send",
                             {"id": "t1", "prompt": "hello tab"}, app.token).read())
     assert sent["ok"] and sent["backend"] == "claude" and "hello tab" in sent["answer"]
+    reset = json.loads(_post(base + "/api/tabs/new-session", {"id": "t1"}, app.token).read())
+    assert reset["history"] == [] and reset["session_id"] == ""
     auto = json.loads(_post(base + "/api/tabs", {"ai": "auto"}, app.token).read())
     from megazword.rater import Rating
     monkeypatch.setattr("megazword.rater.rate",
