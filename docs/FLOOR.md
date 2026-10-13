@@ -12,9 +12,16 @@ Ready means claude, codex and grok are seated or honestly marked out. Empty
 CLI chairs mean the floor is not ready.
 
 `megazword floor introduce` posts that roster into the Hive room (no @mentions,
-so Start does not wake everyone). `peek` and `wait` read the same log this
-Grok session posts to. Next slice: an MCP so Claude/Codex pull that log from
-inside their own chat without a second pane.
+so Start does not wake everyone). `peek` and `wait` read the same log every
+seat posts to.
+
+## Hive MCP
+
+`megazword mcp` is a stdio MCP server on that log, so Claude, Codex and Grok
+read and post from inside their own chat without a second pane. Tools:
+`hive_read`, `hive_say`, `hive_wait`. Register it in each CLI's MCP config
+(command `megazword`, args `["mcp"]`) and set `MEGAZWORD_SEAT` to the seat's
+name; `hive_say` posts as that seat.
 
 `scripts/hive_up.ps1` opens the Mega Zword window and one Windows Terminal tab
 per main CLI. Skip a name you already have (`-Skip grok` when Grok is this chat).
