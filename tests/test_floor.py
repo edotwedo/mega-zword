@@ -1,0 +1,141 @@
+"""Tests for Hive floor seats, readiness, and local snapshots."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from itertools import product
+
+import pytest
+
+from megazword import floor
+from megazword.backends import Backend
+
+
+@dataclass
+class FakeBackend(Backend):
+    available_flag: bool = True
+
+    def available(self) -> bool:
+        return self.available_flag
+
+    def _run(self, prompt: str) -> str:
+        raise AssertionError("Floor tests must never run a model")
+
+
+NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize("name,kind", [("claude", "cli"), ("groq", "http")])
+@pytest.mark.parametrize("available", [True, False])
+def test_roster_seated_or_empty(name, kind, available):
+    seats = floor.roster(
+        {name: FakeBackend(name, available_flag=available)}, now=NOW
+    )
+    by_name = {seat.name: seat for seat in seats}
+
+    assert len(seats) == len(floor.CLI_SEATS) + len(floor.HTTP_SEATS)
+    assert set(by_name) == set(floor.CLI_SEATS + floor.HTTP_SEATS)
+    assert by_name[name].kind == kind
+    assert by_name[name].status == ("seated" if available else "empty")
+    assert by_name[name].until is None
+    assert all(seat.status == "empty" for seat in seats if seat.name != name)
+
+
+@pytest.mark.parametrize("name", ["codex", "cloudflare"])
+@pytest.mark.parametrize("available", [True, False, None])
+def test_roster_future_out_until_overrides_availability(name, available):
+    until = NOW + timedelta(hours=2)
+    backends = (
+        {} if available is None
+        else {name: FakeBackend(name, available_flag=available)}
+    )
+    seats = floor.roster(backends, out_until={name: until}, now=NOW)
+    seat = next(seat for seat in seats if seat.name == name)
+
+    assert seat.status == "out"
+    assert seat.until == until
+
+
+@pytest.mark.parametrize("available", [True, False])
+@pytest.mark.parametrize("offset", [timedelta(0), timedelta(seconds=-1)])
+def test_roster_expired_out_until_uses_availability(available, offset):
+    seats = floor.roster(
+        {"grok": FakeBackend("grok", available_flag=available)},
+        out_until={"grok": NOW + offset},
+        now=NOW,
+    )
+    seat = next(seat for seat in seats if seat.name == "grok")
+
+    assert seat.status == ("seated" if available else "empty")
+    assert seat.until is None
+
+
+@pytest.mark.parametrize("statuses", list(product(("seated", "out"), repeat=3)))
+def test_ready_when_required_cli_seated_or_out(statuses):
+    seats = [
+        floor.Seat(name, "cli", status)
+        for name, status in zip(("claude", "codex", "grok"), statuses)
+    ]
+    seats.append(floor.Seat("gemini", "cli", "empty"))
+    seats.append(floor.Seat("groq", "http", "empty"))
+
+    assert floor.ready(seats) is True
+
+
+@pytest.mark.parametrize("empty_name", ["claude", "codex", "grok"])
+def test_ready_false_when_required_cli_empty(empty_name):
+    seats = [
+        floor.Seat(name, "cli", "empty" if name == empty_name else "seated")
+        for name in ("claude", "codex", "grok")
+    ]
+    seats.append(floor.Seat("groq", "http", "seated"))
+
+    assert floor.ready(seats) is False
+
+
+@pytest.mark.parametrize("backends", [{}, {
+    name: FakeBackend(name) for name in floor.CLI_SEATS + floor.HTTP_SEATS
+}])
+def test_introduce_text_has_no_mentions(backends):
+    seats = floor.roster(backends, out_until={"grok": NOW + timedelta(hours=2)}, now=NOW)
+
+    text = floor.introduce_text(seats)
+
+    assert "@" not in text
+    assert "Out: grok." in text
+    assert "Wait here for Phil" in text
+
+
+@pytest.mark.parametrize("codex_available", [True, False])
+def test_save_snapshot_writes_floor_json(tmp_path, codex_available):
+    until = NOW + timedelta(hours=2)
+    seats = floor.roster(
+        {
+            "claude": FakeBackend("claude"),
+            "codex": FakeBackend("codex", available_flag=codex_available),
+            "groq": FakeBackend("groq", trains_on_data=True),
+        },
+        out_until={"grok": until},
+        now=NOW,
+    )
+    home = tmp_path / "nested" / "home"
+
+    path = floor.save_snapshot(seats, home=home)
+
+    assert path == home / "floor.json"
+    assert path.is_file()
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["ready"] is codex_available
+    saved = {seat["name"]: seat for seat in payload["seats"]}
+    assert len(payload["seats"]) == len(seats)
+    assert set(saved) == {seat.name for seat in seats}
+    assert saved["grok"] == {
+        "name": "grok", "kind": "cli", "status": "out",
+        "until": until.isoformat(), "trains_on_data": False,
+    }
+    assert saved["codex"]["status"] == ("seated" if codex_available else "empty")
+    assert saved["claude"]["until"] is None
+    assert saved["groq"]["kind"] == "http"
+    assert saved["groq"]["trains_on_data"] is True
