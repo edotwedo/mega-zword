@@ -354,6 +354,8 @@ Night Shift does real work while you sleep. It reads `docs/QUEUE.md` on GitHub
 - Turn off: `megazword night stop` stops after the current job and skips future
   runs; `megazword night resume` turns it back on. `megazword night remove`
   deletes the scheduled task.
+- `megazword night status` shows whether the STOP file is set, whether a run
+  is going, the last 10 jobs, and where the last summary is.
 - The log is `~\.megazword\night\night.log`; each night's summary is
   `~\.megazword\night\summary-<date>.md`.
 

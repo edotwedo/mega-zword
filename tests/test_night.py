@@ -158,6 +158,30 @@ def test_usage_floor_and_unknown_meters_fail_closed(origin):
     assert "night/2026-10-13-1" not in heads(origin)
 
 
+def test_night_status_shows_stop_lock_jobs_and_summary(capsys):
+    night.home().mkdir(parents=True, exist_ok=True)
+    night.stop_path().write_text("stopped\n", encoding="utf-8")
+    (night.home() / "running.lock").write_text("1", encoding="utf-8")
+    night.save_state({
+        "job-a": {"at": "2026-10-13T01:00:00", "status": "done",
+                  "branch": "night/2026-10-13-1", "ai": "codex"},
+    })
+    (night.home() / "summary-2026-10-13.md").write_text("# summary\n", encoding="utf-8")
+    assert main(["night", "status"]) == 0
+    out = capsys.readouterr().out
+    assert "STOP file: yes" in out
+    assert "lock: a run is going" in out
+    assert "night/2026-10-13-1" in out and "codex" in out
+    assert "summary-2026-10-13.md" in out
+
+
+def test_night_resume_when_no_stop_file(capsys):
+    assert not night.stop_path().exists()
+    assert main(["night", "resume"]) == 0
+    assert "on again" in capsys.readouterr().out
+    assert not night.stop_path().exists()
+
+
 def test_stop_file_and_job_cap(origin):
     ais = fakes(("codex", typo_fix))
     n = night.Night(ais, usage=meters(codex=10), date="2026-10-13")
