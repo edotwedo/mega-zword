@@ -27,7 +27,7 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from . import advise, stats, answers, config, room, runlog, sentinel, tabs
+from . import advise, stats, answers, config, floor, room, runlog, sentinel, tabs
 from .backends import _kill_tree, default_backends, process_group
 from .meters import STALE, summarize_all
 from .memory import Memory, check_project, list_projects, project_name
@@ -202,6 +202,15 @@ class App:
             "jobs": [j.view() for j in reversed(jobs)][:10],
             "tabs": tabs.list_tabs(),
             "sentinel": sentinel.summary(),
+            "floor": self.floor_state(now),
+        }
+
+    def floor_state(self, now: datetime | None = None) -> dict:
+        seats = floor.roster(self.backends, self.cfg.out_until, now)
+        return {
+            "seats": [{"name": s.name, "kind": s.kind, "status": s.status} for s in seats],
+            "ready": floor.ready(seats),
+            "suggest": {k: floor.suggest_seat(k, seats) for k in floor.JOB_KINDS},
         }
 
     # --- actions ---------------------------------------------------------
