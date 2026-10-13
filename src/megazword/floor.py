@@ -84,11 +84,33 @@ JOB_ORDER = {
 JOB_KINDS = ("bulk", "edit", "decide", "review")
 
 
-def suggest_seat(job_kind: str, seats: list[Seat]) -> str | None:
-    """Conductor: which seated model should take this kind of job. Skips empty and out."""
-    seated = {s.name: s for s in seats if s.status == "seated"}
+def auth_failed(log_path: Path | None) -> set[str]:
+    """Backends whose latest run in log.jsonl failed on login (401/403).
+    Only steers `suggest`; the seat is not marked out (Phil fixes the key)."""
+    from . import failures, runlog
+    if log_path is None:
+        return set()
+    latest: dict[str, dict] = {}
+    for record in runlog.read(Path(log_path)):
+        latest[str(record["backend"])] = record  # file order: last line wins
+    broken = set()
+    for name, record in latest.items():
+        reason = record.get("rejected")
+        if record.get("ok") or not isinstance(reason, str) or not reason.startswith("failed"):
+            continue
+        failure = failures.classify(name, reason)
+        if failure is not None and failure.kind == "auth":
+            broken.add(name)
+    return broken
+
+
+def suggest_seat(job_kind: str, seats: list[Seat],
+                 skip: set[str] | frozenset[str] = frozenset()) -> str | None:
+    """Conductor: which seated model should take this kind of job.
+    Skips empty, out, and `skip` (latest run failed auth, see auth_failed)."""
+    seated = {s.name: s for s in seats if s.status == "seated" and s.name not in skip}
     if job_kind == "bulk":
-        http = [s.name for s in seats if s.status == "seated" and s.kind == "http"]
+        http = [s.name for s in seats if s.name in seated and s.kind == "http"]
         order = [n for n in BULK_ORDER if n in http] + [n for n in http if n not in BULK_ORDER]
         return order[0] if order else None
     for name in JOB_ORDER.get(job_kind, ()):
@@ -113,8 +135,9 @@ def snapshot_path(home: Path | None = None) -> Path:
 
 
 def save_snapshot(seats: list[Seat], home: Path | None = None) -> Path:
+    import json
+    from .filelock import write_atomic
     path = snapshot_path(home)
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "ready": ready(seats),
         "seats": [
@@ -124,7 +147,7 @@ def save_snapshot(seats: list[Seat], home: Path | None = None) -> Path:
             for s in seats
         ],
     }
-    path.write_text(__import__("json").dumps(payload, indent=2) + "\n", encoding="utf-8")
+    write_atomic(path, json.dumps(payload, indent=2) + "\n")  # readers never see half a file
     return path
 
 
@@ -155,7 +178,7 @@ def peek_text(room_name: str, n: int = 10, home: Path | None = None) -> str:
     msgs = room.read_messages(room_name, home)
     if not msgs:
         return "(hive empty)\n(after=0)"
-    lines = [format_msg(m) for m in msgs[-max(1, n):]]
+    lines = [format_msg(m) for m in msgs[-n:]] if n > 0 else []  # -n 0: cursor only
     return "\n".join(lines + [f"(after={len(msgs)})"])
 
 
@@ -179,10 +202,19 @@ def wait_for(room_name: str, home: Path | None = None, after: int | None = None,
 def command(args, backends: dict[str, Backend], cfg: config.Config,
             write: Callable[[str], None] = print) -> int:
     from . import room
-    seats = roster(backends, cfg.out_until)
-    save_snapshot(seats)
     action = getattr(args, "action", None) or "status"
-    room_name = getattr(args, "room", None) or "hive"
+    room_name = getattr(args, "room", None)
+    if room_name is None:
+        room_name = "hive"
+    if action in ("introduce", "peek", "wait"):
+        try:
+            room.room_path(room_name)
+        except ValueError as e:
+            write(f"floor: {e}")
+            return 2
+    seats = roster(backends, cfg.out_until)
+    if action in ("status", "introduce"):  # peek/wait poll often; don't rewrite floor.json
+        save_snapshot(seats)
     if action == "status":
         write(format_roster(seats))
         return 0
@@ -192,10 +224,12 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
         write(format_roster(seats))
         return 0
     if action == "peek":
-        write(peek_text(room_name, n=getattr(args, "n", 10) or 10))
+        n = getattr(args, "n", None)
+        write(peek_text(room_name, n=10 if n is None else n))
         return 0
     if action == "wait":
-        timeout = float(getattr(args, "timeout", 120) or 120)
+        timeout = getattr(args, "timeout", None)
+        timeout = 120.0 if timeout is None else float(timeout)
         after = getattr(args, "after", None)
         if after is None:
             after = len(room.read_messages(room_name))
@@ -211,7 +245,7 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
         if kind not in JOB_KINDS:
             write("Usage: megazword floor suggest bulk|edit|decide|review")
             return 2
-        name = suggest_seat(kind, seats)
+        name = suggest_seat(kind, seats, auth_failed(getattr(cfg, "log_path", None)))
         if name is None:
             write("(no seat)")
             return 1

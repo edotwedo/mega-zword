@@ -24,6 +24,23 @@ def test_help_lists_every_subcommand_in_its_section(capsys):
     assert len(text.split("Examples:\n")[1].strip().splitlines()) == 4
 
 
+def test_command_groups_cover_every_subcommand_once():
+    parser = build_parser()
+    sub = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    listed = [n for names in COMMAND_GROUPS.values() for n in names]
+    assert len(listed) == len(set(listed))
+    assert set(listed) == set(sub.choices)
+
+
+def test_python_dash_m_megazword_runs_cli(monkeypatch, capsys):
+    import runpy
+    monkeypatch.setattr("sys.argv", ["megazword", "--version"])
+    with pytest.raises(SystemExit) as exc:
+        runpy.run_module("megazword", run_name="__main__")
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.startswith("megazword ")
+
+
 def test_help_lists_mcp(capsys):
     with pytest.raises(SystemExit):
         main(["--help"])

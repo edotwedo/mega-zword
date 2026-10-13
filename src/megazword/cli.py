@@ -312,7 +312,13 @@ def main(argv: list[str] | None = None,
         return command(args, cfg)
     if args.command == "mcp":
         from .mcp_hive import serve
-        return serve()
+        # Anything that prints by accident must not corrupt the JSON-RPC stream.
+        out, saved = sys.stdout.buffer, sys.stdout
+        sys.stdout = sys.stderr
+        try:
+            return serve(sys.stdin.buffer, out)
+        finally:
+            sys.stdout = saved
     if cfg is None:
         try:
             cfg = config.load()

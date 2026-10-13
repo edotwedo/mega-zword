@@ -2,7 +2,7 @@
 
 **Active: Quill-12 (Grok) is lead, working overnight 2026-10-13 while Phil sleeps.** **Feature freeze is OFF (Phil, 2026-10-12).** The Hive floor (seats, peek/wait, MCP `hive_read`/`hive_say`/`hive_wait`) is on main. PRs 11-16 are on main: room start works on a fresh install, gemini-api default `gemini-flash-latest`, AI CLIs start with a hidden console on Windows, floor suggest, `hive_up` keeps working while Phil sleeps, `megazword mcp` runs the Hive stdio server, Windows fills missing API keys from User env. **Floor ready.** **Next:** keep taking unclaimed work. Gemini is out until Oct 18; Groq returned 403 last night. The Beta 3.0 checklist below still stands but no longer blocks features.
 **Night Shift v1 (Forge-13, Claude Code on Phil's PC, 2026-10-13 07:00 PT, branch `claude/night-shift-v1`):** `megazword night run|install|remove|stop|resume|status` and `docs/QUEUE.md`. Mega Zword (not the AI) does git, tests and the push to `night/<date>-<n>`; never main. Usage floor 15% and fail-closed (no meter or old reading = no night work). Tests: `tests/test_night.py` (3-job dry run on a local bare repo with fake AIs). Also fixed: smoke/live-check refilled API keys from the Windows User environment (`MEGAZWORD_NO_USER_ENV`). Next: one real queued job via the scheduled task, check its branch on GitHub.
-**Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
+**Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved well past it (Beta 2 work, floor, Hive MCP, tabs, desktop window); Beta 3.0 release notes (item 3) will list it.
 **Lead:** Quill-12 (Grok Build on Phil's PC). Phil named this seat lead. Tally-11 is released. Cloud Claudes coordinate in Q; they do not take main.
 **Last updated:** 2026-10-13 overnight by Quill-12: PRs 11-16 on main (room-start, gemini-flash-latest, hidden console, floor suggest, hive_up keep-working, megazword mcp, User env keys). Floor ready. Gemini out until Oct 18; Groq 403 last night. Earlier (2026-10-12): Wren-12's Q split — Grok keeps Beta 3.0 1-5; J1/J2/J4 after ship. Usage (2026-10-12): Claude 2% 5h / 69% week; Codex 9% 5h / 78% week; Grok 16% week; Gemini out until Oct 18.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
@@ -20,33 +20,28 @@
 
 Phil requested work visible through this chat and direct phone access. Added `megazword dashboard --phone` with Tailscale discovery and actionable connection errors; GUIDE updated. Validation: 616 tests, 36/36 smoke, clean diff check, real missing-installation diagnostic verified. No software installed or network settings changed. Next: lead merges `codex/phone-access-2026-10-12`; Phil installs/signs into Tailscale on PC and phone, then runs `megazword dashboard --phone` and opens the printed private link. B5/B4/B6 remain separate unfinished work.
 
-## Next (cold start, 2026-10-11 night plan)
-
-Current main contains the agy empty-answer fix, B12, B13 and B15. B5 and B4 are pushed on separate Codex branches; next is B6. Calendar B10/B11 remain parked until Phil asks. Do not post room summaries to Q.
-
 ## Next up (from Tally-11, 2026-10-11): done
 All five Beta 1 PC steps are done: reinstalled from main (0.1.0b1), Claude meter readable, Gemini verified live (`agy` answered in plan mode), Beta 1 tagged. Older worktree folders were not certified safe to remove; check each before cleanup.
 
 ## Beta 3.0 release (freeze lifted by Phil 2026-10-12; checklist kept, not blocking)
 Usage at the call (13:05 PT): Claude 73% 5-hour (resets 2:00 PM) / 67% week; Codex 100% 5-hour / 76% week, slowing down until Oct 17; Grok 15% week (most room); Gemini out until Oct 18.
 Put your name on a step before you start it; tick it when it's on main.
-1. **Linux-only test failures (3):** **Quill-12, this branch.** CLI test uses a native outside path (`/bin/true` on Linux). Sentinel tests patch `_is_windows` instead of `os.name` (that made pathlib WindowsPath and crashed Linux pytest). 678 tests passed on this PC.
-2. **B7 review pass** of everything since Beta 1 (B1-B6b, B8, B9, B12-B15, room API, chat tabs UI, desktop window). Findings as a list in Q; small fixes on `grok/b7-review-2026-10-12`. **Grok** (needs Phil's prompt).
+1. **[x] Linux-only test failures (3):** **Quill-12, on main.** CLI test uses a native outside path (`/bin/true` on Linux). Sentinel tests patch `_is_windows` instead of `os.name` (that made pathlib WindowsPath and crashed Linux pytest). 678 tests passed on this PC.
+2. **B7 review pass** of everything since Beta 1 (B1-B6b, B8, B9, B12-B15, room API, chat tabs UI, desktop window). Findings: `docs/handoffs/2026-10-13-b7-review.md`; fixes land as small `grok/overnight-b7-*` branches. **Quill-12.**
 3. **Release notes** (README "What's new in Beta 3.0", GUIDE check). **Nimbus-12.**
 4. **Version** `0.3.0b1`, tag `v0.3.0-beta.1` after 1-3 are on main and tests + smoke pass. **Nimbus-12.**
 5. **Install on Phil's PC** from the tag: `pip install -e .[app]` in `C:\Users\mrmar\mega-zword`, `megazword doctor`, `megazword app install`, smoke. **Nimbus-12.**
 6. **Phil's check:** open Mega Zword from the Start menu, try Home, Hive and a chat tab. **Phil.**
 Deferred until after Beta 3.0: Codex tab order, the standalone .exe, B10/B11 calendar (parked by Phil).
-Codex: no Mega Zword work until Phil says to use the 5-hour refresh.
 ## Beta 2 lanes (reassigned 2026-10-11 by usage room; spec: SPEC.md "Beta 2", sections R, T, D, S, C)
 Each lane has a handoff in `docs/handoffs/2026-10-11-*.md` with everything needed to start cold.
 **Lanes follow live usage (Phil, 2026-10-12):** the lanes below are a starting point, not a rule. Before taking or handing out an item, run `megazword plan` (or read the Q usage board) and give unstarted items to whoever has the most room now. Keep an item already in progress with its bot unless that bot runs out.
 
 **Re-plan (Tally-11 cloud, 2026-10-12 12:50 PT, from the last reading in this file, Larch-11 04:48 PT; Q board is ~20h old):** weekly used: Grok 15%, Claude 54%, Codex 57%, Gemini 100% until Oct 18. Grok has the most room. **Correction (Tally-11 PC, 13:00 PT): B10/B11 stay parked; Phil's DECISIONS 2026-10-11 says calendar work is near zero unless he asks.** Grok takes the B7 reviews; the Linux test fixes are Tally-11's (in progress). Original line: fixing the 3 Windows-only tests that fail on Linux (test_no_real_cli, 2 in test_sentinel; CI's Ubuntu job). Codex keeps tab order, then B6 .exe. Claude reviews and merges only. Re-check `megazword plan` before starting; if Grok is low, take the next bot down.
 
-**Lane update (Tally-11, 2026-10-12):** Gemini/agy is at 100% in both pools until Oct 18; park B10/B11. B12, B13 and B15 are on main. Codex completed B5 and B4; B6 is next. Grok round 2 fixed the agy empty-answer bug and reviews B7 and B1. B14 and Grok B3/B8/B9 plus Antigravity B1 are already on main. Finish and push each item before starting another. Nimbus-12 (Grok) is lead and merges/reconciles lanes.
+**Lane update (Tally-11, 2026-10-12):** Gemini/agy is at 100% in both pools until Oct 18; park B10/B11. B12, B13 and B15 are on main. Codex completed B5 and B4; B6 is next. Grok round 2 fixed the agy empty-answer bug and reviews B7 and B1. B14 and Grok B3/B8/B9 plus Antigravity B1 are already on main. Finish and push each item before starting another.
 Rules: put your name on an item here, own branch, small pushes, tests + smoke pass, no paid calls in
-tests, hand finished branches to the lead (**Nimbus-12**) to merge; post the branch name in Q. Lane empty? Take the next
+tests, hand finished branches to the lead (**Quill-12**) to merge; post the branch name in Q. Lane empty? Take the next
 unclaimed item from another lane.
 
 Usage at assignment (5h/week % used): Claude 59/31, Codex 12/30, Grok -/0 (new week), Gemini -/3,
@@ -133,14 +128,8 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
 - Review and merge finished branches; keep STATUS and the lanes true.
 - B2 Lessons + summaries: **done** (Tally-11, 2026-10-11), see Done.
 
-## Current cross-lane sequence (Tally-11, 2026-10-12)
-1. B12, B13 and B15 are on main; B5 is complete on `codex/b5-new-look-2026-10-12`.
-2. Codex: B6. Grok handles B7 reviews and the B1 second look.
-3. Grok: B7 reviews of Codex's branches, B1 second look, STATUS note; B15 is on main.
-4. Gemini calendar B10/B11 is parked until Phil asks; agy is out through Oct 18.
-5. Check usage before and after each item; keep branches separate and test with fakes.
 ## Done
-- **Usage-first tooling (Tally-11 cloud, 2026-10-12):** `megazword plan` ranks the AIs for new work by live spare usage (most room first, no-meter next, out last; says "check by hand" when no meter is live). Claude Code hooks in `.claude/` (read-only): session start injects the rule plus live `megazword plan` and `usage`; every prompt adds a one-line reminder; said once per session even if project and user hooks both run. One-time PC setup, run by Phil: `python scripts/install_usage_hook.py --yes` (adds the hook to his user Claude settings and schedules the Q usage board every 15 minutes). Note: 3 Windows-only tests fail on Linux on main (test_no_real_cli, 2 in test_sentinel), before this change too.
+- **Usage-first tooling (Tally-11 cloud, 2026-10-12):** `megazword plan` ranks the AIs for new work by live spare usage (most room first, no-meter next, out last; says "check by hand" when no meter is live). Claude Code hooks in `.claude/` (read-only): session start injects the rule plus live `megazword plan` and `usage`; every prompt adds a one-line reminder; said once per session even if project and user hooks both run. One-time PC setup, run by Phil: `python scripts/install_usage_hook.py --yes` (adds the hook to his user Claude settings and schedules the Q usage board every 15 minutes). The 3 tests that failed on Linux (test_no_real_cli, 2 in test_sentinel) are fixed (Beta 3.0 item 1).
 - **B1 second look (Tally-11, 2026-10-12, Grok idle):** one session per room (session id + heartbeat; a second `room start` is refused while the first is alive, stale after 20 min; an old loop exits when a newer one takes over, and no longer overwrites its state); `room say` no longer clears a Stop; room names are checked (no `../`). Earlier fixes: no `--continue` reuse (Easel-11), Q posts only with `--post`. 601 passed, smoke 36/36.
 - **B4 Hive tab UI (Larch-11, 2026-10-12):** added the Home/Hive navigation and Hive screen on the B5 shell. It shows the room stream, primary project, turn count/cap, last speaker and idle/running/paused state; supports Phil messages, Start, cooperative Pause (after the current reply), Resume and Stop. Added a pause endpoint and preserved pause state across a reply so resume continues to the chosen turn cap. 601 tests passed; smoke 36/36. Fake backends only. Branch `codex/b4-hive-ui-2026-10-12`, stacked on B5 PR #6.
 - **B5 New look (Larch-11, 2026-10-12):** restyled the dashboard as a dark Windows-style workspace with a responsive sidebar linking Home and Hive, eight-pixel panels, icon-only refresh/send/retry buttons with accessible names, Cascadia Code prompt and run cards, green live marker, and ASCII MZ mark. Preserved C9 contrast, focus, reduced-motion and touch-target requirements. Desktop (1440px) and phone (390px) previews verified. 598 tests passed; smoke 36/36. Branch `codex/b5-new-look-2026-10-12`. B4+B5 merged by Tally-11 together with the one-session-per-room guard (Pause kept; lessons wait until a paused session really ends).
@@ -213,56 +202,16 @@ Claude (tightest; light lead only) -> `docs/handoffs/2026-10-11-claude-lead.md`:
   - F25 part 1 (Forge): start screen no longer prints "Plans:" twice; export escapes only what Markdown needs; export always writes UTF-8 (a Windows `>` redirect wrote cp1252 and crashed on emoji).
   - 516+ tests, 27/27 smoke checks pass.
 
-## In progress
-- **Nimbus-12 (Grok Build):** R1 table is in this file under B14. Next: B3 tabs backend on `grok/beta2-2026-10-11`. Agy stdin and the real agy /usage output are unverified until someone runs Next up item 4 on the PC.
-
-## Overnight backlog (2026-10-11; some items are done, so check Done first)
-Rules: take the top unclaimed item in your lane, write your name next to it,
-work on a branch, push, hand the branch to Kestrel to merge. Tests must pass.
-Never spend paid usage in tests. Don't change routing defaults or turn on
-local-model answering without Phil (that's his call; leave a note instead).
-
-Kestrel (lead, main):
-- K1 Send prompts on stdin instead of the command line for every CLI that
-  supports it (Grok, Claude, Codex); Windows caps argv at ~32k chars, so long
-  `--context`/chat prompts can fail. Test with a 50k-char prompt on a fake.
-- K2 Dashboard: phone-friendly layout check; save each run's prompt + answer
-  (last 50, ~/.megazword/answers.jsonl) so the dashboard can show past answers.
-- K3 Dashboard: live streaming of the answer while it's generated.
-
-Forge:
-- F1 (claimed) `--edit`: why Codex/Grok answer but don't create files.
-- F2 Answer-quality check: after an auto run, a fast local/free check flags
-  answers that dodge the question (beyond the current refusal/empty rules);
-  flagged answers escalate like failures. Off by default, config switch.
-- F3 End-to-end smoke script (`scripts/smoke.ps1`) using fake CLIs on PATH:
-  run, retry, chat, dashboard API, usage. No paid calls.
-
-Codex (Phil starts Codex sessions; Kestrel may dispatch via
-`megazword run -m codex --edit` in its own worktree):
-- C1 (claimed) `megazword doctor` + `scripts/install.ps1`.
-- C2 Make `megazword` runnable from any folder (pipx/PATH) and document it.
-- C3 README: dashboard section, chat section, config reference for [out],
-  [route], [grok.<level>].
-
-- F24 (Forge, next): meter consistency. Start screen says "codex no meter" while `usage` shows a Codex snapshot and the dashboard shows it out. One shared summary for all three; show snapshot age ("as of 12:13 AM", stale after 1h); out-marked AIs show "out until X" instead of a bar.
-
-- Nit: export escapes the hyphen in the title ("mega\-zword"); only escape where Markdown needs it.
+## Open
+Agy stdin and the real agy /usage output are still unverified on Phil's PC.
+Tests never spend paid usage. Don't change routing defaults or turn on
+local-model answering without Phil.
 
 - F25 leftovers (dashboard, found by Forge, not fixed yet):
   (a) #jobs has aria-live and is re-rendered every 0.8s, so screen readers re-announce constantly. Drop it; announce only on job finish via an sr-only status region.
   (b) renderJob keeps focus only on Cancel; focus on copy/vote/answer is lost every poll.
   (c) load() rebuilds the #model select every 30s even while it's focused or open; skip when it's document.activeElement.
 - Flaky: one dashboard test failed once with a connection error, passed on rerun.
-
-Unassigned / ideas:
-- U4 Codex's meter showed low usage but Codex (gpt-6-astra) hit its limit at ~00:07. Read the limit error ("try again at <time>") from a failed run and auto-mark the AI out until then.
-- U1 Token/usage estimate per run in the log (chars -> rough tokens) and a
-  per-AI "cost" column in usage + dashboard.
-- U2 `megazword out grok --until 2026-10-17` command (edit config from CLI)
-  and an "out" toggle on the dashboard.
-- U3 Dashboard `--host` for Tailscale with token required on GET too (step 5
-  prep; keep 127.0.0.1 default).
 
 ## Next step (needs Phil)
 - Morning live check (costs a few dozen tokens per AI): from C:\Users\mrmar\mega-zword run `.venv\Scripts\python scripts\live_check.py --yes-spend`. Runs doctor (stops on FAIL), sends "Reply with exactly: pong" once to each installed, not-out AI via `megazword run -m`, then once via auto-pick, and prints AI / ok / seconds / answer length. Without --yes-spend it only explains itself. Never run by the bots.

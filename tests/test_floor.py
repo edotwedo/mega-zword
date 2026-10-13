@@ -216,6 +216,49 @@ def test_floor_suggest_command_prints_name(monkeypatch, tmp_path):
     assert out == ["groq"]
 
 
+def _log(path, *records):
+    with path.open("a", encoding="utf-8") as f:
+        for backend, ok, rejected in records:
+            f.write(json.dumps({"time": "2026-10-13T02:00:00+00:00", "backend": backend,
+                                "ok": ok, "rejected": rejected}) + "\n")
+
+
+def test_auth_failed_uses_latest_run_per_backend(tmp_path):
+    log = tmp_path / "log.jsonl"
+    _log(log,
+         ("groq", False, "failed: API HTTP error 403: forbidden (auth rejected, check the API key or model access)"),
+         ("mistral", False, "failed: API HTTP error 401: unauthorized (auth failed, check the API key)"),
+         ("mistral", True, None),  # fixed since: latest run wins
+         ("zai", False, "failed: API connection failed: unable to connect (network or DNS)"),
+         ("claude", False, "failed: Error: Not logged in. Please run /login"),
+         ("codex", False, "too short (mentions 401)"))  # judge rejection, not a failed call
+    assert floor.auth_failed(log) == {"groq", "claude"}
+    assert floor.auth_failed(tmp_path / "missing.jsonl") == set()
+    assert floor.auth_failed(None) == set()
+
+
+def test_suggest_skips_auth_failed_without_marking_out(tmp_path):
+    seats = _seats(claude="seated", grok="seated", groq="seated", mistral="seated")
+    assert floor.suggest_seat("bulk", seats, {"groq"}) == "mistral"
+    assert floor.suggest_seat("decide", seats, {"claude"}) == "grok"
+    assert floor.suggest_seat("bulk", seats, {"groq", "mistral"}) is None
+    assert {s.name: s.status for s in seats}["groq"] == "seated"
+
+
+def test_floor_suggest_command_skips_groq_after_403(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: tmp_path / "floor.json")
+    log = tmp_path / "log.jsonl"
+    _log(log, ("groq", False, "failed: API HTTP error 403: forbidden (auth rejected, check the API key or model access)"))
+    backends = {"groq": FakeBackend("groq"), "mistral": FakeBackend("mistral")}
+    cfg = SimpleNamespace(out_until={}, log_path=log)
+    out: list[str] = []
+    args = SimpleNamespace(action="suggest", kind="bulk", room=None)
+    assert floor.command(args, backends, cfg, write=out.append) == 0
+    assert out == ["mistral"]
+    assert cfg.out_until == {}
+
+
 def test_peek_and_wait_share_the_hive_log(tmp_path, monkeypatch):
     from megazword import room
     monkeypatch.setattr(floor, "sleep", lambda _s: None)
@@ -246,3 +289,52 @@ def test_floor_wait_command_after_catches_missed_message(monkeypatch, tmp_path):
     monkeypatch.setattr(floor, "monotonic", iter([0.0, 1.0]).__next__)
     assert floor.command(args, {}, cfg, write=out.append) == 1
     assert out == ["(no new hive message)\n(after=2)"]
+
+
+def test_floor_peek_n0_and_wait_timeout0_are_not_defaults(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from megazword import room
+    monkeypatch.setattr(room.config, "HOME", tmp_path)
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: tmp_path / "floor.json")
+    monkeypatch.setattr(floor, "sleep", lambda _s: pytest.fail("timeout 0 must not block"))
+    room.append_message("hive", "phil", "one")
+    room.append_message("hive", "phil", "two")
+    cfg = SimpleNamespace(out_until={})
+    out: list[str] = []
+    assert floor.command(SimpleNamespace(action="peek", room=None, n=0), {}, cfg,
+                         write=out.append) == 0
+    assert out == ["(after=2)"]
+    out.clear()
+    args = SimpleNamespace(action="wait", room=None, timeout=0, after=None)
+    assert floor.command(args, {}, cfg, write=out.append) == 1
+    assert out == ["(no new hive message)\n(after=2)"]
+
+
+def test_floor_snapshot_only_on_status_and_introduce(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from megazword import room
+    monkeypatch.setattr(room.config, "HOME", tmp_path)
+    monkeypatch.setattr(floor, "sleep", lambda _s: None)
+    saved = []
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: saved.append(1))
+    cfg = SimpleNamespace(out_until={})
+    for action in ("peek", "wait", "suggest"):
+        args = SimpleNamespace(action=action, room=None, n=None, timeout=0, after=None,
+                               kind="bulk")
+        floor.command(args, {}, cfg, write=lambda s: None)
+    assert saved == []
+    for action in ("status", "introduce"):
+        floor.command(SimpleNamespace(action=action, room=None), {}, cfg, write=lambda s: None)
+    assert saved == [1, 1]
+
+
+def test_floor_bad_room_is_one_line_exit_2(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: pytest.fail("no snapshot"))
+    cfg = SimpleNamespace(out_until={})
+    for action in ("peek", "wait", "introduce"):
+        out: list[str] = []
+        args = SimpleNamespace(action=action, room="../x", n=None, timeout=0, after=None)
+        assert floor.command(args, {}, cfg, write=out.append) == 2
+        assert len(out) == 1 and "\n" not in out[0]
+        assert out[0].startswith("floor: room name '../x'")

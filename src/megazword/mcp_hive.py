@@ -12,10 +12,11 @@ import os
 import sys
 from typing import Any, BinaryIO
 
-from . import floor, room
+from . import __version__, floor, room
 
 PROTOCOL_VERSION = "2024-11-05"
-SERVER_INFO = {"name": "megazword-hive", "version": "0.1.0"}
+SUPPORTED_PROTOCOL_VERSIONS = (PROTOCOL_VERSION,)
+SERVER_INFO = {"name": "megazword-hive", "version": __version__}
 MAX_WAIT_SECONDS = 300.0
 MAX_BODY_BYTES = 1_000_000  # same limit as the dashboard
 
@@ -34,7 +35,9 @@ TOOLS = [
     },
     {
         "name": "hive_say",
-        "description": "Post a message to a hive room. No @mentions required.",
+        "description": "Post a message to a hive room. No @mentions required; an @name "
+                       "still wakes that seat for a one-shot reply while `room start` "
+                       "is running.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -78,6 +81,8 @@ def hive_read(args: dict) -> str:
     room_name = args.get("room") or "hive"
     n = int(args.get("n", 10))
     msgs = room.read_messages(room_name)
+    if n <= 0 and msgs:  # like `floor peek -n 0`: cursor only
+        return f"(after={len(msgs)})"
     recent = msgs[-n:] if n > 0 else []
     return f"{_lines(recent) or '(no messages yet)'}\n(after={len(msgs)})"
 
@@ -127,8 +132,10 @@ def handle(request: dict) -> dict | None:
     if not isinstance(params, dict):
         return err(-32602, "params must be an object")
     if method == "initialize":
+        # Echo a version we speak; otherwise offer ours and let the client decide.
+        asked = params.get("protocolVersion")
         return ok({
-            "protocolVersion": params.get("protocolVersion") or PROTOCOL_VERSION,
+            "protocolVersion": asked if asked in SUPPORTED_PROTOCOL_VERSIONS else PROTOCOL_VERSION,
             "capabilities": {"tools": {}},
             "serverInfo": SERVER_INFO,
         })
