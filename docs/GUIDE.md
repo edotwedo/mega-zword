@@ -437,6 +437,8 @@ Set the provider's API key as described below. This also works with `openrouter`
 still depend on the provider. No live API call was used to test this feature.
 For local Ollama, pull the configured model, then use `-m ollama`. Its default is
 `qwen2.5-coder:7b`; change it under `[free.ollama]` with `model = "your-model"`.
+If that model is missing, the coding loop uses the first installed model reported
+by Ollama and prints its name.
 
 With just `-e`, the normal route picks the AI. API models on that route use the
 coding loop. Claude, Codex and Grok keep their existing CLI paths and restrictions.
@@ -446,6 +448,10 @@ and finish with a summary. Replacements must match once. It refuses paths outsid
 the current folder, `.git`, `.env` files and hard links. It never commits. It prints
 the summary and `git diff --stat`; new untracked files do not appear in that stat.
 Review the files after a run, including one that stops early.
+After an edit, a passing test command ends the run successfully. Three identical
+tool calls in a row prompt the model to finish. Edits to `test_*.py`, `*_test.py`
+and files under `tests/` require the job to mention tests. API errors 429, 500,
+502 and 503 get three retries, after 2, 5 and 10 seconds, within the run's time cap.
 
 Native tool calls are preferred. If the provider rejects them or the model replies
 with text, the loop switches to JSON tool replies. Set `text_protocol = true` to

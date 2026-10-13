@@ -43,10 +43,9 @@ def test_edit_tests_finish(tmp_path):
         call("run_tests"), call("finish", summary="Edited and tested.")],
         test_command=(sys.executable, "-c", "print('tests pass')"))
     result = loop.run("fix a")
-    assert result.ok and result.text == "Edited and tested."
+    assert result.ok and result.text == "tests pass"
     assert (tmp_path / "a.py").read_text() == "after"
-    assert loop.request_count == 4
-    assert "exit code 0" in loop.model_backend.seen[-1][0][-1]["content"]
+    assert loop.request_count == 3
 
 
 @pytest.mark.parametrize("path", ["../escape", ".git/config", ".env", ".env.local",
@@ -254,3 +253,177 @@ def test_hardlink_refused(tmp_path):
     loop, _ = coding(tmp_path, [])
     with pytest.raises(ValueError, match="hard-linked"):
         loop._path("alias")
+
+
+def test_auto_finish_uses_last_assistant_text(tmp_path):
+    reply = call("run_tests")
+    reply["content"] = "Fixed the addition bug."
+    loop, _ = coding(tmp_path, [call("write_file", path="calc.py", text="fixed"), reply],
+                    test_command=(sys.executable, "-c", "pass"))
+    assert loop.run("fix addition").text == "Fixed the addition bug."
+    assert loop.request_count == 2
+
+
+@pytest.mark.parametrize("edited,exit_code", [(False, 0), (True, 1)])
+def test_no_auto_finish_without_edit_and_passing_tests(tmp_path, edited, exit_code):
+    replies = ([call("write_file", path="calc.py", text="fixed")] if edited else [])
+    replies += [call("run_tests"), call("finish", summary="explicit finish")]
+    loop, model = coding(tmp_path, replies,
+        test_command=(sys.executable, "-c", f"raise SystemExit({exit_code})"))
+    assert loop.run("fix addition").text == "explicit finish"
+    assert f"exit code {exit_code}" in model.seen[-1][0][-1]["content"]
+
+
+def test_repeated_call_nudges_finish(tmp_path):
+    loop, model = coding(tmp_path, [call("list_files", glob="*")] * 3 +
+                         [call("finish", summary="done")])
+    assert loop.run("job").ok
+    assert "Finish now" in model.seen[-1][0][-1]["content"]
+
+
+def test_repeated_calls_in_batch_nudge_after_all_tool_results(tmp_path):
+    batch = {"tool_calls": [call("list_files", glob="*")["tool_calls"][0] for _ in range(3)]
+                          + call("read_file", path="calc.py")["tool_calls"]}
+    (tmp_path / "calc.py").write_text("code")
+    loop, model = coding(tmp_path, [batch, call("finish", summary="done")])
+    assert loop.run("job").ok
+    history = model.seen[-1][0]
+    assert "Finish now" in history[-1]["content"]
+    assert [m["role"] for m in history[-5:-1]] == ["tool"] * 4
+
+
+@pytest.mark.parametrize("test_alias", [True, False])
+def test_test_file_symlink_edits_refused(tmp_path, test_alias):
+    target = tmp_path / ("calc.py" if test_alias else "test_calc.py")
+    alias = tmp_path / ("test_calc.py" if test_alias else "calc.py")
+    target.write_text("original")
+    try:
+        alias.symlink_to(target)
+    except OSError:
+        pytest.skip("symlink privilege unavailable")
+    loop, model = coding(tmp_path, [call("write_file", path=alias.name, text="changed"),
+                                  call("finish", summary="done")])
+    assert loop.run("fix addition").ok
+    assert "job does not mention tests" in model.seen[-1][0][-1]["content"]
+    assert target.read_text() == "original"
+
+
+@pytest.mark.parametrize("path", ["test_calc.py", "calc_test.py", "tests/calc.py",
+                                   "nested/tests/calc.py", "TEST_CALC.PY"])
+@pytest.mark.parametrize("tool", ["write_file", "replace_in_file"])
+def test_test_edits_refused_without_job_permission(tmp_path, path, tool):
+    target = tmp_path / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("original")
+    args = {"text": "changed"} if tool == "write_file" else {"old": "original", "new": "changed"}
+    loop, model = coding(tmp_path, [call(tool, path=path, **args), call("finish", summary="done")])
+    assert loop.run("fix addition").ok
+    assert "job does not mention tests" in model.seen[-1][0][-1]["content"]
+    assert target.read_text() == "original"
+
+
+@pytest.mark.parametrize("job", ["Add tests", "Fix the TEST", "Run pytest", "Improve testing"])
+def test_test_edits_allowed_when_job_mentions_tests(tmp_path, job):
+    loop, _ = coding(tmp_path, [call("write_file", path="tests/test_calc.py", text="ok"),
+                              call("finish", summary="done")])
+    assert loop.run(job).ok
+    assert (tmp_path / "tests/test_calc.py").read_text() == "ok"
+
+
+@pytest.mark.parametrize("code", [429, 500, 502, 503])
+def test_transient_http_retries(tmp_path, monkeypatch, code):
+    from megazword.free_apis import APIHTTPError
+    sleeps = []
+    monkeypatch.setattr(agent.time, "sleep", sleeps.append)
+    loop, _ = coding(tmp_path, [APIHTTPError(code)] * 3 + [call("finish", summary="done")], max_steps=1)
+    assert loop.run("job").ok
+    assert sleeps == [2, 5, 10]
+    assert loop.request_count == 4
+
+
+def test_transient_http_retry_exhaustion(tmp_path, monkeypatch):
+    from megazword.free_apis import APIHTTPError
+    sleeps = []
+    monkeypatch.setattr(agent.time, "sleep", sleeps.append)
+    loop, _ = coding(tmp_path, [APIHTTPError(503)] * 4)
+    result = loop.run("job")
+    assert not result.ok and result.error == "API HTTP error 503"
+    assert sleeps == [2, 5, 10] and loop.request_count == 4
+
+
+def test_real_chat_preserves_retry_status(tmp_path, monkeypatch):
+    import io
+    import urllib.error
+    import urllib.request
+    monkeypatch.setenv("TEST_KEY", "test-key")
+    sleeps, requests = [], []
+    monkeypatch.setattr(agent.time, "sleep", sleeps.append)
+    def urlopen(req, timeout):
+        requests.append(json.loads(req.data))
+        if len(requests) <= 2:
+            raise urllib.error.HTTPError(req.full_url, 503, "private body", {}, None)
+        return io.BytesIO(json.dumps({"choices": [{"message": call("finish", summary="done")}]}).encode())
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    model = OpenAICompatibleBackend("gemini-api", base_url="https://example.test/v1",
+                                    key_env="TEST_KEY", model="fake")
+    loop = agent.wrap(model, {"root": tmp_path, "max_steps": 1})
+    assert loop.run("job").ok
+    assert sleeps == [2, 5] and loop.request_count == 3
+
+
+def test_http_auth_error_is_not_retried(tmp_path, monkeypatch):
+    from megazword.free_apis import APIHTTPError
+    sleeps = []
+    monkeypatch.setattr(agent.time, "sleep", sleeps.append)
+    loop, _ = coding(tmp_path, [APIHTTPError(401)])
+    assert not loop.run("job").ok
+    assert not sleeps and loop.request_count == 1
+
+
+def test_retry_obeys_wall_cap(tmp_path, monkeypatch):
+    from megazword.free_apis import APIHTTPError
+    sleeps = []
+    monkeypatch.setattr(agent.time, "sleep", sleeps.append)
+    loop, _ = coding(tmp_path, [APIHTTPError(503)], wall_timeout=1)
+    assert "wall-clock cap" in loop.run("job").error
+    assert not sleeps
+
+
+def test_ollama_missing_model_uses_first_installed(tmp_path, monkeypatch, capsys):
+    import io
+    import urllib.error
+    import urllib.request
+    from megazword.backends import OllamaBackend
+    seen = []
+    def urlopen(req, timeout):
+        url = req if isinstance(req, str) else req.full_url
+        seen.append((url, timeout))
+        if url.endswith("/api/tags"):
+            return io.BytesIO(json.dumps({"models": [{"name": "qwen2.5:1.5b"},
+                                                    {"name": "another"}]}).encode())
+        body = json.loads(req.data)
+        if body["model"] == "missing":
+            raise urllib.error.HTTPError(url, 404, "missing", {}, None)
+        assert body["model"] == "qwen2.5:1.5b"
+        tool = "list_files" if len(seen) == 3 else "finish"
+        args = {"glob": "*"} if tool == "list_files" else {"summary": "done"}
+        return io.BytesIO(json.dumps({"response": json.dumps({"tool": tool, "arguments": args})}).encode())
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    model = OllamaBackend("ollama", model="missing")
+    loop = agent.wrap(model, {"root": tmp_path})
+    assert loop.run("job").ok
+    assert loop.request_count == 3
+    assert sum(url.endswith("/api/tags") for url, _ in seen) == 1
+    assert "using installed model qwen2.5:1.5b" in capsys.readouterr().out
+    assert model.model == "missing"
+
+
+def test_ollama_missing_model_no_installed_models(tmp_path, monkeypatch):
+    import urllib.error
+    from megazword.backends import OllamaBackend
+    def missing(*args, **kwargs):
+        raise urllib.error.HTTPError("http://local/api/generate", 404, "missing", {}, None)
+    monkeypatch.setattr("megazword.ollama.generate", missing)
+    monkeypatch.setattr("megazword.ollama.installed_models", lambda *args, **kwargs: [])
+    loop = agent.wrap(OllamaBackend("ollama", model="missing"), {"root": tmp_path})
+    assert "no fallback model available" in loop.run("job").error

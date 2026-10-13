@@ -15,6 +15,14 @@ class ToolsUnsupported(RuntimeError):
     """Backend rejected the native tool schema; retry using text JSON."""
 
 
+class APIHTTPError(RuntimeError):
+    """HTTP status for retry decisions, with no private response details."""
+
+    def __init__(self, code, headers=None):
+        self.code = code
+        super().__init__(http_error_message(code, headers))
+
+
 @dataclass
 class OpenAICompatibleBackend(Backend):
     base_url: str = ""
@@ -72,7 +80,7 @@ class OpenAICompatibleBackend(Backend):
                 raise ToolsUnsupported("API rejected native tools") from None
             # Response bodies, reasons and URLs can echo credentials. Never
             # propagate them into Result.error (which the CLI prints/logs).
-            raise RuntimeError(http_error_message(exc.code, exc.headers)) from None
+            raise APIHTTPError(exc.code, exc.headers) from None
         except TimeoutError:
             raise RuntimeError("API request timed out") from None
         except urllib.error.URLError as exc:

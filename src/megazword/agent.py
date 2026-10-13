@@ -4,14 +4,16 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
 import time
+import urllib.error
 from dataclasses import dataclass, field
 
 from .backends import Backend, OllamaBackend, process_group, _kill_tree
-from .free_apis import ToolsUnsupported
+from .free_apis import APIHTTPError, ToolsUnsupported
 from .guard import scrub
 
 
@@ -149,6 +151,7 @@ class AgentBackend(Backend):
                     raise TimeoutError("test command timed out") from None
                 output.seek(0, 2)
                 output.seek(max(0, output.tell() - max(1, self.max_chars - 30)))
+                self._tests_passed = proc.returncode == 0
                 return f"exit code {proc.returncode}\n" + output.read().decode("utf-8", errors="replace")
         path = self._path(args["path"])
         if name == "read_file":
@@ -156,6 +159,13 @@ class AgentBackend(Backend):
             if end is not None and end < start:
                 raise ValueError("end must be at least start")
             return "".join(self._read(path).splitlines(keepends=True)[start - 1:end])
+        if not self._allow_test_edits:
+            paths = (Path(args["path"]), path.relative_to(self.root.resolve()))
+            if any(any(p.lower() == "tests" for p in candidate.parts)
+                   or fnmatch.fnmatch(candidate.name.lower(), "test_*.py")
+                   or fnmatch.fnmatch(candidate.name.lower(), "*_test.py")
+                   for candidate in paths):
+                raise ValueError("test file edits are refused because the job does not mention tests; fix the implementation instead")
         if name == "write_file":
             text = args["text"]
         else:
@@ -165,12 +175,58 @@ class AgentBackend(Backend):
             text = text.replace(args["old"], args["new"], 1)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
+        self._edited = True
         return "wrote " + args["path"]
+
+    def _model_call(self, sent, text_mode):
+        retries = 0
+        while True:
+            remaining = self._deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
+            self.request_count += 1
+            self.prompt_chars += len(json.dumps(sent))
+            try:
+                if isinstance(self.model_backend, OllamaBackend):
+                    from .ollama import generate
+                    return {"content": generate(json.dumps(sent), self._ollama_model,
+                            self.model_backend.url, json_format=True,
+                            timeout=min(self.call_timeout, remaining))}
+                return self.model_backend.chat(sent, tools=None if text_mode else TOOLS,
+                                               timeout=min(self.call_timeout, remaining))
+            except (APIHTTPError, urllib.error.HTTPError) as exc:
+                if (isinstance(self.model_backend, OllamaBackend) and exc.code == 404
+                        and not self._ollama_fallback):
+                    from .ollama import installed_models
+                    self._ollama_fallback = True
+                    remaining = self._deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError("agent wall-clock cap reached") from None
+                    names = installed_models(self.model_backend.url,
+                                             timeout=min(self.call_timeout, remaining))
+                    if not names or names[0] == self._ollama_model:
+                        raise RuntimeError("Ollama configured model missing; no fallback model available") from None
+                    self._ollama_model = names[0]
+                    print(f"Ollama: using installed model {self._ollama_model}")
+                    continue
+                if exc.code not in (429, 500, 502, 503) or retries >= 3:
+                    raise
+                delay = (2, 5, 10)[retries]
+                if self._deadline - time.monotonic() <= delay:
+                    raise TimeoutError("agent wall-clock cap reached during retry backoff") from None
+                time.sleep(delay)
+                retries += 1
 
     def _run(self, prompt):
         self.root = self.root.resolve()
         self._deadline = time.monotonic() + min(self.wall_timeout, self.timeout)
         self.request_count = self.prompt_chars = self.answer_chars = 0
+        self._edited = self._tests_passed = False
+        self._allow_test_edits = bool(re.search(r"\b(?:tests?|testing|pytest|unittest)\b", prompt, re.I))
+        self._ollama_model = getattr(self.model_backend, "model", "")
+        self._ollama_fallback = False
+        previous_call, repeats = None, 0
+        last_text = ""
         messages = [{"role": "system", "content": INSTRUCTIONS},
                     {"role": "user", "content": prompt}]
         text_mode = self.text_protocol or isinstance(self.model_backend, OllamaBackend)
@@ -179,17 +235,8 @@ class AgentBackend(Backend):
             if remaining <= 0:
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
             sent = _scrub_values(messages) if self.trains_on_data else messages
-            self.request_count += 1
-            self.prompt_chars += len(json.dumps(sent))
             try:
-                if isinstance(self.model_backend, OllamaBackend):
-                    from .ollama import generate
-                    reply = {"content": generate(json.dumps(sent), self.model_backend.model,
-                             self.model_backend.url, json_format=True,
-                             timeout=min(self.call_timeout, remaining))}
-                else:
-                    reply = self.model_backend.chat(sent, tools=None if text_mode else TOOLS,
-                                                   timeout=min(self.call_timeout, remaining))
+                reply = self._model_call(sent, text_mode)
             except ToolsUnsupported:
                 text_mode = True
                 messages.append({"role": "user", "content": "Use the fenced JSON tool protocol."})
@@ -214,12 +261,15 @@ class AgentBackend(Backend):
             elif text_mode:
                 # A model may use native tools after switching protocols.
                 text_mode = False
+            if not text_mode and reply.get("content"):
+                last_text = reply["content"]
             messages.append({"role": "assistant", "content": reply.get("content"),
                              "tool_calls": calls} if not text_mode else
                             {"role": "assistant", "content": content})
             # Bound work per turn even if the model emits a huge batch.
             if not isinstance(calls, list) or len(calls) > 8:
                 raise ValueError("agent tool batch cap reached")
+            nudge_finish = False
             for call in calls:
                 remaining = self._deadline - time.monotonic()
                 if remaining <= 0:
@@ -229,6 +279,10 @@ class AgentBackend(Backend):
                 try:
                     name = call["function"]["name"]
                     args = json.loads(call["function"]["arguments"])
+                    signature = (name, json.dumps(args, sort_keys=True))
+                    repeats = repeats + 1 if signature == previous_call else 1
+                    previous_call = signature
+                    nudge_finish = nudge_finish or repeats == 3
                     result = self._perform(name, args, remaining)
                 except TimeoutError:
                     raise
@@ -244,10 +298,16 @@ class AgentBackend(Backend):
                 result = result[:self.max_chars]
                 if name == "finish":
                     return result
+                if name == "run_tests" and self._edited and self._tests_passed:
+                    summary = last_text or "tests pass"
+                    return (scrub(summary) if self.trains_on_data else summary)[:self.max_chars]
                 messages.append({"role": "user", "content": result} if text_mode else
                                 {"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
                 if bad_protocol:
                     text_mode = True
+            if nudge_finish:
+                messages.append({"role": "user", "content":
+                                 "You repeated the same tool call three times. Finish now with an honest summary."})
             if text_mode:
                 # Flatten native history when a model cannot form valid calls.
                 # Text-only providers need ordinary user/assistant messages.

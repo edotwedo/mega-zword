@@ -32,7 +32,12 @@ def reachable(url: str = DEFAULT_URL, timeout: float = 2) -> bool:
         return False
 
 
+def installed_models(url: str = DEFAULT_URL, timeout: float = 2) -> list[str]:
+    """Locally pulled names in server order; this never runs a generation."""
+    with urllib.request.urlopen(f"{url}/api/tags", timeout=timeout) as resp:
+        return [item["name"] for item in json.loads(resp.read()).get("models", [])]
+
+
 def models(url: str = DEFAULT_URL, timeout: float = 2) -> set[str]:
     """Names of locally pulled models; this never runs a generation."""
-    with urllib.request.urlopen(f"{url}/api/tags", timeout=timeout) as resp:
-        return {item["name"] for item in json.loads(resp.read()).get("models", [])}
+    return set(installed_models(url, timeout))

@@ -106,3 +106,86 @@ Next step for Sorrel-12: review `src/megazword/agent.py` and the related diff, r
 the suite outside the restricted worker sandbox, then stage the new agent/tests
 and this handoff along with the tracked changes. Commit on the current branch;
 review before merging. No live provider success is claimed here.
+
+## Fix pass 2 (Sorrel-12, 2026-10-13 16:15) -- live trial findings
+A live trial on a toy repo (calc.py add() bug + one pytest test) showed:
+1. **Cloudflare Llama fixed the bug but never called finish** and ran to the 30-step cap.
+   Fix: after any edit, when run_tests passes, end the run as success automatically
+   (summary = last assistant text or "tests pass"). Also nudge the model: when it repeats
+   the same tool call 3 times, tell it to finish.
+2. **It appended `test_add()` to test_calc.py.** Fix: refuse edits to test files
+   (`test_*.py`, `*_test.py`, `tests/`) unless the job text mentions tests; the
+   refusal message tells the model why.
+3. **gemini-api returned HTTP 503 twice** (Google busy). Fix: retry 429/500/502/503 with
+   backoff (2s, 5s, 10s) inside the loop's model call, then fail as now.
+4. **ollama returned 404**: Phil's PC has only `qwen2.5:1.5b` pulled. Fix: if the
+   configured model is missing, ask Ollama's `/api/tags` and use the first installed
+   model, printing which one; tests with a fake.
+Same rules as above. Add a "Report 2" section when done.
+
+## Report 2
+
+Fix pass 2 is implemented in this folder. Changes remain uncommitted, as Phil
+requested. Startup and coordination were skipped; Sorrel-12 owns those steps.
+
+After a successful file edit, a passing test command ends the run automatically.
+The summary uses the latest plain assistant text, or "tests pass" when the model
+only sends tool JSON. Passing tests without an edit do not end the run. Failed
+tests leave the loop running. Three identical tool calls in a row prompt the model
+to finish, including calls in a batch.
+
+Both edit tools refuse `test_*.py`, `*_test.py` and files under `tests/` unless the
+job mentions test, tests, testing, pytest or unittest. Names are checked without
+case sensitivity, before and after resolving symlinks. Reads remain allowed.
+The refusal explains that the model should fix the implementation instead.
+
+HTTP 429, 500, 502 and 503 retry after 2, 5 and 10 seconds. Retries stay inside the
+wall-clock cap and each request is counted for logging. API HTTP errors retain
+their status without exposing response bodies or credentials. Other statuses
+fail immediately, apart from the existing native-tool fallback.
+
+When an Ollama generation returns 404, the loop reads `/api/tags` and uses the
+first installed model in server order. It prints the chosen name and keeps using
+it for the run. The configured model is unchanged. An empty model list fails
+clearly. This fallback is attempted once per run.
+
+Try from a toy work folder, with the provider key already set:
+
+```powershell
+megazword run -e -m groq "Fix the addition bug in calc.py."
+```
+
+Use the source invocation from Report above until Sorrel installs this version.
+Include "tests" in the job when test-file edits are intended. Use `-m ollama` to
+try the installed-model fallback. No live model call was made during this pass.
+
+Focused validation: **134 passed** across agent, API, CLI, run-log and stats tests.
+The new tests use scripted models and fake HTTP responses. They cover automatic
+success, failed tests, test-file restrictions and symlinks, repeated calls and
+batches, all four retry statuses, exhaustion, the time cap, actual chat-client
+status propagation and Ollama's server-order fallback. `git diff --check` passes.
+
+Full suite: **843 passed, 5 failed, 9 setup errors** in 228.64 seconds. It started
+before the final batch/symlink refinements and four additional regression cases;
+the final focused run covers those changes. The five failing checks are:
+
+- `tests/test_codex_live.py::test_silent_app_server_times_out_and_falls_back`
+- `tests/test_codex_review.py::test_add_user_path_keeps_vars_duplicates_and_is_idempotent`
+- `tests/test_dashboard.py::test_real_job_cancel_kills_process`
+- `tests/test_dashboard.py::test_cancel_stops_backend_child_too`
+- `tests/test_timeouts.py::test_dashboard_cancel_kills_the_ai_underneath`
+
+All nine setup errors are in `tests/test_night.py`: its local Git clone fixture
+exits with status 128. These are the same failing areas recorded in Report's
+baseline comparison. No unrelated fixes were made. The known live-check failure
+did not occur. Sorrel's next step is to review this uncommitted diff, rerun outside
+the sandbox, and commit after review. No staging, commit or push was attempted.
+
+## Fix pass 3 (Grok review, 2026-10-13) -- do after pass 2
+1. HIGH agent.py ~139: run_tests runs pytest in the writable folder with the parent env; the model can write conftest.py/pytest.py that prints os.environ (API keys) back to itself. Fix: run the test command with an env stripped of key/token/secret vars (all known *_API_KEY, *_TOKEN etc. plus anything matching KEY|TOKEN|SECRET|PASSWORD), `python -I`-style isolation where possible, and always guard.scrub test output for every backend (not only trainers).
+2. med ~119: list_files resolves the glob as a path; `*`/`?` raise WinError 123 on Windows. Validate as a pattern (reject `:`, `\`, NUL, `..`), don't resolve it.
+3. med ~172: deadline = min(wall_timeout, self.timeout), so per-call timeout caps the whole run. Use wall_timeout for the run, call_timeout per call.
+4. med ~205: list-type `content` (multi-part) crashes on .strip(). Treat non-str as an invalid reply (nudge, continue).
+5. med ~221: non-list/oversized tool_calls raise out of _run. Treat as invalid reply.
+6. low ~159: cap write_file size (e.g. 200 KB).
+Tests for each. Add "Report 3".
