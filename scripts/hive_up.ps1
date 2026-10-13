@@ -19,7 +19,7 @@ $workshop = Join-Path $env:USERPROFILE 'Desktop\workshop'
 if (-not (Test-Path $workshop)) { $workshop = Join-Path $env:USERPROFILE 'workshop' }
 
 $prompt = @"
-You are one Hive floor seat on Phil's PC (docs/FLOOR.md). This is your only window; use subagents for extra hands. Working copy: $repo. Check megazword usage before any job. Do not post a Q greeting. Do not edit until Phil assigns work in the Mega Zword Hive tab. Conserve Claude/Codex/Grok: send bulk to Groq and other HTTP seats. Gemini is out until 18 Oct.
+You are one Hive floor seat on Phil's PC (docs/FLOOR.md). This is your only window; use subagents for extra hands. Working copy: $repo. Check megazword usage before any job. Do not post a Q greeting. KEEP WORKING while Phil sleeps or watches Netflix. Do not stop at bye. Pull origin/main, take the next unclaimed file, push. Bulk -> megazword floor suggest bulk (Groq/HTTP). Edit -> Codex/Claude. Decide/review -> Claude/Grok. Gemini is out until 18 Oct.
 "@
 
 $lanes = [ordered]@{
@@ -31,6 +31,10 @@ $lanes = [ordered]@{
 if (-not $PrintOnly -and -not $NoIntroduce) {
   & $mz floor introduce
   if ($LASTEXITCODE -ne 0) { throw 'megazword floor introduce failed' }
+  foreach ($kind in @('bulk','edit','decide','review')) {
+    Write-Host -NoNewline "suggest $kind -> "
+    & $mz floor suggest $kind
+  }
 }
 
 if (-not $PrintOnly -and -not $NoApp) {
