@@ -69,7 +69,7 @@ DEFAULT_FREE = {
     "groq": "llama-3.3-70b-versatile",
     "cloudflare": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "zai": "glm-4.5-flash",
-    "gemini-api": "gemini-2.0-flash",
+    "gemini-api": "gemini-flash-latest",
     "nvidia": "meta/llama-3.1-8b-instruct",
     "mistral": "mistral-small-latest",
 }

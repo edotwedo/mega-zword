@@ -139,8 +139,10 @@ def run_quick(cmd: list[str], timeout: float) -> subprocess.CompletedProcess:
 
 def process_group() -> dict:
     """Popen kwargs that start a child in its own process group, so
-    _kill_tree() can later take down everything it started."""
-    return ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    _kill_tree() can later take down everything it started. On Windows the child also
+    gets a hidden console: started from a windowless app (the Hive widget, the desktop
+    window) each AI CLI, and the MCP servers it starts, flashed a console window per turn."""
+    return ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW}
             if os.name == "nt" else {"start_new_session": True})
 
 

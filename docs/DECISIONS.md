@@ -2,6 +2,9 @@
 
 Newest first. Don't reopen these without Phil.
 
+## 2026-10-13
+- Phil unfroze features 2026-10-12; 2026-10-13 the bots keep working overnight while Phil sleeps (Quill-12 lead).
+
 ## 2026-10-12
 - Phil: **Feature freeze is off.** The Hive floor (`megazword floor`, `docs/FLOOR.md`) is the next layer. The Beta 3.0 checklist in STATUS.md no longer blocks feature work. This replaces the "Feature freeze" entries below.
 - Phil (this Grok chat): **Nimbus-12 (Grok Build on Phil's PC) is Mega Zword lead.** Tally-11 is released. Owns main, merges and assignments. Codex's 5-hour refresh is Phil's call; no Codex Mega Zword work until he says so. Feature freeze for Beta 3.0 still stands.

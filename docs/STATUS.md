@@ -1,6 +1,6 @@
 # Status
 
-**Active: Nimbus-12 (Grok Build on Phil's PC) is lead (Phil, 2026-10-12).** **Feature freeze off (Phil, 2026-10-12):** the Hive floor (`megazword floor`) is the next layer; split in `docs/handoffs/2026-10-12-floor.md`. The Beta 3.0 checklist below still stands but no longer blocks features.
+**Active: Quill-12 (Grok) is lead, working overnight 2026-10-13 while Phil sleeps.** **Feature freeze is OFF (Phil, 2026-10-12).** The Hive floor (seats, peek/wait, MCP `hive_read`/`hive_say`/`hive_wait`) is on main. Branch `grok/overnight-2026-10-13` adds: room start works on a fresh install (bots only hand off to bots that can answer), gemini-api default `gemini-flash-latest`, AI CLIs start with a hidden console on Windows. **Next:** merge this branch, install on Phil's PC from main, then Beta 3.0 notes and tag. The Beta 3.0 checklist below still stands but no longer blocks features.
 **Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved on since (live usage meters, widget).
 **Lead:** Nimbus-12 (Grok Build on Phil's PC). Phil named this seat lead. Tally-11 is released. Cloud Claudes coordinate in Q; they do not take main.
 **Last updated:** 2026-10-12 by Quill-12: Wren-12's Q split — Grok keeps Beta 3.0 1-5; J1/J2/J4 after ship. Usage: Claude 2% 5h / 69% week; Codex 9% 5h / 78% week; Grok 16% week; Gemini out until Oct 18.

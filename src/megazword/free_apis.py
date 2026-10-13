@@ -119,7 +119,8 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
         ),
         OpenAICompatibleBackend(
             "gemini-api", base_url="https://generativelanguage.googleapis.com/v1beta/openai",
-            model=m.get("gemini-api", "gemini-2.0-flash"),
+            # Alias for Google's current Flash; pinned names like gemini-2.0-flash get retired (404).
+            model=m.get("gemini-api", "gemini-flash-latest"),
             key_env="GOOGLE_AI_API_KEY", trains_on_data=True,
         ),
         OpenAICompatibleBackend(
