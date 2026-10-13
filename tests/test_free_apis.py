@@ -56,7 +56,7 @@ def test_available_without_network(api, monkeypatch, value):
 
 @pytest.mark.parametrize("error, message", [
     (urllib.error.HTTPError("https://example.test", 429, "secret-test-credential", {},
-                            io.BytesIO(b"secret-test-credential")), "API HTTP error 429: rate limited"),
+                            io.BytesIO(b"secret-test-credential")), "API HTTP error 429: rate limited, try again in 2 minutes"),
     (TimeoutError("secret-test-credential"), "API request timed out"),
     (urllib.error.URLError(TimeoutError("secret-test-credential")), "API request timed out"),
     (urllib.error.URLError("secret-test-credential"),
@@ -104,6 +104,45 @@ def test_invalid_response(api, monkeypatch, body):
 def test_echoed_key_is_redacted(api, monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: reply("secret-test-credential"))
     assert api.run("hi").text == "[REDACTED]"
+
+
+@pytest.mark.parametrize("headers,minutes", [({}, 2), ({"Retry-After": "90"}, 2),
+    ({"Retry-After": "180"}, 3), ({"Retry-After": "bad"}, 2),
+    ({"Retry-After": "NaN"}, 2), ({"Retry-After": "30.5"}, 1)])
+def test_api_rate_limit_reset(headers, minutes):
+    from datetime import datetime, timedelta, timezone
+    from megazword.free_apis import http_error_message
+    from megazword.limits import detect
+    now = datetime.now(timezone.utc)
+    hit = detect(http_error_message(429, headers), now)
+    assert hit.exact and hit.until == now + timedelta(minutes=minutes)
+
+
+def test_retry_after_http_date():
+    from datetime import datetime, timedelta, timezone
+    from email.utils import format_datetime
+    from megazword.free_apis import http_error_message
+    date = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=150))
+    assert "in 3 minutes" in http_error_message(429, {"Retry-After": date})
+
+
+def test_cloudflare_validation_error_reason_is_safe(api, monkeypatch):
+    api.name = "cloudflare"
+    monkeypatch.setenv("OTHER_SECRET", "opaque-other-secret")
+    seen = []
+    def fail(request, **kwargs):
+        seen.append(json.loads(request.data))
+        body = {"errors": [{"message": "context too long secret-test-credential opaque-other-secret "
+                    "https://private.test/?token=hidden\npassword: hunter42"}]}
+        raise urllib.error.HTTPError(request.full_url, 400, "private", {},
+                                     io.BytesIO(json.dumps(body).encode()))
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    result = api.run("job")
+    assert "context too long" in result.error
+    for secret in ("secret-test-credential", "opaque-other-secret", "private.test", "hunter42"):
+        assert secret not in result.error
+    assert "stream" not in seen[0]
+    assert len(result.error) < 270 and "\n" not in result.error
 
 
 def test_presets_config_and_routes(monkeypatch):

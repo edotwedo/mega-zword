@@ -427,3 +427,125 @@ def test_ollama_missing_model_no_installed_models(tmp_path, monkeypatch):
     monkeypatch.setattr("megazword.ollama.installed_models", lambda *args, **kwargs: [])
     loop = agent.wrap(OllamaBackend("ollama", model="missing"), {"root": tmp_path})
     assert "no fallback model available" in loop.run("job").error
+
+
+def test_test_env_isolated_and_output_scrubbed_for_nontrainer(tmp_path, monkeypatch):
+    monkeypatch.setenv("UNUSUAL_PRIVATE_TOKEN", "opaque-private-value")
+    monkeypatch.setenv("MY_PASSWORD", "another-private-value")
+    monkeypatch.setenv("PYTHONPATH", str(tmp_path))
+    (tmp_path / "pytest.py").write_text("raise RuntimeError('shadow pytest imported')")
+    secret = "sk-" + "z" * 30
+    code = ("import os,sys; assert not any(k in os.environ for k in "
+            "['UNUSUAL_PRIVATE_TOKEN','MY_PASSWORD','PYTHONPATH']); "
+            "assert sys.flags.isolated; print('" + secret + "')")
+    loop, model = coding(tmp_path, [call("run_tests"), call("finish", summary="done")],
+                         test_command=(sys.executable, "-c", code))
+    assert loop.run("job").ok
+    output = model.seen[-1][0][-1]["content"]
+    assert "exit code 0" in output and secret not in output
+    assert agent.scrub(secret) in output
+
+
+def test_python_test_module_cannot_be_shadowed(tmp_path):
+    (tmp_path / "pytest.py").write_text("print('SHADOW_IMPORTED'); raise SystemExit(0)")
+    (tmp_path / "test_probe.py").write_text("def test_probe(): assert True")
+    loop, model = coding(tmp_path, [call("run_tests"), call("finish", summary="done")],
+                         test_command=(sys.executable, "-m", "pytest", "-q"))
+    assert loop.run("job").ok
+    output = model.seen[-1][0][-1]["content"]
+    assert "1 passed" in output and "SHADOW_IMPORTED" not in output
+
+
+def test_conftest_cannot_print_parent_credentials(tmp_path, monkeypatch):
+    names = ["GROQ_API_KEY", "CLOUDFLARE_API_TOKEN", "MY_SECRET", "MY_PASSWORD", "lowercase_key"]
+    for name in names:
+        monkeypatch.setenv(name, "opaque-parent-credential")
+    (tmp_path / "conftest.py").write_text("import os; print(dict(os.environ))")
+    (tmp_path / "test_probe.py").write_text("def test_probe(): assert True")
+    loop, model = coding(tmp_path, [call("run_tests"), call("finish", summary="done")],
+                         test_command=(sys.executable, "-m", "pytest", "-q", "-s"))
+    assert loop.run("job").ok
+    output = model.seen[-1][0][-1]["content"]
+    assert "1 passed" in output and "opaque-parent-credential" not in output
+
+
+def test_test_output_scrub_before_tail_truncation(tmp_path):
+    secret = "sk-" + "z" * 100
+    loop, model = coding(tmp_path, [call("run_tests"), call("finish", summary="done")],
+                         max_chars=80, test_command=(sys.executable, "-c", f"print('{secret}')"))
+    assert loop.run("job").ok
+    output = model.seen[-1][0][-1]["content"]
+    assert "zzzz" not in output and agent.scrub(secret) in output
+
+
+@pytest.mark.parametrize("pattern", ["*.py", "nested/?.py", "**/*.py"])
+def test_glob_patterns_are_not_resolved(tmp_path, monkeypatch, pattern):
+    (tmp_path / "nested").mkdir()
+    (tmp_path / "nested/a.py").write_text("ok")
+    original = agent.AgentBackend._path
+    def checked(self, value):
+        assert "*" not in value and "?" not in value
+        return original(self, value)
+    monkeypatch.setattr(agent.AgentBackend, "_path", checked)
+    loop, model = coding(tmp_path, [call("list_files", glob=pattern), call("finish", summary="done")])
+    assert loop.run("job").ok
+    assert "nested/a.py" in model.seen[-1][0][-1]["content"]
+
+
+@pytest.mark.parametrize("pattern", ["../*", "C:/*", "nested\\*", "bad\0*", "/*"])
+def test_unsafe_glob_patterns_refused(tmp_path, pattern):
+    loop, model = coding(tmp_path, [call("list_files", glob=pattern), call("finish", summary="done")])
+    assert loop.run("job").ok
+    assert "tool refused" in model.seen[-1][0][-1]["content"]
+
+
+def test_call_timeout_does_not_cap_run(tmp_path, monkeypatch):
+    loop, model = coding(tmp_path, [call("list_files", glob="*"), call("finish", summary="done")],
+                         call_timeout=3, wall_timeout=20)
+    loop.timeout = 1
+    ticks = iter(range(100))
+    monkeypatch.setattr(agent.time, "monotonic", lambda: next(ticks))
+    assert loop.run("job").ok
+    assert all(timeout == 3 for _, _, timeout in model.seen)
+
+
+@pytest.mark.parametrize("reply", [{"content": []}, {"content": {"text": "bad"}},
+    {"tool_calls": "bad"}, {"tool_calls": {}}, {"tool_calls": [None] * 9},
+    {"tool_calls": [None]}, ["bad"]])
+def test_invalid_model_replies_recover(tmp_path, reply):
+    loop, model = coding(tmp_path, [reply, call("finish", summary="recovered")])
+    assert loop.run("job").text == "recovered"
+    assert "Invalid reply" in model.seen[-1][0][-1]["content"] or "tool refused" in model.seen[-1][0][-1]["content"]
+
+
+@pytest.mark.parametrize("tool", ["write_file", "replace_in_file"])
+def test_write_size_cap_in_bytes(tmp_path, tool):
+    (tmp_path / "a.py").write_text("original")
+    args = {"text": "\u00e9" * 100001} if tool == "write_file" else {"old": "original", "new": "\u00e9" * 100001}
+    loop, model = coding(tmp_path, [call(tool, path="a.py", **args), call("finish", summary="done")])
+    assert loop.run("job").ok
+    assert "200,000 bytes" in model.seen[-1][0][-1]["content"]
+    assert (tmp_path / "a.py").read_text() == "original"
+
+
+def test_cloudflare_rejection_flattens_and_trims_history(tmp_path):
+    from megazword.free_apis import APIHTTPError
+    (tmp_path / "a.py").write_text("x" * 10000)
+    loop, model = coding(tmp_path, [call("read_file", path="a.py"), ToolsUnsupported("schema"),
+        APIHTTPError(400, reason="context too long"), call("finish", summary="done")])
+    loop.name = "cloudflare"
+    assert loop.run("job").ok
+    assert model.seen[2][1] is None and model.seen[3][1] is None
+    history = model.seen[3][0]
+    assert all(set(m) == {"role", "content"} for m in history)
+    assert all(len(m["content"]) <= 2000 for m in history[2:-1])
+    assert history[1]["content"] == "job"
+
+
+def test_cloudflare_invalid_request_recovery_is_bounded(tmp_path):
+    from megazword.free_apis import APIHTTPError
+    loop, _ = coding(tmp_path, [APIHTTPError(400, reason="context too long")] * 2)
+    loop.name = "cloudflare"
+    result = loop.run("job")
+    assert not result.ok and "context too long" in result.error
+    assert loop.request_count == 2

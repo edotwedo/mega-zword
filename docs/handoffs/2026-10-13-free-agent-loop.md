@@ -189,3 +189,70 @@ the sandbox, and commit after review. No staging, commit or push was attempted.
 5. med ~221: non-list/oversized tool_calls raise out of _run. Treat as invalid reply.
 6. low ~159: cap write_file size (e.g. 200 KB).
 Tests for each. Add "Report 3".
+7. Live: **cloudflare returns HTTP 400** on real jobs (a 'write tests for src/megazword/answers.py' job), though it handled a 2-file toy job. Find out why (likely request size/context, tool schema, or a param Workers AI rejects), make the loop adapt (shrink/trim history, drop unsupported params, fall back to text protocol), and show the provider's short error reason (no secrets) in the failure line.
+8. Live: **gemini-api 429 marked it out for 1 hour** ("reset time not given; guessing 1 hour") though free Gemini limits are per-minute. For API backends, a 429 without a reset time should mark out for ~2 minutes, not 1 hour (Retry-After header when present).
+
+## Report 3
+
+Fix pass 3 changes are in this folder and remain uncommitted. Startup and
+coordination were skipped as Phil requested. No staging, commit or push was
+attempted.
+
+1. Test commands receive an environment without variables whose names contain
+   KEY, TOKEN, SECRET or PASSWORD, ignoring case. Python environment settings are
+   removed too. Python executables get `-I`; pytest plugin auto-loading is disabled.
+   Test output always goes through `guard.scrub`, for every backend. Scrubbing
+   includes extra context before selecting the output tail. This remains a
+   normal local process, not an OS sandbox. Project code can still read files
+   allowed to the user, and isolation can require adjusting project test setup.
+2. Globs are validated as patterns. Wildcards are not passed to path resolution.
+   Colon, backslash, NUL, `..` and absolute patterns are refused. Matching files
+   still receive the existing confinement checks.
+3. The run deadline uses `wall_timeout`. Each model call uses `call_timeout`,
+   reduced to the remaining run time when needed.
+4. Non-string content receives an invalid-reply nudge. The loop continues.
+5. Non-list tool calls, batches over eight calls and malformed call structures
+   receive the same recovery. Invalid batches do not enter the message history.
+6. Both write tools refuse results over 200,000 UTF-8 bytes before changing files.
+7. Native-tool rejection now flattens existing history before switching to text.
+   Cloudflare omits the optional stream parameter. A further HTTP 400/422 retries
+   once with text protocol and trimmed history: the original task plus the last
+   four observations, each capped at 2,000 characters. The model is told to read
+   files again if needed. Further failure reports a short sanitized validation
+   reason from structured provider errors. Environment credentials, account ID,
+   bearer tokens, URLs and guard-recognized secrets are removed before printing.
+   Auth and rate-limit response bodies remain private.
+8. API 429 errors without a usable Retry-After now say to retry in two minutes.
+   The existing limit detector uses that to mark the provider out for two minutes.
+   Numeric Retry-After values and HTTP dates are supported, rounded up to minutes.
+   CLI providers keep their existing fallback.
+
+Focused validation: **178 passed** across agent, API, CLI, run-log, stats and
+limit tests. Tests cover each review item with fakes, plus real local Python and
+pytest subprocesses for environment isolation, malicious conftest output and
+module shadowing. No real provider calls occur in the tests.
+
+Full suite: **877 passed, 5 failed, 9 setup errors** in 224.01 seconds. It started
+before the final malformed-call validation, output-tail refinement and two extra
+regression tests; the final focused run covers those changes. The five failing
+test names are exactly those listed in Report 2. All nine setup errors are again
+in tests/test_night.py, where the local Git clone fixture exits with status 128.
+No failure was in the changed agent or API tests. The known live-check failure
+did not occur. `git diff --check` passes.
+
+Three separate read-only Cloudflare probes used the initial native request,
+the native request with answers.py source, and the equivalent text request.
+No returned tools were executed. All three failed with
+`API connection failed: unable to connect (network or DNS)` in this sandbox.
+The original live HTTP 400 cause and live recovery therefore remain unverified.
+The temporary probe script was removed. Sorrel's next step is to retry the real
+job outside this sandbox and inspect the new sanitized failure reason if needed.
+
+Try from the work folder with Cloudflare credentials already set:
+
+```powershell
+megazword run -e -m cloudflare "Write tests for src/megazword/answers.py."
+```
+
+Use Report's source invocation until this source is installed. Review the diff
+and rerun checks outside the sandbox before committing.

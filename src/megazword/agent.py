@@ -118,7 +118,9 @@ class AgentBackend(Backend):
             return args["summary"]
         if name == "list_files":
             pattern = args["glob"]
-            self._path(pattern)
+            if (not pattern or any(c in pattern for c in (":", "\\", "\0"))
+                    or ".." in pattern or pattern.startswith("/")):
+                raise ValueError("use a relative glob without colon, backslash, NUL or ..")
             found = []
             size = 0
             for folder, dirs, files in os.walk(self.root, followlinks=False):
@@ -140,8 +142,16 @@ class AgentBackend(Backend):
             return "\n".join(sorted(found))
         if name == "run_tests":
             # The trusted config supplies this argv. The model cannot change it.
+            env = {k: v for k, v in os.environ.items()
+                   if not re.search(r"KEY|TOKEN|SECRET|PASSWORD", k, re.I)
+                   and not k.upper().startswith("PYTHON")}
+            env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+            command = list(self.test_command)
+            if re.fullmatch(r"python(?:\d+(?:\.\d+)*)?(?:\.exe)?", Path(command[0]).name, re.I):
+                if "-I" not in command[1:]:
+                    command.insert(1, "-I")
             with tempfile.TemporaryFile() as output:
-                proc = subprocess.Popen(list(self.test_command), cwd=self.root,
+                proc = subprocess.Popen(command, cwd=self.root, env=env,
                                         stdin=subprocess.DEVNULL, stdout=output,
                                         stderr=subprocess.STDOUT, **process_group())
                 try:
@@ -150,9 +160,13 @@ class AgentBackend(Backend):
                     _kill_tree(proc)
                     raise TimeoutError("test command timed out") from None
                 output.seek(0, 2)
-                output.seek(max(0, output.tell() - max(1, self.max_chars - 30)))
+                tail_chars = max(1, self.max_chars - 30)
+                # Include context before the output tail so normal token shapes
+                # are scrubbed before truncation cuts off their identifying prefix.
+                output.seek(max(0, output.tell() - tail_chars - 8192))
                 self._tests_passed = proc.returncode == 0
-                return f"exit code {proc.returncode}\n" + output.read().decode("utf-8", errors="replace")
+                text = scrub(output.read().decode("utf-8", errors="replace"))
+                return f"exit code {proc.returncode}\n" + text[-tail_chars:]
         path = self._path(args["path"])
         if name == "read_file":
             start, end = args.get("start", 1), args.get("end")
@@ -173,6 +187,8 @@ class AgentBackend(Backend):
             if not args["old"] or text.count(args["old"]) != 1:
                 raise ValueError("old text must match exactly once")
             text = text.replace(args["old"], args["new"], 1)
+        if len(text.encode("utf-8")) > 200_000:
+            raise ValueError("file write exceeds 200,000 bytes")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         self._edited = True
@@ -219,7 +235,7 @@ class AgentBackend(Backend):
 
     def _run(self, prompt):
         self.root = self.root.resolve()
-        self._deadline = time.monotonic() + min(self.wall_timeout, self.timeout)
+        self._deadline = time.monotonic() + self.wall_timeout
         self.request_count = self.prompt_chars = self.answer_chars = 0
         self._edited = self._tests_passed = False
         self._allow_test_edits = bool(re.search(r"\b(?:tests?|testing|pytest|unittest)\b", prompt, re.I))
@@ -230,6 +246,7 @@ class AgentBackend(Backend):
         messages = [{"role": "system", "content": INSTRUCTIONS},
                     {"role": "user", "content": prompt}]
         text_mode = self.text_protocol or isinstance(self.model_backend, OllamaBackend)
+        compacted = False
         for _ in range(self.max_steps):
             remaining = self._deadline - time.monotonic()
             if remaining <= 0:
@@ -239,14 +256,37 @@ class AgentBackend(Backend):
                 reply = self._model_call(sent, text_mode)
             except ToolsUnsupported:
                 text_mode = True
+                messages = self._text_history(messages)
                 messages.append({"role": "user", "content": "Use the fenced JSON tool protocol."})
                 continue
+            except APIHTTPError as exc:
+                if self.name == "cloudflare" and exc.code in (400, 422) and not compacted:
+                    text_mode = compacted = True
+                    history = self._text_history(messages)
+                    # Keep the task and recent observations; remove native fields.
+                    messages = [history[0], history[1], *history[2:][-4:]]
+                    for message in messages[2:]:
+                        message["content"] = message["content"][-2000:]
+                    messages.append({"role": "user", "content": "History trimmed after API rejection. Inspect files again if needed. Use one fenced JSON tool object."})
+                    continue
+                raise
             self.answer_chars += len(json.dumps(reply))
             if time.monotonic() >= self._deadline:
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
+            if (not isinstance(reply, dict)
+                    or (reply.get("content") is not None and not isinstance(reply["content"], str))
+                    or (reply.get("tool_calls") is not None and (
+                        not isinstance(reply["tool_calls"], list) or len(reply["tool_calls"]) > 8
+                        or any(not isinstance(call, dict) or not isinstance(call.get("function"), dict)
+                               or not isinstance(call["function"].get("name"), str)
+                               or not isinstance(call["function"].get("arguments"), str)
+                               for call in reply["tool_calls"])))):
+                messages.append({"role": "user", "content": "Invalid reply. Use string content and at most eight tool calls."})
+                continue
             calls = reply.get("tool_calls")
             if not calls:
                 text_mode = True
+                messages = self._text_history(messages)
                 content = reply.get("content") or ""
                 try:
                     raw = content.strip()
@@ -266,9 +306,6 @@ class AgentBackend(Backend):
             messages.append({"role": "assistant", "content": reply.get("content"),
                              "tool_calls": calls} if not text_mode else
                             {"role": "assistant", "content": content})
-            # Bound work per turn even if the model emits a huge batch.
-            if not isinstance(calls, list) or len(calls) > 8:
-                raise ValueError("agent tool batch cap reached")
             nudge_finish = False
             for call in calls:
                 remaining = self._deadline - time.monotonic()
@@ -302,7 +339,7 @@ class AgentBackend(Backend):
                     summary = last_text or "tests pass"
                     return (scrub(summary) if self.trains_on_data else summary)[:self.max_chars]
                 messages.append({"role": "user", "content": result} if text_mode else
-                                {"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
+                                {"role": "tool", "tool_call_id": call.get("id", "") if isinstance(call, dict) else "", "content": result})
                 if bad_protocol:
                     text_mode = True
             if nudge_finish:
@@ -311,11 +348,15 @@ class AgentBackend(Backend):
             if text_mode:
                 # Flatten native history when a model cannot form valid calls.
                 # Text-only providers need ordinary user/assistant messages.
-                messages = [{"role": "assistant" if m["role"] == "assistant" else
-                             "system" if m["role"] == "system" else "user",
-                             "content": m.get("content") or json.dumps(m.get("tool_calls", []))}
-                            for m in messages]
+                messages = self._text_history(messages)
         raise RuntimeError(f"agent step cap reached ({self.max_steps}); edits remain in the work folder")
+
+    @staticmethod
+    def _text_history(messages):
+        return [{"role": "assistant" if m["role"] == "assistant" else
+                 "system" if m["role"] == "system" else "user",
+                 "content": m.get("content") or json.dumps(m.get("tool_calls", []))}
+                for m in messages]
 
 
 def wrap(backend, settings=None):
