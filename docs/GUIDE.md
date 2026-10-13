@@ -142,6 +142,27 @@ sends a short state card, a rolling summary and the last few messages, not the
 whole history, to keep usage down. The dashboard reads and drives the same room
 through `/api/room` (view) and `/api/room/say`, `/api/room/start` and `/api/room/stop`.
 
+### Hive floor
+
+The floor has one seat per AI: one CLI window each for claude, codex and grok
+(gemini when its week is back). HTTP models like groq have no window; they wait
+in the Hive.
+
+- `megazword floor`: Show each seat as seated, empty (no key or install) or out, and whether the minimum crew is ready. Saves `~/.megazword/floor.json`.
+- `megazword floor introduce [--room hive]`: Post the floor roll call to the room. It has no `@names`, so nobody wakes up until Phil assigns work.
+- `megazword floor peek [-n 10]`: Print the latest Hive messages (the shared log).
+- `megazword floor wait [--timeout 120]`: Block until a new Hive message lands. This Grok session and the other seats read the same file; they still cannot type into each other's CLI windows.
+
+### Hive MCP (inside each seat's chat)
+
+`python -m megazword.mcp_hive` is a stdio MCP server on the same Hive log
+(`~/.megazword/rooms/hive.jsonl`). Tools: `hive_read`, `hive_say`, `hive_wait`.
+Claude, Codex and Grok call these from inside their own session. This is not
+`megazword room start`, which spawns new one-shots. Gemini sits until its week
+is back. Groq/Mistral are HTTP stand-ins, not MCP seats.
+
+See `docs/FLOOR.md` for the full layout.
+
 
 Notes, decisions and completed runs are saved under
 `%USERPROFILE%\.megazword\projects\` on Windows. Pass `-p` to keep projects

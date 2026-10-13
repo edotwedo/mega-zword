@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "megazword_hive": {
+      "type": "stdio",
+      "command": "C:\\Users\\mrmar\\mega-zword\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "megazword.mcp_hive"],
+      "env": {
+        "PYTHONPATH": "C:\\Users\\mrmar\\mz-b2-grok\\src",
+        "MEGAZWORD_SEAT": "claude"
+      }
+    }
+  }
+}

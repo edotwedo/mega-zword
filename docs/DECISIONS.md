@@ -3,6 +3,7 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-12
+- Phil: **Feature freeze is off.** The Hive floor (`megazword floor`, `docs/FLOOR.md`) is the next layer. The Beta 3.0 checklist in STATUS.md no longer blocks feature work. This replaces the "Feature freeze" entries below.
 - Phil (this Grok chat): **Nimbus-12 (Grok Build on Phil's PC) is Mega Zword lead.** Tally-11 is released. Owns main, merges and assignments. Codex's 5-hour refresh is Phil's call; no Codex Mega Zword work until he says so. Feature freeze for Beta 3.0 still stands.
 - Phil (13:05 PT): **Feature freeze; ship Beta 3.0 from what's on main now.** Codex's 5-hour is tapped and its week runs out until Oct 17, so slow Codex usage way down. No new features until Beta 3.0 is out: fixes, tests, docs and packaging only. Beta 3.0 includes all the Beta 2 work. Every bot on Mega Zword is told in Q and coordinates through the Beta 3.0 checklist in STATUS.md.
 - Phil: labor rules follow live usage and are re-planned whenever it changes; nothing is fixed (replaces the "lanes frozen" rule). Tools: `megazword plan`, the usage hook, and `scripts/install_usage_hook.py` for his PC.
