@@ -63,13 +63,16 @@ def roster(backends: dict[str, Backend], out_until: dict[str, datetime] | None =
 
 
 def ready(seats: list[Seat]) -> bool:
-    """Minimum CLI crew is seated (or marked out, so we don't wait forever)."""
+    """Minimum CLI crew is seated (or marked out, so we don't wait forever).
+    All three out is not ready: nobody is on the floor."""
     by_name = {s.name: s for s in seats}
+    seated = 0
     for name in MINIMUM_CLI:
         seat = by_name.get(name)
         if seat is None or seat.status == "empty":
             return False
-    return True
+        seated += seat.status == "seated"
+    return seated > 0
 
 
 BULK_ORDER = ("groq", "mistral", "cloudflare", "zai", "gemini-api")
