@@ -16,6 +16,10 @@ repo is the only handoff. Nothing lives only in a chat.
   PC is asleep, so say so). Then write a labor plan: which AI does which part, by spare usage and fit,
   with the reading quoted. `megazword plan` ranks them. Plans and lanes follow the live reading: re-plan
   when it changes; nothing in STATUS is fixed. Do this before any work, not partway through.
+- **Own folder per seat (Phil, 2026-10-13).** Never edit, stash or checkout in the shared
+  `C:\Users\mrmar\mega-zword` while other seats run. Work in your own worktree:
+  `git worktree add %USERPROFILE%\mz-seats\<your-name> -B seat/<your-name> origin/main`
+  (`scripts/hive_up.ps1` does this for you). Pull with rebase, push `HEAD:main` after tests.
 - **One AI at a time.** Before editing, put your tool name and the time in the
   "Active" line of `docs/STATUS.md`, then commit and push it. If that line names
   another AI and is less than 2 hours old, stop and ask Phil before continuing.
