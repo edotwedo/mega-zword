@@ -152,6 +152,11 @@ in the Hive.
 - `megazword floor introduce [--room hive]`: Post the floor roll call to the room. It has no `@names`, so nobody wakes up until Phil assigns work.
 - `megazword floor peek [-n 10]`: Print the latest Hive messages (the shared log).
 - `megazword floor wait [--timeout 120]`: Block until a new Hive message lands. This Grok session and the other seats read the same file; they still cannot type into each other's CLI windows.
+- `megazword floor suggest bulk|edit|decide|review`: Print which seated model should take that kind of job. Empty and out seats are skipped. It prints `(no seat)` and exits 1 when nobody fits. It suggests only; nothing is sent.
+  - `megazword floor suggest bulk` → `groq` (first seated HTTP seat: groq, mistral, cloudflare, zai, gemini-api, then any other HTTP seat)
+  - `megazword floor suggest edit` → `codex` (then claude)
+  - `megazword floor suggest decide` → `claude` (then grok, codex)
+  - `megazword floor suggest review` → `claude` (then grok, codex)
 
 ### Hive MCP (inside each seat's chat)
 
