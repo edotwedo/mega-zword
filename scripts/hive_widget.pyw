@@ -1,8 +1,8 @@
 """Hive master widget: Phil's always-on-top window into the Hive room (the bots' group chat).
 
 Run with: .venv\\Scripts\\pythonw scripts\\hive_widget.pyw   (or the desktop shortcut)
-Type and press Enter to post as Phil; Phil's messages always come first for the bots.
-Start runs a few bot turns, Pause stops after the current reply, Stop ends the session.
+Type and press Enter to post as Phil; if no bots are talking, that wakes them (a few turns).
+Phil's messages always come first for the bots. Start runs a few bot turns, Pause stops after the current reply, Stop ends the session.
 Drag any bar to move, drag the corner grip to resize; size and spot are remembered. The x closes. Reading the room never calls a model; only Start does.
 """
 
@@ -23,6 +23,7 @@ SMALL = ("Cascadia Code", 8)
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 MIN_W, MIN_H = 260, 200
 SPOT = config.HOME / "hive_widget.json"  # remembered size and position
+ERRLOG = config.HOME / "hive_widget.log"  # output of bot sessions the widget starts
 
 
 class HiveWidget:
@@ -30,6 +31,7 @@ class HiveWidget:
         self.root, self.cfg = root, config.load()
         self.room = self.cfg.room_name or room.DEFAULT_ROOM
         self.seen = None
+        self.proc = None
         root.title("Hive")
         root.overrideredirect(True)
         root.attributes("-topmost", True)
@@ -118,18 +120,28 @@ class HiveWidget:
             self.entry.delete(0, "end")
         except Exception as exc:
             self.note(f"!! {exc}", BAD)
+            return
         self.poll(once=True)
+        self.start(quiet=True)  # Phil spoke: wake the bots unless a session is already going
 
-    def start(self):
+    def start(self, quiet=False):
         state = room.load_state(self.room)
-        if room.other_session_running(state):
-            self.note("already running", WARN)
+        if room.other_session_running(state) or (self.proc and self.proc.poll() is None):
+            if not quiet:
+                self.note("already running", WARN)
             return
         code = "import sys; from megazword.cli import main; sys.exit(main(sys.argv[1:]))"
-        subprocess.Popen([sys.executable, "-c", code, "room", "start", "--room", self.room,
-                          "--turns", str(TURNS)], creationflags=NO_WINDOW,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        self.note(f"starting {TURNS} turns...", ACCENT)
+        try:
+            log = open(ERRLOG, "a", encoding="utf-8")
+            log.write(f"\n--- {datetime.now():%Y-%m-%d %H:%M} start\n")
+            log.flush()
+            self.proc = subprocess.Popen([sys.executable, "-c", code, "room", "start", "--room",
+                                          self.room, "--turns", str(TURNS)], creationflags=NO_WINDOW,
+                                         stdout=log, stderr=log)
+        except OSError as exc:
+            self.note(f"!! couldn't start bots: {exc}", BAD)
+            return
+        self.note("waking the bots...", ACCENT)
 
     def pause(self):
         room.set_paused(self.room, True)
