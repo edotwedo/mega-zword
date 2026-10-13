@@ -289,3 +289,34 @@ def test_floor_wait_command_after_catches_missed_message(monkeypatch, tmp_path):
     monkeypatch.setattr(floor, "monotonic", iter([0.0, 1.0]).__next__)
     assert floor.command(args, {}, cfg, write=out.append) == 1
     assert out == ["(no new hive message)\n(after=2)"]
+
+
+def test_floor_peek_n0_and_wait_timeout0_are_not_defaults(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from megazword import room
+    monkeypatch.setattr(room.config, "HOME", tmp_path)
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: tmp_path / "floor.json")
+    monkeypatch.setattr(floor, "sleep", lambda _s: pytest.fail("timeout 0 must not block"))
+    room.append_message("hive", "phil", "one")
+    room.append_message("hive", "phil", "two")
+    cfg = SimpleNamespace(out_until={})
+    out: list[str] = []
+    assert floor.command(SimpleNamespace(action="peek", room=None, n=0), {}, cfg,
+                         write=out.append) == 0
+    assert out == ["(after=2)"]
+    out.clear()
+    args = SimpleNamespace(action="wait", room=None, timeout=0, after=None)
+    assert floor.command(args, {}, cfg, write=out.append) == 1
+    assert out == ["(no new hive message)\n(after=2)"]
+
+
+def test_floor_bad_room_is_one_line_exit_2(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: pytest.fail("no snapshot"))
+    cfg = SimpleNamespace(out_until={})
+    for action in ("peek", "wait", "introduce"):
+        out: list[str] = []
+        args = SimpleNamespace(action=action, room="../x", n=None, timeout=0, after=None)
+        assert floor.command(args, {}, cfg, write=out.append) == 2
+        assert len(out) == 1 and "\n" not in out[0]
+        assert out[0].startswith("floor: room name '../x'")

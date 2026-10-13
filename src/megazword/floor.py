@@ -177,7 +177,7 @@ def peek_text(room_name: str, n: int = 10, home: Path | None = None) -> str:
     msgs = room.read_messages(room_name, home)
     if not msgs:
         return "(hive empty)\n(after=0)"
-    lines = [format_msg(m) for m in msgs[-max(1, n):]]
+    lines = [format_msg(m) for m in msgs[-n:]] if n > 0 else []  # -n 0: cursor only
     return "\n".join(lines + [f"(after={len(msgs)})"])
 
 
@@ -201,10 +201,18 @@ def wait_for(room_name: str, home: Path | None = None, after: int | None = None,
 def command(args, backends: dict[str, Backend], cfg: config.Config,
             write: Callable[[str], None] = print) -> int:
     from . import room
+    action = getattr(args, "action", None) or "status"
+    room_name = getattr(args, "room", None)
+    if room_name is None:
+        room_name = "hive"
+    if action in ("introduce", "peek", "wait"):
+        try:
+            room.room_path(room_name)
+        except ValueError as e:
+            write(f"floor: {e}")
+            return 2
     seats = roster(backends, cfg.out_until)
     save_snapshot(seats)
-    action = getattr(args, "action", None) or "status"
-    room_name = getattr(args, "room", None) or "hive"
     if action == "status":
         write(format_roster(seats))
         return 0
@@ -214,10 +222,12 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
         write(format_roster(seats))
         return 0
     if action == "peek":
-        write(peek_text(room_name, n=getattr(args, "n", 10) or 10))
+        n = getattr(args, "n", None)
+        write(peek_text(room_name, n=10 if n is None else n))
         return 0
     if action == "wait":
-        timeout = float(getattr(args, "timeout", 120) or 120)
+        timeout = getattr(args, "timeout", None)
+        timeout = 120.0 if timeout is None else float(timeout)
         after = getattr(args, "after", None)
         if after is None:
             after = len(room.read_messages(room_name))
