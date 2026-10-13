@@ -84,11 +84,33 @@ JOB_ORDER = {
 JOB_KINDS = ("bulk", "edit", "decide", "review")
 
 
-def suggest_seat(job_kind: str, seats: list[Seat]) -> str | None:
-    """Conductor: which seated model should take this kind of job. Skips empty and out."""
-    seated = {s.name: s for s in seats if s.status == "seated"}
+def auth_failed(log_path: Path | None) -> set[str]:
+    """Backends whose latest run in log.jsonl failed on login (401/403).
+    Only steers `suggest`; the seat is not marked out (Phil fixes the key)."""
+    from . import failures, runlog
+    if log_path is None:
+        return set()
+    latest: dict[str, dict] = {}
+    for record in runlog.read(Path(log_path)):
+        latest[str(record["backend"])] = record  # file order: last line wins
+    broken = set()
+    for name, record in latest.items():
+        reason = record.get("rejected")
+        if record.get("ok") or not isinstance(reason, str) or not reason.startswith("failed"):
+            continue
+        failure = failures.classify(name, reason)
+        if failure is not None and failure.kind == "auth":
+            broken.add(name)
+    return broken
+
+
+def suggest_seat(job_kind: str, seats: list[Seat],
+                 skip: set[str] | frozenset[str] = frozenset()) -> str | None:
+    """Conductor: which seated model should take this kind of job.
+    Skips empty, out, and `skip` (latest run failed auth, see auth_failed)."""
+    seated = {s.name: s for s in seats if s.status == "seated" and s.name not in skip}
     if job_kind == "bulk":
-        http = [s.name for s in seats if s.status == "seated" and s.kind == "http"]
+        http = [s.name for s in seats if s.name in seated and s.kind == "http"]
         order = [n for n in BULK_ORDER if n in http] + [n for n in http if n not in BULK_ORDER]
         return order[0] if order else None
     for name in JOB_ORDER.get(job_kind, ()):
@@ -211,7 +233,7 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
         if kind not in JOB_KINDS:
             write("Usage: megazword floor suggest bulk|edit|decide|review")
             return 2
-        name = suggest_seat(kind, seats)
+        name = suggest_seat(kind, seats, auth_failed(getattr(cfg, "log_path", None)))
         if name is None:
             write("(no seat)")
             return 1
