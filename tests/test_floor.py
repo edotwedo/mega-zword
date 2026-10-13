@@ -225,3 +225,24 @@ def test_peek_and_wait_share_the_hive_log(tmp_path, monkeypatch):
     assert len(already) == 1
     none = floor.wait_for("hive", home=tmp_path, after=1, timeout=0, pause=0)
     assert none == []
+    assert floor.peek_text("hive", n=5, home=tmp_path).endswith("\n(after=1)")
+
+
+def test_floor_wait_command_after_catches_missed_message(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from megazword import room
+    monkeypatch.setattr(room.config, "HOME", tmp_path)
+    monkeypatch.setattr(floor, "save_snapshot", lambda seats: tmp_path / "floor.json")
+    monkeypatch.setattr(floor, "sleep", lambda _s: pytest.fail("must not block"))
+    room.append_message("hive", "phil", "seen")
+    room.append_message("hive", "quill-12", "missed")
+    cfg = SimpleNamespace(out_until={})
+    out: list[str] = []
+    args = SimpleNamespace(action="wait", room=None, timeout=0.001, after=1)
+    assert floor.command(args, {}, cfg, write=out.append) == 0
+    assert out == ["[quill-12] missed\n(after=2)"]
+    out.clear()
+    args.after = 2
+    monkeypatch.setattr(floor, "monotonic", iter([0.0, 1.0]).__next__)
+    assert floor.command(args, {}, cfg, write=out.append) == 1
+    assert out == ["(no new hive message)\n(after=2)"]

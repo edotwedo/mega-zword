@@ -68,7 +68,7 @@ def test_handle_tools_list():
 
 
 def test_handle_hive_read_empty():
-    assert text_result(call_tool("hive_read", {})) == "(no messages yet)"
+    assert text_result(call_tool("hive_read", {})) == "(no messages yet)\n(after=0)"
 
 
 def test_handle_hive_say_and_read(isolated_home):
@@ -79,14 +79,15 @@ def test_handle_hive_say_and_read(isolated_home):
     messages = room.read_messages("test-room", home=isolated_home)
     assert [(m.author, m.text) for m in messages] == [("reed-12", "hello hive")]
     assert room.room_path("test-room").parent == isolated_home / "rooms"
-    assert text_result(call_tool("hive_read", {"room": "test-room"})) == "[reed-12] hello hive"
-    assert text_result(call_tool("hive_read", {})) == "(no messages yet)"
+    assert text_result(call_tool("hive_read", {"room": "test-room"})) == \
+        "[reed-12] hello hive\n(after=1)"
+    assert text_result(call_tool("hive_read", {})) == "(no messages yet)\n(after=0)"
 
 
 @pytest.mark.parametrize("n, expected", [
-    (1, "[quill-12] second"),
-    (2, "[reed-12] first\n[quill-12] second"),
-    (0, "(no messages yet)"),
+    (1, "[quill-12] second\n(after=2)"),
+    (2, "[reed-12] first\n[quill-12] second\n(after=2)"),
+    (0, "(no messages yet)\n(after=2)"),
 ])
 def test_handle_hive_read_recent(n, expected):
     room.append_message("hive", "reed-12", "first")
@@ -141,7 +142,7 @@ def test_handle_hive_wait_new_message(monkeypatch):
         "test-room", "quill-12", "new instruction",
     ))
     result = call_tool("hive_wait", {"room": "test-room", "timeout": 1})
-    assert text_result(result) == "[quill-12] new instruction"
+    assert text_result(result) == "[quill-12] new instruction\n(after=2)"
 
 
 def test_handle_hive_wait_timeout(monkeypatch):
@@ -151,7 +152,32 @@ def test_handle_hive_wait_timeout(monkeypatch):
         pytest.fail("zero timeout must not sleep")
 
     monkeypatch.setattr(floor, "sleep", unexpected_sleep)
-    assert text_result(call_tool("hive_wait", {"timeout": 0})) == "(no new hive message)"
+    assert text_result(call_tool("hive_wait", {"timeout": 0})) == \
+        "(no new hive message)\n(after=1)"
+
+
+def test_handle_hive_wait_after_catches_message_posted_since_read(monkeypatch):
+    room.append_message("hive", "reed-12", "seen")
+    assert text_result(call_tool("hive_read", {})).endswith("\n(after=1)")
+    room.append_message("hive", "quill-12", "landed between read and wait")
+    monkeypatch.setattr(floor, "sleep", lambda pause: pytest.fail("must not block"))
+    result = text_result(call_tool("hive_wait", {"after": 1, "timeout": 0}))
+    assert result == "[quill-12] landed between read and wait\n(after=2)"
+    # Chaining the returned cursor waits for anything newer.
+    assert text_result(call_tool("hive_wait", {"after": 2, "timeout": 0})) == \
+        "(no new hive message)\n(after=2)"
+
+
+def test_handle_hive_wait_negative_after_is_clamped(monkeypatch):
+    room.append_message("hive", "reed-12", "one")
+    monkeypatch.setattr(floor, "sleep", lambda pause: pytest.fail("must not block"))
+    assert text_result(call_tool("hive_wait", {"after": -5, "timeout": 0})) == \
+        "[reed-12] one\n(after=1)"
+
+
+def test_hive_wait_schema_has_after():
+    tools = {t["name"]: t for t in mcp_hive.TOOLS}
+    assert tools["hive_wait"]["inputSchema"]["properties"]["after"]["type"] == "integer"
 
 
 @pytest.mark.parametrize("text", ["", "   "])

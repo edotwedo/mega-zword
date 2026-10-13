@@ -19,7 +19,8 @@ SERVER_INFO = {"name": "megazword-hive", "version": "0.1.0"}
 TOOLS = [
     {
         "name": "hive_read",
-        "description": "Read the last n messages of a hive room as lines \"[author] text\".",
+        "description": "Read the last n messages of a hive room as lines \"[author] text\", "
+                       "then \"(after=N)\": pass N to hive_wait.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -44,12 +45,17 @@ TOOLS = [
     },
     {
         "name": "hive_wait",
-        "description": "Block until a new message lands in a hive room (or timeout seconds pass).",
+        "description": "Block until a new message lands in a hive room (or timeout seconds pass). "
+                       "Pass `after` from the last hive_read/hive_wait so nothing posted in "
+                       "between is missed.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "room": {"type": "string", "default": "hive"},
                 "timeout": {"type": "number", "default": 120},
+                "after": {"type": "integer",
+                          "description": "Message count from the last \"(after=N)\" line. "
+                                         "Omit to wait for messages newer than now."},
             },
         },
     },
@@ -69,7 +75,7 @@ def hive_read(args: dict) -> str:
     n = int(args.get("n", 10))
     msgs = room.read_messages(room_name)
     recent = msgs[-n:] if n > 0 else []
-    return _lines(recent) or "(no messages yet)"
+    return f"{_lines(recent) or '(no messages yet)'}\n(after={len(msgs)})"
 
 
 def hive_say(args: dict) -> str:
@@ -86,8 +92,11 @@ def hive_say(args: dict) -> str:
 def hive_wait(args: dict) -> str:
     room_name = args.get("room") or "hive"
     timeout = float(args.get("timeout", 120))
-    msgs = floor.wait_for(room_name, timeout=timeout)
-    return _lines(msgs) or "(no new hive message)"
+    after = args.get("after")
+    # Pin the baseline here so the reply can carry the next cursor.
+    after = len(room.read_messages(room_name)) if after is None else max(0, int(after))
+    msgs = floor.wait_for(room_name, after=after, timeout=timeout)
+    return f"{_lines(msgs) or '(no new hive message)'}\n(after={after + len(msgs)})"
 
 
 HANDLERS = {"hive_read": hive_read, "hive_say": hive_say, "hive_wait": hive_wait}
