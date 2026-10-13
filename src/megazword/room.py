@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -586,10 +587,18 @@ def run_room(room: str = DEFAULT_ROOM,
     return 0
 
 
+def check_author(author: str) -> None:
+    """Only Phil posts as phil: a bot seat ($MEGAZWORD_SEAT set to anything else) can't (B7)."""
+    seat = (os.environ.get("MEGAZWORD_SEAT") or "").strip().lower()
+    if author.strip().lower() == "phil" and seat not in ("", "phil"):
+        raise PermissionError(f"seat '{seat}' cannot post as phil")
+
+
 def say(room: str, text: str, author: str = "phil",
         home: Path | None = None, write: Callable[[str], None] = print) -> int:
     """Post a message to the room. It doesn't clear a stop: a message typed after Stop
     must not restart a session that is still finishing its turn (`room start` does that)."""
+    check_author(author)
     msg = append_message(room, author, text, home=home)
     write(f"[{msg.author}] {msg.text}")
     return 0

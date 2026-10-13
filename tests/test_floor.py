@@ -72,7 +72,9 @@ def test_roster_expired_out_until_uses_availability(available, offset):
     assert seat.until is None
 
 
-@pytest.mark.parametrize("statuses", list(product(("seated", "out"), repeat=3)))
+@pytest.mark.parametrize("statuses", [
+    s for s in product(("seated", "out"), repeat=3) if "seated" in s
+])
 def test_ready_when_required_cli_seated_or_out(statuses):
     seats = [
         floor.Seat(name, "cli", status)
@@ -90,6 +92,15 @@ def test_ready_false_when_required_cli_empty(empty_name):
         floor.Seat(name, "cli", "empty" if name == empty_name else "seated")
         for name in ("claude", "codex", "grok")
     ]
+    seats.append(floor.Seat("groq", "http", "seated"))
+
+    assert floor.ready(seats) is False
+
+
+def test_ready_false_when_required_cli_all_out():
+    """B7: all three out means nobody is on the floor, even with HTTP seats up."""
+    seats = [floor.Seat(name, "cli", "out") for name in ("claude", "codex", "grok")]
+    seats.append(floor.Seat("gemini", "cli", "seated"))
     seats.append(floor.Seat("groq", "http", "seated"))
 
     assert floor.ready(seats) is False

@@ -469,7 +469,11 @@ def main(argv: list[str] | None = None,
         if action == "stop":
             return room.stop(args.room)
         if action == "say":
-            return room.say(args.room, args.text, author=args.by)
+            try:
+                return room.say(args.room, args.text, author=args.by)
+            except PermissionError as e:
+                print(f"[megazword room] {e}", file=sys.stderr)
+                return 2
         if action == "show":
             return room.show(args.room, n=args.n)
         if action == "post-summary":

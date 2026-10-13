@@ -100,6 +100,38 @@ def test_handle_hive_say_defaults_to_seat(monkeypatch, isolated_home):
     assert room.read_messages("hive", home=isolated_home)[0].author == "reed-12"
 
 
+@pytest.mark.parametrize("author", ["phil", "Phil", None])
+def test_handle_hive_say_bot_seat_cannot_post_as_phil(monkeypatch, isolated_home, author):
+    monkeypatch.setenv("MEGAZWORD_SEAT", "claude")
+    args = {"text": "ship it"}
+    if author:
+        args["author"] = author
+    result = call_tool("hive_say", args)
+    if author is None:  # falls back to the seat, which is fine
+        assert text_result(result) == "[claude] ship it"
+        return
+    assert result["isError"] is True
+    assert "cannot post as phil" in result["content"][0]["text"]
+    assert room.read_messages("hive", home=isolated_home) == []
+
+
+@pytest.mark.parametrize("seat", [None, "phil", "PHIL"])
+def test_handle_hive_say_phil_allowed_without_bot_seat(monkeypatch, isolated_home, seat):
+    if seat:
+        monkeypatch.setenv("MEGAZWORD_SEAT", seat)
+    result = call_tool("hive_say", {"author": "phil", "text": "go"})
+    assert text_result(result) == "[phil] go"
+
+
+def test_room_say_bot_seat_cannot_post_as_phil(monkeypatch, isolated_home):
+    monkeypatch.setenv("MEGAZWORD_SEAT", "grok")
+    with pytest.raises(PermissionError):
+        room.say("hive", "pretend", home=isolated_home, write=lambda s: None)
+    assert room.read_messages("hive", home=isolated_home) == []
+    room.say("hive", "as myself", author="grok", home=isolated_home, write=lambda s: None)
+    assert room.read_messages("hive", home=isolated_home)[0].author == "grok"
+
+
 def test_handle_hive_wait_new_message(monkeypatch):
     room.append_message("test-room", "reed-12", "already seen")
     # Deliver a local message at the polling boundary without threads or sleeping.
