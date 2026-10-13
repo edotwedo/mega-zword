@@ -24,6 +24,12 @@ def test_help_lists_every_subcommand_in_its_section(capsys):
     assert len(text.split("Examples:\n")[1].strip().splitlines()) == 4
 
 
+def test_help_lists_mcp(capsys):
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    assert "mcp" in capsys.readouterr().out.split("See:\n", 1)[1].split("\n\n", 1)[0]
+
+
 @pytest.mark.parametrize("command", [n for ns in COMMAND_GROUPS.values() for n in ns])
 def test_subcommand_help_has_description(command, capsys):
     parser = build_parser()
