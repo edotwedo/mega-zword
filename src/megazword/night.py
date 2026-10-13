@@ -590,7 +590,7 @@ def status(write: Callable[[str], None] = print) -> int:
 
 
 def add_parser(sub) -> None:
-    night = sub.add_parser("night", help="Night Shift: run docs/QUEUE.md jobs unattended on night/ branches")
+    night = sub.add_parser("night", help="Night Shift: unattended queue jobs")
     nsub = night.add_subparsers(dest="night_cmd", required=True)
     run = nsub.add_parser("run", help="run waiting queue jobs now")
     run.add_argument("--max", type=int, default=MAX_JOBS, help=f"most jobs this run (default {MAX_JOBS})")

@@ -48,7 +48,8 @@ def make_env(tmp: Path) -> dict:
     env = dict(os.environ)
     # No real API keys (any *_API_KEY, so future HTTP backends are covered too):
     # nothing here may reach a paid or rate-limited API.
-    for key in [k for k in env if k.upper().endswith("_API_KEY")]:
+    for key in [k for k in env if k.upper().endswith(("_API_KEY", "_API_TOKEN"))
+                or k.upper() == "CLOUDFLARE_ACCOUNT_ID"]:
         del env[key]
     home = tmp / "home"
     home.mkdir()
