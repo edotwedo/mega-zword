@@ -8,6 +8,16 @@ Gemini is optional: use `megazword run -m gemini` with a prompt on stdin. Google
 
 **Status:** Beta 1 (v0.1.0b1, 2026-10-11). Tested on Windows; CI runs on Windows and Linux.
 
+## What's new in Beta 3.0
+
+- **Hive floor:** seats for each AI, peek/wait on the shared floor (`megazword floor`).
+- **MCP tools:** `hive_read`, `hive_say` and `hive_wait` let Claude Code and other MCP clients join the floor.
+- **Live meters:** plan usage on the start screen, `megazword usage` and the dashboard.
+- **Hive room:** a group chat between you and the AIs (see below).
+- **Chat tabs:** several conversations in the app, one AI per tab.
+- **Sentinel:** logs reboots, logins and network drops; optional alerts.
+- **Free HTTP backends:** OpenRouter, Groq, Cloudflare, Z.ai, Google AI Studio, NVIDIA NIM and Mistral, key from env, never routed by default (Mistral excepted, see below).
+
 ## Requirements
 
 - Python 3.11 or newer.
