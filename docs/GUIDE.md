@@ -410,6 +410,7 @@ Start with `megazword doctor`; each line below matches one of its check names.
 |---|---|
 | `Python` is FAIL | Install Python 3.11 or newer and reopen the terminal. |
 | A CLI says `not on PATH` | Install that tool, sign in, then open a new terminal. At least one of Claude Code, Codex, or Grok is needed. |
+| Codex shell calls fail with `CreateProcessAsUserW failed: -1073283067` | On Windows, Mega Zword removes `WindowsApps` and `PowerShell\7` entries from Codex's child PATH so its sandbox uses System32 Windows PowerShell; restart Mega Zword after updating. |
 | `config: FAIL` | Open `%USERPROFILE%\.megazword\config.toml`; fix its TOML syntax and make each route a list of AI names. If you want a fresh default, save a copy and run `megazword init --force`. |
 | `routes: WARN` | Remove misspelled backend names from `[route]`. `megazword backends` shows the supported tools. |
 | `out marks: WARN` | List marks with `megazword out`; clear one with `megazword out AI --clear` or correct its reset time in `[out]`. |
