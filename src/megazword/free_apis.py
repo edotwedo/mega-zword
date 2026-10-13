@@ -81,6 +81,11 @@ def http_error_message(code: int, headers=None) -> str:
             minutes = max(1, -(-int(retry.strip()) // 60))  # round up
             return f"API HTTP error 429: rate limited, try again in {minutes} minutes"
         return "API HTTP error 429: rate limited"
+    # Worded so failures.classify() sees an auth problem. Never echo the body.
+    if code == 401:
+        return "API HTTP error 401: unauthorized (auth failed, check the API key)"
+    if code == 403:
+        return "API HTTP error 403: forbidden (auth rejected, check the API key or model access)"
     return f"API HTTP error {code}"
 
 

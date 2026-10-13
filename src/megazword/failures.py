@@ -30,7 +30,7 @@ LOGIN_FIX = {
 
 _AUTH = re.compile(
     r"not logged in|not signed in|please (?:log|sign) ?in|log ?in required|login required"
-    r"|unauthori[sz]ed|\b401\b|authentication (?:failed|required|error)|invalid api key"
+    r"|unauthori[sz]ed|\b401\b|\bforbidden\b|authentication (?:failed|required|error)|invalid api key"
     r"|invalid x-api-key|(?:token|session|credentials?) (?:has )?expired|expired (?:token|session)"
     r"|no api key|missing api key|run .{0,20}\blogin\b", re.I)
 _NETWORK = re.compile(
