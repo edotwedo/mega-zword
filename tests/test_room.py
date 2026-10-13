@@ -483,3 +483,14 @@ def test_show_empty_room(tmp_path):
     out = []
     assert room.show("empty", home=tmp_path, write=out.append) == 0
     assert out == ["[megazword room] room 'empty' has no messages yet"]
+
+
+def test_turn_prompt_names_only_bots_that_can_answer():
+    """A bot alone in the room (others saving usage) must not hand off to bots that never reply."""
+    from megazword.room import build_turn_prompt
+    alone = build_turn_prompt("card", "", "phil: hi", "grok", "workshop", "phil", others=[])
+    assert "only bot in the room" in alone and "@claude" not in alone
+    two = build_turn_prompt("card", "", "phil: hi", "grok", "workshop", "phil", others=["codex"])
+    assert "@codex" in two and "@claude" not in two
+    legacy = build_turn_prompt("card", "", "phil: hi", "grok", "workshop", "phil")
+    assert "@claude, @codex, @grok, @gemini" in legacy
