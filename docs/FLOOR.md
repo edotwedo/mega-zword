@@ -25,6 +25,17 @@ Phil enters the Mega Zword **Hive** tab and says what to decide and what to do.
 Nobody auto-fires an easy/medium/hard list. Bulk and stand-in work goes to Groq
 and the other HTTP seats so Claude/Codex/Grok last for the big projects.
 
+`megazword floor suggest <kind>` names the seated model for a job. It skips
+empty and out seats, prints `(no seat)` (exit 1) if nobody fits, and sends
+nothing. With every seat filled:
+
+| Kind | Example | Order |
+| --- | --- | --- |
+| bulk | `megazword floor suggest bulk` → `groq` | groq, mistral, cloudflare, zai, gemini-api, then other HTTP seats (never a CLI) |
+| edit | `megazword floor suggest edit` → `codex` | codex, claude |
+| decide | `megazword floor suggest decide` → `claude` | claude, grok, codex |
+| review | `megazword floor suggest review` → `claude` | claude, grok, codex |
+
 Money and new keys: Phil. The app hunts empty chairs and says what is missing.
 
 ## Launched CLI prompt
