@@ -19,7 +19,7 @@ from .rater import Rating, rate
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room"),
     "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
-            "sentinel", "floor"),
+            "sentinel", "floor", "mcp"),
     "Set up": ("init", "doctor", "out", "backends", "app"),
     "Memory": ("note", "decide", "import-hive"),
 }
@@ -120,6 +120,7 @@ def build_parser() -> argparse.ArgumentParser:
     floor.add_argument("--room", default="hive", help="hive room name (default: hive)")
     floor.add_argument("-n", type=int, default=10, help="peek: how many messages")
     floor.add_argument("--timeout", type=int, default=120, help="wait: seconds to block")
+    sub.add_parser("mcp", help="Hive MCP server on stdio (for AI CLIs to connect to)")
 
     out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -303,6 +304,9 @@ def main(argv: list[str] | None = None,
     if args.command == "export":
         from .export import command
         return command(args, cfg)
+    if args.command == "mcp":
+        from .mcp_hive import serve
+        return serve()
     if cfg is None:
         try:
             cfg = config.load()
