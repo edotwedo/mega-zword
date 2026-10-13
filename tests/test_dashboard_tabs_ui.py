@@ -107,6 +107,24 @@ def test_page_has_the_tab_controls_with_labels():
     assert "confirm(" not in html  # browser dialogs block the app window; close uses two clicks
 
 
+def test_floor_line_shows_ready_and_seated_names(tmp_path):
+    out = run("""
+renderFloor({floor: {ready: true, seats: [
+  {name: 'claude', kind: 'cli', status: 'seated'}, {name: 'codex', kind: 'cli', status: 'out'},
+  {name: '<b>x</b>', kind: 'http', status: 'seated'}, {name: 'grok', kind: 'cli', status: 'empty'}]}});
+out.ready = snap().floor.html;
+renderFloor({floor: {ready: false, seats: [{name: 'grok', kind: 'cli', status: 'empty'}]}});
+out.empty = snap().floor.html;
+renderFloor({});
+out.missing = snap().floor;
+""", tmp_path)
+    assert ">ready<" in out["ready"] and "claude" in out["ready"]
+    assert "codex" not in out["ready"] and "grok" not in out["ready"]  # only seated names
+    assert "<b>x</b>" not in out["ready"] and "&lt;b&gt;x&lt;/b&gt;" in out["ready"]
+    assert "not ready" in out["empty"] and "none" in out["empty"]
+    assert out["missing"]["html"] == ""  # older servers without `floor` show nothing
+
+
 def test_deep_link_opens_a_tab_once(tmp_path):
     out = run(f"""
 location.hash = '#tab-t1';
