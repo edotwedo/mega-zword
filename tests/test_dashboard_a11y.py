@@ -35,9 +35,13 @@ def test_landmarks_labels_and_live_regions():
     assert headings.count(3) == 3
     for name in ('prompt', 'note'):
         assert page.by_id(name)['aria-label']
-    for name in ('jobs', 'toast'):
-        assert page.by_id(name)['aria-live'] == 'polite'
+    assert 'aria-live' not in page.by_id('jobs')
+    assert page.by_id('toast')['aria-live'] == 'polite'
     assert page.by_id('toast')['role'] == 'status'
+    status = page.by_id('job-status')
+    assert status['aria-live'] == 'polite'
+    assert status['role'] == 'status'
+    assert 'sr-only' in status.get('class', '')
     assert page.by_id('mem')['tabindex'] == '0'
     assert not any(int(a.get('tabindex', '0')) > 0 for _, a in page.elements)
 
@@ -168,3 +172,12 @@ def test_focus_touch_and_reduced_motion():
     # A character-only global shortcut interferes with speech input (WCAG 2.1.4).
     shortcut = SCRIPT[SCRIPT.index('if (e.key === "/"'):].split('{', 1)[0]
     assert '&& e.altKey' in shortcut
+
+
+def test_f25_job_status_and_focus_contracts():
+    """Forge leftovers: live region only on finish; restore copy/vote/answer; skip #model rebuild."""
+    assert 'announceJob(j)' in SCRIPT
+    assert 'focusedCancel' not in SCRIPT
+    assert 'classList.contains("copy")' in SCRIPT
+    assert 'classList.contains("vote")' in SCRIPT
+    assert 'document.activeElement !== sel' in SCRIPT
