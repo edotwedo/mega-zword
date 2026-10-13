@@ -35,9 +35,8 @@ TOOLS = [
     },
     {
         "name": "hive_say",
-        "description": "Post a message to a hive room. No @mentions required; an @name "
-                       "still wakes that seat for a one-shot reply while `room start` "
-                       "is running.",
+        "description": "Post a message to a hive room. No @mentions required. "
+                       "Phil's @name picks the next room-start one-shot; bot @names do not.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -95,6 +94,7 @@ def hive_say(args: dict) -> str:
     author = args.get("author") or os.environ.get("MEGAZWORD_SEAT") or "bot"
     out: list[str] = []
     room.say(room_name, text, author=author, write=out.append)
+    floor.hear(author)
     return "\n".join(out) or "posted"
 
 
@@ -132,6 +132,7 @@ def handle(request: dict) -> dict | None:
     if not isinstance(params, dict):
         return err(-32602, "params must be an object")
     if method == "initialize":
+        floor.hear(os.environ.get("MEGAZWORD_SEAT") or "")
         # Echo a version we speak; otherwise offer ours and let the client decide.
         asked = params.get("protocolVersion")
         return ok({

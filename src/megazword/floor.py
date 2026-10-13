@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -127,7 +128,54 @@ def format_roster(seats: list[Seat]) -> str:
     lines.append("One window each for claude, codex, grok (gemini when its week is back).")
     lines.append("HTTP seats have no window; they wait in this Hive.")
     lines.append("Phil assigns work here. Subagents stay inside their CLI.")
+    lines.append(format_heard())
     return "\n".join(lines)
+
+
+def presence_path(home: Path | None = None) -> Path:
+    return (home or config.HOME) / "presence.json"
+
+
+def hear(name: str, home: Path | None = None, now: datetime | None = None) -> None:
+    """A live MCP seat just read or posted. floor status prints this as Heard."""
+    from .filelock import write_atomic
+    key = (name or "").strip().lower()
+    if not key or key in ("phil", "floor", "bot"):
+        return
+    now = now or datetime.now().astimezone()
+    path = presence_path(home)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, ValueError):
+        data = {}
+    data[key] = now.isoformat(timespec="seconds")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_atomic(path, json.dumps(data, indent=2) + "\n")
+
+
+def format_heard(home: Path | None = None, now: datetime | None = None) -> str:
+    path = presence_path(home)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    if not isinstance(data, dict) or not data:
+        return "Heard in Hive MCP: none (live seats post with hive_say)."
+    now = now or datetime.now().astimezone()
+    parts = []
+    for name, raw in sorted(data.items()):
+        try:
+            ts = datetime.fromisoformat(str(raw))
+        except ValueError:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=now.tzinfo)
+        secs = max(0, int((now - ts).total_seconds()))
+        ago = f"{secs}s ago" if secs < 120 else ts.strftime("%H:%M")
+        parts.append(f"{name} {ago}")
+    return "Heard in Hive MCP: " + (", ".join(parts) if parts else "none (live seats post with hive_say).")
 
 
 def snapshot_path(home: Path | None = None) -> Path:

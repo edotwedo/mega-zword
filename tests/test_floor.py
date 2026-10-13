@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from itertools import product
+from pathlib import Path
 
 import pytest
 
@@ -338,3 +339,24 @@ def test_floor_bad_room_is_one_line_exit_2(monkeypatch, tmp_path):
         assert floor.command(args, {}, cfg, write=out.append) == 2
         assert len(out) == 1 and "\n" not in out[0]
         assert out[0].startswith("floor: room name '../x'")
+
+
+def test_hear_and_format_heard(tmp_path, monkeypatch):
+    monkeypatch.setattr(floor.config, "HOME", tmp_path)
+    now = datetime(2026, 10, 13, 16, 0, tzinfo=timezone.utc)
+    assert "none" in floor.format_heard(home=tmp_path, now=now)
+    floor.hear("grok", home=tmp_path, now=now)
+    floor.hear("phil", home=tmp_path, now=now)  # ignored
+    floor.hear("bot", home=tmp_path, now=now)
+    later = now + timedelta(seconds=9)
+    text = floor.format_heard(home=tmp_path, now=later)
+    assert "grok 9s ago" in text
+    assert "phil" not in text
+    roster = floor.format_roster([])
+    assert "Heard in Hive MCP" in roster
+
+
+def test_hive_up_sets_seat_env():
+    script = (Path(__file__).parents[1] / "scripts" / "hive_up.ps1").read_text(encoding="utf-8")
+    assert "MEGAZWORD_SEAT" in script
+    assert "hive_say" in script
