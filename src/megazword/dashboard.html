@@ -296,6 +296,7 @@ main[hidden], #hive[hidden] { display:none; }
 <div id="hive" class="hive-view" role="region" aria-labelledby="hive-title" hidden>
   <section class="wide">
     <h2 id="hive-title">Hive room</h2>
+    <div id="hive-floor" class="note" role="status" style="margin:0 0 8px"></div>
     <p class="room-status" id="room-status" role="status" aria-live="polite">Room is idle.</p>
     <div class="row" id="room-summary" aria-label="Room status"></div>
     <div class="room-messages" id="room-messages" role="region" aria-label="Hive room messages" tabindex="0"></div>
@@ -433,13 +434,16 @@ function renderRoute(s) {
       return `<span class="${x ? "x" : ""}">${aiTag(n)}</span>`; }).join(" → ")}</td></tr>`).join("");
 }
 
-// Read-only view of `megazword floor`: ready flag + who is seated right now.
+// Read-only view of `megazword floor`: ready flag + who is seated right now. Same line on Home and Hive.
 function renderFloor(s) {
   const f = s.floor;
-  if (!f) { $("floor").innerHTML = ""; return; }
-  const seated = (f.seats || []).filter(x => x.status === "seated").map(x => x.name);
-  $("floor").innerHTML = `Floor: <b class="${f.ready ? "ok" : "warn"}">${f.ready ? "ready" : "not ready"}</b>`
-    + ` · seated ${seated.length ? seated.map(aiTag).join(", ") : '<span class="empty">none</span>'}`;
+  let html = "";
+  if (f) {
+    const seated = (f.seats || []).filter(x => x.status === "seated").map(x => x.name);
+    html = `Floor: <b class="${f.ready ? "ok" : "warn"}">${f.ready ? "ready" : "not ready"}</b>`
+      + ` · seated ${seated.length ? seated.map(aiTag).join(", ") : '<span class="empty">none</span>'}`;
+  }
+  $("floor").innerHTML = html; $("hive-floor").innerHTML = html;
 }
 
 function settingRow(parent, id, kind, name, content) {

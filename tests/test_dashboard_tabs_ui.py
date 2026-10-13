@@ -102,7 +102,7 @@ def test_page_has_the_tab_controls_with_labels():
     html = resources.files("megazword").joinpath("dashboard.html").read_text(encoding="utf-8")
     for needle in ('id="chat-tabs" aria-label="Chat tabs"', 'aria-label="New chat tab"',
                    'aria-label="AI for a new chat tab"', 'aria-label="Chat tab name"',
-                   'id="chat-close"', 'aria-label="Your message"'):
+                   'id="chat-close"', 'aria-label="Your message"', 'id="hive-floor"'):
         assert needle in html
     assert "confirm(" not in html  # browser dialogs block the app window; close uses two clicks
 
@@ -112,12 +112,14 @@ def test_floor_line_shows_ready_and_seated_names(tmp_path):
 renderFloor({floor: {ready: true, seats: [
   {name: 'claude', kind: 'cli', status: 'seated'}, {name: 'codex', kind: 'cli', status: 'out'},
   {name: '<b>x</b>', kind: 'http', status: 'seated'}, {name: 'grok', kind: 'cli', status: 'empty'}]}});
-out.ready = snap().floor.html;
+out.ready = snap().floor.html; out.hiveReady = snap()['hive-floor'].html;
 renderFloor({floor: {ready: false, seats: [{name: 'grok', kind: 'cli', status: 'empty'}]}});
 out.empty = snap().floor.html;
 renderFloor({});
-out.missing = snap().floor;
+out.missing = snap().floor; out.hiveMissing = snap()['hive-floor'].html;
 """, tmp_path)
+    assert out["hiveReady"] == out["ready"]  # Hive panel shows the same line as Home
+    assert out["hiveMissing"] == ""
     assert ">ready<" in out["ready"] and "claude" in out["ready"]
     assert "codex" not in out["ready"] and "grok" not in out["ready"]  # only seated names
     assert "<b>x</b>" not in out["ready"] and "&lt;b&gt;x&lt;/b&gt;" in out["ready"]
