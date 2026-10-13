@@ -19,8 +19,8 @@ from .rater import Rating, rate
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room", "night"),
     "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
-            "sentinel", "floor", "mcp"),
-    "Set up": ("init", "doctor", "out", "backends", "app"),
+            "sentinel", "floor"),
+    "Set up": ("init", "doctor", "out", "backends", "app", "mcp"),
     "Memory": ("note", "decide", "import-hive"),
 }
 

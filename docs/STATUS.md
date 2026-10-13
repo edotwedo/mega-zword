@@ -1,10 +1,10 @@
 # Status
 
-**Active: Quill-12 (Grok) is lead, working overnight 2026-10-13 while Phil sleeps.** **Feature freeze is OFF (Phil, 2026-10-12).** The Hive floor (seats, peek/wait, MCP `hive_read`/`hive_say`/`hive_wait`) is on main. PRs 11-16 are on main: room start works on a fresh install, gemini-api default `gemini-flash-latest`, AI CLIs start with a hidden console on Windows, floor suggest, `hive_up` keeps working while Phil sleeps, `megazword mcp` runs the Hive stdio server, Windows fills missing API keys from User env. **Floor ready.** **Next:** keep taking unclaimed work. Gemini is out until Oct 18; Groq returned 403 last night. The Beta 3.0 checklist below still stands but no longer blocks features.
-**Night Shift v1 (Forge-13, Claude Code on Phil's PC, 2026-10-13 07:00 PT, branch `claude/night-shift-v1`):** `megazword night run|install|remove|stop|resume|status` and `docs/QUEUE.md`. Mega Zword (not the AI) does git, tests and the push to `night/<date>-<n>`; never main. Usage floor 15% and fail-closed (no meter or old reading = no night work). Tests: `tests/test_night.py` (3-job dry run on a local bare repo with fake AIs). Also fixed: smoke/live-check refilled API keys from the Windows User environment (`MEGAZWORD_NO_USER_ENV`). Next: one real queued job via the scheduled task, check its branch on GitHub.
-**Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main has moved well past it (Beta 2 work, floor, Hive MCP, tabs, desktop window); Beta 3.0 release notes (item 3) will list it.
+**Active: Quill-12 (Grok) is lead, 2026-10-13.** **Feature freeze is OFF.** Floor + Hive MCP on main. Release notes on main (PR 37). **Next:** F25 dashboard a11y on `grok/overnight-f25-a11y-2026-10-13`. Forge-13 owns Night Shift v1 (`claude/night-shift-v1`). GitHub Actions is blocked on account billing (Phil's money). Gemini out until Oct 18; Groq 403.
+**Night Shift v1 (Forge-13, Claude Code on Phil's PC, 2026-10-13 07:00 PT, branch `claude/night-shift-v1`):** `megazword night run|install|remove|stop|resume|status` and `docs/QUEUE.md`. Mega Zword (not the AI) does git, tests and the push to `night/<date>-<n>`; never main. Usage floor 15% and fail-closed (no meter or old reading = no night work). Tests: `tests/test_night.py` (3-job dry run on a local bare repo with fake AIs). Also fixed: smoke/live-check refilled API keys from the Windows User environment (`MEGAZWORD_NO_USER_ENV`). PR https://github.com/edotwedo/mega-zword/pull/39 (needs a lead merge; Forge-13 could not push to main). Live run 2026-10-13 04:56: Codex edited GUIDE.md and `night/2026-10-13-1` landed on GitHub; its tests failed (see PR). Codex review P1s fixed. Next: merge PR 39, `git pull` in mega-zword, `megazword night install --at 01:00 --yes`.
+**Version:** Beta 1, `0.1.0b1`, tagged `v0.1.0-beta.1`. Main is past it; `docs/RELEASE-NOTES.md` lists Beta 3.0 (not tagged).
 **Lead:** Quill-12 (Grok Build on Phil's PC). Phil named this seat lead. Tally-11 is released. Cloud Claudes coordinate in Q; they do not take main.
-**Last updated:** 2026-10-13 overnight by Quill-12: PRs 11-16 on main (room-start, gemini-flash-latest, hidden console, floor suggest, hive_up keep-working, megazword mcp, User env keys). Floor ready. Gemini out until Oct 18; Groq 403 last night. Earlier (2026-10-12): Wren-12's Q split — Grok keeps Beta 3.0 1-5; J1/J2/J4 after ship. Usage (2026-10-12): Claude 2% 5h / 69% week; Codex 9% 5h / 78% week; Grok 16% week; Gemini out until Oct 18.
+**Last updated:** 2026-10-13 Quill-12: PR 37 notes on main; F25 a11y this branch. Forge-13 owns Night Shift. GitHub Actions billing blocked. Usage: Claude 5h 73% / week 82%; Codex 5h 40%; Grok week 35%; Gemini out until Oct 18.
 **Usage first (Phil's rule):** run `megazword usage` before and after each step. Every plan says which AI does which part.
 
 ## Where things live
@@ -28,7 +28,7 @@ Usage at the call (13:05 PT): Claude 73% 5-hour (resets 2:00 PM) / 67% week; Cod
 Put your name on a step before you start it; tick it when it's on main.
 1. **[x] Linux-only test failures (3):** **Quill-12, on main.** CLI test uses a native outside path (`/bin/true` on Linux). Sentinel tests patch `_is_windows` instead of `os.name` (that made pathlib WindowsPath and crashed Linux pytest). 678 tests passed on this PC.
 2. **B7 review pass** of everything since Beta 1 (B1-B6b, B8, B9, B12-B15, room API, chat tabs UI, desktop window). Findings: `docs/handoffs/2026-10-13-b7-review.md`; fixes land as small `grok/overnight-b7-*` branches. **Quill-12.**
-3. **Release notes** (README "What's new in Beta 3.0", GUIDE check). **Nimbus-12.**
+3. **[x] Release notes** (`docs/RELEASE-NOTES.md`). **Quill-12, PR 37.** No tag.
 4. **Version** `0.3.0b1`, tag `v0.3.0-beta.1` after 1-3 are on main and tests + smoke pass. **Nimbus-12.**
 5. **Install on Phil's PC** from the tag: `pip install -e .[app]` in `C:\Users\mrmar\mega-zword`, `megazword doctor`, `megazword app install`, smoke. **Nimbus-12.**
 6. **Phil's check:** open Mega Zword from the Start menu, try Home, Hive and a chat tab. **Phil.**
@@ -207,11 +207,13 @@ Agy stdin and the real agy /usage output are still unverified on Phil's PC.
 Tests never spend paid usage. Don't change routing defaults or turn on
 local-model answering without Phil.
 
-- F25 leftovers (dashboard, found by Forge, not fixed yet):
-  (a) #jobs has aria-live and is re-rendered every 0.8s, so screen readers re-announce constantly. Drop it; announce only on job finish via an sr-only status region.
-  (b) renderJob keeps focus only on Cancel; focus on copy/vote/answer is lost every poll.
-  (c) load() rebuilds the #model select every 30s even while it's focused or open; skip when it's document.activeElement.
-- Flaky: one dashboard test failed once with a connection error, passed on rerun.
+- F25 leftovers (dashboard): **Quill-12, this branch** `grok/overnight-f25-a11y-2026-10-13`.
+  (a) #jobs no longer has aria-live; `#job-status` announces only when a watched job finishes.
+  (b) renderJob restores focus on Cancel, copy, vote, and the answer region.
+  (c) load() skips rebuilding `#model` while that select is `document.activeElement`.
+- Flaky: dashboard urlopen timeout raised 5s → 10s (connection error once, passed on rerun).
+- GitHub Actions: jobs do not start (account payments / spending limit). Local pytest is the check until Phil fixes billing.
+- B7 #24: `mcp` is under Set up in `--help` (this branch).
 
 ## Next step (needs Phil)
 - Morning live check (costs a few dozen tokens per AI): from C:\Users\mrmar\mega-zword run `.venv\Scripts\python scripts\live_check.py --yes-spend`. Runs doctor (stops on FAIL), sends "Reply with exactly: pong" once to each installed, not-out AI via `megazword run -m`, then once via auto-pick, and prints AI / ok / seconds / answer length. Without --yes-spend it only explains itself. Never run by the bots.

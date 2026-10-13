@@ -115,14 +115,14 @@ def _post(url, body, token=None, host=None):
         req.add_header("X-MZ-Token", token)
     if host:
         req.add_header("Host", host)
-    return urllib.request.urlopen(req, timeout=5)
+    return urllib.request.urlopen(req, timeout=10)
 
 
 def test_page_carries_token_and_state_serves(server):
     base, app = server
-    html = urllib.request.urlopen(base + "/", timeout=5).read().decode()
+    html = urllib.request.urlopen(base + "/", timeout=10).read().decode()
     assert app.token in html and "MEGA" in html
-    state = json.loads(urllib.request.urlopen(base + "/api/state", timeout=5).read())
+    state = json.loads(urllib.request.urlopen(base + "/api/state", timeout=10).read())
     assert state["project"] == "proj"
 
 
@@ -143,7 +143,7 @@ def test_foreign_host_is_refused(server):
 def test_post_with_token_starts_job(server):
     base, app = server
     job = json.loads(_post(base + "/api/run", {"prompt": "hi"}, app.token).read())["job"]
-    view = json.loads(urllib.request.urlopen(f"{base}/api/job/{job}", timeout=5).read())
+    view = json.loads(urllib.request.urlopen(f"{base}/api/job/{job}", timeout=10).read())
     assert view["done"] and view["out"] == "answer"
 
 
@@ -192,18 +192,18 @@ def test_remote_needs_token_for_reads(remote_server):
     base, app = remote_server
     for path in ("/", "/api/state"):
         with pytest.raises(urllib.error.HTTPError) as e:
-            urllib.request.urlopen(base + path, timeout=5)
+            urllib.request.urlopen(base + path, timeout=10)
         assert e.value.code == 403
 
 
 def test_remote_link_sets_cookie_and_cookie_works(remote_server):
     base, app = remote_server
-    r = urllib.request.urlopen(f"{base}/?t={app.token}", timeout=5)
+    r = urllib.request.urlopen(f"{base}/?t={app.token}", timeout=10)
     cookie = r.headers["Set-Cookie"]
     assert "HttpOnly" in cookie and app.token in cookie
     req = urllib.request.Request(base + "/api/state",
                                  headers={"Cookie": cookie.split(";")[0], "Host": "pc.tailnet:1"})
-    assert json.loads(urllib.request.urlopen(req, timeout=5).read())["project"] == "proj"
+    assert json.loads(urllib.request.urlopen(req, timeout=10).read())["project"] == "proj"
 
 
 def test_remote_post_still_needs_header(remote_server):
@@ -252,7 +252,7 @@ def test_settings_api_saves_and_exposes_values(server, body):
     base, app = server
     result = json.loads(_post(base + '/api/settings', body, app.token).read())
     assert result['ok']
-    state = json.loads(urllib.request.urlopen(base + '/api/state', timeout=5).read())
+    state = json.loads(urllib.request.urlopen(base + '/api/state', timeout=10).read())
     assert state['settings'] == result['settings']
     cfg = config.load()
     assert state['settings']['route'] == cfg.route
@@ -322,7 +322,7 @@ def test_remote_header_works_despite_stale_cookie(remote_server):
     base, app = remote_server
     req = urllib.request.Request(base + "/api/state", headers={
         "Cookie": "mz_t=old-launch-token", "X-MZ-Token": app.token})
-    assert urllib.request.urlopen(req, timeout=5).status == 200
+    assert urllib.request.urlopen(req, timeout=10).status == 200
 
 
 def test_tabs_http_list_create_rename_close_send(server, monkeypatch):
@@ -336,7 +336,7 @@ def test_tabs_http_list_create_rename_close_send(server, monkeypatch):
     app.backends = {"claude": RunFake("claude"), "grok": RunFake("grok")}
     app.cfg = config.Config(log_path=config.HOME / "log.jsonl",
                             route={"easy": ["claude"], "medium": ["claude"], "hard": ["claude"]})
-    listed = json.loads(urllib.request.urlopen(base + "/api/tabs", timeout=5).read())
+    listed = json.loads(urllib.request.urlopen(base + "/api/tabs", timeout=10).read())
     assert listed["tabs"] == []
     created = json.loads(_post(base + "/api/tabs",
                                {"ai": "claude", "title": "Work"}, app.token).read())
@@ -356,14 +356,14 @@ def test_tabs_http_list_create_rename_close_send(server, monkeypatch):
     assert auto_sent["ok"] and auto_sent["backend"] == "claude"
     closed = json.loads(_post(base + "/api/tabs/close", {"id": "t1"}, app.token).read())
     assert closed["ok"]
-    left = json.loads(urllib.request.urlopen(base + "/api/tabs", timeout=5).read())["tabs"]
+    left = json.loads(urllib.request.urlopen(base + "/api/tabs", timeout=10).read())["tabs"]
     assert [t["id"] for t in left] == [auto["id"]]
     assert "tabs" in app.state()
 
 
 def test_room_http_say_pause_and_stop(server):
     base, app = server
-    initial = json.loads(urllib.request.urlopen(base + "/api/room?room=hive", timeout=5).read())
+    initial = json.loads(urllib.request.urlopen(base + "/api/room?room=hive", timeout=10).read())
     assert initial["room"] == "hive" and initial["paused"] is False
     said = json.loads(_post(base + "/api/room/say", {"room":"hive", "text":"Hello @codex"}, app.token).read())
     assert said["messages"][-1]["author"] == "phil"
@@ -378,7 +378,7 @@ def test_remote_malformed_cookie_returns_forbidden(remote_server):
     base, app = remote_server
     req = urllib.request.Request(base + "/api/state", headers={"Cookie": "bad@name=value"})
     with pytest.raises(urllib.error.HTTPError) as exc:
-        urllib.request.urlopen(req, timeout=5)
+        urllib.request.urlopen(req, timeout=10)
     assert exc.value.code == 403
 
 
