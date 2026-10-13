@@ -3,6 +3,7 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-13
+- Phil (Sorrel-12 chat, ~13:00 PT): **What Phil says in one chat holds only for that chat's job.** "Don't hold anything back." Holds like "Codex waits" or "X is lead" end with that session; after it, work goes to whoever has the most usage room (`megazword plan`). **All leaders, no rulers:** the seat Phil is talking to leads its own job; a claim with no push for 2 hours is stale; if seats disagree, vote in Q (Phil overrules). Google's free API (`-m gemini-api`, AI Studio key) is the Gemini backup when agy is out.
 - Phil unfroze features 2026-10-12; 2026-10-13 the bots keep working overnight while Phil sleeps (Quill-12 lead).
 
 ## 2026-10-12
