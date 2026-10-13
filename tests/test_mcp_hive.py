@@ -325,6 +325,34 @@ def test_serve_oversized_content_length_is_skipped(monkeypatch):
     assert replies[1] == {"jsonrpc": "2.0", "id": 9, "result": {}}
 
 
+def test_cli_mcp_keeps_stray_prints_off_stdout(monkeypatch):
+    import io
+    import sys
+    from types import SimpleNamespace
+
+    from megazword import cli
+
+    rpc = BytesIO()
+    fake_out = SimpleNamespace(buffer=rpc)
+    fake_err = io.StringIO()
+    seen = {}
+
+    def fake_serve(stdin, stdout):
+        print("oops, a stray print")
+        seen["stdout"] = stdout
+        return 0
+
+    monkeypatch.setattr(mcp_hive, "serve", fake_serve)
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(buffer=BytesIO()))
+    monkeypatch.setattr(sys, "stdout", fake_out)
+    monkeypatch.setattr(sys, "stderr", fake_err)
+    assert cli.main(["mcp"]) == 0
+    assert seen["stdout"] is rpc
+    assert rpc.getvalue() == b""
+    assert "stray print" in fake_err.getvalue()
+    assert sys.stdout is fake_out
+
+
 @pytest.mark.parametrize("header", [b"Content-Length: nope", b"X-Other: 1"])
 def test_serve_bad_content_length_header_is_protocol_error(header):
     [reply] = framed_replies(serve_bytes(header + b"\r\n\r\n"))
