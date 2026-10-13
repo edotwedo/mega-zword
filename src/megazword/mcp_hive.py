@@ -7,6 +7,7 @@ anything else goes to stderr. Run with `python -m megazword.mcp_hive`.
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 from typing import Any, BinaryIO
@@ -15,6 +16,8 @@ from . import floor, room
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_INFO = {"name": "megazword-hive", "version": "0.1.0"}
+MAX_WAIT_SECONDS = 300.0
+MAX_BODY_BYTES = 1_000_000  # same limit as the dashboard
 
 TOOLS = [
     {
@@ -52,7 +55,8 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "room": {"type": "string", "default": "hive"},
-                "timeout": {"type": "number", "default": 120},
+                "timeout": {"type": "number", "default": 120, "maximum": 300,
+                            "description": "Seconds, capped at 300."},
                 "after": {"type": "integer",
                           "description": "Message count from the last \"(after=N)\" line. "
                                          "Omit to wait for messages newer than now."},
@@ -92,6 +96,10 @@ def hive_say(args: dict) -> str:
 def hive_wait(args: dict) -> str:
     room_name = args.get("room") or "hive"
     timeout = float(args.get("timeout", 120))
+    if math.isnan(timeout):
+        raise ValueError("timeout must be a number")
+    # serve() is single-threaded: a huge wait would leave every other request unanswered.
+    timeout = min(max(0.0, timeout), MAX_WAIT_SECONDS)
     after = args.get("after")
     # Pin the baseline here so the reply can carry the next cursor.
     after = len(room.read_messages(room_name)) if after is None else max(0, int(after))
@@ -116,6 +124,8 @@ def handle(request: dict) -> dict | None:
     def err(code: int, message: str) -> dict:
         return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
 
+    if not isinstance(params, dict):
+        return err(-32602, "params must be an object")
     if method == "initialize":
         return ok({
             "protocolVersion": params.get("protocolVersion") or PROTOCOL_VERSION,
@@ -140,9 +150,25 @@ def handle(request: dict) -> dict | None:
     return err(-32601, f"method not found: {method}")
 
 
+def safe_handle(message: Any) -> dict | None:
+    """handle() that never raises: a bad message gets an error reply, not a dead server."""
+    if not isinstance(message, dict):
+        return {"jsonrpc": "2.0", "id": None,
+                "error": {"code": -32600, "message": "invalid request"}}
+    try:
+        return handle(message)
+    except Exception as e:
+        log(f"handler crashed: {e!r}")
+        if "id" not in message:  # notifications never get a reply
+            return None
+        return {"jsonrpc": "2.0", "id": message.get("id"),
+                "error": {"code": -32603, "message": str(e)}}
+
+
 def read_message(stream: BinaryIO) -> tuple[dict | None, bool] | None:
     """Read one message. Returns (message, framed) or None at EOF.
-    message is None when the body isn't valid JSON."""
+    message is None when the body isn't valid JSON or Content-Length is bad
+    (missing, negative, or over MAX_BODY_BYTES)."""
     while True:
         line = stream.readline()
         if not line:
@@ -150,7 +176,7 @@ def read_message(stream: BinaryIO) -> tuple[dict | None, bool] | None:
         stripped = line.strip()
         if not stripped:
             continue
-        if stripped.startswith(b"{"):
+        if stripped.startswith((b"{", b"[")):
             try:
                 return json.loads(stripped.decode("utf-8")), False
             except ValueError:
@@ -168,6 +194,17 @@ def read_message(stream: BinaryIO) -> tuple[dict | None, bool] | None:
         length = int(headers.get("content-length", ""))
     except ValueError:
         log(f"bad headers: {headers}")
+        return None, True
+    if length < 0:  # stream.read(-n) would block until stdin closes
+        log(f"negative Content-Length: {length}")
+        return None, True
+    if length > MAX_BODY_BYTES:
+        log(f"Content-Length too large: {length}")
+        while length > 0:  # skip the body so the next message still lines up
+            chunk = stream.read(min(length, 65536))
+            if not chunk:
+                return None
+            length -= len(chunk)
         return None, True
     body = stream.read(length)
     if len(body) < length:
@@ -199,19 +236,15 @@ def serve(stdin: BinaryIO | None = None, stdout: BinaryIO | None = None) -> int:
             write_message(stdout, {"jsonrpc": "2.0", "id": None,
                                    "error": {"code": -32700, "message": "parse error"}}, framed)
             continue
-        if isinstance(message, list):  # batch
-            replies = [r for r in (handle(m) for m in message if isinstance(m, dict)) if r]
+        if isinstance(message, list):  # batch: each item stands alone
+            if not message:
+                write_message(stdout, safe_handle(None), framed)
+                continue
+            replies = [r for r in (safe_handle(m) for m in message) if r]
             if replies:
                 write_message(stdout, replies, framed)
             continue
-        if not isinstance(message, dict):
-            continue
-        try:
-            reply = handle(message)
-        except Exception as e:
-            log(f"handler crashed: {e!r}")
-            reply = {"jsonrpc": "2.0", "id": message.get("id"),
-                     "error": {"code": -32603, "message": str(e)}}
+        reply = safe_handle(message)
         if reply is not None:
             write_message(stdout, reply, framed)
 
