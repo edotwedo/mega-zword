@@ -56,6 +56,17 @@ def test_state_has_meters_pace_out_and_runs(app):
     json.dumps(s, default=str)
 
 
+def test_state_has_floor(app):
+    f = app.state()["floor"]
+    seats = {s["name"]: s for s in f["seats"]}
+    assert seats["claude"] == {"name": "claude", "kind": "cli", "status": "seated"}
+    assert seats["grok"]["status"] == "out" and seats["codex"]["status"] == "empty"
+    assert f["ready"] is False
+    assert set(f["suggest"]) == {"bulk", "edit", "decide", "review"}
+    assert f["suggest"]["edit"] == "claude" and f["suggest"]["bulk"] is None
+    json.dumps(f)
+
+
 def test_day_chart_counts_all_runs_not_just_recent_sixty(app):
     stamp = datetime.now(timezone.utc).isoformat()
     app.cfg.log_path.write_text("\n".join(json.dumps({
