@@ -100,3 +100,18 @@ def test_release_leaves_another_sessions_room_alone(tmp_path):
 def test_shutdown_without_a_room_does_nothing(app):
     app.shutdown()
     assert not dashboard.room.load_state("hive").active
+
+
+def test_start_falls_back_to_launch_project_when_room_primary_is_missing(tmp_path, monkeypatch):
+    """Fresh install: the default room primary ('workshop') has no project folder yet.
+    Start used to fail with "no project named 'workshop'"; it now uses the launch project."""
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setattr(cli, "plan_statuses", lambda: {})
+    cfg = config.Config(log_path=tmp_path / "log.jsonl")
+    app = dashboard.App(cfg, "mine", None, {"claude": Fake("claude", reply="hi")})
+    app.room_say({"text": "hello"})
+    app.room_start({"turns": 1})
+    app._room_thread.join(10)
+    assert dashboard.room.load_state("hive").primary == "mine"
+    with pytest.raises(ValueError, match="no project named"):
+        app.room_start({"project": "nope"})

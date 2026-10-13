@@ -318,7 +318,8 @@ def format_recent(messages: list[RoomMessage], count: int = RECENT_MESSAGES_COUN
 def build_turn_prompt(state_card: str, rolling_summary: str,
                       recent_text: str, speaker: str,
                       primary_project: str, last_author: str | None = None,
-                      reply_words: int = DEFAULT_REPLY_WORDS) -> str:
+                      reply_words: int = DEFAULT_REPLY_WORDS,
+                      others: list[str] | None = None) -> str:
     """Build lean turn prompt with prime directive, token budget, and reply constraints."""
     parts = [
         "[Sent by Mega Zword as a one-shot task. Answer it directly. Skip session startup, coordination and check-in routines.]",
@@ -339,11 +340,22 @@ def build_turn_prompt(state_card: str, rolling_summary: str,
                if last_author == "phil" else
                f"Reply as @{speaker}.")
 
+    # `others`: bots that can actually speak next. Mentioning one that is saving usage
+    # or out gets no answer, and the speaker ends up talking to itself.
+    if others is None:
+        handoff = "Mention another bot (@claude, @codex, @grok, @gemini) to hand off or ask a question."
+    elif others:
+        handoff = ("Mention another bot in the room right now ("
+                   + ", ".join(f"@{b}" for b in others)
+                   + ") to hand off or ask a question; the others are saving usage or out.")
+    else:
+        handoff = ("You are the only bot in the room right now (the others are saving usage or out). "
+                   "Don't hand off to another bot; answer Phil yourself.")
     parts.append(
         f"[Your Turn: @{speaker}]\n"
         f"{lead_in} Keep your answer friendly, concise, and under {reply_words} words. "
         f"Never write code or edit files here; do that in normal tasks. "
-        f"Mention another bot (@claude, @codex, @grok, @gemini) to hand off or ask a question."
+        f"{handoff}"
     )
     return "\n\n".join(parts)
 
@@ -503,7 +515,8 @@ def run_room(room: str = DEFAULT_ROOM,
             recent_text = format_recent(messages, RECENT_MESSAGES_COUNT)
             prompt = build_turn_prompt(
                 card, state.rolling_summary, recent_text,
-                speaker, primary, last_msg.author if last_msg else None
+                speaker, primary, last_msg.author if last_msg else None,
+                others=[b for b in eligible if b != speaker],
             )
             prompt_chars = len(prompt)
 

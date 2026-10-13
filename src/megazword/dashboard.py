@@ -368,7 +368,13 @@ class App:
         turns = body.get("turns")
         if turns is not None and (not isinstance(turns, int) or not 1 <= turns <= 50):
             raise ValueError("turns must be 1-50")
-        project = self.project_for(body.get("project") or self.cfg.room_primary)
+        if body.get("project"):
+            project = self.project_for(body["project"])
+        else:
+            try:
+                project = self.project_for(self.cfg.room_primary)
+            except ValueError:  # room primary not set up on this PC (fresh install): launch project
+                project = self.project
         from . import cli
         self._room_session = (name, uuid.uuid4().hex)
         self._room_thread = threading.Thread(
