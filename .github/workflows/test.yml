@@ -20,12 +20,18 @@ jobs:
     runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 20
     steps:
+      - name: Restore runner PowerShell policy
+        shell: cmd
+        run: powershell.exe -NoProfile -Command "Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Undefined -Force"
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - name: Create virtual environment (local Python 3.11)
         shell: cmd
         run: C:\Tools\Python311\python.exe -m venv .venv
+      - name: Add virtual environment to PATH
+        shell: cmd
+        run: echo %GITHUB_WORKSPACE%\.venv\Scripts>>%GITHUB_PATH%
       - name: Install
         shell: cmd
         run: .venv\Scripts\python.exe -m pip install -e ".[dev]"
