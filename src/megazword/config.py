@@ -75,7 +75,9 @@ DEFAULT_FREE = {
     "zai": "glm-4.5-flash",
     "gemini-api": "gemini-flash-latest",
     "nvidia": "meta/llama-3.1-8b-instruct",
-    "mistral": "mistral-small-latest",
+    # The free account returns 429/code 1300 for Mistral Small but allows
+    # Ministral 3B under the same key and API limits (verified 2026-10-14).
+    "mistral": "ministral-3b-2512",
 }
 
 DEFAULT_FREE_FAILOVER = ["kimi", "qwen-coder", "deepseek", "groq", "gemini-api",

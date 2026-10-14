@@ -251,7 +251,7 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
         ),
         OpenAICompatibleBackend(
             "mistral", base_url="https://api.mistral.ai/v1",
-            model=m.get("mistral", "mistral-small-latest"),
+            model=m.get("mistral", "ministral-3b-2512"),
             key_env="MISTRAL_API_KEY", trains_on_data=True,
         ),
         # OpenRouter chooses the serving provider. Its training policy can

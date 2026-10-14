@@ -211,6 +211,8 @@ def test_presets_config_and_routes(monkeypatch):
     assert backends["openrouter"].key_env == "OPENROUTER_API_KEY"
     assert backends["groq"].key_env == "GROQ_API_KEY"
     assert config.DEFAULT_FREE["openrouter"].endswith(":free")
+    assert config.DEFAULT_FREE["mistral"] == "ministral-3b-2512"
+    assert default_backends()["mistral"].model == "ministral-3b-2512"
     assert cfg.route == config.DEFAULT_ROUTE
     generated = config.render_default(list(backends))
     assert "openrouter" not in generated and "groq" not in generated
