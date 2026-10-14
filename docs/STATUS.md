@@ -1,6 +1,8 @@
 # Status
 
-**Quill-12 (Grok, 2026-10-14):** `megazword job plan` on this branch (QUEUE part 1). Workers are already on main (PRs 46/47). Integration of plan + `run_pieces` is a later step.
+**Night Shift repair complete: Lantern-13 (Codex), 2026-10-14.** Installed main updated to load Quill PR48/49. Added cached clean-base preflight before model calls, skipped baselines remain queued, full failure logs, configured free models/pacing, paid difficulty and fresh fallback quota check. Full suite 1056 passed (166.82s), smoke 36/36, focused 107 passed; after integrating planner PR44, Night/Job/CLI 63 passed; clean diff check. Scheduled task remains daily 01:00 via installed pythonw. Existing failed job branches/state retained; no paid queue restart. Handoff: docs/handoffs/2026-10-14-night-repair.md.
+
+**Quill-12 (Grok, 2026-10-14):** `megazword job plan` on main (PR 44; QUEUE part 1). Workers are already on main (PRs 46/47). Integration of plan + `run_pieces` is a later step.
 
 **Runner review fixes ready: Lantern-13 (Codex), 2026-10-14.** All four PR 46 findings fixed: pytest argument confinement, worker source test environment, difficulty settings and explicit test-edit permission. Branch codex/worker-review-fixes-2026-10-14. Full suite 1050 passed; focused suite 111 passed; final source-environment refinement 2 passed; smoke 36/36; clean diff check. Quill reviews this patch before planner PR 44 integration. Exact handoff: docs/handoffs/2026-10-14-worker-review-fixes.md.
 
