@@ -320,6 +320,6 @@ def test_provider_training_labels_match_developer_api_terms():
     assert backends["mistral"].trains_on_data
 
 
-def test_gemini_api_default_model_is_flash_latest():
-    assert config.DEFAULT_FREE["gemini-api"] == "gemini-flash-latest"
-    assert default_backends()["gemini-api"].model == "gemini-flash-latest"
+def test_gemini_api_default_model_is_flash_lite():
+    assert config.DEFAULT_FREE["gemini-api"] == "gemini-3.5-flash-lite"
+    assert default_backends()["gemini-api"].model == "gemini-3.5-flash-lite"

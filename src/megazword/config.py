@@ -73,7 +73,7 @@ DEFAULT_FREE = {
     "groq": "llama-3.3-70b-versatile",
     "cloudflare": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "zai": "glm-4.5-flash",
-    "gemini-api": "gemini-flash-latest",
+    "gemini-api": "gemini-3.5-flash-lite",
     "nvidia": "meta/llama-3.1-8b-instruct",
     # The free account returns 429/code 1300 for Mistral Small but allows
     # Ministral 3B under the same key and API limits (verified 2026-10-14).
