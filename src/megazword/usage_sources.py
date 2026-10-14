@@ -149,11 +149,13 @@ def codex_live(timeout: float = 15) -> PlanUsage | None:
             except ValueError:
                 continue
             if msg.get("id") == 2:
+                checked_at = datetime.now(timezone.utc)
                 limits = (msg.get("result") or {}).get("rateLimits") or {}
                 windows = [Window(_window_label(w.get("windowDurationMins")),
                                   float(w.get("usedPercent") or 0), _ts(w.get("resetsAt")))
                            for w in (limits.get("primary"), limits.get("secondary")) if w]
-                return PlanUsage("codex", windows, "codex app-server (live)") if windows else None
+                return PlanUsage("codex", windows, "codex app-server (live)",
+                                 as_of=checked_at) if windows else None
         return None
     finally:
         timer.cancel()

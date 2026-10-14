@@ -27,14 +27,18 @@ class Summary:
     as_of: datetime | None = None  # None = read just now
     stale: bool = False
     note: str = ""
+    windows: tuple[tuple[str, float], ...] = ()
 
     def line(self) -> str:
         """One plain line (no colour), e.g. 'codex   out until Sun Oct 11 02:45 AM'."""
         if self.state == "out":
             text = f"out until {self.out_until.astimezone():%a %b %d %I:%M %p}"
         elif self.state == "meter":
-            filled = max(0, min(10, round(self.used / 10)))
-            text = f"[{'#' * filled}{'.' * (10 - filled)}] {self.used:3.0f}% {self.window}"
+            if len(self.windows) > 1:
+                text = " / ".join(f"{used:.0f}% {name}" for name, used in self.windows)
+            else:
+                filled = max(0, min(10, round(self.used / 10)))
+                text = f"[{'#' * filled}{'.' * (10 - filled)}] {self.used:3.0f}% {self.window}"
         else:
             text = shorten(self.note or "no meter", width=60, placeholder="...")
         if self.as_of and self.state != "out":
@@ -54,7 +58,8 @@ def summarize(plan: PlanUsage, out_until: dict[str, datetime],
     if known:
         worst = max(known, key=lambda w: w.used_percent)
         return Summary(plan.service, "meter", worst.used_percent, worst.name,
-                       as_of=as_of, stale=stale)
+                       as_of=as_of, stale=stale,
+                       windows=tuple((w.name, w.used_percent) for w in known))
     return Summary(plan.service, "none", note=plan.note if not plan.windows else "no meter",
                    as_of=as_of, stale=stale)
 
