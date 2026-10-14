@@ -364,8 +364,10 @@ There is no phone-model answering backend yet.
 Night Shift does real work while you sleep. It reads `docs/QUEUE.md` on GitHub
 (`edotwedo/mega-zword` main) and runs each open line as a job:
 
-1. Reads usage. An AI with less than 15% left, no meter, or an old reading gets
-   no night work. Claude and Codex can take jobs (they can edit files on Windows).
+1. Reads usage. Free HTTP APIs and Ollama can take jobs without a meter; a 429
+   moves to the next free backend. Paid CLIs (Claude, Codex, Grok) stay
+   fail-closed: less than 15% left, no meter, or an old reading gets no night
+   work. Free backends edit through Mega Zword's coding loop.
 2. Makes a fresh copy of the job's repo under `~\.megazword\night\`, never your
    own working folders.
 3. The AI with the most room edits files there. If it changes nothing, the next
@@ -376,7 +378,10 @@ Night Shift does real work while you sleep. It reads `docs/QUEUE.md` on GitHub
    summary to Q with no @-tags.
 
 - Run now: `megazword night run` (`--max 3` jobs, `--job-minutes 30` per job,
-  `--floor 15` percent).
+  `--floor 15` percent). `--max` is how many jobs this run tries, one after
+  another (not in parallel). When a job hits the time cap, Mega Zword kills
+  the AI CLI and every child it started (the `node` process under Codex's
+  `.cmd` shim), marks the job failed, and goes to the next line.
 - Turn on every night: `megazword night install --at 01:00 --yes`. It's a
   Windows scheduled task that runs as you, with no window. It only runs while
   you're signed in (a locked PC is fine) and won't start on battery.

@@ -131,7 +131,8 @@ def test_wall_timeout(tmp_path, monkeypatch):
         return original(*args, **kwargs)
     monkeypatch.setattr(model, "chat", slow)
     assert "wall-clock" in loop.run("job").error
-    assert model.seen[0][2] <= 0.01
+    # 0.01 is not binary-exact; the cap must still be the wall, not the 0.02 sleep.
+    assert model.seen[0][2] <= 0.01 + 1e-8
 
 
 def test_output_tail_and_no_model_commands(tmp_path):
@@ -182,6 +183,7 @@ def test_ollama_edit_uses_text_protocol(tmp_path, monkeypatch):
     loop = agent.wrap(OllamaBackend("ollama", model="local"), {"root": tmp_path})
     assert loop.run("job").text == "local done"
     assert seen[0][1] == "local" and seen[0][2]["json_format"]
+    assert seen[0][2]["messages"][0]["role"] == "system"
 
 
 def test_listing_filters_private_paths(tmp_path):
@@ -414,7 +416,7 @@ def test_ollama_missing_model_uses_first_installed(tmp_path, monkeypatch, capsys
         assert body["model"] == "qwen2.5:1.5b"
         tool = "list_files" if len(seen) == 3 else "finish"
         args = {"glob": "*"} if tool == "list_files" else {"summary": "done"}
-        return io.BytesIO(json.dumps({"response": json.dumps({"tool": tool, "arguments": args})}).encode())
+        return io.BytesIO(json.dumps({"message": {"content": json.dumps({"tool": tool, "arguments": args})}}).encode())
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)
     model = OllamaBackend("ollama", model="missing")
     loop = agent.wrap(model, {"root": tmp_path})

@@ -1,6 +1,10 @@
 # Status
 
-**Quill-12 (Grok, 2026-10-14):** following Sorrel-12. `megazword job plan` on `grok/parallel-workers-2026-10-13` (QUEUE part 1: split + save job.json, fake AI tests). Workers not in this PR. Mega Zword only. `test_say_start_and_view` passes on current main.
+**Quill-12 (Grok, 2026-10-14):** `megazword job plan` on this branch (QUEUE part 1). Workers are already on main (PRs 46/47). Integration of plan + `run_pieces` is a later step.
+
+**Runner review fixes ready: Lantern-13 (Codex), 2026-10-14.** All four PR 46 findings fixed: pytest argument confinement, worker source test environment, difficulty settings and explicit test-edit permission. Branch codex/worker-review-fixes-2026-10-14. Full suite 1050 passed; focused suite 111 passed; final source-environment refinement 2 passed; smoke 36/36; clean diff check. Quill reviews this patch before planner PR 44 integration. Exact handoff: docs/handoffs/2026-10-14-worker-review-fixes.md.
+
+**Parallel-worker runner ready: Lantern-13, 2026-10-14 (Sorrel-12 part 2).** `job_workers.run_pieces` handles separate worktrees, free coding-loop failover, one metered paid retry, file/test/secret/branch checks, commits and persisted results. No planner/CLI changes or merge to main. Full suite 1030 passed; final runner suite 12 passed; smoke 36/36. Quill-12 integrates with plan-only PR 44 and owns combine/review/push. Local Ollama live trials were correctly rejected (step cap/no edits); no real-model success claimed. Exact contract and validation: `docs/handoffs/2026-10-14-parallel-worker-runner.md`.
 
 **OpenRouter catalog and free coding failover (Reed-13, Codex worker for Sorrel-12, 2026-10-13):** Local, uncommitted changes in `mz-seats/codex-catalog`: `kimi`, `deepseek`, `qwen-coder`, configurable models and in-loop free-backend failover preserving edits/history/tests. GUIDE includes OpenRouter key setup and model/privacy caveats. Focused fake-backend suite: 180 passed. Full suite attempted: 1000 passed, 5 failed, 9 errors; Windows sandbox denies taskkill, Git local clone signal pipes and the registry test fails. Exact validation and next step: `docs/handoffs/2026-10-13-openrouter-catalog.md`. No commit or push at Phil's request.
 

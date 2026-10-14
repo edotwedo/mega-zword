@@ -104,6 +104,7 @@ class AgentBackend(Backend):
     wall_timeout: float = 600
     test_timeout: float = 120
     test_command: tuple[str, ...] = ("python", "-m", "pytest", "-q", "-x")
+    allow_test_edits: bool | None = None
     text_protocol: bool = False
     pace: dict[str, float] = field(default_factory=dict)
     reviewer: str = ""
@@ -321,10 +322,10 @@ class AgentBackend(Backend):
                 if isinstance(self.model_backend, OllamaBackend):
                     from .ollama import generate
                     return {"content": generate(json.dumps(sent), self._ollama_model,
-                            self.model_backend.url, json_format=True,
-                            timeout=min(self.call_timeout, remaining, self.model_backend.timeout))}
+                            self.model_backend.url, json_format=True, messages=sent,
+                            timeout=min(self.call_timeout, self.wall_timeout, remaining, self.model_backend.timeout))}
                 return self.model_backend.chat(sent, tools=None if text_mode else TOOLS,
-                                               timeout=min(self.call_timeout, remaining, self.model_backend.timeout))
+                                               timeout=min(self.call_timeout, self.wall_timeout, remaining, self.model_backend.timeout))
             except (APIHTTPError, urllib.error.HTTPError) as exc:
                 if (isinstance(self.model_backend, OllamaBackend) and exc.code == 404
                         and not self._ollama_fallback):
@@ -388,7 +389,8 @@ class AgentBackend(Backend):
         self._attempted = {self.model_backend.name}
         self._edited = self._tests_passed = False
         self._originals = {}
-        self._allow_test_edits = bool(re.search(r"\b(?:tests?|testing|pytest|unittest)\b", prompt, re.I))
+        self._allow_test_edits = (self.allow_test_edits if self.allow_test_edits is not None else
+                                 bool(re.search(r"\b(?:tests?|testing|pytest|unittest)\b", prompt, re.I)))
         self._ollama_model = getattr(self.model_backend, "model", "")
         self._ollama_fallback = False
         previous_call, repeats = None, 0

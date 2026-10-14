@@ -2,6 +2,8 @@
 
 import os
 import subprocess
+import sys
+import time
 from types import SimpleNamespace
 
 from megazword.backends import process_group
@@ -15,6 +17,60 @@ def test_process_group_hides_console_on_windows():
         assert flags["creationflags"] == hidden
     else:
         assert flags.get("start_new_session") is True
+
+
+def _pid_alive(pid: int) -> bool:
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
+    import ctypes
+    handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+    if not handle:
+        return False
+    try:
+        code = ctypes.c_ulong()
+        if ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+            return code.value == 259  # STILL_ACTIVE
+        return True
+    finally:
+        ctypes.windll.kernel32.CloseHandle(handle)
+
+
+def test_kill_tree_kills_grandchild(tmp_path):
+    """A timed-out CLI is a .cmd/.exe shim plus a child (node). Both must die."""
+    marker = tmp_path / "child.pid"
+    nested = (
+        "import os, sys, time, pathlib\n"
+        "pathlib.Path(sys.argv[1]).write_text(str(os.getpid()), encoding='utf-8')\n"
+        "time.sleep(60)\n"
+    )
+    parent = (
+        "import subprocess, sys, time\n"
+        "child = subprocess.Popen([sys.executable, '-c', sys.argv[1], sys.argv[2]])\n"
+        "time.sleep(60)\n"
+    )
+    proc = subprocess.Popen(
+        [sys.executable, "-c", parent, nested, str(marker)],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        **backends.process_group(),
+    )
+    try:
+        for _ in range(50):
+            if marker.exists():
+                break
+            time.sleep(0.05)
+        assert marker.exists(), "grandchild never started"
+        child_pid = int(marker.read_text(encoding="utf-8"))
+        assert _pid_alive(proc.pid)
+        assert _pid_alive(child_pid)
+        backends._kill_tree(proc)
+        assert not _pid_alive(proc.pid)
+        assert not _pid_alive(child_pid)
+    finally:
+        backends._kill_tree(proc)
 
 
 def test_windows_cleanup_also_hides_its_console(monkeypatch):
