@@ -37,6 +37,7 @@ def test_append_creates_parents_and_writes_json_records(tmp_path):
     for record in records:
         stamp = datetime.fromisoformat(record.pop("time"))
         assert stamp.utcoffset().total_seconds() == 0
+        assert stamp.microsecond == 0
         assert before <= stamp <= after
     assert records == [
         {"backend": "test", "text": "café\nnext line", "n": 1},
@@ -50,6 +51,26 @@ def test_append_preserves_supplied_time(tmp_path):
     assert json.loads(path.read_text(encoding="utf-8")) == {
         "time": "recorded earlier", "n": 3,
     }
+
+
+# Additional coverage retained from night/2026-10-14-1 (0d81d40).
+def test_append_trims_existing_records_to_exact_newest(tmp_path):
+    path = tmp_path / "run.jsonl"
+    for index in range(6):
+        log.append(path, max_lines=5, index=index, message="x" * 150)
+    assert len(path.read_text(encoding="utf-8").splitlines()) == 6
+
+    log.append(path, max_lines=5, index=6, message="x" * 150)
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert [record["index"] for record in records] == [2, 3, 4, 5, 6]
+
+
+def test_byte_precheck_leaves_small_file_unchanged(tmp_path, trim_file):
+    path = tmp_path / "run.jsonl"
+    original = b"x\n" * 7
+    path.write_bytes(original)
+    assert trim_file(path, keep=5) is False
+    assert path.read_bytes() == original
 
 
 @pytest.mark.parametrize("keep", [0, -1])

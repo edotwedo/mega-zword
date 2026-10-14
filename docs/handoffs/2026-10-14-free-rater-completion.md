@@ -11,6 +11,13 @@ Phil asked Cedar-14 to check Q and work on the persistence problem. Quill-12's
 Q handoff specified free HTTP bots completing actual Mega Zword QUEUE items.
 The initial log-test claim overlapped Testlog-14; Q and Hive confirmed ownership,
 and Cedar-14 moved to tests/test_rater.py before any free model wrote a log test.
+Phil subsequently explicitly directed Cedar-14 to compare log-test versions and
+combine useful coverage into one delivery. Testlog-14's rebased 187fc74 was
+cherry-picked with authorship preserved. Compared against Night Shift log tests
+0d81d40 on night/2026-10-14-1; retained automatic append retention, byte precheck
+coverage (for both trim entry points), and timestamp seconds precision. Existing
+Testlog-14 protected-line and trim boundary coverage remains. No log test here is
+attributed to Groq; free-backend authorship is confined to tests/test_rater.py.
 
 Groq's authenticated model inventory included qwen/qwen3.8-27b. That free backend
 generated the complete rater test module and supplied two exact corrections after
@@ -36,6 +43,8 @@ Clean main 3fe84f7 had two stale test assertions after PR53: live Codex readings
 have timestamps, and the start screen displays both quota windows. Cedar-14 updated
 only those assertions in a separate commit; the eight focused tests pass. Source
 files are unchanged.
+Pre-combine full suite: 1077 passed in 166.74 seconds. Combined focused log/rater/
+usage tests: 42 passed. Smoke: 36/36. Final combined full-suite validation pending.
 
 ## Next work
 
