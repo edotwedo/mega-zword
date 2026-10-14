@@ -6,6 +6,7 @@ import difflib
 import json
 import os
 import re
+import sys
 from pathlib import Path
 import subprocess
 import tempfile
@@ -26,6 +27,8 @@ DEFAULT_PACE = {"gemini-api": 6, "mistral": 2, "groq": 2, "cloudflare": 1,
 
 def pace_call(name, pace, deadline):
     """Reserve a call start while holding a cross-process provider lock."""
+    if name in ("kimi", "deepseek", "qwen-coder"):
+        name = "openrouter"  # One key/quota and pacing lock across aliases.
     gap = pace.get(name, DEFAULT_PACE.get(name, 0))
     if gap <= 0:
         return
@@ -91,6 +94,9 @@ def _scrub_values(value):
 @dataclass
 class AgentBackend(Backend):
     model_backend: Backend | None = None
+    fallback_backends: list[Backend] = field(default_factory=list)
+    backends_used: list[str] = field(default_factory=list)
+    requests_by_backend: dict[str, int] = field(default_factory=dict)
     root: Path = field(default_factory=Path.cwd)
     max_steps: int = 30
     max_chars: int = 12000
@@ -274,6 +280,7 @@ class AgentBackend(Backend):
             raise TimeoutError("agent wall-clock cap reached during review")
         timeout = min(self.call_timeout, remaining, backend.timeout)
         self.request_count += 1
+        self.requests_by_backend[backend.name] = self.requests_by_backend.get(backend.name, 0) + 1
         self.prompt_chars += len(prompt)
         if isinstance(backend, OllamaBackend):
             from .ollama import generate
@@ -307,15 +314,17 @@ class AgentBackend(Backend):
             if remaining <= 0:
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
             self.request_count += 1
+            name = self.model_backend.name
+            self.requests_by_backend[name] = self.requests_by_backend.get(name, 0) + 1
             self.prompt_chars += len(json.dumps(sent))
             try:
                 if isinstance(self.model_backend, OllamaBackend):
                     from .ollama import generate
                     return {"content": generate(json.dumps(sent), self._ollama_model,
                             self.model_backend.url, json_format=True,
-                            timeout=min(self.call_timeout, remaining))}
+                            timeout=min(self.call_timeout, remaining, self.model_backend.timeout))}
                 return self.model_backend.chat(sent, tools=None if text_mode else TOOLS,
-                                               timeout=min(self.call_timeout, remaining))
+                                               timeout=min(self.call_timeout, remaining, self.model_backend.timeout))
             except (APIHTTPError, urllib.error.HTTPError) as exc:
                 if (isinstance(self.model_backend, OllamaBackend) and exc.code == 404
                         and not self._ollama_fallback):
@@ -333,16 +342,50 @@ class AgentBackend(Backend):
                     continue
                 if exc.code not in (429, 500, 502, 503) or retries >= 3:
                     raise
+                if self._has_fallback():
+                    raise  # Switch immediately instead of waiting on this provider.
                 delay = (2, 5, 10)[retries]
                 if self._deadline - time.monotonic() <= delay:
                     raise TimeoutError("agent wall-clock cap reached during retry backoff") from None
                 time.sleep(delay)
                 retries += 1
 
+    def _has_fallback(self):
+        return any(b.name not in self._attempted for b in self.fallback_backends)
+
+    def _failover(self, exc):
+        if isinstance(exc, ToolsUnsupported):
+            return False
+        if not isinstance(exc, (APIHTTPError, urllib.error.HTTPError,
+                                urllib.error.URLError, TimeoutError, RuntimeError)):
+            return False
+        if time.monotonic() >= self._deadline:
+            return False
+        for backend in self.fallback_backends:
+            if backend.name in self._attempted:
+                continue
+            self._attempted.add(backend.name)
+            if not backend.available():
+                continue
+            old = self.model_backend.name
+            self.model_backend = backend
+            # Once a training provider has participated, keep output scrubbing.
+            self.trains_on_data = self.trains_on_data or backend.trains_on_data
+            self._ollama_model = getattr(backend, "model", "")
+            self._ollama_fallback = False
+            self.backends_used.append(backend.name)
+            print(f"[megazword] coding loop: {old} failed ({scrub(str(exc))}); "
+                  f"continuing with {backend.name}", file=sys.stderr)
+            return True
+        return False
+
     def _run(self, prompt):
         self.root = self.root.resolve()
         self._deadline = time.monotonic() + self.wall_timeout
         self.request_count = self.prompt_chars = self.answer_chars = 0
+        self.backends_used = [self.model_backend.name]
+        self.requests_by_backend = {}
+        self._attempted = {self.model_backend.name}
         self._edited = self._tests_passed = False
         self._originals = {}
         self._allow_test_edits = bool(re.search(r"\b(?:tests?|testing|pytest|unittest)\b", prompt, re.I))
@@ -366,8 +409,10 @@ class AgentBackend(Backend):
                 messages = self._text_history(messages)
                 messages.append({"role": "user", "content": "Use the fenced JSON tool protocol."})
                 continue
-            except APIHTTPError as exc:
-                if self.name == "cloudflare" and exc.code in (400, 422) and not compacted:
+            except (APIHTTPError, RuntimeError, TimeoutError,
+                    urllib.error.HTTPError, urllib.error.URLError) as exc:
+                if (isinstance(exc, APIHTTPError) and self.model_backend.name == "cloudflare"
+                        and exc.code in (400, 422) and not compacted):
                     text_mode = compacted = True
                     history = self._text_history(messages)
                     # Keep the task and recent observations; remove native fields.
@@ -376,7 +421,15 @@ class AgentBackend(Backend):
                         message["content"] = message["content"][-2000:]
                     messages.append({"role": "user", "content": "History trimmed after API rejection. Inspect files again if needed. Use one fenced JSON tool object."})
                     continue
-                raise
+                if not self._failover(exc):
+                    raise
+                text_mode = True
+                compacted = False
+                messages = self._text_history(messages)
+                messages.append({"role": "user", "content":
+                    "Continue the same task from the current files and tool results. "
+                    "The previous backend failed. Use the fenced JSON tool protocol."})
+                continue
             self.answer_chars += len(json.dumps(reply))
             if time.monotonic() >= self._deadline:
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
@@ -469,7 +522,10 @@ class AgentBackend(Backend):
                 for m in messages]
 
 
-def wrap(backend, settings=None, reviewer_backend=None):
+def wrap(backend, settings=None, reviewer_backend=None, fallback_backends=None):
+    settings = dict(settings or {})
+    settings.pop("failover_order", None)  # CLI selects candidates; not an agent field.
     return AgentBackend(backend.name, timeout=backend.timeout,
                         trains_on_data=backend.trains_on_data,
-                        model_backend=backend, reviewer_backend=reviewer_backend, **(settings or {}))
+                        model_backend=backend, reviewer_backend=reviewer_backend,
+                        fallback_backends=list(fallback_backends or []), **settings)

@@ -65,6 +65,9 @@ DEFAULT_ROUTE = {
 }
 
 DEFAULT_FREE = {
+    "kimi": "moonshotai/kimi-k2.6:free",
+    "deepseek": "deepseek/deepseek-chat-v3.1:free",
+    "qwen-coder": "qwen/qwen3-coder:free",
     "ollama": "qwen2.5-coder:7b",
     "openrouter": "qwen/qwen3-4b:free",
     "groq": "llama-3.3-70b-versatile",
@@ -74,6 +77,9 @@ DEFAULT_FREE = {
     "nvidia": "meta/llama-3.1-8b-instruct",
     "mistral": "mistral-small-latest",
 }
+
+DEFAULT_FREE_FAILOVER = ["kimi", "qwen-coder", "deepseek", "groq", "gemini-api",
+                         "cloudflare", "mistral", "ollama"]
 
 # API keys Mega Zword reads. On Windows a key set with
 # SetEnvironmentVariable(..., "User") is missing from shells and subprocesses
@@ -217,6 +223,12 @@ def load(path: Path | None = None) -> Config:
                 if not isinstance(value, str):
                     raise ValueError("agent.reviewer must be a backend name")
                 value = value.strip()
+            elif key == "failover_order":
+                if not isinstance(value, list) or any(
+                        not isinstance(name, str) or name not in DEFAULT_FREE for name in value):
+                    raise ValueError("agent.failover_order must be a list of free backend names")
+                if len(value) != len(set(value)):
+                    raise ValueError("agent.failover_order must not contain duplicates")
             else:
                 raise ValueError(f"unknown agent setting: {key}")
             cfg.agent[key] = value

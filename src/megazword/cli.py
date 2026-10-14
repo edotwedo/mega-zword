@@ -574,9 +574,15 @@ def main(argv: list[str] | None = None,
             reviewers.update({name: b for name, b in backends.items()
                               if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))})
             reviewer = reviewers.get(cfg.agent["reviewer"])
-        chain = [wrap(b, cfg.agent, reviewer) if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))
+        order = cfg.agent.get("failover_order", config.DEFAULT_FREE_FAILOVER)
+        fallbacks = [backends[name] for name in order if name in backends
+                     and name not in cfg.out_now()
+                     and isinstance(backends[name], (OpenAICompatibleBackend, OllamaBackend))]
+        for backend in [*chain, *fallbacks]:
+            backend.timeout = cfg.timeouts.get(backend.name, backend.timeout)
+        chain = [wrap(b, cfg.agent, reviewer, fallbacks) if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))
                  else b for b in chain]
-    # A forced AI (-m) never escalates; otherwise move up the chain on failure.
+    # Forced CLI AIs never escalate. Free coding agents can switch internally.
     code = execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))
     if args.edit:
         from .agent import AgentBackend
@@ -625,6 +631,9 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
                    rejected=reason, prompt_chars=agent.prompt_chars if agent else len(prompt),
                    answer_chars=agent.answer_chars if agent else len(result.text),
                    requests=agent.request_count if agent else 1,
+                   backends_used=agent.backends_used if agent else [name],
+                   final_backend=agent.model_backend.name if agent else name,
+                   requests_by_backend=agent.requests_by_backend if agent else {name: 1},
                    est_tokens=(agent.prompt_chars + agent.answer_chars) // 4 if agent else
                               (len(prompt) + len(result.text)) // 4,
                    trains_on_data=trains)
@@ -659,7 +668,9 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         print(result.text)
     else:
         on_answer(result.text)
-    print(f"[megazword] {result.backend} answered in {result.seconds:.1f}s"
+    agent = next((b for b in chain if b.name == result.backend and hasattr(b, "model_backend")), None)
+    answer_name = agent.model_backend.name if agent else result.backend
+    print(f"[megazword] {answer_name} answered in {result.seconds:.1f}s"
           + (" (after escalating)" if outcome.escalated else ""), file=sys.stderr)
     return 0
 

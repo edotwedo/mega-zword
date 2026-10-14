@@ -541,6 +541,7 @@ def test_cloudflare_rejection_flattens_and_trims_history(tmp_path):
     loop, model = coding(tmp_path, [call("read_file", path="a.py"), ToolsUnsupported("schema"),
         APIHTTPError(400, reason="context too long"), call("finish", summary="done")])
     loop.name = "cloudflare"
+    model.name = "cloudflare"
     assert loop.run("job").ok
     assert model.seen[2][1] is None and model.seen[3][1] is None
     history = model.seen[3][0]
@@ -551,8 +552,9 @@ def test_cloudflare_rejection_flattens_and_trims_history(tmp_path):
 
 def test_cloudflare_invalid_request_recovery_is_bounded(tmp_path):
     from megazword.free_apis import APIHTTPError
-    loop, _ = coding(tmp_path, [APIHTTPError(400, reason="context too long")] * 2)
+    loop, model = coding(tmp_path, [APIHTTPError(400, reason="context too long")] * 2)
     loop.name = "cloudflare"
+    model.name = "cloudflare"
     result = loop.run("job")
     assert not result.ok and "context too long" in result.error
     assert loop.request_count == 2

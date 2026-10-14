@@ -427,6 +427,53 @@ For the available commands and options on this version, use `megazword --help`.
 
 ## Free AIs that code
 
+### Kimi, DeepSeek and Qwen Coder through OpenRouter
+
+Sign in with Google at [openrouter.ai](https://openrouter.ai), open **Keys**,
+then **Create Key**. Keep the key private. Save it in PowerShell:
+
+```powershell
+setx OPENROUTER_API_KEY "paste-your-key-here"
+```
+
+Open a new terminal. One key enables `kimi`, `deepseek`, `qwen-coder` and
+`openrouter`. Select them for a normal answer or a coding run:
+
+```powershell
+megazword run -m kimi "Explain this function"
+megazword run -e -m kimi "Fix the failing test in this folder"
+megazword run -e -m qwen-coder "Fix the failing test in this folder"
+```
+
+Override model IDs in `~/.megazword/config.toml`:
+
+```toml
+[free.kimi]
+model = "moonshotai/kimi-k2.6:free"
+[free.deepseek]
+model = "deepseek/deepseek-chat-v3.1:free"
+[free.qwen-coder]
+model = "qwen/qwen3-coder:free"
+```
+
+Check the exact ID and price at [openrouter.ai/models](https://openrouter.ai/models)
+before using it: IDs and free endpoints change. The defaults prefer published
+`:free` variants, including [Kimi K2.6](https://openrouter.ai/moonshotai/kimi-k2.6:free),
+[DeepSeek V3.1](https://openrouter.ai/deepseek/deepseek-chat-v3.1:free) and
+[Qwen3 Coder](https://openrouter.ai/qwen/qwen3-coder:free).
+To choose the newest K-series instead of the free default, check
+[Kimi Latest](https://openrouter.ai/~moonshotai/kimi-latest) and set its model ID;
+that alias can be paid. Mega Zword never upgrades a free ID to a paid ID automatically.
+Free models still have quota limits; paid IDs spend OpenRouter credit.
+
+These three backends are marked as training on data conservatively: an unknown
+serving-provider policy counts as `True`, so prompts and file results are scrubbed.
+[OpenRouter's privacy policy](https://openrouter.ai/privacy/) explains that data
+practices vary by serving provider. Check your OpenRouter privacy settings and
+the chosen provider's policy. A scrub cannot guarantee removal of all private data.
+
+### Coding loop and automatic failover
+
 Free API models can edit files through Mega Zword's own coding loop:
 
 ```powershell
@@ -434,7 +481,7 @@ megazword run -e -m groq "Fix the failing test in this folder. Run tests and sum
 ```
 
 Set the provider's API key as described below. This also works with `openrouter`,
-`gemini-api`, `mistral`, `cloudflare`, `zai`, and `nvidia`. Availability and quota
+`kimi`, `deepseek`, `qwen-coder`, `gemini-api`, `mistral`, `cloudflare`, `zai`, and `nvidia`. Availability and quota
 still depend on the provider. No live API call was used to test this feature.
 For local Ollama, pull the configured model, then use `-m ollama`. Its default is
 `qwen2.5-coder:7b`; change it under `[free.ollama]` with `model = "your-model"`.
@@ -452,8 +499,19 @@ Review the files after a run, including one that stops early.
 After an edit, a passing test command ends the run successfully, subject to the
 test quality gate and optional review below. Three identical
 tool calls in a row prompt the model to finish. Edits to `test_*.py`, `*_test.py`
-and files under `tests/` require the job to mention tests. API errors 429, 500,
-502 and 503 get three retries, after 2, 5 and 10 seconds, within the run's time cap.
+and files under `tests/` require the job to mention tests.
+
+On an API failure (including 429 or a timeout), the coding loop tries the next
+available free backend within the same run, even with `-m kimi`. Your selected
+backend goes first, followed by `kimi`, `qwen-coder`, `deepseek`, `groq`,
+`gemini-api`, `cloudflare`, `mistral`, `ollama`. Missing keys, unavailable local
+Ollama and backends marked out in config are skipped. Each backend is tried at
+most once in this order. The task, tool observations, current files, test results
+and quality gate carry forward; the step and wall-clock caps do not reset.
+The terminal reports each switch. CLI coders keep their usual routing.
+When there are no remaining fallback candidates, 429, 500, 502 and 503 retain
+the three retries after 2, 5 and 10 seconds. Tool-format rejections first try the
+existing JSON protocol. Test failures and reviewer rejection do not cause a switch.
 
 Native tool calls are preferred. If the provider rejects them or the model replies
 with text, the loop switches to JSON tool replies. Set `text_protocol = true` to
@@ -464,6 +522,8 @@ Optional settings in `~/.megazword/config.toml`:
 
 ```toml
 [agent]
+# [] disables automatic backend switching. Only free/API/local backend names.
+failover_order = ["kimi", "qwen-coder", "deepseek", "groq", "gemini-api", "cloudflare", "mistral", "ollama"]
 max_steps = 30
 max_chars = 12000
 call_timeout = 60
@@ -511,5 +571,6 @@ yourself for the project. Tests execute project code with your normal permission
 the file tools' path rules do not sandbox that code. Each call's timeout is also
 bounded by the time left in the run and the backend's `[timeouts]` setting.
 Runs stop on a cap or error and leave edits for review. The normal run log records
-the request count and estimated tokens. Stats count those model requests and use
+the request count, backend switch history, requests by backend and estimated tokens.
+Stats count those model requests and use
 the coding run's final outcome for their success rate.

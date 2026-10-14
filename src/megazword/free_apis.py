@@ -151,6 +151,9 @@ def http_error_message(code: int, headers=None) -> str:
 
 # Names shown in `megazword backends` / doctor. Never put these on DEFAULT_ROUTE.
 FREE_KEYS = (
+    ("kimi", "OPENROUTER_API_KEY"),
+    ("deepseek", "OPENROUTER_API_KEY"),
+    ("qwen-coder", "OPENROUTER_API_KEY"),
     ("openrouter", "OPENROUTER_API_KEY"),
     ("groq", "GROQ_API_KEY"),
     ("cloudflare", "CLOUDFLARE_API_TOKEN"),
@@ -198,4 +201,13 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
             model=m.get("mistral", "mistral-small-latest"),
             key_env="MISTRAL_API_KEY", trains_on_data=True,
         ),
+        # OpenRouter chooses the serving provider. Its training policy can
+        # vary by endpoint (and configured model); unknown means scrub prompts.
+        *[OpenAICompatibleBackend(name, base_url="https://openrouter.ai/api/v1",
+                                  model=m.get(name, default),
+                                  key_env="OPENROUTER_API_KEY", trains_on_data=True)
+          for name, default in (
+              ("kimi", "moonshotai/kimi-k2.6:free"),
+              ("deepseek", "deepseek/deepseek-chat-v3.1:free"),
+              ("qwen-coder", "qwen/qwen3-coder:free"))],
     ]
