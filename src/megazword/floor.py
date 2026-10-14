@@ -254,7 +254,7 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
     room_name = getattr(args, "room", None)
     if room_name is None:
         room_name = "hive"
-    if action in ("introduce", "peek", "wait"):
+    if action in ("introduce", "peek", "wait", "announce"):
         try:
             room.room_path(room_name)
         except ValueError as e:
@@ -299,5 +299,9 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
             return 1
         write(name)
         return 0
-    write("Usage: megazword floor [status|introduce|peek|wait|suggest]")
+    if action == "announce":
+        from . import announce
+        args.message = getattr(args, "message", "") or ""
+        return announce.command(args, cfg, write=write)
+    write("Usage: megazword floor [status|introduce|peek|wait|suggest|announce]")
     return 2
