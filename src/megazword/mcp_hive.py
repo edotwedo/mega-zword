@@ -12,7 +12,7 @@ import os
 import sys
 from typing import Any, BinaryIO
 
-from . import __version__, floor, room
+from . import __version__, briefing, floor, room
 
 PROTOCOL_VERSION = "2024-11-05"
 SUPPORTED_PROTOCOL_VERSIONS = (PROTOCOL_VERSION,)
@@ -21,6 +21,22 @@ MAX_WAIT_SECONDS = 300.0
 MAX_BODY_BYTES = 1_000_000  # same limit as the dashboard
 
 TOOLS = [
+    {
+        "name": "hive_status",
+        "description": "Publish this session's short status card for Phil's return briefing. "
+                       "Update when starting, finishing, blocked, or handing off work. "
+                       "Use a unique seat designation. No secrets; no AI is called.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "seat": {"type": "string", "description": "Session designation or MEGAZWORD_SEAT"},
+                "project": {"type": "string"},
+                "state": {"type": "string", "enum": list(briefing.STATES)},
+                "doing": {"type": "string"}, "done": {"type": "string"},
+                "blocked": {"type": "string"}, "next": {"type": "string"},
+            },
+        },
+    },
     {
         "name": "hive_read",
         "description": "Read the last n messages of a hive room as lines \"[author] text\", "
@@ -112,7 +128,13 @@ def hive_wait(args: dict) -> str:
     return f"{_lines(msgs) or '(no new hive message)'}\n(after={after + len(msgs)})"
 
 
-HANDLERS = {"hive_read": hive_read, "hive_say": hive_say, "hive_wait": hive_wait}
+def hive_status(args: dict) -> str:
+    card = briefing.publish(args)
+    return f"Saved report for {card['seat']}."
+
+
+HANDLERS = {"hive_read": hive_read, "hive_say": hive_say, "hive_wait": hive_wait,
+            "hive_status": hive_status}
 
 
 def handle(request: dict) -> dict | None:

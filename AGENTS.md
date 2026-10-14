@@ -39,3 +39,14 @@ repo is the only handoff. Nothing lives only in a chat.
 ## Project basics
 - Python 3.11, Windows 11 is the main machine. Command: `megazword`.
 - Code goes in `src/megazword/`, tests in `tests/`.
+
+## Return briefings
+- After a meaningful task change, publish a short session card using `hive_status`
+  (Hive MCP) or `megazword brief report --seat YOUR-DESIGNATION --project mega-zword
+  --state working --doing "current task" --done "just completed" --blocked "blocker"
+  --next "next step"` (one command line). Use your own session designation.
+- Publish on starting, finishing, becoming blocked, or handing off; no heartbeat loop.
+  Set `--state` to `working`, `waiting`, `blocked` or `done`. Each report replaces
+  the previous card, so include every field you want retained. Keep secrets out.
+- `megazword brief` and the dashboard's **Catch me up** read these snapshots without
+  waking models. Old/unreported sessions are unknown; do not claim all terminals are live.

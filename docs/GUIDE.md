@@ -4,6 +4,49 @@ Mega Zword is a local command line tool. It routes a prompt to one of your AI
 tools, keeps a run log and project memory, and can show the work in a dashboard.
 It does not run tasks in the background. Start it when you need it.
 
+## Catch me up when I return
+
+Click **Catch me up** in the dashboard header, or run `megazword brief` in a
+terminal. The briefing shows what each reporting session is working on, what it
+just finished, blockers and next steps. It reads saved cards without model calls.
+Reports older than 30 minutes are marked stale. Missing fields say "not reported";
+the feature cannot inspect arbitrary terminal windows or infer their progress.
+
+Mega Zword CLI runs publish start/finish/failure cards automatically. Their
+"done" means an answer was returned, not that its claims have been verified.
+Use `MEGAZWORD_SEAT` for a stable session name; otherwise the card uses `run-PID`.
+Standalone Codex/Claude/Grok sessions publish through Hive MCP's `hive_status`
+or this one-line command (replace the example with the session's actual facts):
+
+```powershell
+megazword brief report --seat Testlog-14 --project mega-zword --state working --doing "Reviewing the patch" --done "Focused tests passed" --blocked "" --next "Run the full suite"
+```
+
+Update on meaningful changes, not in a heartbeat loop. Each report replaces the
+previous card, including blank fields. Cards live locally under
+`~/.megazword/briefings/`; keep passwords, keys and private details out of them.
+Existing MCP sessions need a server reconnect to discover `hive_status`.
+
+For optional camera presence, install from the main checkout using the same Python
+environment that runs the dashboard, then restart the dashboard:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[camera]"
+```
+
+Open **Catch me up → Enable local camera**. The webcam belongs to the PC running
+the dashboard, including when you view it from your phone. Processing uses local
+OpenCV face detection; it does not recognize identities, upload frames, save images,
+or wake AI sessions. Any detected face can trigger it. Lighting and looking away
+can affect detection. After at least 15 seconds with no face and two seconds of
+steady presence, the open dashboard displays a briefing. A two-minute cooldown
+prevents repeated briefings. It does not inject text into other terminals or speak.
+
+The header shows when the camera is on. **Disable local camera** or close the
+dashboard server to release it; closing a browser tab alone does not stop the
+server. Camera permission/device failures appear in the dialog. Camera enablement
+is never saved across server restarts. The manual button works without OpenCV.
+
 ## First setup
 
 Install Python 3.11 or newer and at least one supported AI command line tool;

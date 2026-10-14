@@ -192,6 +192,10 @@ main[hidden], #hive[hidden] { display:none; }
 .new-chat select { flex:1; min-width:0; }
 #chat[hidden] { display:none; }
 .chat-tab-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#brief-dialog { width:min(780px, calc(100vw - 24px)); max-height:85vh; overflow:auto;
+  color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); }
+#brief-dialog::backdrop { background:#0009; }
+#brief-text { margin-top:16px; }
 </style>
 </head>
 <body>
@@ -218,6 +222,8 @@ main[hidden], #hive[hidden] { display:none; }
   <h1><span id="view-title">Home</span> <span class="live-dot" title="Local dashboard is live">●</span></h1>
   <label class="meta">project <select id="project" title="Memory, notes, runs and answers follow this project"></select></label>
   <span class="meta" id="meta">loading…</span>
+  <button id="catch-up" type="button">Catch me up</button>
+  <span class="note" id="camera-indicator" role="status"></span>
   <button id="refresh" aria-label="Refresh usage meters" title="Re-read the usage meters now">↻</button>
 </header>
 <main id="home-view">
@@ -337,6 +343,19 @@ main[hidden], #hive[hidden] { display:none; }
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 </div></div>
+<dialog id="brief-dialog" aria-labelledby="brief-title">
+  <h2 id="brief-title">Welcome back</h2>
+  <div class="row">
+    <button id="brief-refresh" type="button">Refresh reports</button>
+    <button id="brief-camera" type="button" aria-pressed="false">Enable local camera</button>
+    <button id="brief-close" type="button">Close</button>
+  </div>
+  <p class="note">Camera is optional. Face presence stays on this PC; no images are saved or sent.
+    After 15 seconds away and a steady return, show one briefing (two-minute cooldown).
+    This detects a face, not who it belongs to. Looking away or poor light can count as absence.</p>
+  <p id="brief-camera-status" class="note" role="status" aria-live="polite">Camera off</p>
+  <pre id="brief-text"></pre>
+</dialog>
 <script>
 const TOKEN = "__MZ_TOKEN__";
 const $ = id => document.getElementById(id);
@@ -369,6 +388,46 @@ function until(iso) {
   const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
   return "resets in " + (d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`);
 }
+// A lightweight local read, independent of usage meters or model requests.
+let briefEvent = null, briefTimer = null, cameraOn = false;
+function renderBriefing(data, show = false) {
+  const camera = data.camera;
+  cameraOn = camera.status !== "off";
+  const label = camera.error || (cameraOn
+    ? `Camera ${camera.status} · ${camera.present == null ? "connecting" : camera.present ? "face present" : "no face"}`
+    : "Camera off");
+  $("brief-camera-status").textContent = label;
+  $("camera-indicator").textContent = cameraOn ? "Camera on" : camera.error ? "Camera unavailable" : "";
+  $("brief-camera").textContent = cameraOn ? "Disable local camera" : "Enable local camera";
+  $("brief-camera").setAttribute("aria-pressed", String(cameraOn));
+  const returned = briefEvent !== null && camera.event > briefEvent;
+  briefEvent = Math.max(briefEvent ?? 0, camera.event);
+  if (show || returned || $("brief-dialog").open) $("brief-text").textContent = data.text;
+  if ((show || returned) && !$("brief-dialog").open) $("brief-dialog").showModal();
+}
+async function loadBriefing(show = false) {
+  clearTimeout(briefTimer);
+  try {
+    const response = await fetch("/api/briefing");
+    if (!response.ok) throw new Error("Could not read session reports");
+    renderBriefing(await response.json(), show);
+  } catch (error) {
+    $("camera-indicator").textContent = "Briefing disconnected";
+    if (show) toast(error.message);
+  } finally {
+    briefTimer = setTimeout(() => loadBriefing(), cameraOn ? 2000 : 15000);
+  }
+}
+$("catch-up").onclick = () => loadBriefing(true);
+$("brief-refresh").onclick = () => loadBriefing(true);
+$("brief-close").onclick = () => $("brief-dialog").close();
+$("brief-camera").onclick = async () => {
+  const button = $("brief-camera");
+  button.disabled = true;
+  try { renderBriefing(await post("/api/briefing/camera", {enabled: !cameraOn})); }
+  catch (error) { toast(error.message); }
+  finally { button.disabled = false; loadBriefing(); }
+};
 const ago = iso => { const s = (Date.now() - new Date(iso)) / 1000;
   return s < 60 ? "just now" : s < 3600 ? `${Math.floor(s/60)}m ago` : s < 86400 ? `${Math.floor(s/3600)}h ago` : new Date(iso).toLocaleDateString(); };
 const barColor = (w) => w.used >= 95 ? "var(--bad)" : (w.pace ?? 0) > 10 ? "var(--warn)" : "var(--ok)";
@@ -1002,6 +1061,7 @@ $("chat-close").onclick = async () => {
 $("room-pause").onclick = () => roomAction("/api/room/pause");
 $("room-stop").onclick = () => roomAction("/api/room/stop");
 load();
+loadBriefing();
 setInterval(() => load(), 30000);
 setInterval(() => state && renderPlans(state), 60000);
 </script>
