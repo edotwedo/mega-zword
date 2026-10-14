@@ -32,8 +32,10 @@ def test_say_start_and_view(app):
     app._room_thread.join(10)
     view = app.room_view()
     authors = [m["author"] for m in view["messages"]]
-    assert authors[:3] == ["phil", "claude", "codex"]
-    assert view["turn_count"] == 2 and not view["running"]
+    # One-shots answer Phil once; Claude's @codex reply must not chain.
+    assert authors == ["phil", "claude"]
+    assert view["messages"][-1]["text"] == "ok @codex"
+    assert view["turn_count"] == 1 and not view["running"]
 
 
 def test_start_twice_is_refused_and_stop_sets_flag(app, monkeypatch):
