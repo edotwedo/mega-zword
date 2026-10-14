@@ -124,6 +124,10 @@ class OpenAICompatibleBackend(Backend):
                 body.pop("stream")  # The default is a non-streaming response.
             if tools is not None:
                 body["tools"] = tools
+                # OpenAI-compatible providers do not all default to automatic
+                # selection when tools are present. Google documents this field
+                # for its compatibility endpoint; be explicit for each API.
+                body["tool_choice"] = "auto"
             request = urllib.request.Request(
                 self._endpoint(),
                 data=json.dumps(body).encode("utf-8"),

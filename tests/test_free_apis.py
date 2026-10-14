@@ -240,6 +240,7 @@ def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
     monkeypatch.setattr(urllib.request, "urlopen", finish_reply)
     assert cli.main(["run", "hello", "-m", name, "--edit"], cfg=cfg) == 0
     assert "tools" in calls[-1]
+    assert calls[-1]["tool_choice"] == "auto"
     assert len(calls) == 2
     assert cli.main(["backends"], cfg=cfg) == 0
     output = capsys.readouterr().out
