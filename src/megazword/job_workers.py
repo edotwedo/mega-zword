@@ -20,7 +20,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from . import config, night
 from .agent import AgentBackend, wrap
-from .backends import Backend, CLIBackend, OllamaBackend, default_backends
+from .backends import Backend, CLIBackend, OllamaBackend, default_backends, apply_levels
 from .filelock import write_atomic
 from .free_apis import OpenAICompatibleBackend
 from .guard import scrub
@@ -77,6 +77,45 @@ def _file(value: str) -> str:
     return path.as_posix()
 
 
+def _pytest_args(args, work=None):
+    """Allow selectors and a small set of reporting options, never path options."""
+    flags = {"-q", "-qq", "-v", "-vv", "-x", "-s", "--disable-warnings",
+             "--strict-markers", "--strict-config", "--collect-only", "--no-header", "--no-summary"}
+    values = {"-k", "-m", "--maxfail", "--tb", "--capture", "--durations", "-p"}
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        option, sep, value = arg.partition("=")
+        if arg in flags:
+            i += 1
+            continue
+        if option in values:
+            if not sep:
+                i += 1
+                if i == len(args):
+                    raise ValueError("missing pytest option value")
+                value = args[i]
+            if not value or (option in {"--maxfail", "--durations"} and not value.isdigit()):
+                raise ValueError("invalid pytest option value")
+            if option == "--tb" and value not in {"auto", "long", "short", "line", "native", "no"}:
+                raise ValueError("invalid pytest traceback style")
+            if option == "--capture" and value not in {"fd", "sys", "no", "tee-sys"}:
+                raise ValueError("invalid pytest capture mode")
+            if option == "-p" and value != "no:cacheprovider":
+                raise ValueError("pytest plugin loading is refused")
+        elif arg.startswith("-"):
+            raise ValueError("unsupported pytest option; path and plugin options are refused")
+        else:
+            target = arg.split("::", 1)[0]
+            if target.startswith("@"):
+                raise ValueError("pytest argument files are refused")
+            if target != ".":
+                _file(target)
+            if work is not None and not (work / target).resolve().is_relative_to(work.resolve()):
+                raise ValueError("pytest target escapes the work folder")
+        i += 1
+
+
 def _test(value) -> tuple[str, ...]:
     if not value:
         return ()
@@ -91,8 +130,10 @@ def _test(value) -> tuple[str, ...]:
     if exe in ("python", "python3", "python.exe", "python3.exe"):
         if args[1:3] != ["-m", "pytest"] and tuple(args[1:3]) != ("-m", "pytest"):
             raise ValueError("Python test commands must use -m pytest")
+        _pytest_args(args[3:])
         return (sys.executable, *args[1:])
     if exe in ("pytest", "pytest.exe"):
+        _pytest_args(args[1:])
         return (sys.executable, "-m", "pytest", *args[1:])
     if exe in ("npm", "npm.cmd") and tuple(args[1:]) in (("test",), ("run", "typecheck")):
         return tuple(args)
@@ -159,11 +200,14 @@ class Runner:
         if free:
             settings = dict(self.cfg.agent)
             settings.update(root=work, wall_timeout=min(self.seconds, settings.get("wall_timeout", 600)),
-                            reviewer="")  # combined review is the separate final stage
+                            reviewer="", allow_test_edits=bool(re.search(
+                                r"\b(?:tests?|testing|pytest|unittest)\b", piece.title, re.I)))
             if piece.test:
                 settings["test_command"] = piece.test
             return wrap(replace(free[0]), settings, fallback_backends=[replace(b) for b in free[1:]])
-        source = self.backends[paid]
+        selected = {paid: replace(self.backends[paid])}
+        apply_levels(selected, piece.difficulty, self.cfg.grok, self.cfg.levels)
+        source = selected[paid]
         return replace(source, cwd=str(work), timeout=min(source.timeout, int(self.seconds)))
 
     def run_piece(self, clone: Path, folder: Path, job_id: str, index: int, piece: Piece,
@@ -246,10 +290,17 @@ class Runner:
                 night._check(night.git(["-c", "core.hooksPath=", "commit", "--quiet", "-m",
                                        f"job {job_id}: {piece.title[:80]}"], work), "commit")
                 tested = night._check(night.git(["rev-parse", "HEAD"], work), "HEAD").strip()
-                cmd = list(piece.test) if piece.test else night.test_command(
-                    work, night.Job(0, " ", "", piece.title, "piece passes"))[0]
+                cmd, env = night.test_command(work, night.Job(0, " ", "", piece.title, "piece passes"))
+                if piece.test:
+                    cmd = list(piece.test)
+                    env = night.test_env(work)
+                    if (work / "src").is_dir():
+                        env["PYTHONPATH"] = os.pathsep.join(
+                            [str(work / "src"), env.get("PYTHONPATH", "")]).strip(os.pathsep)
                 if cmd:
-                    checked = night.run_cmd(cmd, work, self.test_seconds, night.test_env(work))
+                    if cmd[1:3] == ["-m", "pytest"]:
+                        _pytest_args(cmd[3:], work)
+                    checked = night.run_cmd(cmd, work, self.test_seconds, env)
                     result.tests = "passed" if checked.returncode == 0 else "failed"
                     if checked.returncode:
                         result.reason = "tests failed: " + _safe((checked.stdout or checked.stderr))[-1000:]

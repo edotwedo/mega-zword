@@ -104,6 +104,7 @@ class AgentBackend(Backend):
     wall_timeout: float = 600
     test_timeout: float = 120
     test_command: tuple[str, ...] = ("python", "-m", "pytest", "-q", "-x")
+    allow_test_edits: bool | None = None
     text_protocol: bool = False
     pace: dict[str, float] = field(default_factory=dict)
     reviewer: str = ""
@@ -388,7 +389,8 @@ class AgentBackend(Backend):
         self._attempted = {self.model_backend.name}
         self._edited = self._tests_passed = False
         self._originals = {}
-        self._allow_test_edits = bool(re.search(r"\b(?:tests?|testing|pytest|unittest)\b", prompt, re.I))
+        self._allow_test_edits = (self.allow_test_edits if self.allow_test_edits is not None else
+                                 bool(re.search(r"\b(?:tests?|testing|pytest|unittest)\b", prompt, re.I)))
         self._ollama_model = getattr(self.model_backend, "model", "")
         self._ollama_fallback = False
         previous_call, repeats = None, 0
