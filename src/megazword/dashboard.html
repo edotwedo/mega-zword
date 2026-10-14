@@ -69,6 +69,7 @@ button.go { background: var(--accent); color: var(--on-accent); border-color: va
 button:disabled { opacity: .5; cursor: wait; }
 textarea { width: 100%; min-height: 90px; resize: vertical; font-family: var(--mono); font-size: 14px; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.instruction { flex: 1; min-width: 180px; max-width: 100%; }
 .row label { color: var(--dim); font-size: 13px; display: flex; gap: 5px; align-items: center; }
 .ai { font-weight: 650; }
 .ai.claude { color: var(--claude); } .ai.codex { color: var(--codex); }
@@ -234,13 +235,14 @@ main[hidden], #hive[hidden] { display:none; }
     <div class="row">
       <label>AI <select id="model"><option value="">auto (route + pacing)</option></select></label>
       <label><input type="checkbox" id="context"> include project memory</label>
-      <label title="Choose a free API bot or Ollama; edits happen in the dashboard's working folder"><input type="checkbox" id="edit"> code with a free bot</label>
+      <label title="Choose a free API bot; edits happen in the dashboard's working folder"><input type="checkbox" id="edit"> code with a free bot</label>
       <label title="Same prompt on 2-3 AIs at once, answers side by side"><input type="checkbox" id="compare"> compare</label>
       <span id="cmppicks" hidden></span>
       <button class="go" id="send" aria-label="Send task" title="Send task">↗</button>
       <button id="retry" aria-label="Retry with a stronger AI" title="Last answer not good enough: give it to a stronger AI">↻</button>
     </div>
     <div id="jobs" aria-label="Job output" style="margin-top:10px"></div>
+    <div id="coding-folder" class="note" hidden></div>
     <div id="job-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   </section>
 
@@ -875,6 +877,8 @@ async function load(refresh) {
     sel.value = cur;
   }
   $("meta").textContent = `project ${state.project} · ${state.runs.length} runs logged · updated ${new Date().toLocaleTimeString()}`;
+  $("coding-folder").textContent = `Coding edits happen in ${state.working_folder || "the dashboard working folder"}. Use a dedicated worktree.`;
+  $("coding-folder").hidden = !$("edit").checked;
   renderSettings(state.settings); renderPlans(state); renderSentinel(state); renderRoute(state); renderFloor(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state); renderComparePicks(); renderAdvice(state);
   for (const j of state.jobs) if (!document.getElementById("job-" + j.id)) {
     renderJob(j); if (!j.done && !watching.has(j.id)) watch(j.id); }
@@ -915,6 +919,7 @@ $("jobs").addEventListener("click", async e => {
 });
 $("send").onclick = send;
 $("compare").onchange = renderComparePicks;
+$("edit").onchange = () => { $("coding-folder").hidden = !$("edit").checked; };
 $("prompt").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(); });
 $("retry").onclick = async () => { try { const {job} = await post("/api/retry", {model: $("model").value, project}); watch(job); }
   catch (e) { toast(e.message); } };

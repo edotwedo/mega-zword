@@ -103,6 +103,7 @@ class Job:
         self.control = Control(config.HOME / "run-controls" / uuid.uuid4().hex) if "-e" in cmd else None
         env = os.environ.copy()
         env.pop(CONTROL_ENV, None)
+        env["MEGAZWORD_SEAT"] = "dashboard-" + uuid.uuid4().hex[:12]
         if self.control:
             env[CONTROL_ENV] = str(self.control.folder.resolve())
         # Own process group so cancel() also stops the AI CLI underneath.
@@ -218,6 +219,7 @@ class App:
             "now": now.isoformat(),
             "project": project,
             "launch_project": self.project,
+            "working_folder": str(Path.cwd().resolve()),
             "projects": sorted({p.name for p in list_projects(config.HOME)} | {self.project}),
             "usage": self.usage.get(force=refresh),
             # Same one-line summaries as the start screen and `megazword usage`.
@@ -295,8 +297,8 @@ class App:
         model = body.get("model") or ""
         picks = [str(n) for n in body.get("compare") or []]
         if body.get("edit"):
-            if picks or not isinstance(model, str) or model not in {*config.DEFAULT_FREE, "ollama"}:
-                raise ValueError("for coding, choose one free API bot or Ollama and turn off compare")
+            if picks or not isinstance(model, str) or model not in (set(config.DEFAULT_FREE) - {"ollama"}):
+                raise ValueError("for coding, choose one free API bot and turn off compare")
             args.append("-e")
         if picks:
             if not 2 <= len(picks) <= 3 or any(n not in self.backends for n in picks):

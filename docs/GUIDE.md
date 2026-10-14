@@ -310,7 +310,7 @@ Edge or Chrome app window. Ctrl+C in the terminal stops the server.
 To watch a free bot code, choose its AI in Home, check **code with a free bot**,
 and send the task. It edits the folder where you started the dashboard (shown
 in the activity panel). Use a dedicated worktree for coding. Compare and Auto
-are unavailable in this mode; choose one free API backend or Ollama.
+are unavailable in this mode; choose one free API backend.
 
 The job shows the current backend/model, request count, tool activity, edited
 files and test outcomes. **Pause** waits for the current request or test to

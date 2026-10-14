@@ -1,5 +1,6 @@
 """Real local control files, scripted models, and no provider calls."""
 import json
+import io
 import sys
 import threading
 
@@ -123,3 +124,27 @@ def test_dashboard_edit_requires_one_free_bot(tmp_path):
         app.run({"prompt": "x", "model": "codex", "edit": True})
     with pytest.raises(ValueError, match="choose one free"):
         app.run({"prompt": "x", "edit": True})
+
+
+def test_dashboard_child_owns_control_and_briefing_identity(monkeypatch):
+    monkeypatch.setenv("MEGAZWORD_SEAT", "Cedar-14")
+    captured = {}
+
+    class Process:
+        stdin = io.StringIO()
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+
+        def wait(self):
+            return 0
+
+    def spawn(cmd, **kwargs):
+        captured.update(kwargs)
+        return Process()
+
+    monkeypatch.setattr(dashboard.subprocess, "Popen", spawn)
+    job = dashboard.Job("j1", "test", ["scripted", "-e"], "")
+    assert captured["env"]["MEGAZWORD_SEAT"].startswith("dashboard-")
+    assert captured["env"]["MEGAZWORD_SEAT"] != "Cedar-14"
+    assert captured["env"][ENV] == str(job.control.folder.resolve())
+    assert job.control.folder.is_relative_to(config.HOME / "run-controls")
