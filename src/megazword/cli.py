@@ -20,7 +20,7 @@ from .rater import Rating, rate
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room", "night", "job"),
     "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
-            "sentinel", "floor", "brief"),
+            "sentinel", "floor", "brief", "announce"),
     "Set up": ("init", "doctor", "out", "backends", "app", "mcp"),
     "Memory": ("note", "decide", "import-hive"),
 }
@@ -114,15 +114,19 @@ def build_parser() -> argparse.ArgumentParser:
                       help="for install: actually create the scheduled task")
     floor = sub.add_parser("floor", help="Hive floor: seats, introduce, peek/wait; suggest picks a seat")
     floor.add_argument("action", nargs="?",
-                       choices=("status", "introduce", "peek", "wait", "suggest"),
+                       choices=("status", "introduce", "peek", "wait", "suggest", "announce"),
                        default="status")
     floor.add_argument("kind", nargs="?", choices=("bulk", "edit", "decide", "review"),
                        help="suggest: which seated model should take this kind of job")
+    floor.add_argument("-m", "--message", default="",
+                       help="announce: the one-shot text (or use: megazword announce TEXT)")
     floor.add_argument("--room", default="hive", help="hive room name (default: hive)")
     floor.add_argument("-n", type=int, default=10, help="peek: how many messages")
     floor.add_argument("--timeout", type=int, default=120, help="wait: seconds to block")
     floor.add_argument("--after", type=int, default=None,
                        help="wait: message count from peek's (after=N); returns anything newer")
+    from .announce import add_parser as add_announce_parser
+    add_announce_parser(sub)
     sub.add_parser("mcp", help="Hive MCP server on stdio (for AI CLIs to connect to)")
     from .briefing import add_parser as add_brief_parser
     add_brief_parser(sub)
@@ -343,6 +347,9 @@ def main(argv: list[str] | None = None,
     if args.command == "night":
         from .night import command
         return command(args, cfg)
+    if args.command == "announce":
+        from . import announce
+        return announce.command(args, cfg)
     if args.command in (None, "start"):
         from .start import render
         print(render(cfg))

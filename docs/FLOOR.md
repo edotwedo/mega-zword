@@ -53,3 +53,11 @@ Money and new keys: Phil. The app hunts empty chairs and says what is missing.
 
 You are one seat. Check `megazword usage` before you work. Do not greet in Q.
 Wait for Phil in the Hive. Use a subagent for extra hands, not a second window.
+
+## Announce
+
+`megazword announce pause and read the Q update` (or `megazword floor announce -m "..."`)
+posts one Hive line as **floor**, with no @mentions, writes `~/.megazword/announce.json`,
+and pings ntfy plus a Windows balloon. Seats blocked on `hive_wait` see it on the next
+wait. Mid-turn Claude/Codex/Grok CLI windows are not injected; glance at them if they
+are stuck in a turn.
