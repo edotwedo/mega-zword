@@ -253,7 +253,7 @@ Set `OPENROUTER_API_KEY` or `GROQ_API_KEY` in the environment, then run
 `megazword doctor` reports whether each key is set, without displaying it.
 `.env.example` lists the variables; Mega Zword does not load `.env` files.
 
-Defaults are `qwen/qwen3-4b:free` for OpenRouter and `llama-3.3-70b-versatile`
+Defaults are `qwen/qwen3-4b:free` for OpenRouter and `openai/gpt-oss-20b`
 for Groq. Override them in `~/.megazword/config.toml`:
 
 ```toml
@@ -261,7 +261,7 @@ for Groq. Override them in `~/.megazword/config.toml`:
 model = "qwen/qwen3-4b:free"
 
 [free.groq]
-model = "llama-3.3-70b-versatile"
+model = "openai/gpt-oss-20b"
 ```
 
 More optional backends use the same pattern: Cloudflare Workers AI

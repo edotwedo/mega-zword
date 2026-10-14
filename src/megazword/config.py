@@ -70,7 +70,7 @@ DEFAULT_FREE = {
     "qwen-coder": "qwen/qwen3-coder:free",
     "ollama": "qwen2.5-coder:7b",
     "openrouter": "qwen/qwen3-4b:free",
-    "groq": "llama-3.3-70b-versatile",
+    "groq": "openai/gpt-oss-20b",
     "cloudflare": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "zai": "glm-4.5-flash",
     "gemini-api": "gemini-flash-latest",
