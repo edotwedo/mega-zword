@@ -17,7 +17,7 @@ from .rater import Rating, rate
 
 
 COMMAND_GROUPS = {
-    "Ask": ("run", "chat", "retry", "room", "night"),
+    "Ask": ("run", "chat", "retry", "room", "night", "job"),
     "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor"),
     "Set up": ("init", "doctor", "out", "backends", "app", "mcp"),
@@ -125,6 +125,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("mcp", help="Hive MCP server on stdio (for AI CLIs to connect to)")
     from .night import add_parser as add_night_parser
     add_night_parser(sub)
+    from .job import add_parser as add_job_parser
+    add_job_parser(sub)
 
     out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -344,6 +346,9 @@ def main(argv: list[str] | None = None,
                                     lean=cfg.lean)
     rater = rater if rater is not None else (lambda p: rate(p, cfg.rater_model))
 
+    if args.command == "job":
+        from .job import command as job_command
+        return job_command(args, backends, cfg)
     if args.command == "backends":
         for name, b in backends.items():
             mark = "installed" if b.available() else "not found"
