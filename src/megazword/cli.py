@@ -12,6 +12,7 @@ from typing import Callable
 from . import __version__, config, failures, log
 from .memory import Memory, project_name, with_context
 from .backends import Backend, apply_levels, default_backends, grok_label
+from .briefing import track_run
 from .escalate import escalate, looks_failed
 from .rater import Rating, rate
 
@@ -19,7 +20,7 @@ from .rater import Rating, rate
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room", "night", "job"),
     "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
-            "sentinel", "floor"),
+            "sentinel", "floor", "brief"),
     "Set up": ("init", "doctor", "out", "backends", "app", "mcp"),
     "Memory": ("note", "decide", "import-hive"),
 }
@@ -123,6 +124,8 @@ def build_parser() -> argparse.ArgumentParser:
     floor.add_argument("--after", type=int, default=None,
                        help="wait: message count from peek's (after=N); returns anything newer")
     sub.add_parser("mcp", help="Hive MCP server on stdio (for AI CLIs to connect to)")
+    from .briefing import add_parser as add_brief_parser
+    add_brief_parser(sub)
     from .night import add_parser as add_night_parser
     add_night_parser(sub)
     from .job import add_parser as add_job_parser
@@ -306,6 +309,9 @@ def main(argv: list[str] | None = None,
     if argv is None:  # real CLI run, not a test calling main([...])
         config.load_user_env()
     args = build_parser().parse_args(argv)
+    if args.command == "brief":
+        from .briefing import command
+        return command(args)
     if args.command == "doctor":
         from .doctor import run
         return run()
@@ -609,6 +615,7 @@ ONE_SHOT_NOTE = ("[Sent by Mega Zword as a one-shot task. Answer it directly. Sk
                  "session startup, coordination and check-in routines.]\n\n")
 
 
+@track_run
 def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
             memory: Memory, rating: Rating | None, forced: bool,
             start_after: str | None = None, prior_answer: str | None = None,

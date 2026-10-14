@@ -19,7 +19,7 @@ seat posts to.
 
 `megazword mcp` is a stdio MCP server on that log, so Claude, Codex and Grok
 read and post from inside their own chat without a second pane. Tools:
-`hive_read`, `hive_say`, `hive_wait`. Register it in each CLI's MCP config
+`hive_read`, `hive_say`, `hive_wait`, `hive_status`. Register it in each CLI's MCP config
 (command `megazword`, args `["mcp"]`) and set `MEGAZWORD_SEAT` to the seat's
 name; `hive_say` posts as that seat.
 
