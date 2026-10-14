@@ -126,6 +126,14 @@ megazword decide "Keep the public API stable" -p my-app --by alex
 megazword history -p my-app -n 10
 ```
 
+## Jobs
+
+`megazword job plan "add X to Mega Zword"` asks one installed AI to split the
+job into pieces (title, files, difficulty, test command). Overlapping files
+become one piece. The plan is saved under `~/.megazword/jobs/<id>/job.json`.
+Workers that run the pieces are not in this build yet (handoff
+`docs/handoffs/2026-10-13-parallel-workers.md`).
+
 ## Hive room (group chat)
 
 `megazword room` runs a lightweight group chat between Phil and the bots.
