@@ -10,6 +10,11 @@ repo is the only handoff. Nothing lives only in a chat.
 3. `docs/DECISIONS.md`: dated log of choices; don't reopen these without Phil.
 
 ## Working rules
+- **Cost is the primary operating objective (Phil).** Before choosing hosted compute or paid APIs,
+  check current usage/quota and estimate the cost. Prefer included/free and self-hosted resources;
+  avoid duplicate CI triggers and cancel superseded work. Never enable uncapped billable usage.
+  When Phil approves billable usage, track it with an account hard cap and report usage/cost as work
+  proceeds.
 - **Usage first, every time (Phil).** Before you start, claim or hand out any work: run `megazword usage`
   (on Phil's PC) or read the usage board in Q
   (https://github.com/edotwedo/workshop/pull/33#issuecomment-6115098816; over 30 minutes old means the
