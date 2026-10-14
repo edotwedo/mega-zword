@@ -32,6 +32,8 @@ remains queued, is checked only once per run, and works after main is repaired.
 They also prove healthy baseline caching, worker tests, configuration forwarding
 and a paid quota change preventing a model call.
 
-Validation/deployment results: see the newest Night Shift line in STATUS.
+Validation: full suite 1056 passed in 166.82s; smoke 36/36; focused 107
+passed; after integrating planner PR44, Night/Job/CLI 63 passed; clean diff check.
+Repair is merged and deployed through the installed main editable checkout.
 Existing failed job branches and state are retained for review; no paid queue
 restart or claim that a real free model has successfully coded a job.
