@@ -52,6 +52,7 @@ def isolated_home(tmp_path, monkeypatch):
     monkeypatch.setattr(night, "_schtasks", no_schtasks)
     # ...or inherit a bot's seat, which would block posting as phil (B7).
     monkeypatch.delenv("MEGAZWORD_SEAT", raising=False)
+    monkeypatch.delenv("MEGAZWORD_RUN_CONTROL", raising=False)
     for var in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "CLOUDFLARE_API_TOKEN",
                 "CLOUDFLARE_ACCOUNT_ID", "ZAI_API_KEY", "GOOGLE_AI_API_KEY",
                 "NVIDIA_API_KEY", "MISTRAL_API_KEY"):

@@ -228,6 +228,7 @@ main[hidden], #hive[hidden] { display:none; }
     <div class="row">
       <label>AI <select id="model"><option value="">auto (route + pacing)</option></select></label>
       <label><input type="checkbox" id="context"> include project memory</label>
+      <label title="Choose a free API bot or Ollama; edits happen in the dashboard's working folder"><input type="checkbox" id="edit"> code with a free bot</label>
       <label title="Same prompt on 2-3 AIs at once, answers side by side"><input type="checkbox" id="compare"> compare</label>
       <span id="cmppicks" hidden></span>
       <button class="go" id="send" aria-label="Send task" title="Send task">↗</button>
@@ -618,10 +619,17 @@ function renderJob(j) {
     $("jobs").prepend(el); }
   const secs = Math.max(0, Math.round((Date.now() - new Date(j.started)) / 1000));
   const ae = document.activeElement;
+  const activity = j.activity;
+  const live = activity && !j.done && !["finished", "failed"].includes(activity.phase);
+  const instruction = el.querySelector(".instruction");
+  const draft = instruction ? instruction.value : "";
+  const selection = instruction ? [instruction.selectionStart, instruction.selectionEnd] : [0, 0];
   let restore = null;
   if (el.contains(ae)) {
     restore = {
       cancel: ae.classList.contains("cancel"),
+      runAction: ae.dataset ? ae.dataset.runAction : "",
+      instruction: ae.classList.contains("instruction"),
       copy: ae.classList.contains("copy"),
       vote: ae.classList.contains("vote"),
       voteAi: ae.dataset ? ae.dataset.ai : "",
@@ -632,14 +640,26 @@ function renderJob(j) {
     <b>${esc(j.label)}</b>${j.done ? "" : ` <span class="t">${secs}s</span>
     <button class="cancel" data-job="${esc(j.id)}" style="padding:1px 8px;font-size:12px">Cancel</button>`}
     <pre>${esc(j.err.trim())}</pre></div>
+    ${activity ? `<div class="note">${esc(activity.backend || "starting")} · ${esc(activity.model || "")} · ${esc(activity.phase || "starting")} · ${esc(activity.requests || "0")} requests
+      ${activity.pause_requested && activity.phase !== "paused" ? " · pause requested; waiting for the current operation" : ""}
+      ${activity.pending_instructions ? ` · ${activity.pending_instructions} instruction(s) pending` : ""}
+      ${activity.folder ? `<div>Working folder: ${esc(activity.folder)}</div>` : ""}</div>
+      <pre aria-label="Coding activity">${(activity.events || []).slice(-12).map(e => esc(`${new Date(e.time).toLocaleTimeString()} ${e.phase}${e.tool ? " · " + e.tool : ""}${e.file ? " · " + e.file : ""}${e.tests ? " · " + e.tests : ""}${e.seconds ? " · " + e.seconds + "s" : ""}`)).join("\n")}</pre>` : ""}
+    ${live ? `<div class="row"><button data-run-action="${activity.pause_requested ? "resume" : "pause"}" data-job="${esc(j.id)}">${activity.pause_requested ? "Resume" : "Pause"}</button>
+      <input class="instruction" aria-label="New instruction for this coding job" maxlength="4000" placeholder="Give this job another instruction" value="${esc(draft)}">
+      <button data-run-action="instruct" data-job="${esc(j.id)}">Send instruction</button></div>
+      <div class="note">Pause waits for the current request or test to finish. Instructions take effect before the next operation. Resume after sending an instruction to a paused job.</div>` : ""}
     ${j.out ? renderAnswer(j) : ""}`;
   if (restore) {
     let t = null;
     if (restore.cancel) t = el.querySelector("button.cancel");
+    else if (restore.runAction) t = el.querySelector(`[data-run-action="${restore.runAction}"]`);
+    else if (restore.instruction) t = el.querySelector(".instruction");
     else if (restore.copy) t = el.querySelector("button.copy");
     else if (restore.vote) t = el.querySelector("button.vote[data-ai=\"" + CSS.escape(restore.voteAi) + "\"]") || el.querySelector("button.vote");
     else if (restore.ans) t = el.querySelector(".ans[tabindex]");
     (t || $("prompt")).focus();
+    if (restore.instruction && t) t.setSelectionRange(...selection);
   }
 }
 
@@ -811,13 +831,25 @@ async function send() {
       ? [...$("cmppicks").querySelectorAll("input:checked")].map(i => i.value) : [];
     if ($("compare").checked && (compare.length < 2 || compare.length > 3))
       throw new Error("pick 2 or 3 AIs to compare");
-    const {job} = await post("/api/run", {prompt, model: $("model").value, context: $("context").checked, compare, project});
+    const {job} = await post("/api/run", {prompt, model: $("model").value, context: $("context").checked, edit: $("edit").checked, compare, project});
     $("prompt").value = ""; watch(job);
   } catch (e) { toast(e.message); }
   $("send").disabled = false;
 }
 
 $("jobs").addEventListener("click", async e => {
+  const action = e.target.closest("button[data-run-action]");
+  if (action) {
+    const input = action.closest(".job").querySelector(".instruction");
+    action.disabled = true;
+    try {
+      await post("/api/job/control", {job: action.dataset.job, action: action.dataset.runAction, text: input.value});
+      if (action.dataset.runAction === "instruct") input.value = "";
+      toast(action.dataset.runAction === "instruct" ? "instruction queued" : "control requested");
+    } catch (err) { toast(err.message); }
+    action.disabled = false;
+    return;
+  }
   const b = e.target.closest("button.cancel"); if (!b) return;
   b.disabled = true;
   try { await post("/api/cancel", {job: b.dataset.job}); } catch (err) { toast(err.message); }
