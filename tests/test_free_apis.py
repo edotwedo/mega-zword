@@ -56,7 +56,7 @@ def test_available_without_network(api, monkeypatch, value):
 
 @pytest.mark.parametrize("error, message", [
     (urllib.error.HTTPError("https://example.test", 429, "secret-test-credential", {},
-                            io.BytesIO(b"secret-test-credential")), "API HTTP error 429: rate limited"),
+                            io.BytesIO(b"secret-test-credential")), "API HTTP error 429: rate limited, try again in 2 minutes"),
     (TimeoutError("secret-test-credential"), "API request timed out"),
     (urllib.error.URLError(TimeoutError("secret-test-credential")), "API request timed out"),
     (urllib.error.URLError("secret-test-credential"),
@@ -106,6 +106,45 @@ def test_echoed_key_is_redacted(api, monkeypatch):
     assert api.run("hi").text == "[REDACTED]"
 
 
+@pytest.mark.parametrize("headers,minutes", [({}, 2), ({"Retry-After": "90"}, 2),
+    ({"Retry-After": "180"}, 3), ({"Retry-After": "bad"}, 2),
+    ({"Retry-After": "NaN"}, 2), ({"Retry-After": "30.5"}, 1)])
+def test_api_rate_limit_reset(headers, minutes):
+    from datetime import datetime, timedelta, timezone
+    from megazword.free_apis import http_error_message
+    from megazword.limits import detect
+    now = datetime.now(timezone.utc)
+    hit = detect(http_error_message(429, headers), now)
+    assert hit.exact and hit.until == now + timedelta(minutes=minutes)
+
+
+def test_retry_after_http_date():
+    from datetime import datetime, timedelta, timezone
+    from email.utils import format_datetime
+    from megazword.free_apis import http_error_message
+    date = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=150))
+    assert "in 3 minutes" in http_error_message(429, {"Retry-After": date})
+
+
+def test_cloudflare_validation_error_reason_is_safe(api, monkeypatch):
+    api.name = "cloudflare"
+    monkeypatch.setenv("OTHER_SECRET", "opaque-other-secret")
+    seen = []
+    def fail(request, **kwargs):
+        seen.append(json.loads(request.data))
+        body = {"errors": [{"message": "context too long secret-test-credential opaque-other-secret "
+                    "https://private.test/?token=hidden\npassword: hunter42"}]}
+        raise urllib.error.HTTPError(request.full_url, 400, "private", {},
+                                     io.BytesIO(json.dumps(body).encode()))
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    result = api.run("job")
+    assert "context too long" in result.error
+    for secret in ("secret-test-credential", "opaque-other-secret", "private.test", "hunter42"):
+        assert secret not in result.error
+    assert "stream" not in seen[0]
+    assert len(result.error) < 270 and "\n" not in result.error
+
+
 def test_presets_config_and_routes(monkeypatch):
     config.HOME.mkdir(parents=True)
     (config.HOME / "config.toml").write_text(
@@ -122,12 +161,13 @@ def test_presets_config_and_routes(monkeypatch):
     assert cfg.route == config.DEFAULT_ROUTE
     generated = config.render_default(list(backends))
     assert "openrouter" not in generated and "groq" not in generated
-    assert not {"openrouter", "groq"} & default_backends(edit=True).keys()
+    assert {"openrouter", "groq"} <= default_backends(edit=True).keys()
 
 
 @pytest.mark.parametrize("name, key_env", [("openrouter", "OPENROUTER_API_KEY"),
                                            ("groq", "GROQ_API_KEY")])
-def test_cli_forced_and_edit_exclusion(name, key_env, monkeypatch, capsys):
+def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
+    monkeypatch.setattr("megazword.ollama.reachable", lambda *a, **k: False)
     monkeypatch.setenv(key_env, "secret-test-credential")
     calls = []
     def fake(request, **kwargs):
@@ -139,8 +179,13 @@ def test_cli_forced_and_edit_exclusion(name, key_env, monkeypatch, capsys):
     assert cli.main(["run", "hello", "-m", name], cfg=cfg) == 0
     assert calls[0]["model"] == "override-model"
     assert "answer" in capsys.readouterr().out
-    assert cli.main(["run", "hello", "-m", name, "--edit"], cfg=cfg) == 2
-    assert len(calls) == 1
+    def finish_reply(request, **kwargs):
+        calls.append(json.loads(request.data))
+        return reply(json.dumps({"tool": "finish", "arguments": {"summary": "done"}}))
+    monkeypatch.setattr(urllib.request, "urlopen", finish_reply)
+    assert cli.main(["run", "hello", "-m", name, "--edit"], cfg=cfg) == 0
+    assert "tools" in calls[-1]
+    assert len(calls) == 2
     assert cli.main(["backends"], cfg=cfg) == 0
     output = capsys.readouterr().out
     assert "openrouter" in output and "groq" in output
@@ -157,7 +202,7 @@ def test_b14_backends_exist_off_route_and_train_flags():
         for level, names in config.DEFAULT_ROUTE.items():
             # B15 (Phil): only Mistral is routed by default, first in `easy`.
             assert name not in names or (name, level) == ("mistral", "easy")
-        assert name not in default_backends(edit=True)
+        assert name in default_backends(edit=True)
     assert not backends["zai"].trains_on_data
     assert backends["gemini-api"].trains_on_data
     assert backends["mistral"].trains_on_data

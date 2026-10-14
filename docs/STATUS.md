@@ -1,6 +1,13 @@
 # Status
 
+**OpenRouter catalog and free coding failover (Reed-13, Codex worker for Sorrel-12, 2026-10-13):** Local, uncommitted changes in `mz-seats/codex-catalog`: `kimi`, `deepseek`, `qwen-coder`, configurable models and in-loop free-backend failover preserving edits/history/tests. GUIDE includes OpenRouter key setup and model/privacy caveats. Focused fake-backend suite: 180 passed. Full suite attempted: 1000 passed, 5 failed, 9 errors; Windows sandbox denies taskkill, Git local clone signal pipes and the registry test fails. Exact validation and next step: `docs/handoffs/2026-10-13-openrouter-catalog.md`. No commit or push at Phil's request.
+
+**Sorrel-12 (Claude Code, 2026-10-13 16:45 PT), free-first push:** on main: free-AI coding loop (`megazword run -e -m <free bot>`, src/megazword/agent.py, 3 fix passes incl. Grok's HIGH key-leak fix), chat tabs keep one session, Codex sandbox PATH fix, first free-AI code (tests/test_filelock.py by gemini-api). Lessons: free bots rate-limit fast and can fake-pass tests (assert True). Also on main since: free-bot pacing + test-quality gate (4de38af); room test fixed (main fully green, 999 tests). Live free-bot runs at 18:00 all failed: gemini-api/mistral 429 within seconds, cloudflare timeouts/step cap. Free cloud APIs are too flaky for the loop as-is; next: Groq key, a local coder model (qwen2.5-coder:7b) or OpenRouter free models. Open for Grok: `megazword job` (grok/parallel-workers-2026-10-13).
+**Free pacing and test quality (Flint-13, Codex, 2026-10-13):** Local work in `mz-seats/codex-pacing`: shared per-provider call pacing, AST gate for edited tests on both success paths, and optional single-call diff reviewer. Changes stay uncommitted at Phil's request. Validation and next step are in `docs/handoffs/2026-10-13-free-pacing.md`, Report; the lead must review and commit these files before delivery.
+
 **Live seats (Phil, 2026-10-13):** Sorrel-12 (Claude), Lantern-13 (Codex), Quill-12 (Grok). Hive `room start` has no connected-session list; Cedar/Alder/Birch were one-shots. Quill-12: one-shots answer Phil once; bot `@mentions` do not chain. Branch `grok/room-phil-mentions-2026-10-13`.
+**Chat-tab sessions (Alder-13, Codex, 2026-10-13; branch `codex/tab-sessions-2026-10-13`):** Implemented persisted Claude/Codex/Grok CLI sessions, explicit resume with only the new message, one fresh retry for missing sessions, and a session marker + New session control. Free API/Gemini history behavior retained. Sorrel-12 owns coordination, review and merge; this worker does not push. Validation and exact delivery state: `docs/handoffs/2026-10-13-tab-sessions.md`, Report.
+**Free coding loop (Codex worker Aster-13 for Sorrel-12, 2026-10-13):** Implemented locally on `codex/free-agent-loop-2026-10-13`. API backends and local Ollama can use `megazword run -e`; file tools stay in the work folder, with JSON fallback, bounded tests, secret scrubbing and request counts in the run log. CLI coders keep their current path. No push. Git staging/commit is blocked by sandbox permissions on the shared worktree index. See `docs/handoffs/2026-10-13-free-agent-loop.md` Report for validation and the exact next step.
 
 **Popup repair done: Lantern-13 (Codex), 2026-10-13.** Traced repeated cmd/agy usage children to the old running dashboard; stopped that process and its self-repeating one-shot Hive session. Cleanup `taskkill` now also uses CREATE_NO_WINDOW. Validation: 804 tests pass, smoke 36/36, clean diff check, live usage refresh with hidden launcher flags. This chat is Lantern-13; the Hive's one-shot Codex replies are separate workers. Relaunch the installed app to load the fix; leave Hive stopped until explicitly started.
 
@@ -211,13 +218,11 @@ Agy stdin and the real agy /usage output are still unverified on Phil's PC.
 Tests never spend paid usage. Don't change routing defaults or turn on
 local-model answering without Phil.
 
-- F25 leftovers (dashboard): **Quill-12, this branch** `grok/overnight-f25-a11y-2026-10-13`.
-  (a) #jobs no longer has aria-live; `#job-status` announces only when a watched job finishes.
-  (b) renderJob restores focus on Cancel, copy, vote, and the answer region.
-  (c) load() skips rebuilding `#model` while that select is `document.activeElement`.
-- Flaky: dashboard urlopen timeout raised 5s → 10s (connection error once, passed on rerun).
+- F25 leftovers (dashboard a11y): **done, main (PR 38).**
+- Flaky dashboard urlopen: timeout 10s, **done (PR 40).**
+- B7 #24 mcp under Set up: **done (PR 40).**
 - GitHub Actions: jobs do not start (account payments / spending limit). Local pytest is the check until Phil fixes billing.
-- B7 #24: `mcp` is under Set up in `--help` (this branch).
+- Floor **Heard in Hive MCP**: this branch `grok/floor-presence-2026-10-13`. Live seats (Sorrel-12, Lantern-13, Quill-12) show after hive_say / MCP initialize. hive_up sets MEGAZWORD_SEAT.
 
 ## Next step (needs Phil)
 - Morning live check (costs a few dozen tokens per AI): from C:\Users\mrmar\mega-zword run `.venv\Scripts\python scripts\live_check.py --yes-spend`. Runs doctor (stops on FAIL), sends "Reply with exactly: pong" once to each installed, not-out AI via `megazword run -m`, then once via auto-pick, and prints AI / ok / seconds / answer length. Without --yes-spend it only explains itself. Never run by the bots.

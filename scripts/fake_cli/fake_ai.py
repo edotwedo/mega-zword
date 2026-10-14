@@ -5,6 +5,10 @@ that fake AI refuse, or "SLEEP-<name>" to make it hang (tests timeouts).
 """
 
 import sys
+import json
+import os
+from pathlib import Path
+import uuid
 
 
 def main() -> int:
@@ -32,6 +36,23 @@ def main() -> int:
             prompt = f.read()
     else:
         prompt = sys.stdin.read()
+    session = ""
+    structured = "--json" in args or ("--output-format" in args and
+                 args[args.index("--output-format") + 1] == "json")
+    session_mode = structured or "--session-id" in args or "--resume" in args or "resume" in args
+    if session_mode:
+        flag = "--resume" if "--resume" in args else "resume" if "resume" in args else None
+        session = args[args.index(flag) + 1] if flag else (
+            args[args.index("--session-id") + 1] if "--session-id" in args else str(uuid.uuid4()))
+        directory = Path(os.environ["MEGAZWORD_HOME"]) / "fake-sessions"
+        directory.mkdir(parents=True, exist_ok=True)
+        record = directory / (str(uuid.UUID(session)) + ".json")
+        if flag and not record.exists():
+            print("Session not found", file=sys.stderr)
+            return 1
+        saved = json.loads(record.read_text()) if record.exists() else {"prompts": []}
+        saved["prompts"].append(prompt)
+        record.write_text(json.dumps(saved), encoding="utf-8")
     if f"AUTH-{name}" in prompt:  # simulate an expired login
         print("Error: Not logged in. Please run the login command.", file=sys.stderr)
         return 1
@@ -50,7 +71,10 @@ def main() -> int:
     if "-o" in args:  # codex writes its final message to a file
         with open(args[args.index("-o") + 1], "w", encoding="utf-8") as f:
             f.write(answer)
-        print("codex progress noise")
+        print(json.dumps({"type": "thread.started", "thread_id": session})
+              if structured else "codex progress noise")
+    elif name == "claude" and structured:
+        print(json.dumps({"result": answer, "session_id": session, "is_error": False}))
     else:
         print(answer)
     return 0

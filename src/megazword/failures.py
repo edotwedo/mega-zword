@@ -15,6 +15,9 @@ from .limits import detect as detect_limit
 
 # Exact commands from each CLI's --help (checked 2026-10-11).
 LOGIN_FIX = {
+    "kimi": "set OPENROUTER_API_KEY (see `megazword doctor`)",
+    "deepseek": "set OPENROUTER_API_KEY (see `megazword doctor`)",
+    "qwen-coder": "set OPENROUTER_API_KEY (see `megazword doctor`)",
     "claude": "run `claude auth login`",
     "codex": "run `codex login`",
     "grok": "run `grok login`",

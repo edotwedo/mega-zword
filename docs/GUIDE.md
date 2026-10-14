@@ -280,6 +280,22 @@ new chat tab. Each tab keeps its AI, project and last few turns across restarts.
 Ctrl+Enter sends; **Rename** changes the name; **Close tab** needs two clicks.
 Links: `#hive` opens the Hive, `#tab-t1` opens tab t1. Tabs can't be reordered yet.
 
+### Continuing chat-tab sessions
+
+Claude, Codex and Grok chat tabs save their CLI session ID in `tabs.json` and
+resume that conversation, including after an app restart. **session kept** marks
+a saved session. Resumed turns send only your new message. If the session is
+missing or expired, Mega Zword tries a fresh session once with the tab's recent
+history and shows a short note. Login, quota and network errors do not trigger
+that retry.
+
+**New session** clears this tab's saved session and recent conversation. It is
+disabled while an answer is running. Saved answers remain in answer history.
+Auto tabs resume when the answering AI matches the saved session; switching AI
+starts with recent history. Free API backends and Gemini keep receiving recent
+history; they do not use this CLI-session feature. Grok's installed CLI supports
+`--session-id` and `--resume`, so Grok tabs keep real sessions too.
+
 ### Home controls
 
 The project selector switches the memory, notes, runs and answers shown. The
@@ -394,6 +410,7 @@ Start with `megazword doctor`; each line below matches one of its check names.
 |---|---|
 | `Python` is FAIL | Install Python 3.11 or newer and reopen the terminal. |
 | A CLI says `not on PATH` | Install that tool, sign in, then open a new terminal. At least one of Claude Code, Codex, or Grok is needed. |
+| Codex shell calls fail with `CreateProcessAsUserW failed: -1073283067` | On Windows, Mega Zword removes `WindowsApps` and `PowerShell\7` entries from Codex's child PATH so its sandbox uses System32 Windows PowerShell; restart Mega Zword after updating. |
 | `config: FAIL` | Open `%USERPROFILE%\.megazword\config.toml`; fix its TOML syntax and make each route a list of AI names. If you want a fresh default, save a copy and run `megazword init --force`. |
 | `routes: WARN` | Remove misspelled backend names from `[route]`. `megazword backends` shows the supported tools. |
 | `out marks: WARN` | List marks with `megazword out`; clear one with `megazword out AI --clear` or correct its reset time in `[out]`. |
@@ -407,3 +424,153 @@ Start with `megazword doctor`; each line below matches one of its check names.
 | Phone cannot open dashboard | Confirm both devices are on the same Tailscale account, use the PC's Tailscale IP, keep the dashboard terminal open, and copy the full token URL from that launch. |
 
 For the available commands and options on this version, use `megazword --help`.
+
+## Free AIs that code
+
+### Kimi, DeepSeek and Qwen Coder through OpenRouter
+
+Sign in with Google at [openrouter.ai](https://openrouter.ai), open **Keys**,
+then **Create Key**. Keep the key private. Save it in PowerShell:
+
+```powershell
+setx OPENROUTER_API_KEY "paste-your-key-here"
+```
+
+Open a new terminal. One key enables `kimi`, `deepseek`, `qwen-coder` and
+`openrouter`. Select them for a normal answer or a coding run:
+
+```powershell
+megazword run -m kimi "Explain this function"
+megazword run -e -m kimi "Fix the failing test in this folder"
+megazword run -e -m qwen-coder "Fix the failing test in this folder"
+```
+
+Override model IDs in `~/.megazword/config.toml`:
+
+```toml
+[free.kimi]
+model = "moonshotai/kimi-k2.6:free"
+[free.deepseek]
+model = "deepseek/deepseek-chat-v3.1:free"
+[free.qwen-coder]
+model = "qwen/qwen3-coder:free"
+```
+
+Check the exact ID and price at [openrouter.ai/models](https://openrouter.ai/models)
+before using it: IDs and free endpoints change. The defaults prefer published
+`:free` variants, including [Kimi K2.6](https://openrouter.ai/moonshotai/kimi-k2.6:free),
+[DeepSeek V3.1](https://openrouter.ai/deepseek/deepseek-chat-v3.1:free) and
+[Qwen3 Coder](https://openrouter.ai/qwen/qwen3-coder:free).
+To choose the newest K-series instead of the free default, check
+[Kimi Latest](https://openrouter.ai/~moonshotai/kimi-latest) and set its model ID;
+that alias can be paid. Mega Zword never upgrades a free ID to a paid ID automatically.
+Free models still have quota limits; paid IDs spend OpenRouter credit.
+
+These three backends are marked as training on data conservatively: an unknown
+serving-provider policy counts as `True`, so prompts and file results are scrubbed.
+[OpenRouter's privacy policy](https://openrouter.ai/privacy/) explains that data
+practices vary by serving provider. Check your OpenRouter privacy settings and
+the chosen provider's policy. A scrub cannot guarantee removal of all private data.
+
+### Coding loop and automatic failover
+
+Free API models can edit files through Mega Zword's own coding loop:
+
+```powershell
+megazword run -e -m groq "Fix the failing test in this folder. Run tests and summarize the change."
+```
+
+Set the provider's API key as described below. This also works with `openrouter`,
+`kimi`, `deepseek`, `qwen-coder`, `gemini-api`, `mistral`, `cloudflare`, `zai`, and `nvidia`. Availability and quota
+still depend on the provider. No live API call was used to test this feature.
+For local Ollama, pull the configured model, then use `-m ollama`. Its default is
+`qwen2.5-coder:7b`; change it under `[free.ollama]` with `model = "your-model"`.
+If that model is missing, the coding loop uses the first installed model reported
+by Ollama and prints its name.
+
+With just `-e`, the normal route picks the AI. API models on that route use the
+coding loop. Claude, Codex and Grok keep their existing CLI paths and restrictions.
+
+The loop can list, read, write and replace files, run one configured test command,
+and finish with a summary. Replacements must match once. It refuses paths outside
+the current folder, `.git`, `.env` files and hard links. It never commits. It prints
+the summary and `git diff --stat`; new untracked files do not appear in that stat.
+Review the files after a run, including one that stops early.
+After an edit, a passing test command ends the run successfully, subject to the
+test quality gate and optional review below. Three identical
+tool calls in a row prompt the model to finish. Edits to `test_*.py`, `*_test.py`
+and files under `tests/` require the job to mention tests.
+
+On an API failure (including 429 or a timeout), the coding loop tries the next
+available free backend within the same run, even with `-m kimi`. Your selected
+backend goes first, followed by `kimi`, `qwen-coder`, `deepseek`, `groq`,
+`gemini-api`, `cloudflare`, `mistral`, `ollama`. Missing keys, unavailable local
+Ollama and backends marked out in config are skipped. Each backend is tried at
+most once in this order. The task, tool observations, current files, test results
+and quality gate carry forward; the step and wall-clock caps do not reset.
+The terminal reports each switch. CLI coders keep their usual routing.
+When there are no remaining fallback candidates, 429, 500, 502 and 503 retain
+the three retries after 2, 5 and 10 seconds. Tool-format rejections first try the
+existing JSON protocol. Test failures and reviewer rejection do not cause a switch.
+
+Native tool calls are preferred. If the provider rejects them or the model replies
+with text, the loop switches to JSON tool replies. Set `text_protocol = true` to
+start with JSON. Models that train on data receive the existing secret scrub on
+prompts and file/test results before every call.
+
+Optional settings in `~/.megazword/config.toml`:
+
+```toml
+[agent]
+# [] disables automatic backend switching. Only free/API/local backend names.
+failover_order = ["kimi", "qwen-coder", "deepseek", "groq", "gemini-api", "cloudflare", "mistral", "ollama"]
+max_steps = 30
+max_chars = 12000
+call_timeout = 60
+wall_timeout = 600
+test_timeout = 120
+text_protocol = false
+test_command = ["python", "-m", "pytest", "-q", "-x"]
+# Optional; unset or empty disables review.
+reviewer = ""
+
+[agent.pace]
+gemini-api = 6
+mistral = 2
+groq = 2
+cloudflare = 1
+openrouter = 3
+nvidia = 2
+zai = 2
+ollama = 0
+```
+
+Pacing is the minimum number of seconds between call starts for each provider,
+including retries. Workers share timestamps and locks under
+`MEGAZWORD_HOME/agent-pace` (normally `~/.megazword/agent-pace`); different models
+on the same provider share the gap. Zero disables pacing. Waiting uses the run's
+wall time cap; an unavailable lock stops the run instead of sending a burst.
+
+New or changed Python tests must contain a nonconstant assertion or
+`pytest.raises`, and call imported production code directly or through a helper
+or fixture. Both explicit finish and passing tests go through this check.
+Rejection gives the model the file, test and reason, then continues within the
+same step and time caps. This static check catches empty/constant tests; it does
+not prove that a test covers the requested behavior. Tests using dynamic imports,
+custom assertion helpers or unusual fixture wiring may need a simpler structure.
+
+Set `reviewer = "groq"` (or another available backend) to review the complete diff
+of files edited by the loop, including new files, once before success. API/local
+reviewers receive no tools; CLI reviewers use the normal non-edit backend.
+The reviewer must reply `ACCEPT` or `REJECT` with a reason. Rejection, an invalid
+answer, or reviewer failure fails the run and leaves the edits for inspection.
+Diffs above 200,000 characters fail rather than receiving an incomplete review.
+
+The model cannot change the test command or add shell commands. Set the command
+yourself for the project. Tests execute project code with your normal permissions;
+the file tools' path rules do not sandbox that code. Each call's timeout is also
+bounded by the time left in the run and the backend's `[timeouts]` setting.
+Runs stop on a cap or error and leave edits for review. The normal run log records
+the request count, backend switch history, requests by backend and estimated tokens.
+Stats count those model requests and use
+the coding run's final outcome for their success rate.

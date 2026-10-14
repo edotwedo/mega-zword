@@ -102,9 +102,41 @@ def test_page_has_the_tab_controls_with_labels():
     html = resources.files("megazword").joinpath("dashboard.html").read_text(encoding="utf-8")
     for needle in ('id="chat-tabs" aria-label="Chat tabs"', 'aria-label="New chat tab"',
                    'aria-label="AI for a new chat tab"', 'aria-label="Chat tab name"',
-                   'id="chat-close"', 'aria-label="Your message"', 'id="hive-floor"'):
+                   'id="chat-close"', 'id="chat-new-session"', 'aria-label="Your message"', 'id="hive-floor"'):
         assert needle in html
     assert "confirm(" not in html  # browser dialogs block the app window; close uses two clicks
+
+
+def test_session_marker_note_and_busy_reset(tmp_path):
+    out = run("""
+setChatTabs([{id:'t1', title:'Work', ai:'claude', project:'p', history:[],
+  session_id:'abc', session_backend:'claude', session_note:'Previous session unavailable; started a new session.'}]);
+setView('tab:t1'); out.kept = snap();
+chatBusy.add('t1'); renderChat(chatTab('t1'));
+out.disabled = $('chat-new-session').disabled;
+out.busy = snap();
+""", tmp_path)
+    assert "session kept (claude)" in out["kept"]["chat-info"]["text"]
+    assert "Previous session unavailable" in out["kept"]["chat-status"]["text"]
+    assert out["disabled"] is True
+
+
+def test_new_session_button_posts_reset_and_refreshes(tmp_path):
+    out = run("""
+setChatTabs([{id:'t1', title:'Work', ai:'codex', project:'p', history:[], session_id:'abc'}]);
+setView('tab:t1'); $('chat-input').value = 'draft';
+post = async (url, body) => { out.request = {url, body}; return {}; };
+reloadChatTabs = async () => { setChatTabs([{id:'t1', title:'Work', ai:'codex', project:'p',
+  history:[], session_id:'', session_note:'New session started.'}]); };
+$('chat-new-session').onclick().then(() => {
+  out.after = snap(); out.input = $('chat-input').value;
+  out.busy = chatBusy.has('t1'); console.log(JSON.stringify(out)); process.exit(0);
+});
+""", tmp_path)
+    assert out["request"] == {"url": "/api/tabs/new-session", "body": {"id": "t1"}}
+    assert "session kept" not in out["after"]["chat-info"]["text"]
+    assert out["after"]["chat-status"]["text"] == "New session started."
+    assert out["input"] == "" and out["busy"] is False
 
 
 def test_floor_line_shows_ready_and_seated_names(tmp_path):

@@ -558,8 +558,44 @@ def main(argv: list[str] | None = None,
 
     memory = Memory(config.HOME, args.project or project_name(), cfg.memory_lines)
     sent = with_context(prompt, memory.context_block()) if args.context else prompt
-    # A forced AI (-m) never escalates; otherwise move up the chain on failure.
-    return execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))
+    if args.edit:
+        from .agent import wrap
+        from .backends import OllamaBackend
+        from .free_apis import OpenAICompatibleBackend
+        reviewer = None
+        if cfg.agent.get("reviewer"):
+            # Never reuse the CLI backends configured with edit permissions.
+            reviewers = default_backends(edit=False, free_models=cfg.free, lean=cfg.lean)
+            if "claude" in reviewers:
+                # A review should not inherit Claude's interactive tool approvals.
+                from dataclasses import replace
+                reviewers["claude"] = replace(reviewers["claude"], args=[
+                    *reviewers["claude"].args, "--permission-mode", "plan", "--tools", ""])
+            reviewers.update({name: b for name, b in backends.items()
+                              if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))})
+            reviewer = reviewers.get(cfg.agent["reviewer"])
+        order = cfg.agent.get("failover_order", config.DEFAULT_FREE_FAILOVER)
+        fallbacks = [backends[name] for name in order if name in backends
+                     and name not in cfg.out_now()
+                     and isinstance(backends[name], (OpenAICompatibleBackend, OllamaBackend))]
+        for backend in [*chain, *fallbacks]:
+            backend.timeout = cfg.timeouts.get(backend.name, backend.timeout)
+        chain = [wrap(b, cfg.agent, reviewer, fallbacks) if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))
+                 else b for b in chain]
+    # Forced CLI AIs never escalate. Free coding agents can switch internally.
+    code = execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))
+    if args.edit:
+        from .agent import AgentBackend
+        if any(isinstance(b, AgentBackend) for b in chain):
+            import subprocess
+            from .backends import run_quick
+            try:
+                diff = run_quick(["git", "diff", "--stat"], timeout=10)
+                print((diff.stdout.strip() or "[megazword] no tracked diff") if diff.returncode == 0
+                      else "[megazword] git diff --stat unavailable", file=sys.stderr)
+            except (OSError, subprocess.SubprocessError):
+                print("[megazword] git diff --stat unavailable", file=sys.stderr)
+    return code
 
 
 # The CLIs load their users' global startup rules (e.g. "read the team board
@@ -572,7 +608,8 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
             memory: Memory, rating: Rating | None, forced: bool,
             start_after: str | None = None, prior_answer: str | None = None,
             on_answer: Callable[[str], None] | None = None,
-            tab_id: str | None = None) -> int:
+            tab_id: str | None = None,
+            on_result: Callable | None = None) -> int:
     """Run the chain with escalation, log every attempt, print the answer,
     and remember the run so `megazword retry` can pick it up."""
     first_line = prompt.strip().splitlines()[0][:80]
@@ -586,12 +623,19 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         if not result.ok:
             failure = explain_failure(name, result.error, cfg)
         trains = any(getattr(x, "trains_on_data", False) for x in chain if x.name == name)
+        agent = next((x for x in chain if x.name == name and hasattr(x, "request_count")), None)
         log.append(cfg.log_path, cfg.log_lines, backend=name, forced=forced, project=memory.project,
                    rating=rating.level if rating else None,
                    rater=rating.source if rating else None,
                    seconds=round(result.seconds, 2), ok=result.ok and not reason,
-                   rejected=reason, prompt_chars=len(prompt), answer_chars=len(result.text),
-                   est_tokens=(len(prompt) + len(result.text)) // 4,
+                   rejected=reason, prompt_chars=agent.prompt_chars if agent else len(prompt),
+                   answer_chars=agent.answer_chars if agent else len(result.text),
+                   requests=agent.request_count if agent else 1,
+                   backends_used=agent.backends_used if agent else [name],
+                   final_backend=agent.model_backend.name if agent else name,
+                   requests_by_backend=agent.requests_by_backend if agent else {name: 1},
+                   est_tokens=(agent.prompt_chars + agent.answer_chars) // 4 if agent else
+                              (len(prompt) + len(result.text)) // 4,
                    trains_on_data=trains)
         memory.add("done", f"{'REJECTED (' + reason + ')' if reason else 'ok'}: {first_line}",
                    by=name)
@@ -616,13 +660,17 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
         print("[megazword] no AI gave a usable answer", file=sys.stderr)
         return 1
     result = outcome.result
+    if on_result is not None:
+        on_result(result)
     save_last_run(sent, prompt, [b.name for b in chain], result.backend, result.text,
                   memory.project, rating.level if rating else None, tab_id=tab_id)
     if on_answer is None:
         print(result.text)
     else:
         on_answer(result.text)
-    print(f"[megazword] {result.backend} answered in {result.seconds:.1f}s"
+    agent = next((b for b in chain if b.name == result.backend and hasattr(b, "model_backend")), None)
+    answer_name = agent.model_backend.name if agent else result.backend
+    print(f"[megazword] {answer_name} answered in {result.seconds:.1f}s"
           + (" (after escalating)" if outcome.escalated else ""), file=sys.stderr)
     return 0
 

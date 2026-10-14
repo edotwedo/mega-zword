@@ -84,7 +84,8 @@ class CLIBackend(Backend):
         # pipes open and hang us after the shim itself is killed.
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, text=True, encoding="utf-8",
-                                errors="replace", cwd=self.cwd or None, **process_group())
+                                errors="replace", cwd=self.cwd or None,
+                                env=self._env(), **process_group())
         try:
             out, err = proc.communicate(stdin, timeout=self.timeout)
         except KeyboardInterrupt:
@@ -101,6 +102,10 @@ class CLIBackend(Backend):
             raise RuntimeError(f"{self.exe} exited with code {proc.returncode}: {detail}")
         self._check_output(out, err)
         return out
+
+    def _env(self) -> dict[str, str] | None:
+        """Child environment; None keeps the normal inherited environment."""
+        return None
 
     def _check_output(self, out: str, err: str) -> None:
         """Hook for backends that must inspect stderr even on exit 0."""
@@ -172,6 +177,21 @@ def _kill_tree(proc: subprocess.Popen, reap: bool = True) -> None:
 class CodexBackend(CLIBackend):
     """Codex prints progress to stdout, so read the final answer from the
     file written by --output-last-message."""
+
+    def _env(self) -> dict[str, str] | None:
+        if sys.platform != "win32":
+            return None
+        # Codex's Windows sandbox cannot launch Store PowerShell from WindowsApps.
+        # Let it find System32 Windows PowerShell instead, only in this child.
+        env = os.environ.copy()
+        for key in env:
+            if key.casefold() == "path":
+                env[key] = ";".join(
+                    entry for entry in env[key].split(";")
+                    if "windowsapps" not in entry.casefold()
+                    and "powershell\\7" not in entry.replace("/", "\\").casefold()
+                )
+        return env
 
     def _run(self, prompt: str) -> str:
         fd, out_path = tempfile.mkstemp(prefix="megazword-codex-", suffix=".txt")
@@ -396,12 +416,14 @@ def default_backends(edit: bool = False,
         # Keep it out of edit mode: folder-contained sandbox writes have not
         # been verified, especially on Windows. auto_edit is not containment.
         backends.append(GeminiBackend("gemini"))
-        from .config import Config, load
-        from .free_apis import free_backends
-        if free_models is None:
-            try:
-                free_models = load().free
-            except (ValueError, TypeError, OSError):  # broken config.toml: use defaults
-                free_models = Config().free
-        backends.extend(free_backends(free_models))
+    from .config import Config, load
+    from .free_apis import free_backends
+    if free_models is None:
+        try:
+            free_models = load().free
+        except (ValueError, TypeError, OSError):
+            free_models = Config().free
+    backends.extend(free_backends(free_models))
+    if edit:
+        backends.append(OllamaBackend("ollama", model=free_models.get("ollama", "qwen2.5-coder:7b")))
     return {b.name: b for b in backends}

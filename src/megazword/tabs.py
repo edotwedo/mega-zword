@@ -8,6 +8,8 @@ to answers.jsonl so a restart still has it.
 from __future__ import annotations
 
 import json
+import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -17,10 +19,18 @@ from .backends import Backend, apply_levels, grok_label
 from .filelock import locked, write_atomic
 from .memory import Memory, check_project, project_name
 from .rater import Rating
+from .tab_sessions import SessionBackend, supports_sessions
 
 MAX_TABS = 40
 TITLE_CHARS = 80
 AUTO = "auto"
+_turn_locks: dict[tuple[str, str], threading.Lock] = {}
+_locks_guard = threading.Lock()
+
+
+def _turn_lock(tab_id: str):
+    with _locks_guard:
+        return _turn_locks.setdefault((str(path()), tab_id), threading.Lock())
 
 
 def path() -> Path:
@@ -79,6 +89,10 @@ def _tab(raw) -> dict | None:
         "project": str(raw.get("project") or "default"),
         "created": str(raw.get("created") or _now()),
         "history": clean[-chat.HISTORY_TURNS:],
+        "session_id": raw.get("session_id") if isinstance(raw.get("session_id"), str) else "",
+        "session_backend": str(raw.get("session_backend") or ""),
+        "session_note": str(raw.get("session_note") or ""),
+        "session_epoch": str(raw.get("session_epoch") or ""),
     }
 
 
@@ -119,7 +133,9 @@ def create(ai: str = AUTO, project: str | None = None, title: str | None = None,
         while f"t{n}" in ids:
             n += 1
         made.append({"id": f"t{n}", "title": label, "ai": pin, "project": proj,
-                     "created": _now(), "history": []})
+                     "created": _now(), "history": [], "session_id": "",
+                     "session_backend": "", "session_note": "",
+                     "session_epoch": uuid.uuid4().hex})
         return [*tabs, made[0]]
 
     _update(add)
@@ -158,9 +174,37 @@ def _conversation_prompt(tab: dict, message: str, context_block: str) -> str:
     return "\n\n".join(sections)
 
 
+def new_session(tab_id: str) -> dict:
+    """Clear the conversation and saved CLI id; refuse a reset during a reply."""
+    lock = _turn_lock(tab_id)
+    if not lock.acquire(blocking=False):
+        raise ValueError("this tab is answering; wait before starting a new session")
+    try:
+        def reset(items):
+            _find(items, tab_id)
+            return [{**t, "history": [], "session_id": "", "session_backend": "",
+                     "session_note": "New session started.", "session_epoch": uuid.uuid4().hex}
+                    if t["id"] == tab_id else t for t in items]
+        return _find(_update(reset), tab_id)
+    finally:
+        lock.release()
+
+
 def send(tab_id: str, prompt: str, backends: dict[str, Backend], cfg: config.Config,
          rater: Callable[[str], Rating],
          statuses: Callable[[], dict] | None = None, context: bool = False) -> dict:
+    lock = _turn_lock(tab_id)
+    if not lock.acquire(blocking=False):
+        raise ValueError("this tab is already answering")
+    try:
+        return _send(tab_id, prompt, backends, cfg, rater, statuses, context)
+    finally:
+        lock.release()
+
+
+def _send(tab_id: str, prompt: str, backends: dict[str, Backend], cfg: config.Config,
+          rater: Callable[[str], Rating],
+          statuses: Callable[[], dict] | None, context: bool) -> dict:
     """One chat turn on a tab. Same lean flags, timeouts, out marks and
     failure text as `megazword chat` (via cli.execute)."""
     from . import cli
@@ -195,26 +239,32 @@ def send(tab_id: str, prompt: str, backends: dict[str, Backend], cfg: config.Con
                     "backend": None, "tab": tab}
         using = grok_label(chain[0])
         forced = False
+    chain = [SessionBackend(b.name, timeout=b.timeout, cli=b,
+                            session_id=tab["session_id"] if tab["session_backend"] == b.name else "",
+                            message=_conversation_prompt({"history": []}, message, block))
+             if supports_sessions(b) else b for b in chain]
     captured: list[str] = []
+    results = []
     code = cli.execute(sent, message, chain, cfg, memory, rating, forced=forced,
-                       on_answer=captured.append, tab_id=tab_id)
+                       on_answer=captured.append, tab_id=tab_id, on_result=results.append)
     if code != 0 or not captured:
         return {"ok": False, "id": tab_id, "error": "no AI gave a usable answer",
                 "answer": "", "backend": None, "using": using, "tab": tab}
     answer = captured[0]
-    backend = chain[0].name
-    try:
-        last = json.loads(cli.last_run_path().read_text(encoding="utf-8"))
-        backend = str(last.get("backend") or backend)
-    except (OSError, ValueError):
-        pass
+    backend = results[0].backend
+    used = next(b for b in chain if b.name == backend)
+    session = used.session_id if isinstance(used, SessionBackend) else ""
+    note = used.note if isinstance(used, SessionBackend) else ""
     turn = {"user": message, "answer": answer, "backend": backend}
 
     def append(tabs: list[dict]) -> list[dict]:
         # Re-read at save time: other tabs may have answered, been renamed or closed
         # during this (possibly minutes-long) call. A tab closed meanwhile stays closed.
-        return [{**t, "history": [*t["history"], turn][-chat.HISTORY_TURNS:]}
-                if t["id"] == tab_id else t for t in tabs]
+        return [{**t, "history": [*t["history"], turn][-chat.HISTORY_TURNS:],
+                 "session_id": session, "session_backend": backend if session else "",
+                 "session_note": note}
+                if t["id"] == tab_id and t["session_epoch"] == tab["session_epoch"]
+                else t for t in tabs]
 
     tab = next((t for t in _update(append) if t["id"] == tab_id),
                {**tab, "history": [*tab["history"], turn][-chat.HISTORY_TURNS:]})

@@ -4,11 +4,48 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import math
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
 from .backends import Backend
+
+
+class ToolsUnsupported(RuntimeError):
+    """Backend rejected the native tool schema; retry using text JSON."""
+
+
+class APIHTTPError(RuntimeError):
+    """HTTP status for retries, optionally with a sanitized validation reason."""
+
+    def __init__(self, code, headers=None, reason=""):
+        self.code = code
+        super().__init__(http_error_message(code, headers) + (": " + reason if reason else ""))
+
+
+def _safe_reason(exc):
+    """Only structured validation messages, bounded and stripped of credentials."""
+    from .guard import scrub
+    try:
+        payload = json.loads(exc.read(16384))
+        error = payload.get("error", {})
+        reason = error.get("message", "") if isinstance(error, dict) else ""
+        if not reason and isinstance(payload.get("errors"), list) and payload["errors"]:
+            reason = payload["errors"][0].get("message", "")
+        if not isinstance(reason, str):
+            return ""
+        for name, value in sorted(os.environ.items(), key=lambda item: -len(item[1])):
+            if value and (re.search(r"KEY|TOKEN|SECRET|PASSWORD", name, re.I)
+                          or name == "CLOUDFLARE_ACCOUNT_ID"):
+                reason = reason.replace(value, "[REDACTED]")
+        reason = re.sub(r"https?://\S+|Bearer\s+\S+", "[REDACTED]", reason, flags=re.I)
+        return " ".join(scrub(reason).split())[:240]
+    except (ValueError, AttributeError, TypeError, IndexError, OSError):
+        return ""
 
 
 @dataclass
@@ -33,30 +70,45 @@ class OpenAICompatibleBackend(Backend):
         return url.rstrip("/") + "/chat/completions"
 
     def _run(self, prompt: str) -> str:
+        message = self.chat([{"role": "user", "content": prompt}])
+        content = message.get("content")
+        if not isinstance(content, str) or not content.strip():
+            raise RuntimeError("API returned an invalid or empty chat response")
+        return content
+
+    def chat(self, messages: list[dict], tools: list[dict] | None = None,
+             timeout: float | None = None) -> dict:
+        """One OpenAI chat turn, preserving native tool calls."""
         key = os.environ.get(self.key_env)
         if not key or not self._env_ok():
             raise RuntimeError("API key not set")
         try:
             headers = {"Authorization": f"Bearer {key}",
                        "Content-Type": "application/json", **self.extra_headers}
+            body = {"model": self.model, "messages": messages, "stream": False}
+            if self.name == "cloudflare":
+                body.pop("stream")  # The default is a non-streaming response.
+            if tools is not None:
+                body["tools"] = tools
             request = urllib.request.Request(
                 self._endpoint(),
-                data=json.dumps({"model": self.model,
-                                 "messages": [{"role": "user", "content": prompt}],
-                                 "stream": False}).encode("utf-8"),
+                data=json.dumps(body).encode("utf-8"),
                 headers=headers,
                 method="POST",
             )
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:
                 payload = json.loads(response.read().decode("utf-8"))
-            content = payload["choices"][0]["message"]["content"]
-            if not isinstance(content, str) or not content.strip():
+            message = payload["choices"][0]["message"]
+            if not isinstance(message, dict):
                 raise ValueError("missing answer")
-            return content.replace(key, "[REDACTED]")
+            return json.loads(json.dumps(message).replace(key, "[REDACTED]"))
         except urllib.error.HTTPError as exc:
-            # Response bodies, reasons and URLs can echo credentials. Never
-            # propagate them into Result.error (which the CLI prints/logs).
-            raise RuntimeError(http_error_message(exc.code, exc.headers)) from None
+            reason = _safe_reason(exc) if exc.code in (400, 422) else ""
+            if tools is not None and exc.code in (400, 422):
+                raise ToolsUnsupported("API rejected native tools" + (": " + reason if reason else "")) from None
+            # Auth and rate-limit bodies stay private. Only sanitized validation
+            # messages reach Result.error (which the CLI prints/logs).
+            raise APIHTTPError(exc.code, exc.headers, reason) from None
         except TimeoutError:
             raise RuntimeError("API request timed out") from None
         except urllib.error.URLError as exc:
@@ -77,10 +129,18 @@ def http_error_message(code: int, headers=None) -> str:
     its 1-hour guess: free-tier rate limits usually clear in seconds."""
     if code == 429:
         retry = (headers.get("Retry-After") if headers is not None else None) or ""
-        if retry.strip().isdigit():
-            minutes = max(1, -(-int(retry.strip()) // 60))  # round up
-            return f"API HTTP error 429: rate limited, try again in {minutes} minutes"
-        return "API HTTP error 429: rate limited"
+        seconds = 120
+        try:
+            seconds = float(retry.strip())
+            if not math.isfinite(seconds):
+                seconds = 120
+        except ValueError:
+            try:
+                seconds = (parsedate_to_datetime(retry) - datetime.now(timezone.utc)).total_seconds()
+            except (ValueError, TypeError, OverflowError):
+                pass
+        minutes = max(1, math.ceil(seconds / 60))
+        return f"API HTTP error 429: rate limited, try again in {minutes} minutes"
     # Worded so failures.classify() sees an auth problem. Never echo the body.
     if code == 401:
         return "API HTTP error 401: unauthorized (auth failed, check the API key)"
@@ -91,6 +151,9 @@ def http_error_message(code: int, headers=None) -> str:
 
 # Names shown in `megazword backends` / doctor. Never put these on DEFAULT_ROUTE.
 FREE_KEYS = (
+    ("kimi", "OPENROUTER_API_KEY"),
+    ("deepseek", "OPENROUTER_API_KEY"),
+    ("qwen-coder", "OPENROUTER_API_KEY"),
     ("openrouter", "OPENROUTER_API_KEY"),
     ("groq", "GROQ_API_KEY"),
     ("cloudflare", "CLOUDFLARE_API_TOKEN"),
@@ -138,4 +201,13 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
             model=m.get("mistral", "mistral-small-latest"),
             key_env="MISTRAL_API_KEY", trains_on_data=True,
         ),
+        # OpenRouter chooses the serving provider. Its training policy can
+        # vary by endpoint (and configured model); unknown means scrub prompts.
+        *[OpenAICompatibleBackend(name, base_url="https://openrouter.ai/api/v1",
+                                  model=m.get(name, default),
+                                  key_env="OPENROUTER_API_KEY", trains_on_data=True)
+          for name, default in (
+              ("kimi", "moonshotai/kimi-k2.6:free"),
+              ("deepseek", "deepseek/deepseek-chat-v3.1:free"),
+              ("qwen-coder", "qwen/qwen3-coder:free"))],
     ]

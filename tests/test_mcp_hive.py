@@ -64,9 +64,11 @@ def test_handle_initialize_unknown_version_answers_ours(asked):
     assert response["result"]["serverInfo"]["version"] == __version__
 
 
-def test_hive_say_description_warns_mentions_still_wake():
+def test_hive_say_description_phil_mentions_only():
     tools = {t["name"]: t for t in mcp_hive.TOOLS}
-    assert "room start" in tools["hive_say"]["description"]
+    desc = tools["hive_say"]["description"]
+    assert "bot @names do not" in desc
+    assert "Phil's @name" in desc
 
 
 def test_handle_tools_list():
@@ -115,6 +117,7 @@ def test_handle_hive_say_defaults_to_seat(monkeypatch, isolated_home):
     monkeypatch.setenv("MEGAZWORD_SEAT", "reed-12")
     assert text_result(call_tool("hive_say", {"text": "ready"})) == "[reed-12] ready"
     assert room.read_messages("hive", home=isolated_home)[0].author == "reed-12"
+    assert "reed-12" in floor.format_heard(home=isolated_home)
 
 
 @pytest.mark.parametrize("author", ["phil", "Phil", None])
