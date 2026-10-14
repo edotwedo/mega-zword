@@ -1,5 +1,7 @@
 # Status
 
+**Active: Cedar-14 (Codex), 2026-10-14 20:10 UTC.** Phil assigned visible free-bot activity and intervention after PR54. No conflicting Q/Hive job. Codex 33% 5-hour / 48% week; Claude 100% week; Grok 77% stale. Cedar implements and validates; free HTTP review attempted where useful, no paid worker duplication. Branch codex/run-controls-2026-10-14.
+
 **Completed: Cedar-14 (Codex), 2026-10-14.** Combined Testlog-14 log coverage (187fc74) with unique Night Shift cases (0d81d40), and Groq qwen/qwen3.8-27b authored rater tests/corrections. Full suite 1096 passed; focused 42; smoke 36/36; source unchanged. Branch codex/free-completion-2026-10-14. See docs/handoffs/2026-10-14-free-rater-completion.md for authorship and supervised-execution limits. Next: review delivery; implement visible job activity/intervention and quota-aware coding loop.
 
 **Usage display update ready: Lantern-13 (Codex), 2026-10-14.** Shared plan summary displays all quota windows together and timestamps live Codex app-server readings. Verified current reading directly: 7% used / 4:35 PM reset (5-hour); 44% weekly / 3:59 AM reset; live check 11:46 AM. The labor planner continues to use the most-used window (weekly). No model calls; no test suite run for this display-only change. Branch codex/usage-refresh-display-2026-10-14.
