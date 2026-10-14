@@ -33,6 +33,8 @@ megazword backends
 megazword doctor
 ```
 
+`megazword free test` sends "Reply with: ok" once to each free API with a key and to local Ollama, then lists status, seconds and safe errors (30-second timeout each; exit 1 if any fail).
+
 `init` makes `~/.megazword/config.toml` (on Windows,
 `%USERPROFILE%\.megazword\config.toml`) with routes for installed AI tools. It
 keeps an existing file; use `megazword init --force` only when you mean to

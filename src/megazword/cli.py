@@ -20,7 +20,7 @@ COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room", "night"),
     "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor"),
-    "Set up": ("init", "doctor", "out", "backends", "app", "mcp"),
+    "Set up": ("init", "doctor", "out", "backends", "free", "app", "mcp"),
     "Memory": ("note", "decide", "import-hive"),
 }
 
@@ -63,6 +63,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"megazword {__version__}")
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")  # none: start screen
+
+    free = sub.add_parser("free", help="check configured free API backends")
+    free.add_subparsers(dest="free_command", required=True).add_parser(
+        "test", help="send one tiny prompt to each configured free backend")
 
     run = sub.add_parser("run", help="run a prompt; picks an AI unless -m is given")
     run.add_argument("prompt", nargs="?", help="the prompt (reads stdin if left out)")
@@ -335,6 +339,9 @@ def main(argv: list[str] | None = None,
     if args.command == "night":
         from .night import command
         return command(args, cfg)
+    if args.command == "free":
+        from .free_test import run
+        return run(cfg, backends)
     if args.command in (None, "start"):
         from .start import render
         print(render(cfg))
