@@ -321,10 +321,10 @@ class AgentBackend(Backend):
                 if isinstance(self.model_backend, OllamaBackend):
                     from .ollama import generate
                     return {"content": generate(json.dumps(sent), self._ollama_model,
-                            self.model_backend.url, json_format=True,
-                            timeout=min(self.call_timeout, remaining, self.model_backend.timeout))}
+                            self.model_backend.url, json_format=True, messages=sent,
+                            timeout=min(self.call_timeout, self.wall_timeout, remaining, self.model_backend.timeout))}
                 return self.model_backend.chat(sent, tools=None if text_mode else TOOLS,
-                                               timeout=min(self.call_timeout, remaining, self.model_backend.timeout))
+                                               timeout=min(self.call_timeout, self.wall_timeout, remaining, self.model_backend.timeout))
             except (APIHTTPError, urllib.error.HTTPError) as exc:
                 if (isinstance(self.model_backend, OllamaBackend) and exc.code == 404
                         and not self._ollama_fallback):
