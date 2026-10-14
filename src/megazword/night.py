@@ -261,31 +261,55 @@ def test_command(work: Path, job: Job) -> tuple[list[str] | None, dict | None]:
 
 # ---------- choosing an AI ----------
 
+def is_free_backend(backend: Backend) -> bool:
+    """HTTP free APIs and local Ollama. Paid CLIs keep the meter floor."""
+    from .free_apis import OpenAICompatibleBackend
+    from .backends import OllamaBackend
+    return isinstance(backend, (OpenAICompatibleBackend, OllamaBackend))
+
+
 def eligible(backends: dict[str, Backend], summaries: list, floor: int = FLOOR) -> tuple[list[str], list[str]]:
-    """AIs that may take a night job, most room first, plus why the others can't.
-    Fail closed: an unattended run has nobody to notice overspend, so an AI with no
-    meter, an old reading, or less than `floor`% left is skipped."""
+    """AIs that may take a night job. Free HTTP/Ollama go first and may run
+    without a meter (a 429 is the next one's problem). Paid CLIs stay fail-closed:
+    no meter, a stale reading, or less than `floor`% left is skipped."""
     from .meters import labor_order
     by_name = {s.service: s for s in summaries}
-    ok, why = [], []
+    free, paid, why, seen = [], [], [], set()
     for name, _reason in labor_order(summaries):
         if name not in backends:
             continue
+        seen.add(name)
+        b = backends[name]
         s = by_name[name]
+        if s.state == "out":
+            why.append(f"{name}: out")
+            continue
+        if is_free_backend(b):
+            if b.available():
+                free.append(name)
+            else:
+                why.append(f"{name}: not installed")
+            continue
         if s.state != "meter":
-            why.append(f"{name}: {'out' if s.state == 'out' else 'no meter'}")
+            why.append(f"{name}: no meter")
         elif s.stale:
             why.append(f"{name}: old meter reading")
         elif 100 - (s.used or 0) < floor:
             why.append(f"{name}: {100 - (s.used or 0):.0f}% left, under the {floor}% floor")
-        elif not backends[name].available():
+        elif not b.available():
             why.append(f"{name}: not installed")
         else:
-            ok.append(name)
-    for name in backends:
-        if name not in by_name:
+            paid.append(name)
+    for name, b in backends.items():
+        if name in seen:
+            continue
+        if is_free_backend(b) and b.available():
+            free.append(name)
+        elif is_free_backend(b):
+            why.append(f"{name}: not installed")
+        else:
             why.append(f"{name}: no meter")
-    return ok, why
+    return free + paid, why
 
 
 def live_summaries() -> list:
@@ -354,11 +378,26 @@ class Night:
     def _work(self, job: Job, out: Outcome, names: list[str], work: Path, branch: str) -> Outcome:
         prompt = PROMPT.format(repo=job.repo, task=job.task, done=job.done_when)
         base = _check(git(["rev-parse", "HEAD"], work), "git rev-parse").strip()
+        tried_free: set[str] = set()
         for name in names:
+            if name in tried_free:
+                continue
             out.tried.append(name)
-            backend = replace(self.backends[name], cwd=str(work), timeout=int(self.job_seconds))
-            self.log(f"{branch}: {name} working on: {job.task}")
-            result = backend.run(prompt)
+            source = self.backends[name]
+            if is_free_backend(source):
+                from .agent import wrap
+                fallbacks = [self.backends[n] for n in names
+                             if n != name and n not in tried_free and is_free_backend(self.backends[n])]
+                worker = wrap(replace(source),
+                              {"root": work, "wall_timeout": int(self.job_seconds), "reviewer": ""},
+                              fallback_backends=fallbacks)
+                self.log(f"{branch}: {name} working on: {job.task}")
+                result = worker.run(prompt)
+                tried_free.update(getattr(worker, "backends_used", None) or [name])
+            else:
+                backend = replace(source, cwd=str(work), timeout=int(self.job_seconds))
+                self.log(f"{branch}: {name} working on: {job.task}")
+                result = backend.run(prompt)
             git(["add", "-A"], work)
             changed = git(["diff", "--cached", "--quiet"], work).returncode != 0
             if changed and result.ok:

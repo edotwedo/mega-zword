@@ -356,8 +356,10 @@ There is no phone-model answering backend yet.
 Night Shift does real work while you sleep. It reads `docs/QUEUE.md` on GitHub
 (`edotwedo/mega-zword` main) and runs each open line as a job:
 
-1. Reads usage. An AI with less than 15% left, no meter, or an old reading gets
-   no night work. Claude and Codex can take jobs (they can edit files on Windows).
+1. Reads usage. Free HTTP APIs and Ollama can take jobs without a meter; a 429
+   moves to the next free backend. Paid CLIs (Claude, Codex, Grok) stay
+   fail-closed: less than 15% left, no meter, or an old reading gets no night
+   work. Free backends edit through Mega Zword's coding loop.
 2. Makes a fresh copy of the job's repo under `~\.megazword\night\`, never your
    own working folders.
 3. The AI with the most room edits files there. If it changes nothing, the next
