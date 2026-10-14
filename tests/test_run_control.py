@@ -8,6 +8,7 @@ import pytest
 
 from megazword import agent, config, dashboard
 from megazword.free_apis import OpenAICompatibleBackend
+from megazword.free_apis import APIHTTPError
 from megazword.run_control import Control, ENV
 
 
@@ -148,3 +149,50 @@ def test_dashboard_child_owns_control_and_briefing_identity(monkeypatch):
     assert captured["env"]["MEGAZWORD_SEAT"] != "Cedar-14"
     assert captured["env"][ENV] == str(job.control.folder.resolve())
     assert job.control.folder.is_relative_to(config.HOME / "run-controls")
+
+
+def test_cooldown_instruction_is_seen_once_and_write_is_executed(tmp_path, monkeypatch):
+    control = Control(config.HOME / "run-controls" / "retry")
+    monkeypatch.setattr(agent.time, "sleep", lambda seconds: None)
+    seen = []
+
+    class Model(OpenAICompatibleBackend):
+        def available(self):
+            return True
+
+        def chat(self, messages, tools=None, timeout=None):
+            seen.append(json.loads(json.dumps(messages)))
+            if len(seen) == 1:
+                control.request("instruct", "Write chosen.py")
+                raise APIHTTPError(429, {"Retry-After": "1"})
+            if len(seen) == 2:
+                return call("write_file", path="chosen.py", text="chosen")
+            return call("run_tests")
+
+    loop = agent.wrap(Model("groq"), {"root": tmp_path, "control": control,
+        "pace": {"groq": 0}, "wall_timeout": 20,
+        "test_command": (sys.executable, "-c", "print('ok')")})
+    result = loop.run("write file")
+    assert result.ok, result.error
+    assert (tmp_path / "chosen.py").read_text() == "chosen"
+    assert loop.request_count == 3
+    for messages in seen[1:]:
+        assert sum("Write chosen.py" in (m.get("content") or "") for m in messages) == 1
+
+
+@pytest.mark.parametrize("header, seconds", [("1", 1), ("61", 61), ("0.5", .5), ("bad", 120), ("nan", 120)])
+def test_rate_limit_keeps_exact_retry_seconds(header, seconds):
+    assert APIHTTPError(429, {"Retry-After": header}).retry_after == seconds
+
+
+def test_cancel_kills_even_when_control_file_cannot_be_written(monkeypatch):
+    class Broken:
+        def request(self, action):
+            raise PermissionError("cannot write")
+
+    job = dashboard.Job.__new__(dashboard.Job)
+    job.code, job.err, job.control, job.proc = None, [], Broken(), object()
+    killed = []
+    monkeypatch.setattr(dashboard, "_kill_tree", lambda proc, reap: killed.append((proc, reap)))
+    job.cancel()
+    assert killed == [(job.proc, False)]

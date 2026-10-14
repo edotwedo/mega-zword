@@ -140,13 +140,14 @@ class Job:
 
     def cancel(self) -> None:
         if self.code is None:
-            if self.control:
-                try:
+            try:
+                if self.control:
                     self.control.request("stop")
-                except ValueError:
-                    pass  # A busy control lock must never prevent process cancellation.
-            self.err.append("[megazword] cancelled from the dashboard\n")
-            _kill_tree(self.proc, reap=False)
+            except (ValueError, OSError):
+                pass  # Busy/unwritable control files cannot prevent cancellation.
+            finally:
+                self.err.append("[megazword] cancelled from the dashboard\n")
+                _kill_tree(self.proc, reap=False)
 
     def view(self) -> dict:
         return {"id": self.id, "label": self.label, "started": self.started,

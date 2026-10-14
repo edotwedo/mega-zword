@@ -15,7 +15,7 @@ import urllib.error
 from dataclasses import dataclass, field
 
 from .backends import Backend, OllamaBackend, process_group, _kill_tree
-from .free_apis import APIHTTPError, ToolsUnsupported
+from .free_apis import APIHTTPError, ToolsUnsupported, retry_seconds
 from .guard import scrub
 from . import config
 from .filelock import locked, write_atomic
@@ -113,7 +113,7 @@ class AgentBackend(Backend):
     prompt_chars: int = 0
     answer_chars: int = 0
     control: object | None = None
-    _queued_directions: list = field(default_factory=list)
+    _retry_directions: list = field(default_factory=list)
 
     def _event(self, phase, **details):
         if self.control:
@@ -126,10 +126,8 @@ class AgentBackend(Backend):
             return []
         instructions, paused = self.control.checkpoint()
         self._deadline += paused
-        directions = self._queued_directions
-        self._queued_directions = []
-        return [*directions, *({"role": "user", "content": "New instruction from the user: " + text}
-                              for text in instructions)]
+        return [{"role": "user", "content": "New instruction from the user: " + text}
+                for text in instructions]
 
     @staticmethod
     def _skip_calls(messages, calls, index, text_mode):
@@ -335,6 +333,7 @@ class AgentBackend(Backend):
         return summary
 
     def _model_call(self, sent, text_mode):
+        sent = list(sent)  # retry interventions belong in history exactly once
         retries = 0
         while True:
             pace_call(self.model_backend.name, self.pace, self._deadline)
@@ -375,9 +374,8 @@ class AgentBackend(Backend):
                     raise  # Switch immediately instead of waiting on this provider.
                 delay = (2, 5, 10)[retries]
                 if exc.code == 429:
-                    minutes = re.search(r"try again in (\d+) minutes", str(exc))
-                    if minutes:
-                        delay = int(minutes[1]) * 60
+                    delay = (exc.retry_after if isinstance(exc, APIHTTPError)
+                             else retry_seconds(exc.headers))
                 self._event("cooldown", seconds=delay, http_status=exc.code)
                 if self._deadline - time.monotonic() <= delay:
                     raise TimeoutError("agent wall-clock cap reached during retry backoff") from None
@@ -392,7 +390,7 @@ class AgentBackend(Backend):
                         time.sleep(step)
                         left -= step
                     sent.extend(queued)
-                    self._queued_directions.extend(queued)
+                    self._retry_directions.extend(queued)
                 retries += 1
 
     def _has_fallback(self):
@@ -502,6 +500,9 @@ class AgentBackend(Backend):
                     "Continue the same task from the current files and tool results. "
                     "The previous backend failed. Use the fenced JSON tool protocol."})
                 continue
+            finally:
+                messages.extend(self._retry_directions)
+                self._retry_directions = []
             self.answer_chars += len(json.dumps(reply))
             if time.monotonic() >= self._deadline:
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
