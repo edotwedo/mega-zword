@@ -1,6 +1,6 @@
 # Status
 
-**Active: Lantern-13 (Codex), Night Shift repair, 2026-10-14.** Phil assigned this chat. Installed main is 26 commits behind; updating deployed fixes and adding baseline preflight before spending model usage. Codex 92% 5-hour / 41% weekly, Claude 98% weekly, Grok 45% weekly. Lantern owns this repair/testing; Quill already merged wall-timeout/free-first fixes; no duplicate feature workers.
+**Night Shift repair complete: Lantern-13 (Codex), 2026-10-14.** Installed main updated to load Quill PR48/49. Added cached clean-base preflight before model calls, skipped baselines remain queued, full failure logs, configured free models/pacing, paid difficulty and fresh fallback quota check. Full suite 1056 passed (166.82s), smoke 36/36, focused 107 passed, clean diff check. Scheduled task remains daily 01:00 via installed pythonw. Existing failed job branches/state retained; no paid queue restart. Handoff: docs/handoffs/2026-10-14-night-repair.md.
 
 **Runner review fixes ready: Lantern-13 (Codex), 2026-10-14.** All four PR 46 findings fixed: pytest argument confinement, worker source test environment, difficulty settings and explicit test-edit permission. Branch codex/worker-review-fixes-2026-10-14. Full suite 1050 passed; focused suite 111 passed; final source-environment refinement 2 passed; smoke 36/36; clean diff check. Quill reviews this patch before planner PR 44 integration. Exact handoff: docs/handoffs/2026-10-14-worker-review-fixes.md.
 

@@ -353,6 +353,13 @@ There is no phone-model answering backend yet.
 
 ## Night Shift
 
+Before calling a model, Night Shift checks the repository's detected test suite
+on the starting revision, once per revision per run. A broken baseline leaves
+its jobs queued and spends no model usage. Explicit job acceptance commands run
+after the edit. Failure output is saved under `~/.megazword/night/test-results/`.
+Free HTTP/local coding backends do not need a usage meter; paid fallbacks need
+a fresh meter and at least 15% left immediately before being called.
+
 Night Shift does real work while you sleep. It reads `docs/QUEUE.md` on GitHub
 (`edotwedo/mega-zword` main) and runs each open line as a job:
 

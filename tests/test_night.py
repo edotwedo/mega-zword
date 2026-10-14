@@ -306,3 +306,76 @@ def test_tests_that_move_head_are_not_pushed(origin):
     o = n.run_job(job)
     assert o.status == "failed" and "HEAD moved" in o.reason and not o.branch
     assert "night/2026-10-13-1" not in heads(origin)
+
+
+def python_suite(origin, assertion):
+    seed = origin.parent / "seed"
+    (seed / "pyproject.toml").write_text("[tool.pytest.ini_options]\n", encoding="utf-8")
+    (seed / "tests").mkdir(exist_ok=True)
+    (seed / "tests" / "test_baseline.py").write_text(
+        f"def test_existing():\n    assert {assertion}\n", encoding="utf-8")
+    sh(["add", "-A"], seed)
+    sh(["commit", "-qm", "baseline suite"], seed)
+    sh(["push", "-q", "origin", "main"], seed)
+
+
+def test_broken_baseline_spends_no_model_calls_and_stays_queued(origin, monkeypatch):
+    python_suite(origin, "1 == 2")
+    ai = FakeAI("codex", action=typo_fix)
+    n = night.Night({"codex": ai}, usage=meters(codex=10))
+    actual, suites = night.run_cmd, []
+    def record(cmd, cwd=None, timeout=300, env=None):
+        if "pytest" in cmd:
+            suites.append(str(cwd))
+        return actual(cmd, cwd, timeout, env)
+    monkeypatch.setattr(night, "run_cmd", record)
+    night.run_night(n, queue=str(origin), max_jobs=2, write=lambda s: None)
+    assert not ai.calls and len(suites) == 1  # same failing revision checked once
+    assert not night.load_state()  # repair can retry; not marked permanently failed
+    assert list(heads(origin)) == ["main"]
+    logs = list((night.home() / "test-results").glob("*-baseline.log"))
+    assert len(logs) == 1 and "test_existing" in logs[0].read_text(encoding="utf-8")
+    assert "baseline tests failed before model work" in (
+        night.home() / f"summary-{n.date}.md").read_text(encoding="utf-8")
+    # A repaired base gets a fresh preflight even in the same Night instance.
+    python_suite(origin, "1 == 1")
+    outcome = n.run_job(night.Job(0, " ", str(origin), "Fix typo", "README says receive"))
+    assert outcome.status == "done" and len(ai.calls) == 1 and len(suites) == 3
+
+
+def test_healthy_baseline_checked_once_and_worker_tests_still_run(origin, monkeypatch):
+    python_suite(origin, "1 == 1")
+    ai = FakeAI("codex", action=typo_fix)
+    n = night.Night({"codex": ai}, usage=meters(codex=10))
+    actual, suites = night.run_cmd, []
+    def record(cmd, cwd=None, timeout=300, env=None):
+        if "pytest" in cmd:
+            suites.append(str(cwd))
+        return actual(cmd, cwd, timeout, env)
+    monkeypatch.setattr(night, "run_cmd", record)
+    for i in range(2):
+        o = n.run_job(night.Job(i, " ", str(origin), f"Fix typo {i}", "README says receive"))
+        assert o.status == "done" and o.tests == "passed"
+    assert len(ai.calls) == 2 and len(suites) == 3
+
+
+def test_night_command_passes_free_model_config(monkeypatch):
+    import argparse
+    from megazword import backends, config
+    calls = []
+    monkeypatch.setattr(backends, "default_backends", lambda **kwargs: calls.append(kwargs) or {})
+    monkeypatch.setattr(night, "run_night", lambda worker, *args: calls.append(worker.cfg) or 0)
+    cfg = config.Config(free={"ollama": "custom-coder"}, agent={"max_steps": 4})
+    args = argparse.Namespace(night_cmd="run", floor=15, job_minutes=2, queue=None, max=1, post=False)
+    assert night.command(args, cfg) == 0
+    assert calls[0]["free_models"] == {"ollama": "custom-coder"}
+    assert calls[1] is cfg
+
+
+def test_paid_capacity_rechecked_before_call(origin):
+    ai = FakeAI("codex", action=typo_fix)
+    readings = iter([meters(codex=10)(), meters(codex=95)()])
+    worker = night.Night({"codex": ai}, usage=lambda: next(readings))
+    out = worker.run_job(night.parse_queue(QUEUE.format(repo=origin))[0])
+    assert out.status == "skipped" and "no fresh capacity" in out.reason
+    assert not ai.calls and list(heads(origin)) == ["main"]

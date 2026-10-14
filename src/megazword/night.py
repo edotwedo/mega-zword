@@ -27,6 +27,7 @@ from typing import Callable
 
 from . import config
 from .backends import Backend, _kill_tree, process_group
+from .guard import scrub
 
 QUEUE_REPO = "edotwedo/mega-zword"
 QUEUE_FILE = "docs/QUEUE.md"
@@ -338,7 +339,7 @@ class Night:
     def __init__(self, backends: dict[str, Backend], usage: Callable[[], list] = live_summaries,
                  log: Callable[[str], None] | None = None, floor: int = FLOOR,
                  job_minutes: float = JOB_MINUTES, test_minutes: float = TEST_MINUTES,
-                 date: str | None = None):
+                 date: str | None = None, cfg: config.Config | None = None):
         self.backends = backends
         self.usage = usage
         self.floor = floor
@@ -347,11 +348,43 @@ class Night:
         self.date = date or f"{datetime.now():%Y-%m-%d}"
         self.taken: set[str] = set()
         self.log = log or (lambda s: None)
+        self.cfg = cfg or config.Config()
+        self._baselines: dict[tuple[str, str], str] = {}
+
+    def _test_result(self, res, job: Job, label: str) -> str:
+        """Keep failure details locally instead of throwing away all but the last line."""
+        folder = home() / "test-results"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / f"{self.date}-{job.key}-{label}.log"
+        output = scrub((res.stdout or "") + "\n" + (res.stderr or ""))
+        path.write_text(output[-200000:], encoding="utf-8")
+        tail = output.strip().splitlines()[-1:] or ["no test output"]
+        return f"{tail[0][:200]}; details: {path}"
+
+    def _preflight(self, job: Job, work: Path, base: str) -> str:
+        key = (job.repo, base)
+        if key in self._baselines:
+            return self._baselines[key]
+        # A job's explicit acceptance command may require files that do not exist
+        # yet. Only the repository's detected suite checks the starting revision.
+        cmd, env = test_command(work, replace(job, test=""))
+        reason = ""
+        if cmd:
+            self.log(f"baseline {base[:12]}: checking before any model call")
+            res = run_cmd(cmd, work, self.test_seconds, env)
+            detail = self._test_result(res, job, "baseline")
+            if res.returncode:
+                reason = "baseline tests failed before model work: " + detail
+            _check(git(["reset", "--hard", "--quiet", base], work), "reset baseline test output")
+            _check(git(["clean", "-fdq"], work), "clean baseline test output")
+        self._baselines[key] = reason
+        return reason
 
     def run_job(self, job: Job) -> Outcome:
         out = Outcome(job, "failed")
         summaries = self.usage()  # usage before every job (Phil's rule)
         names, why = eligible(self.backends, summaries, self.floor)
+        names = [name for name in names if name not in self.cfg.out_now()]
         self.log(f"usage: {usage_line(summaries)}")
         if not names:
             out.status, out.reason = "skipped", "no AI has room: " + "; ".join(why)
@@ -378,6 +411,10 @@ class Night:
     def _work(self, job: Job, out: Outcome, names: list[str], work: Path, branch: str) -> Outcome:
         prompt = PROMPT.format(repo=job.repo, task=job.task, done=job.done_when)
         base = _check(git(["rev-parse", "HEAD"], work), "git rev-parse").strip()
+        baseline_problem = self._preflight(job, work, base)
+        if baseline_problem:
+            out.status, out.reason = "skipped", baseline_problem
+            return out
         tried_free: set[str] = set()
         for name in names:
             if name in tried_free:
@@ -388,20 +425,36 @@ class Night:
                 from .agent import wrap
                 fallbacks = [self.backends[n] for n in names
                              if n != name and n not in tried_free and is_free_backend(self.backends[n])]
-                worker = wrap(replace(source),
-                              {"root": work, "wall_timeout": int(self.job_seconds), "reviewer": ""},
+                settings = dict(self.cfg.agent)
+                settings.update(root=work, wall_timeout=int(self.job_seconds), reviewer="",
+                                allow_test_edits=bool(re.search(
+                                    r"\b(?:tests?|testing|pytest|unittest)\b", job.task, re.I)))
+                worker = wrap(replace(source), settings,
                               fallback_backends=fallbacks)
                 self.log(f"{branch}: {name} working on: {job.task}")
                 result = worker.run(prompt)
                 tried_free.update(getattr(worker, "backends_used", None) or [name])
             else:
-                backend = replace(source, cwd=str(work), timeout=int(self.job_seconds))
+                # Free calls can take long enough for a paid quota snapshot to
+                # become stale. Recheck immediately before a paid fallback.
+                current, _ = eligible({name: source}, self.usage(), self.floor)
+                if name not in current or name in self.cfg.out_now():
+                    self.log(f"{branch}: {name} has no fresh capacity; not called")
+                    out.reason = f"{name}: no fresh capacity for paid fallback"
+                    out.status = "skipped"
+                    continue
+                from .backends import apply_levels
+                from .rater import rule_rate
+                selected = {name: replace(source)}
+                apply_levels(selected, rule_rate(job.task).level, self.cfg.grok, self.cfg.levels)
+                backend = replace(selected[name], cwd=str(work), timeout=int(self.job_seconds))
                 self.log(f"{branch}: {name} working on: {job.task}")
+                out.status = "failed"
                 result = backend.run(prompt)
             git(["add", "-A"], work)
             changed = git(["diff", "--cached", "--quiet"], work).returncode != 0
             if changed and result.ok:
-                out.ai = name
+                out.ai = (getattr(worker, "backends_used", None) or [name])[-1] if is_free_backend(source) else name
                 break
             # A timeout or crash can leave half an edit behind: never commit that.
             reason = result.error or "made no changes"
@@ -430,7 +483,7 @@ class Night:
             tail = (res.stdout or res.stderr).strip().splitlines()[-1:] or [""]
             self.log(f"{branch}: tests {out.tests}: {tail[0][:200]}")
             if out.tests == "failed":
-                out.reason = f"tests failed: {tail[0][:200]}"
+                out.reason = "tests failed: " + self._test_result(res, job, "worker")
         # The tests are code too: they must not have moved HEAD or changed what gets pushed.
         if _check(git(["rev-parse", "HEAD"], work), "git rev-parse").strip() != tested[0]:
             out.reason = "the tests changed the commit (HEAD moved); not pushed"
@@ -598,6 +651,8 @@ def run_night(night: Night, queue: str | None = None, max_jobs: int = MAX_JOBS,
             if o.status == "skipped" and o.reason.startswith("no AI has room"):
                 stopped = "no AI has room left"
                 break
+            if o.status == "skipped":
+                continue  # blocked baselines remain queued for a repaired revision
             state[job.key] = {"status": o.status, "branch": o.branch, "ai": o.ai,
                               "at": datetime.now().isoformat(timespec="seconds")}
             save_state(state)
@@ -699,7 +754,7 @@ def command(args: argparse.Namespace, cfg: config.Config) -> int:
     if args.night_cmd == "remove":
         return remove()
     from .backends import default_backends
-    backends = default_backends(edit=True, lean=cfg.lean)
-    night = Night(backends, floor=args.floor, job_minutes=args.job_minutes)
+    backends = default_backends(edit=True, free_models=cfg.free, lean=cfg.lean)
+    night = Night(backends, floor=args.floor, job_minutes=args.job_minutes, cfg=cfg)
     write = print if sys.stdout is not None else (lambda s: None)  # pythonw has no console
     return run_night(night, args.queue, args.max, args.post, write)
