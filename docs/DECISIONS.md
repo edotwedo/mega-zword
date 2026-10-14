@@ -4,8 +4,10 @@ Newest first. Don't reopen these without Phil.
 
 ## 2026-10-14
 - Phil: preserving usage and minimizing operating cost is the primary objective and a standing
-  consideration for every task. Prefer included/free or self-hosted compute, remove duplicate work,
-  and monitor any explicitly approved billable usage with a hard account cap.
+  consideration for every task. Route any work free models can handle to them, with free/local
+  options preferred over paid models for all work. Use paid models only when free/local options
+  cannot complete it. Prefer self-hosted compute, remove duplicate work, and monitor any explicitly
+  approved billable usage with a hard account cap.
 - Phil: self-host Mega Zword CI on his fiber-connected PC. Keep GitHub for source sharing and
   coordination; use hosted Actions only when needed and only with monitored, capped billing.
 - Phil (Cedar-14 chat): savings from free backends means preserving paid usage and credits, not reducing existing subscription payments. Report free-completed work and paid oversight separately; do not invent quota percentages.

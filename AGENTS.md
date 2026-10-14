@@ -11,8 +11,10 @@ repo is the only handoff. Nothing lives only in a chat.
 
 ## Working rules
 - **Cost is the primary operating objective (Phil).** Before choosing hosted compute or paid APIs,
-  check current usage/quota and estimate the cost. Prefer included/free and self-hosted resources;
-  avoid duplicate CI triggers and cancel superseded work. Never enable uncapped billable usage.
+  check current usage/quota and estimate the cost. Prefer free models for any work they can do,
+  plus included and self-hosted resources; use paid models only when no free/local option can
+  complete the work. Avoid duplicate CI triggers and cancel superseded work. Never enable uncapped
+  billable usage.
   When Phil approves billable usage, track it with an account hard cap and report usage/cost as work
   proceeds.
 - **Usage first, every time (Phil).** Before you start, claim or hand out any work: run `megazword usage`
