@@ -27,7 +27,8 @@ from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from . import advise, stats, answers, config, floor, room, runlog, sentinel, tabs
+from . import advise, stats, answers, briefing, config, floor, room, runlog, sentinel, tabs
+from .presence import CameraWatcher
 from .backends import _kill_tree, default_backends, process_group
 from .meters import STALE, summarize_all
 from .memory import Memory, check_project, list_projects, project_name
@@ -180,6 +181,21 @@ class App:
         self._n = 0
         self._room_thread: threading.Thread | None = None
         self._room_session: tuple[str, str] | None = None  # (room, session id) started here
+        self.camera = CameraWatcher()
+
+    def briefing_view(self) -> dict:
+        data = briefing.snapshot()
+        return {**data, "text": briefing.render(data), "camera": self.camera.view()}
+
+    def briefing_camera(self, body: dict) -> dict:
+        enabled = body.get("enabled")
+        if not isinstance(enabled, bool):
+            raise ValueError("enabled must be true or false")
+        if enabled:
+            self.camera.start()
+        else:
+            self.camera.stop()
+        return self.briefing_view()
 
     def project_for(self, value: object) -> str:
         """The project a request asks for (default: the launch project).
@@ -431,6 +447,7 @@ class App:
 
     def shutdown(self) -> None:
         """The dashboard is closing: a room still running here is paused, not left 'active'."""
+        self.camera.stop()
         if self.room_running() and self._room_session:
             room.release(*self._room_session)
 
@@ -519,6 +536,8 @@ def make_handler(app: App, port: int, remote: bool = False):
                                                      project=(query.get("project") or [None])[0]))
                 except ValueError as exc:
                     return self._json(400, {"error": str(exc)})
+            if path == "/api/briefing":
+                return self._json(200, app.briefing_view())
             if path.startswith("/api/job/"):
                 job = app.jobs.get(path.rsplit("/", 1)[-1])
                 return self._json(200, job.view()) if job else self._json(404, {})
@@ -548,6 +567,8 @@ def make_handler(app: App, port: int, remote: bool = False):
                           "/api/note": app.note, "/api/vote": app.vote, "/api/cancel": app.cancel,
                           "/api/job/control": app.intervene,
                           "/api/settings": app.settings,
+                          "/api/briefing/report": briefing.publish,
+                          "/api/briefing/camera": app.briefing_camera,
                           "/api/tabs": app.tabs_create,
                           "/api/tabs/rename": app.tabs_rename,
                           "/api/tabs/close": app.tabs_close,

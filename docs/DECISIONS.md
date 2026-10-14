@@ -3,6 +3,7 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-14
+- Phil (Testlog-14 chat): build a return-to-terminal briefing from each seat's current task, last completed work, blockers and next steps. Start with a catch-up button and add optional local camera presence with a cooldown. Briefings read saved cards without waking every AI.
 - Phil (Cedar-14 chat): savings from free backends means preserving paid usage and credits, not reducing existing subscription payments. Report free-completed work and paid oversight separately; do not invent quota percentages.
 - Phil (Cedar-14 chat): free HTTP bot jobs should eventually let him watch and intervene like other instances. Keep working on real job completion first; retain observation and intervention as the next requirement.
 
