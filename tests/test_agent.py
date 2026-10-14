@@ -131,7 +131,8 @@ def test_wall_timeout(tmp_path, monkeypatch):
         return original(*args, **kwargs)
     monkeypatch.setattr(model, "chat", slow)
     assert "wall-clock" in loop.run("job").error
-    assert model.seen[0][2] <= 0.01
+    # 0.01 is not binary-exact; the cap must still be the wall, not the 0.02 sleep.
+    assert model.seen[0][2] <= 0.01 + 1e-8
 
 
 def test_output_tail_and_no_model_commands(tmp_path):
