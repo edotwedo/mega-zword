@@ -3,6 +3,7 @@ bare repo with fake AIs (no real CLI, no network, no Q post, no scheduled task).
 
 from __future__ import annotations
 
+import json
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,6 +14,7 @@ import pytest
 from megazword import night
 from megazword.backends import Backend
 from megazword.cli import main
+from megazword.free_apis import OpenAICompatibleBackend
 from megazword.meters import Summary
 
 
@@ -156,6 +158,39 @@ def test_usage_floor_and_unknown_meters_fail_closed(origin):
     assert not ais["codex"].calls and not ais["claude"].calls
     assert not night.load_state()  # skipped jobs stay queued for the next night
     assert "night/2026-10-13-1" not in heads(origin)
+
+
+@dataclass
+class FreeHTTP(OpenAICompatibleBackend):
+    """Scripted free API: writes README.md through the coding loop."""
+    seen: list = field(default_factory=list)
+
+    def available(self):
+        return True
+
+    def chat(self, messages, tools=None, timeout=None):
+        self.seen.append(messages)
+        if any(m.get("role") == "tool" for m in messages):
+            args = json.dumps({"summary": "fixed"})
+            return {"tool_calls": [{"id": "t", "function": {"name": "finish", "arguments": args}}]}
+        args = json.dumps({"path": "README.md", "text": "receive\n"})
+        return {"tool_calls": [{"id": "t", "function": {"name": "write_file", "arguments": args}}]}
+
+
+def test_free_http_without_meter_is_eligible_before_paid():
+    ais = {"groq": FreeHTTP("groq"), "codex": FakeAI("codex", action=typo_fix)}
+    names, why = night.eligible(ais, [Summary("codex", "none")])
+    assert names[0] == "groq" and "codex" not in names
+    assert any("codex: no meter" in w for w in why)
+
+
+def test_night_uses_free_http_when_paid_has_no_room(origin):
+    groq = FreeHTTP("groq")
+    n = night.Night({"groq": groq, "codex": FakeAI("codex")},
+                    usage=lambda: [Summary("codex", "none")], date="2026-10-13")
+    night.run_night(n, queue=str(origin), max_jobs=1, write=lambda s: None)
+    assert show(origin, "night/2026-10-13-1", "README.md") == "receive\n"
+    assert groq.seen
 
 
 def test_night_status_shows_stop_lock_jobs_and_summary(capsys):
