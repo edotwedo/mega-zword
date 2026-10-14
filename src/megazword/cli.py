@@ -745,12 +745,16 @@ def auto_mark_out(name: str, error: str, cfg: config.Config) -> bool:
     try:
         config.set_out(config.HOME / "config.toml", name, hit.until)
     except (OSError, ValueError) as exc:
-        print(f"[megazword] {name} hit its usage limit but I couldn't save that: {exc}",
+        kind = ("rate limit" if "rate limit" in error.lower() or "rate limited" in error.lower()
+                else "usage limit")
+        print(f"[megazword] {name} hit its {kind} but I couldn't save that: {exc}",
               file=sys.stderr)
         return False
     cfg.out_until[name] = hit.until
     how = "" if hit.exact else " (reset time not given; guessing 1 hour)"
-    print(f"[megazword] {name} hit its usage limit; marked out until "
+    kind = ("rate limit" if "rate limit" in error.lower() or "rate limited" in error.lower()
+            else "usage limit")
+    print(f"[megazword] {name} hit its {kind}; marked out until "
           f"{hit.until.astimezone():%a %I:%M %p}{how}. Undo: megazword out {name} --clear",
           file=sys.stderr)
     return True

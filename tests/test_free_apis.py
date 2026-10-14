@@ -126,6 +126,59 @@ def test_retry_after_http_date():
     assert "in 3 minutes" in http_error_message(429, {"Retry-After": date})
 
 
+def test_cloudflare_daily_quota_uses_utc_midnight_reset(api, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from megazword import free_apis
+    from megazword.limits import detect
+
+    api.name = "cloudflare"
+    monkeypatch.setattr(free_apis, "_cloudflare_daily_reset_seconds", lambda: 3 * 60 * 60)
+    body = {"errors": [{"code": 4006, "message":
+                        "AiError: you have used up your daily free allocation of 10,000 neurons"}]}
+
+    def fail(request, **kwargs):
+        raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {},
+                                     io.BytesIO(json.dumps(body).encode()))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    result = api.run("hi")
+    assert not result.ok
+    assert "daily free allocation exhausted; resets at 00:00 UTC" in result.error
+    assert "try again in 180 minutes" in result.error
+    now = datetime.now(timezone.utc)
+    hit = detect(result.error, now)
+    assert hit and hit.exact and hit.until == now + timedelta(hours=3)
+
+
+def test_cloudflare_capacity_429_is_not_misread_as_daily_quota(api):
+    from megazword import free_apis
+    body = {"errors": [{"code": 3040, "message": "Capacity temporarily exceeded"}]}
+    assert not free_apis._cloudflare_daily_quota_exhausted(json.dumps(body).encode())
+
+
+def test_cloudflare_daily_reset_is_midnight_utc():
+    from datetime import datetime, timezone
+    from megazword.free_apis import _cloudflare_daily_reset_seconds
+    now = datetime(2026, 10, 14, 22, 30, tzinfo=timezone.utc)
+    assert _cloudflare_daily_reset_seconds(now) == 90 * 60
+
+
+def test_mistral_1300_rate_limit_is_identified_without_echoing_body(api, monkeypatch):
+    api.name = "mistral"
+    body = {"object": "error", "message": "Rate limit exceeded",
+            "type": "rate_limited", "code": 1300}
+
+    def fail(request, **kwargs):
+        raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {},
+                                     io.BytesIO(json.dumps(body).encode()))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    result = api.run("hi")
+    assert not result.ok
+    assert "Mistral rate limit exceeded (code 1300)" in result.error
+    assert "Rate limit exceeded" not in result.error
+
+
 def test_cloudflare_validation_error_reason_is_safe(api, monkeypatch):
     api.name = "cloudflare"
     monkeypatch.setenv("OTHER_SECRET", "opaque-other-secret")
