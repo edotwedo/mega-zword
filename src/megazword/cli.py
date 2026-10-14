@@ -17,7 +17,7 @@ from .rater import Rating, rate
 
 
 COMMAND_GROUPS = {
-    "Ask": ("run", "chat", "retry", "room", "night"),
+    "Ask": ("run", "chat", "retry", "room", "night", "job"),
     "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor"),
     "Set up": ("init", "doctor", "out", "backends", "app", "mcp"),
@@ -125,6 +125,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("mcp", help="Hive MCP server on stdio (for AI CLIs to connect to)")
     from .night import add_parser as add_night_parser
     add_night_parser(sub)
+
+    job = sub.add_parser("job", help="plan a coding job as independent pieces")
+    job_sub = job.add_subparsers(dest="action", required=True)
+    job_plan = job_sub.add_parser("plan", help="ask one AI to split a job; saves job.json")
+    job_plan.add_argument("text", help="the job to plan")
 
     out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -343,6 +348,36 @@ def main(argv: list[str] | None = None,
         backends = default_backends(edit=getattr(args, "edit", False), free_models=cfg.free,
                                     lean=cfg.lean)
     rater = rater if rater is not None else (lambda p: rate(p, cfg.rater_model))
+
+    if args.command == "job":
+        from .job import plan
+        if not args.text.strip():
+            print("[megazword] job text must not be empty", file=sys.stderr)
+            return 2
+        apply_levels(backends, "hard", cfg.grok, cfg.levels)
+        usage = (statuses or plan_statuses)()
+        chain = candidates(Rating("hard", "job planning", "job"), cfg.route,
+                           backends, usage, cfg.out_now())
+        # Strong-route backends with the most spare usage take planning first;
+        # configured order breaks ties and supplies the fallback without a meter.
+        chain.sort(key=lambda b: (b.name not in usage or usage[b.name].verdict == "unknown",
+                                  usage[b.name].max_used_percent if b.name in usage else 100))
+        if not chain:
+            print("[megazword] no installed AI with usage available for job planning",
+                  file=sys.stderr)
+            return 1
+        print(f"[megazword] planning with {chain[0].name}", file=sys.stderr)
+        try:
+            saved = plan(args.text, chain[0])
+        except (ValueError, OSError) as exc:
+            print(f"[megazword] {exc}", file=sys.stderr)
+            return 1
+        for index, piece in enumerate(saved["pieces"], 1):
+            print(f"{index}. {piece['title']} ({piece['difficulty']})")
+            print(f"   Files: {', '.join(piece['files'])}")
+            print(f"   Test: {piece['test']}")
+        print(f"Saved: {config.HOME / 'jobs' / saved['id'] / 'job.json'}")
+        return 0
 
     if args.command == "backends":
         for name, b in backends.items():

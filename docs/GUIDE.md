@@ -577,3 +577,15 @@ Runs stop on a cap or error and leave edits for review. The normal run log recor
 the request count, backend switch history, requests by backend and estimated tokens.
 Stats count those model requests and use
 the coding run's final outcome for their success rate.
+
+## Jobs
+
+`megazword job plan "Add a feature"` asks one available AI from the hard-task
+route to split the job into pieces, preferring the one with the most spare usage.
+It prints each title, allowed files, difficulty and test command, and saves the
+plan to `~/.megazword/jobs/<id>/job.json` (or under `MEGAZWORD_HOME`).
+Shared files are merged, including indirect overlaps and Windows case variants.
+Merged pieces use the highest difficulty. Different pytest commands become a
+full-suite `python -m pytest`; incompatible test commands are refused.
+Invalid JSON, unsafe paths and unsupported test commands are refused without
+saving a job. This command only plans; it does not start workers or run tests.
