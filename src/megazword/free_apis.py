@@ -6,7 +6,7 @@ import json
 import os
 import re
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 import urllib.error
 import urllib.request
@@ -26,6 +26,39 @@ class APIHTTPError(RuntimeError):
         self.code = code
         self.retry_after = retry_seconds(headers) if code == 429 else None
         super().__init__(http_error_message(code, headers) + (": " + reason if reason else ""))
+
+
+def _cloudflare_daily_quota_exhausted(raw: bytes) -> bool:
+    """Recognize Workers AI's daily free-allocation error, not capacity 429s."""
+    try:
+        payload = json.loads(raw.decode("utf-8", "replace"))
+        errors = payload.get("errors", [])
+        return any(
+            isinstance(error, dict)
+            and str(error.get("code", "")) in {"3036", "4006"}
+            and "daily free allocation" in str(error.get("message", "")).lower()
+            for error in errors
+        )
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def _cloudflare_daily_reset_seconds(now: datetime | None = None) -> int:
+    """Workers AI's free allocation resets at midnight UTC."""
+    now = now or datetime.now(timezone.utc)
+    now = now.astimezone(timezone.utc)
+    reset = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(1, math.ceil((reset - now).total_seconds()))
+
+
+def _mistral_rate_limited(raw: bytes) -> bool:
+    """Recognize Mistral's documented structured 429 response without echoing it."""
+    try:
+        payload = json.loads(raw.decode("utf-8", "replace"))
+        return (payload.get("type") == "rate_limited"
+                and str(payload.get("code", "")) == "1300")
+    except (ValueError, TypeError, AttributeError):
+        return False
 
 
 def _safe_reason(exc):
@@ -104,6 +137,20 @@ class OpenAICompatibleBackend(Backend):
                 raise ValueError("missing answer")
             return json.loads(json.dumps(message).replace(key, "[REDACTED]"))
         except urllib.error.HTTPError as exc:
+            if exc.code == 429 and self.name in {"cloudflare", "mistral"}:
+                try:
+                    raw = exc.read(16384)
+                except OSError:
+                    raw = b""
+                reason = ""
+                headers = exc.headers
+                if self.name == "cloudflare" and _cloudflare_daily_quota_exhausted(raw):
+                    headers = dict(exc.headers or {})
+                    headers["Retry-After"] = str(_cloudflare_daily_reset_seconds())
+                    reason = "daily free allocation exhausted; resets at 00:00 UTC"
+                elif self.name == "mistral" and _mistral_rate_limited(raw):
+                    reason = "Mistral rate limit exceeded (code 1300)"
+                raise APIHTTPError(exc.code, headers, reason) from None
             reason = _safe_reason(exc) if exc.code in (400, 422) else ""
             if tools is not None and exc.code in (400, 422):
                 raise ToolsUnsupported("API rejected native tools" + (": " + reason if reason else "")) from None
