@@ -307,6 +307,25 @@ taskbar). Closing that window stops the dashboard. Without pywebview
 (`pip install pywebview`, or `pip install megazword[app]`) it falls back to an
 Edge or Chrome app window. Ctrl+C in the terminal stops the server.
 
+To watch a free bot code, choose its AI in Home, check **code with a free bot**,
+and send the task. It edits the folder where you started the dashboard (shown
+in the activity panel). Use a dedicated worktree for coding. Compare and Auto
+are unavailable in this mode; choose one free API backend.
+
+The job shows the current backend/model, request count, tool activity, edited
+files and test outcomes. **Pause** waits for the current request or test to
+finish; **Resume** continues. **Send instruction** queues a new direction before
+the next operation, including before an already-returned file-write tool call.
+For a paused job, send the instruction then resume. **Cancel** kills the run and
+its child processes; completed edits remain for inspection.
+
+The coding loop condenses large tool histories to reduce repeated context and
+shows rate-limit cooldowns. A cooldown longer than the remaining run cap fails
+instead of spending more calls. Paused time does not consume the coding loop's
+wall-clock cap. Activity is local under `~/.megazword/run-controls/`, bounded to
+40 events per run, with secret values scrubbed. This observes dashboard coding
+jobs; it does not attach to independent CLI sessions or restore interrupted jobs.
+
 `megazword app install` puts **Mega Zword** in the Start menu (MZ icon, no
 console window); `megazword app remove` takes it out.
 

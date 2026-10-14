@@ -32,6 +32,7 @@ from .presence import CameraWatcher
 from .backends import _kill_tree, default_backends, process_group
 from .meters import STALE, summarize_all
 from .memory import Memory, check_project, list_projects, project_name
+from .run_control import Control, ENV as CONTROL_ENV
 
 USAGE_CACHE_SECONDS = 60
 MAX_JOBS = 50
@@ -99,10 +100,16 @@ class Job:
         self.out: list[str] = []
         self.err: list[str] = []
         self.code: int | None = None
+        self.control = Control(config.HOME / "run-controls" / uuid.uuid4().hex) if "-e" in cmd else None
+        env = os.environ.copy()
+        env.pop(CONTROL_ENV, None)
+        env["MEGAZWORD_SEAT"] = "dashboard-" + uuid.uuid4().hex[:12]
+        if self.control:
+            env[CONTROL_ENV] = str(self.control.folder.resolve())
         # Own process group so cancel() also stops the AI CLI underneath.
         self.proc = subprocess.Popen(
             cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace", **process_group())
+            text=True, encoding="utf-8", errors="replace", env=env, **process_group())
         threading.Thread(target=self._feed, args=(stdin,), daemon=True).start()
         self._readers = [threading.Thread(target=self._pump, args=(stream, sink), daemon=True)
                          for stream, sink in ((self.proc.stdout, self.out),
@@ -133,13 +140,27 @@ class Job:
 
     def cancel(self) -> None:
         if self.code is None:
-            self.err.append("[megazword] cancelled from the dashboard\n")
-            _kill_tree(self.proc, reap=False)
+            try:
+                if self.control:
+                    self.control.request("stop")
+            except (ValueError, OSError):
+                pass  # Busy/unwritable control files cannot prevent cancellation.
+            finally:
+                self.err.append("[megazword] cancelled from the dashboard\n")
+                _kill_tree(self.proc, reap=False)
 
     def view(self) -> dict:
         return {"id": self.id, "label": self.label, "started": self.started,
                 "out": "".join(self.out), "err": "".join(self.err),
-                "done": self.code is not None, "code": self.code}
+                "done": self.code is not None, "code": self.code,
+                "activity": self.control.view() if self.control else None}
+
+    def intervene(self, action, text=""):
+        if not self.control or self.code is not None:
+            raise ValueError("intervention needs a running free coding job")
+        if self.control.view().get("phase") in ("finished", "failed"):
+            raise ValueError("coding job already finished")
+        self.control.request(action, text)
 
 
 def megazword_cmd(*args: str) -> list[str]:
@@ -199,6 +220,7 @@ class App:
             "now": now.isoformat(),
             "project": project,
             "launch_project": self.project,
+            "working_folder": str(Path.cwd().resolve()),
             "projects": sorted({p.name for p in list_projects(config.HOME)} | {self.project}),
             "usage": self.usage.get(force=refresh),
             # Same one-line summaries as the start screen and `megazword usage`.
@@ -275,6 +297,10 @@ class App:
         args = ["run", "-p", self.project_for(body.get("project"))]
         model = body.get("model") or ""
         picks = [str(n) for n in body.get("compare") or []]
+        if body.get("edit"):
+            if picks or not isinstance(model, str) or model not in (set(config.DEFAULT_FREE) - {"ollama"}):
+                raise ValueError("for coding, choose one free API bot and turn off compare")
+            args.append("-e")
         if picks:
             if not 2 <= len(picks) <= 3 or any(n not in self.backends for n in picks):
                 raise ValueError("compare needs 2 or 3 known AIs")
@@ -305,6 +331,14 @@ class App:
         if job is None:
             raise ValueError("no such job")
         job.cancel()
+        return {"ok": True}
+
+    def intervene(self, body: dict) -> dict:
+        with self._jobs_lock:
+            job = self.jobs.get(str(body.get("job", "")))
+        if job is None:
+            raise ValueError("no such job")
+        job.intervene(body.get("action"), body.get("text", ""))
         return {"ok": True}
 
     def set_out(self, body: dict) -> dict:
@@ -534,6 +568,7 @@ def make_handler(app: App, port: int, remote: bool = False):
                     raise ValueError("request body must be a JSON object")
                 action = {"/api/run": app.run, "/api/retry": app.retry,
                           "/api/note": app.note, "/api/vote": app.vote, "/api/cancel": app.cancel,
+                          "/api/job/control": app.intervene,
                           "/api/settings": app.settings,
                           "/api/briefing/report": briefing.publish,
                           "/api/briefing/camera": app.briefing_camera,

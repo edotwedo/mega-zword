@@ -346,7 +346,7 @@ def test_transient_http_retries(tmp_path, monkeypatch, code):
     monkeypatch.setattr(agent.time, "sleep", sleeps.append)
     loop, _ = coding(tmp_path, [APIHTTPError(code)] * 3 + [call("finish", summary="done")], max_steps=1)
     assert loop.run("job").ok
-    assert sleeps == [2, 5, 10]
+    assert sleeps == ([120, 120, 120] if code == 429 else [2, 5, 10])
     assert loop.request_count == 4
 
 

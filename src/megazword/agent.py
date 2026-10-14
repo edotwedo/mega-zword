@@ -15,7 +15,7 @@ import urllib.error
 from dataclasses import dataclass, field
 
 from .backends import Backend, OllamaBackend, process_group, _kill_tree
-from .free_apis import APIHTTPError, ToolsUnsupported
+from .free_apis import APIHTTPError, ToolsUnsupported, retry_seconds
 from .guard import scrub
 from . import config
 from .filelock import locked, write_atomic
@@ -112,6 +112,29 @@ class AgentBackend(Backend):
     request_count: int = 0
     prompt_chars: int = 0
     answer_chars: int = 0
+    control: object | None = None
+    _retry_directions: list = field(default_factory=list)
+
+    def _event(self, phase, **details):
+        if self.control:
+            self.control.publish(phase, backend=self.model_backend.name,
+                                 model=getattr(self.model_backend, "model", ""),
+                                 requests=self.request_count, **details)
+
+    def _checkpoint(self):
+        if not self.control:
+            return []
+        instructions, paused = self.control.checkpoint()
+        self._deadline += paused
+        return [{"role": "user", "content": "New instruction from the user: " + text}
+                for text in instructions]
+
+    @staticmethod
+    def _skip_calls(messages, calls, index, text_mode):
+        if not text_mode:
+            messages.extend({"role": "tool", "tool_call_id": call.get("id", ""),
+                             "content": "Skipped: user supplied a new instruction; re-plan."}
+                            for call in calls[index:])
 
     def available(self):
         return self.model_backend is not None and self.model_backend.available()
@@ -189,6 +212,7 @@ class AgentBackend(Backend):
                    if not re.search(r"KEY|TOKEN|SECRET|PASSWORD", k, re.I)
                    and not k.upper().startswith("PYTHON")}
             env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+            env.pop("MEGAZWORD_RUN_CONTROL", None)
             command = list(self.test_command)
             if re.fullmatch(r"python(?:\d+(?:\.\d+)*)?(?:\.exe)?", Path(command[0]).name, re.I):
                 if "-I" not in command[1:]:
@@ -208,6 +232,7 @@ class AgentBackend(Backend):
                 # are scrubbed before truncation cuts off their identifying prefix.
                 output.seek(max(0, output.tell() - tail_chars - 8192))
                 self._tests_passed = proc.returncode == 0
+                self._event("tests finished", tests="passed" if self._tests_passed else "failed")
                 text = scrub(output.read().decode("utf-8", errors="replace"))
                 return f"exit code {proc.returncode}\n" + text[-tail_chars:]
         path = self._path(args["path"])
@@ -308,6 +333,7 @@ class AgentBackend(Backend):
         return summary
 
     def _model_call(self, sent, text_mode):
+        sent = list(sent)  # retry interventions belong in history exactly once
         retries = 0
         while True:
             pace_call(self.model_backend.name, self.pace, self._deadline)
@@ -318,6 +344,7 @@ class AgentBackend(Backend):
             name = self.model_backend.name
             self.requests_by_backend[name] = self.requests_by_backend.get(name, 0) + 1
             self.prompt_chars += len(json.dumps(sent))
+            self._event("request", prompt_chars=len(json.dumps(sent)))
             try:
                 if isinstance(self.model_backend, OllamaBackend):
                     from .ollama import generate
@@ -346,9 +373,24 @@ class AgentBackend(Backend):
                 if self._has_fallback():
                     raise  # Switch immediately instead of waiting on this provider.
                 delay = (2, 5, 10)[retries]
+                if exc.code == 429:
+                    delay = (exc.retry_after if isinstance(exc, APIHTTPError)
+                             else retry_seconds(exc.headers))
+                self._event("cooldown", seconds=delay, http_status=exc.code)
                 if self._deadline - time.monotonic() <= delay:
                     raise TimeoutError("agent wall-clock cap reached during retry backoff") from None
-                time.sleep(delay)
+                if not self.control:
+                    time.sleep(delay)
+                else:
+                    left = delay
+                    queued = []
+                    while left > 0:
+                        queued.extend(self._checkpoint())
+                        step = min(0.1, left)
+                        time.sleep(step)
+                        left -= step
+                    sent.extend(queued)
+                    self._retry_directions.extend(queued)
                 retries += 1
 
     def _has_fallback(self):
@@ -375,12 +417,25 @@ class AgentBackend(Backend):
             self._ollama_model = getattr(backend, "model", "")
             self._ollama_fallback = False
             self.backends_used.append(backend.name)
+            self._event("backend changed", http_status=getattr(exc, "code", ""))
             print(f"[megazword] coding loop: {old} failed ({scrub(str(exc))}); "
                   f"continuing with {backend.name}", file=sys.stderr)
             return True
         return False
 
     def _run(self, prompt):
+        from .run_control import Control
+        self.control = self.control or Control.from_env()
+        self._event("starting", folder=self.root)
+        try:
+            result = self._run_loop(prompt)
+        except Exception:
+            self._event("failed")
+            raise
+        self._event("finished")
+        return result
+
+    def _run_loop(self, prompt):
         self.root = self.root.resolve()
         self._deadline = time.monotonic() + self.wall_timeout
         self.request_count = self.prompt_chars = self.answer_chars = 0
@@ -400,6 +455,19 @@ class AgentBackend(Backend):
         text_mode = self.text_protocol or isinstance(self.model_backend, OllamaBackend)
         compacted = False
         for _ in range(self.max_steps):
+            messages.extend(self._checkpoint())
+            if len(json.dumps(messages)) > 24000:
+                # Completed tool exchanges need not be resent indefinitely. Keep
+                # task and user interventions intact, then recent observations.
+                flattened = self._text_history(messages)
+                directions = [m for m in flattened[2:]
+                              if m.get("content", "").startswith("New instruction from the user:")]
+                recent = [{**m, "content": m["content"][-2000:]} for m in flattened[2:][-4:]]
+                messages = [flattened[0], flattened[1], *directions,
+                            {"role": "user", "content": "Earlier tool history condensed. Inspect files if needed. Use one fenced JSON tool object."},
+                            *recent]
+                text_mode = True
+                self._event("history condensed")
             remaining = self._deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
@@ -432,6 +500,9 @@ class AgentBackend(Backend):
                     "Continue the same task from the current files and tool results. "
                     "The previous backend failed. Use the fenced JSON tool protocol."})
                 continue
+            finally:
+                messages.extend(self._retry_directions)
+                self._retry_directions = []
             self.answer_chars += len(json.dumps(reply))
             if time.monotonic() >= self._deadline:
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
@@ -469,7 +540,12 @@ class AgentBackend(Backend):
                              "tool_calls": calls} if not text_mode else
                             {"role": "assistant", "content": content})
             nudge_finish = False
-            for call in calls:
+            for call_index, call in enumerate(calls):
+                directions = self._checkpoint()
+                if directions:
+                    self._skip_calls(messages, calls, call_index, text_mode)
+                    messages.extend(directions)
+                    break  # re-plan before executing stale model tool calls
                 remaining = self._deadline - time.monotonic()
                 if remaining <= 0:
                     raise TimeoutError("agent wall-clock cap reached")
@@ -478,11 +554,14 @@ class AgentBackend(Backend):
                 try:
                     name = call["function"]["name"]
                     args = json.loads(call["function"]["arguments"])
+                    self._event("tool", tool=name, file=args.get("path", "") if isinstance(args, dict) else "")
                     signature = (name, json.dumps(args, sort_keys=True))
                     repeats = repeats + 1 if signature == previous_call else 1
                     previous_call = signature
                     nudge_finish = nudge_finish or repeats == 3
                     result = self._perform(name, args, remaining)
+                    if name in ("write_file", "replace_in_file"):
+                        self._event("file edited", file=args["path"])
                 except TimeoutError:
                     raise
                 except json.JSONDecodeError:
@@ -496,6 +575,11 @@ class AgentBackend(Backend):
                     result = scrub(result)
                 result = result[:self.max_chars]
                 if name == "finish" or (name == "run_tests" and self._edited and self._tests_passed):
+                    directions = self._checkpoint()
+                    if directions:
+                        self._skip_calls(messages, calls, call_index, text_mode)
+                        messages.extend(directions)
+                        break
                     errors = self._quality_errors()
                     if errors:
                         result = ("quality gate rejected:\n" + "\n".join(errors))[:self.max_chars]

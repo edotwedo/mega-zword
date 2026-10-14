@@ -24,6 +24,7 @@ class APIHTTPError(RuntimeError):
 
     def __init__(self, code, headers=None, reason=""):
         self.code = code
+        self.retry_after = retry_seconds(headers) if code == 429 else None
         super().__init__(http_error_message(code, headers) + (": " + reason if reason else ""))
 
 
@@ -123,23 +124,28 @@ class OpenAICompatibleBackend(Backend):
             raise RuntimeError("API request failed") from None
 
 
+def retry_seconds(headers=None) -> float:
+    """Keep Retry-After precision for numeric seconds or an HTTP-date."""
+    retry = (headers.get("Retry-After") if headers is not None else None) or ""
+    try:
+        seconds = float(str(retry).strip())
+        return max(0, seconds) if math.isfinite(seconds) else 120
+    except ValueError:
+        try:
+            reset = parsedate_to_datetime(retry)
+            if reset.tzinfo is None:
+                reset = reset.replace(tzinfo=timezone.utc)
+            return max(0, (reset - datetime.now(timezone.utc)).total_seconds())
+        except (ValueError, TypeError, OverflowError):
+            return 120
+
+
 def http_error_message(code: int, headers=None) -> str:
     """Safe one-line error (no body/URL). A 429 carries the server's
     Retry-After so limits.detect() marks the AI out for that long, not for
     its 1-hour guess: free-tier rate limits usually clear in seconds."""
     if code == 429:
-        retry = (headers.get("Retry-After") if headers is not None else None) or ""
-        seconds = 120
-        try:
-            seconds = float(retry.strip())
-            if not math.isfinite(seconds):
-                seconds = 120
-        except ValueError:
-            try:
-                seconds = (parsedate_to_datetime(retry) - datetime.now(timezone.utc)).total_seconds()
-            except (ValueError, TypeError, OverflowError):
-                pass
-        minutes = max(1, math.ceil(seconds / 60))
+        minutes = max(1, math.ceil(retry_seconds(headers) / 60))
         return f"API HTTP error 429: rate limited, try again in {minutes} minutes"
     # Worded so failures.classify() sees an auth problem. Never echo the body.
     if code == 401:

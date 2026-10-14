@@ -131,7 +131,10 @@ def test_free_failover_preserves_piece_and_never_repeats_it(origin):
     assert len(busy.seen) == 1 and len(good.seen) == 2
 
 
-def test_easy_failure_gets_one_paid_retry_with_clean_worktree(origin):
+def test_easy_failure_gets_one_paid_retry_with_clean_worktree(origin, monkeypatch):
+    from megazword import agent
+    # Provider cooldowns are real in production; a scripted 429 need not wait.
+    monkeypatch.setattr(agent.time, "sleep", lambda seconds: None)
     busy = Free("groq", fail=True)
     paid = Paid("codex")
     report = run(origin, [piece()], {"groq": busy, "codex": paid}, job_id="retry")
