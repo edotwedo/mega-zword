@@ -28,7 +28,7 @@ def test_render_contents_and_size(tmp_path):
     text = start.render(cfg_with_runs(tmp_path), meters, NOW, color=False)
     lines = text.splitlines()
     assert len(lines) < 25 and "\033[" not in text
-    assert "claude  [######....]  62% 5-hour" in text  # worst known window, not the credit
+    assert "claude  62% 5-hour / 10% weekly" in text
     assert "grok    out until" in text  # marked out: no bar, no "no meter"
     assert [l.split()[2] for l in lines if l.startswith("  ") and "ago" in l] == \
         ["claude", "claude", "codex"]  # newest 3 only
