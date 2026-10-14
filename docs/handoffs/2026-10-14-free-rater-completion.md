@@ -64,4 +64,3 @@ to 21% / 46% at 12:03 PT. Multiple sessions share that allowance, so this delta
 cannot be attributed solely to Cedar-14 or used to calculate a counterfactual saving.
 Sources: https://console.groq.com/docs/rate-limits and
 https://console.groq.com/docs/billing-faqs. Local transcript and keys stay off GitHub.
-

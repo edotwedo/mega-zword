@@ -262,6 +262,3 @@ Build step 5: phone access (see SPEC.md). Needs Phil at the PC and phone.
 
 ## Problems / notes
 - The Grok session that wrote step 3 stopped with about 9% of its own Grok 4.7 weekly limit left (the meter in the Grok CLI status bar, not a Mega Zword plan). Do not wait on that session.
-
-
-
