@@ -449,7 +449,8 @@ and finish with a summary. Replacements must match once. It refuses paths outsid
 the current folder, `.git`, `.env` files and hard links. It never commits. It prints
 the summary and `git diff --stat`; new untracked files do not appear in that stat.
 Review the files after a run, including one that stops early.
-After an edit, a passing test command ends the run successfully. Three identical
+After an edit, a passing test command ends the run successfully, subject to the
+test quality gate and optional review below. Three identical
 tool calls in a row prompt the model to finish. Edits to `test_*.py`, `*_test.py`
 and files under `tests/` require the job to mention tests. API errors 429, 500,
 502 and 503 get three retries, after 2, 5 and 10 seconds, within the run's time cap.
@@ -470,7 +471,40 @@ wall_timeout = 600
 test_timeout = 120
 text_protocol = false
 test_command = ["python", "-m", "pytest", "-q", "-x"]
+# Optional; unset or empty disables review.
+reviewer = ""
+
+[agent.pace]
+gemini-api = 6
+mistral = 2
+groq = 2
+cloudflare = 1
+openrouter = 3
+nvidia = 2
+zai = 2
+ollama = 0
 ```
+
+Pacing is the minimum number of seconds between call starts for each provider,
+including retries. Workers share timestamps and locks under
+`MEGAZWORD_HOME/agent-pace` (normally `~/.megazword/agent-pace`); different models
+on the same provider share the gap. Zero disables pacing. Waiting uses the run's
+wall time cap; an unavailable lock stops the run instead of sending a burst.
+
+New or changed Python tests must contain a nonconstant assertion or
+`pytest.raises`, and call imported production code directly or through a helper
+or fixture. Both explicit finish and passing tests go through this check.
+Rejection gives the model the file, test and reason, then continues within the
+same step and time caps. This static check catches empty/constant tests; it does
+not prove that a test covers the requested behavior. Tests using dynamic imports,
+custom assertion helpers or unusual fixture wiring may need a simpler structure.
+
+Set `reviewer = "groq"` (or another available backend) to review the complete diff
+of files edited by the loop, including new files, once before success. API/local
+reviewers receive no tools; CLI reviewers use the normal non-edit backend.
+The reviewer must reply `ACCEPT` or `REJECT` with a reason. Rejection, an invalid
+answer, or reviewer failure fails the run and leaves the edits for inspection.
+Diffs above 200,000 characters fail rather than receiving an incomplete review.
 
 The model cannot change the test command or add shell commands. Set the command
 yourself for the project. Tests execute project code with your normal permissions;

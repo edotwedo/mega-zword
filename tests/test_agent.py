@@ -10,6 +10,11 @@ from megazword import agent, config, runlog
 from megazword.free_apis import OpenAICompatibleBackend, ToolsUnsupported
 
 
+@pytest.fixture(autouse=True)
+def no_real_pacing(monkeypatch):
+    monkeypatch.setattr(agent, "DEFAULT_PACE", dict.fromkeys(agent.DEFAULT_PACE, 0))
+
+
 def call(name, **args):
     return {"tool_calls": [{"id": "c1", "type": "function", "function": {
         "name": name, "arguments": json.dumps(args)}}]}
@@ -34,7 +39,8 @@ class Scripted(OpenAICompatibleBackend):
 
 def coding(tmp_path, replies, **kwargs):
     model = Scripted(replies, kwargs.pop("trains", False))
-    return agent.wrap(model, {"root": tmp_path, **kwargs}), model
+    reviewer = kwargs.pop("reviewer_backend", None)
+    return agent.wrap(model, {"root": tmp_path, **kwargs}, reviewer), model
 
 
 def test_edit_tests_finish(tmp_path):
@@ -324,10 +330,11 @@ def test_test_edits_refused_without_job_permission(tmp_path, path, tool):
 
 @pytest.mark.parametrize("job", ["Add tests", "Fix the TEST", "Run pytest", "Improve testing"])
 def test_test_edits_allowed_when_job_mentions_tests(tmp_path, job):
-    loop, _ = coding(tmp_path, [call("write_file", path="tests/test_calc.py", text="ok"),
+    text = "from calc import add\ndef test_add():\n    assert add(1, 2) == 3\n"
+    loop, _ = coding(tmp_path, [call("write_file", path="tests/test_calc.py", text=text),
                               call("finish", summary="done")])
     assert loop.run(job).ok
-    assert (tmp_path / "tests/test_calc.py").read_text() == "ok"
+    assert (tmp_path / "tests/test_calc.py").read_text() == text
 
 
 @pytest.mark.parametrize("code", [429, 500, 502, 503])

@@ -562,7 +562,19 @@ def main(argv: list[str] | None = None,
         from .agent import wrap
         from .backends import OllamaBackend
         from .free_apis import OpenAICompatibleBackend
-        chain = [wrap(b, cfg.agent) if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))
+        reviewer = None
+        if cfg.agent.get("reviewer"):
+            # Never reuse the CLI backends configured with edit permissions.
+            reviewers = default_backends(edit=False, free_models=cfg.free, lean=cfg.lean)
+            if "claude" in reviewers:
+                # A review should not inherit Claude's interactive tool approvals.
+                from dataclasses import replace
+                reviewers["claude"] = replace(reviewers["claude"], args=[
+                    *reviewers["claude"].args, "--permission-mode", "plan", "--tools", ""])
+            reviewers.update({name: b for name, b in backends.items()
+                              if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))})
+            reviewer = reviewers.get(cfg.agent["reviewer"])
+        chain = [wrap(b, cfg.agent, reviewer) if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))
                  else b for b in chain]
     # A forced AI (-m) never escalates; otherwise move up the chain on failure.
     code = execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))

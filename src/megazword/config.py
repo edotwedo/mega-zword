@@ -206,6 +206,17 @@ def load(path: Path | None = None) -> Config:
                         isinstance(v, str) and v for v in value):
                     raise ValueError("agent.test_command must be a nonempty argv list")
                 value = tuple(value)
+            elif key == "pace":
+                import math
+                from .agent import DEFAULT_PACE
+                if not isinstance(value, dict) or any(
+                        name not in DEFAULT_PACE or type(gap) not in (int, float)
+                        or not math.isfinite(gap) or gap < 0 for name, gap in value.items()):
+                    raise ValueError("agent.pace must contain known providers and finite nonnegative seconds")
+            elif key == "reviewer":
+                if not isinstance(value, str):
+                    raise ValueError("agent.reviewer must be a backend name")
+                value = value.strip()
             else:
                 raise ValueError(f"unknown agent setting: {key}")
             cfg.agent[key] = value
