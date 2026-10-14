@@ -18,7 +18,7 @@ class FakeBackend(Backend):
         return f"answer to {prompt[-80:]}"
 
 
-def session(lines, backends=None, cfg=None, rater=None):
+def session(lines, backends=None, cfg=None, rater=None, start_model=None):
     remaining = iter(lines)
     prompts = []
     output = []
@@ -35,7 +35,8 @@ def session(lines, backends=None, cfg=None, rater=None):
                                       "hard": ["fake"]})
     cfg.log_path = config.HOME / "log.jsonl"
     result = run(backends, cfg, rater or (lambda p: Rating("easy", "test", "fake")),
-                 statuses=dict, read=read, write=output.append, project="chat-test")
+                 statuses=dict, read=read, write=output.append, project="chat-test",
+                 start_model=start_model)
     return result, output, prompts, backends
 
 
@@ -47,6 +48,15 @@ def test_answer_and_second_message_gets_conversation_context():
     assert "[Conversation so far]" in backends["fake"].calls[1]
     assert "User: hello" in backends["fake"].calls[1]
     assert any(line.startswith("answer to") for line in output)
+
+
+def test_start_model_pins_without_slash_command():
+    calls = []
+    backends = {"groq": FakeBackend("groq", calls=calls),
+                "a": FakeBackend("a", calls=[])}
+    cfg = config.Config(route={"easy": ["a"], "medium": ["a"], "hard": ["a"]})
+    result, output, _, _ = session(["hello", "/quit"], backends, cfg, start_model="groq")
+    assert result == 0 and calls and "Pinned to groq" in output[0]
 
 
 def test_model_pin_then_auto():

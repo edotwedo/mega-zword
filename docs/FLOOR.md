@@ -1,9 +1,11 @@
 # Hive floor
 
 Phil, 2026-10-12: unfreeze. One seat for every model we can run. Launch **one**
-Claude, **one** Codex, **one** Grok. They spawn subagents. Gemini gets a chair
-when its week is back (18 Oct). HTTP models (Groq, Cloudflare, Z.ai, Mistral,
-Gemini API, NVIDIA, OpenRouter) sit in the Hive with no extra window.
+Claude, **one** Codex, **one** Grok. They spawn subagents. Gemini CLI (`agy`) gets a chair when its week is back (18 Oct). HTTP seats
+(Groq, Cloudflare, Z.ai, Gemini API, Mistral, Cerebras, SambaNova) get their
+own persistent `megazword chat -m <name>` tab in one Terminal on the same
+desktop (`scripts/free_floor.ps1`). OpenRouter stays off (pay-per-use).
+NVIDIA sits empty until the key arrives.
 
 ## Ready
 
@@ -51,5 +53,7 @@ Money and new keys: Phil. The app hunts empty chairs and says what is missing.
 
 ## Launched CLI prompt
 
-You are one seat. Check `megazword usage` before you work. Do not greet in Q.
-Wait for Phil in the Hive. Use a subagent for extra hands, not a second window.
+You are one seat. Check `megazword usage` before you work. During a long job
+run `megazword usage --pace` and wrap up at 20% left, stop at 15%. Do not
+greet in Q. Wait for Phil in the Hive. Use a subagent for extra hands, not a
+second window. HTTP seats stay pinned with `megazword chat -m <name>`.

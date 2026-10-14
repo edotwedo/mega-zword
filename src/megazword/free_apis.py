@@ -161,6 +161,8 @@ FREE_KEYS = (
     ("gemini-api", "GOOGLE_AI_API_KEY"),
     ("nvidia", "NVIDIA_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
+    ("cerebras", "CEREBRAS_API_KEY"),
+    ("sambanova", "SAMBANOVA_API_KEY"),
 )
 
 
@@ -200,6 +202,16 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
             "mistral", base_url="https://api.mistral.ai/v1",
             model=m.get("mistral", "mistral-small-latest"),
             key_env="MISTRAL_API_KEY", trains_on_data=True,
+        ),
+        OpenAICompatibleBackend(
+            "cerebras", base_url="https://api.cerebras.ai/v1",
+            model=m.get("cerebras", "llama-3.3-70b"),
+            key_env="CEREBRAS_API_KEY",
+        ),
+        OpenAICompatibleBackend(
+            "sambanova", base_url="https://api.sambanova.ai/v1",
+            model=m.get("sambanova", "Meta-Llama-3.3-70B-Instruct"),
+            key_env="SAMBANOVA_API_KEY",
         ),
         # OpenRouter chooses the serving provider. Its training policy can
         # vary by endpoint (and configured model); unknown means scrub prompts.
