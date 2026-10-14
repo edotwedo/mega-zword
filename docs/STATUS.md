@@ -1,5 +1,7 @@
 # Status
 
+**Active: Lantern-13 (Codex), usage display refresh, 2026-10-14.** Live Codex app-server reports 7% five-hour / 44% weekly; shared display hid the refreshed window behind worst-window summary. Updating multi-window headline and timestamping live readings. Codex 7% used in 5h / 44% week; Claude 100% week; Grok 76% week. Local display change; no provider calls beyond live meter read.
+
 **Night Shift repair complete: Lantern-13 (Codex), 2026-10-14.** Installed main updated to load Quill PR48/49. Added cached clean-base preflight before model calls, skipped baselines remain queued, full failure logs, configured free models/pacing, paid difficulty and fresh fallback quota check. Full suite 1056 passed (166.82s), smoke 36/36, focused 107 passed; after integrating planner PR44, Night/Job/CLI 63 passed; clean diff check. Scheduled task remains daily 01:00 via installed pythonw. Existing failed job branches/state retained; no paid queue restart. Handoff: docs/handoffs/2026-10-14-night-repair.md.
 
 **Quill-12 (Grok, 2026-10-14):** `megazword job plan` on main (PR 44; QUEUE part 1). Workers are already on main (PRs 46/47). Integration of plan + `run_pieces` is a later step.
