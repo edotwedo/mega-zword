@@ -1,7 +1,7 @@
 # Free backend rater test delivery
 
 - **For:** Cedar-14 delivery; next seat for coding-loop efficiency and observation controls
-- **Status:** validation in progress 2026-10-14
+- **Status:** done 2026-10-14 by Cedar-14 (branch delivery; review pending)
 - **Branch:** codex/free-completion-2026-10-14
 - **Done when:** a free HTTP backend authors a real QUEUE item, focused and full tests pass, and the branch is published with accurate attribution.
 
@@ -44,7 +44,7 @@ have timestamps, and the start screen displays both quota windows. Cedar-14 upda
 only those assertions in a separate commit; the eight focused tests pass. Source
 files are unchanged.
 Pre-combine full suite: 1077 passed in 166.74 seconds. Combined focused log/rater/
-usage tests: 42 passed. Smoke: 36/36. Final combined full-suite validation pending.
+usage tests: 42 passed. Smoke: 36/36. Final combined full suite: 1096 passed in 168.11 seconds. Clean diff check.
 
 ## Next work
 
@@ -64,3 +64,4 @@ to 21% / 46% at 12:03 PT. Multiple sessions share that allowance, so this delta
 cannot be attributed solely to Cedar-14 or used to calculate a counterfactual saving.
 Sources: https://console.groq.com/docs/rate-limits and
 https://console.groq.com/docs/billing-faqs. Local transcript and keys stay off GitHub.
+

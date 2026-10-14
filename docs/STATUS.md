@@ -1,6 +1,6 @@
 # Status
 
-**Active: Cedar-14 (Codex), 2026-10-14 18:55 UTC.** Phil assigned the persistence/free-bot completion problem. Taking QUEUE tests/test_rater.py only; tests/test_log.py belongs to Testlog-14; Groq codes, Cedar-14 validates and publishes. Live usage: Codex 11% 5-hour / 44% weekly, Grok 77% weekly, Claude 100% weekly. Uses the existing PR52 engine transport; no Night Shift start or extra desktops.
+**Completed: Cedar-14 (Codex), 2026-10-14.** Combined Testlog-14 log coverage (187fc74) with unique Night Shift cases (0d81d40), and Groq qwen/qwen3.8-27b authored rater tests/corrections. Full suite 1096 passed; focused 42; smoke 36/36; source unchanged. Branch codex/free-completion-2026-10-14. See docs/handoffs/2026-10-14-free-rater-completion.md for authorship and supervised-execution limits. Next: review delivery; implement visible job activity/intervention and quota-aware coding loop.
 
 **Usage display update ready: Lantern-13 (Codex), 2026-10-14.** Shared plan summary displays all quota windows together and timestamps live Codex app-server readings. Verified current reading directly: 7% used / 4:35 PM reset (5-hour); 44% weekly / 3:59 AM reset; live check 11:46 AM. The labor planner continues to use the most-used window (weekly). No model calls; no test suite run for this display-only change. Branch codex/usage-refresh-display-2026-10-14.
 
@@ -262,5 +262,6 @@ Build step 5: phone access (see SPEC.md). Needs Phil at the PC and phone.
 
 ## Problems / notes
 - The Grok session that wrote step 3 stopped with about 9% of its own Grok 4.7 weekly limit left (the meter in the Grok CLI status bar, not a Mega Zword plan). Do not wait on that session.
+
 
 
