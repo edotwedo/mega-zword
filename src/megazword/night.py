@@ -66,10 +66,14 @@ class Job:
     task: str
     done_when: str
     test: str = ""        # optional test command; "" = detect
+    model: str = ""       # explicit local worker; empty keeps metered CLI routing
 
     @property
     def key(self) -> str:
-        return hashlib.sha1(f"{self.repo}|{self.task}".encode()).hexdigest()[:12]
+        value = f"{self.repo}|{self.task}"
+        if self.model:
+            value += f"|model:{self.model}"
+        return hashlib.sha1(value.encode()).hexdigest()[:12]
 
 
 @dataclass
@@ -96,10 +100,13 @@ def parse_queue(text: str) -> list[Job]:
             continue
         done = re.sub(r"^done when:\s*", "", parts[2], flags=re.I)
         test = ""
+        model = ""
         for extra in parts[3:]:
             if extra.lower().startswith("test:"):
                 test = extra[5:].strip()
-        jobs.append(Job(i, m.group("mark").lower(), parts[0], parts[1], done, test))
+            elif extra.lower().startswith("model:"):
+                model = extra[6:].strip().lower()
+        jobs.append(Job(i, m.group("mark").lower(), parts[0], parts[1], done, test, model))
     return jobs
 
 
@@ -328,6 +335,20 @@ class Night:
         out = Outcome(job, "failed")
         summaries = self.usage()  # usage before every job (Phil's rule)
         names, why = eligible(self.backends, summaries, self.floor)
+        if job.model:
+            from .agent import AgentBackend
+            from .backends import OllamaBackend
+            backend = self.backends.get(job.model)
+            # Only a real local coding backend can bypass a subscription meter.
+            # Explicit local jobs must never fall through to paid workers.
+            if (job.model != "ollama" or not isinstance(backend, AgentBackend)
+                    or not isinstance(backend.model_backend, OllamaBackend)):
+                out.status, out.reason = "skipped", f"unsupported night model: {job.model}"
+                return out
+            if not backend.available():
+                out.status, out.reason = "skipped", "local Ollama unavailable; no paid fallback"
+                return out
+            names = ["ollama"]
         self.log(f"usage: {usage_line(summaries)}")
         if not names:
             out.status, out.reason = "skipped", "no AI has room: " + "; ".join(why)
@@ -356,9 +377,25 @@ class Night:
         base = _check(git(["rev-parse", "HEAD"], work), "git rev-parse").strip()
         for name in names:
             out.tried.append(name)
-            backend = replace(self.backends[name], cwd=str(work), timeout=int(self.job_seconds))
+            from .agent import AgentBackend
+            source = self.backends[name]
+            if isinstance(source, AgentBackend):
+                backend = replace(source, root=work, timeout=int(self.job_seconds),
+                                  wall_timeout=min(source.wall_timeout, self.job_seconds),
+                                  fallback_backends=[], reviewer_backend=None)
+                cmd, _env = test_command(work, job)
+                if cmd is not None:
+                    backend.test_command = tuple(cmd)
+            else:
+                backend = replace(source, cwd=str(work), timeout=int(self.job_seconds))
             self.log(f"{branch}: {name} working on: {job.task}")
             result = backend.run(prompt)
+            if isinstance(backend, AgentBackend):
+                from .log import append
+                append(config.HOME / "log.jsonl", backend=name, forced=True,
+                       project=Path(job.repo).name, seconds=result.seconds, ok=result.ok,
+                       requests=backend.request_count, prompt_chars=backend.prompt_chars,
+                       answer_chars=backend.answer_chars)
             git(["add", "-A"], work)
             changed = git(["diff", "--cached", "--quiet"], work).returncode != 0
             if changed and result.ok:
@@ -559,6 +596,8 @@ def run_night(night: Night, queue: str | None = None, max_jobs: int = MAX_JOBS,
             if o.status == "skipped" and o.reason.startswith("no AI has room"):
                 stopped = "no AI has room left"
                 break
+            if o.status == "skipped":
+                continue  # unavailable local models stay queued for a later run
             state[job.key] = {"status": o.status, "branch": o.branch, "ai": o.ai,
                               "at": datetime.now().isoformat(timespec="seconds")}
             save_state(state)
@@ -659,8 +698,11 @@ def command(args: argparse.Namespace, cfg: config.Config) -> int:
         return install(args.at, args.yes)
     if args.night_cmd == "remove":
         return remove()
-    from .backends import default_backends
+    from .agent import wrap
+    from .backends import default_backends, OllamaBackend
     backends = default_backends(edit=True, lean=cfg.lean)
+    backends["ollama"] = wrap(OllamaBackend("ollama", model=cfg.free.get(
+        "ollama", "qwen2.5-coder:7b")), cfg.agent)
     night = Night(backends, floor=args.floor, job_minutes=args.job_minutes)
     write = print if sys.stdout is not None else (lambda s: None)  # pythonw has no console
     return run_night(night, args.queue, args.max, args.post, write)

@@ -4,6 +4,7 @@ bare repo with fake AIs (no real CLI, no network, no Q post, no scheduled task).
 from __future__ import annotations
 
 import subprocess
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -100,6 +101,67 @@ def test_parse_queue_skips_notes_and_reads_test():
     assert [j.mark for j in jobs] == [" ", " ", " ", "x"]
     assert jobs[0].repo == "o/r" and jobs[0].done_when == "README says receive"
     assert jobs[1].test == "exit 0" and jobs[0].test == ""
+
+
+def test_parse_queue_explicit_local_model_has_its_own_key():
+    normal = night.parse_queue("- [ ] o/r | fix README | done when: fixed")[0]
+    local = night.parse_queue("- [ ] o/r | fix README | done when: fixed | model: ollama | test: exit 0")[0]
+    assert local.model == "ollama" and local.test == "exit 0"
+    assert local.key != normal.key
+
+
+def local_loop(monkeypatch, replies, available=True, **settings):
+    from megazword import agent, ollama
+    from megazword.backends import OllamaBackend
+    monkeypatch.setattr(ollama, "reachable", lambda *a, **k: available)
+    answers = iter(replies)
+    monkeypatch.setattr(ollama, "generate", lambda *a, **k: json.dumps(next(answers)))
+    return agent.wrap(OllamaBackend("ollama", model="fake"), settings)
+
+
+def test_local_night_edits_and_pushes_without_paid_meter_or_fallback(origin, monkeypatch):
+    loop = local_loop(monkeypatch, [
+        {"tool": "write_file", "arguments": {"path": "README.md", "text": "receive\n"}},
+        {"tool": "run_tests", "arguments": {}},
+    ])
+    paid = FakeAI("codex", action=typo_fix)
+    n = night.Night({"ollama": loop, "codex": paid}, usage=meters(codex=5), date="2026-10-14")
+    job = night.Job(0, " ", str(origin), "fix README", "fixed", test="exit 0", model="ollama")
+    result = n.run_job(job)
+    assert result.status == "done" and result.ai == "ollama" and result.tests == "passed"
+    assert result.tried == ["ollama"] and not paid.calls
+    assert show(origin, result.branch, "README.md") == "receive\n"
+    from megazword import config, runlog
+    assert runlog.read(config.HOME / "log.jsonl")[-1]["requests"] == 2
+
+
+def test_local_failure_does_not_spend_paid_usage(origin, monkeypatch):
+    loop = local_loop(monkeypatch, [
+        {"tool": "write_file", "arguments": {"path": "README.md", "text": "partial"}},
+    ], max_steps=1)
+    paid = FakeAI("codex", action=typo_fix)
+    n = night.Night({"ollama": loop, "codex": paid}, usage=meters(codex=5))
+    result = n.run_job(night.Job(0, " ", str(origin), "fix", "fixed", model="ollama"))
+    assert result.status == "failed" and not result.branch and not paid.calls
+    assert result.tried == ["ollama"]
+
+
+def test_offline_local_job_stays_queued(origin, monkeypatch):
+    loop = local_loop(monkeypatch, [], available=False)
+    paid = FakeAI("codex", action=typo_fix)
+    n = night.Night({"ollama": loop, "codex": paid}, usage=meters(codex=5))
+    queue = night.home().parent / "local-queue.md"
+    queue.parent.mkdir(parents=True, exist_ok=True)
+    queue.write_text(f"- [ ] {origin} | fix | done when: fixed | model: ollama\n")
+    night.run_night(n, queue=str(queue), write=lambda _: None)
+    assert not night.load_state() and not paid.calls
+
+
+def test_local_name_cannot_disguise_a_paid_backend(origin):
+    paid = FakeAI("ollama", action=typo_fix)
+    n = night.Night({"ollama": paid}, usage=meters(ollama=5))
+    result = n.run_job(night.Job(0, " ", str(origin), "fix", "fixed", model="ollama"))
+    assert result.status == "skipped" and not paid.calls
 
 
 def test_three_job_dry_run(origin):
