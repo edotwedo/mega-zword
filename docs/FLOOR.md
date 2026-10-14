@@ -3,7 +3,7 @@
 Phil, 2026-10-12: unfreeze. One seat for every model we can run. Launch **one**
 Claude, **one** Codex, **one** Grok. They spawn subagents. Gemini CLI (`agy`) gets a chair when its week is back (18 Oct). HTTP seats
 (Groq, Cloudflare, Z.ai, Gemini API, Mistral, Cerebras, SambaNova) get their
-own persistent `megazword chat -m <name>` window on a separate Windows
+own persistent `megazword chat -m <name>` tab in one Terminal on the same
 desktop (`scripts/free_floor.ps1`). OpenRouter stays off (pay-per-use).
 NVIDIA sits empty until the key arrives.
 

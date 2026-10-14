@@ -162,7 +162,7 @@ and `/api/room/stop`.
 The floor has one seat per AI: one CLI window each for claude, codex and grok
 (gemini `agy` when its week is back). HTTP seats (groq, cloudflare, zai,
 gemini-api, mistral, cerebras, sambanova) get a persistent
-`megazword chat -m <name>` window on their own Windows desktop
+`megazword chat -m <name>` tab in one Terminal on this desktop
 (`scripts/free_floor.ps1`). OpenRouter stays off. NVIDIA waits for a key.
 
 - `megazword floor`: Show each seat as seated, empty (no key or install) or out, and whether the minimum crew is ready. Saves `~/.megazword/floor.json`.
