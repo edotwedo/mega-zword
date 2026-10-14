@@ -168,6 +168,7 @@ def test_presets_config_and_routes(monkeypatch):
                                            ("groq", "GROQ_API_KEY")])
 def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
     monkeypatch.setattr("megazword.ollama.reachable", lambda *a, **k: False)
+    monkeypatch.setattr("megazword.free_apis._curl_bin", lambda: None)
     monkeypatch.setenv(key_env, "secret-test-credential")
     calls = []
     def fake(request, **kwargs):
@@ -267,3 +268,66 @@ def test_provider_training_labels_match_developer_api_terms():
 def test_gemini_api_default_model_is_flash_latest():
     assert config.DEFAULT_FREE["gemini-api"] == "gemini-flash-latest"
     assert default_backends()["gemini-api"].model == "gemini-flash-latest"
+
+
+def test_groq_default_model_is_live_catalog():
+    assert config.DEFAULT_FREE["groq"] == "openai/gpt-oss-20b"
+    assert default_backends()["groq"].model == "openai/gpt-oss-20b"
+
+
+def test_groq_posts_with_curl_not_urllib(monkeypatch):
+    from megazword import free_apis
+    monkeypatch.setenv("GROQ_API_KEY", "secret-test-credential")
+    monkeypatch.setattr(free_apis, "_curl_bin", lambda: "curl")
+    seen = []
+
+    def fake_curl(url, headers, body, timeout):
+        seen.append((url, body["model"], headers["Authorization"], timeout))
+        return {"choices": [{"message": {"role": "assistant", "content": "pong"}}]}
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("groq must not use urllib when curl is available")
+
+    monkeypatch.setattr(free_apis, "_curl_json_post", fake_curl)
+    monkeypatch.setattr(urllib.request, "urlopen", unexpected)
+    groq = default_backends()["groq"]
+    result = groq.run("ping")
+    assert result.ok and result.text == "pong"
+    assert seen[0][0].endswith("/chat/completions")
+    assert seen[0][1] == "openai/gpt-oss-20b"
+    assert seen[0][2] == "Bearer secret-test-credential"
+
+
+def test_groq_urllib_1010_retries_curl(monkeypatch):
+    from megazword import free_apis
+    monkeypatch.setenv("GROQ_API_KEY", "secret-test-credential")
+    monkeypatch.setattr(free_apis, "_use_curl", lambda name: False)
+    monkeypatch.setattr(free_apis, "_curl_bin", lambda: "curl")
+    body = b"error code: 1010 Access denied. Please check your network settings."
+
+    def fail(*args, **kwargs):
+        raise urllib.error.HTTPError(
+            "https://api.groq.com/openai/v1/chat/completions", 403, "Forbidden",
+            {}, io.BytesIO(body))
+
+    def fake_curl(url, headers, body, timeout):
+        return {"choices": [{"message": {"role": "assistant", "content": "pong"}}]}
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    monkeypatch.setattr(free_apis, "_curl_json_post", fake_curl)
+    result = default_backends()["groq"].run("ping")
+    assert result.ok and result.text == "pong"
+
+
+def test_groq_curl_http_error_is_not_swallowed(monkeypatch):
+    from megazword import free_apis
+    monkeypatch.setenv("GROQ_API_KEY", "secret-test-credential")
+    monkeypatch.setattr(free_apis, "_curl_bin", lambda: "curl")
+
+    def boom(*args, **kwargs):
+        raise free_apis.APIHTTPError(404)
+
+    monkeypatch.setattr(free_apis, "_curl_json_post", boom)
+    result = default_backends()["groq"].run("ping")
+    assert not result.ok
+    assert result.error == "API HTTP error 404"

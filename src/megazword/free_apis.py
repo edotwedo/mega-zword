@@ -6,6 +6,9 @@ import json
 import os
 import re
 import math
+import shutil
+import subprocess
+import tempfile
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import urllib.error
@@ -22,9 +25,21 @@ class ToolsUnsupported(RuntimeError):
 class APIHTTPError(RuntimeError):
     """HTTP status for retries, optionally with a sanitized validation reason."""
 
-    def __init__(self, code, headers=None, reason=""):
+    def __init__(self, code, headers=None, reason="", blocked=False):
         self.code = code
-        super().__init__(http_error_message(code, headers) + (": " + reason if reason else ""))
+        if blocked:
+            message = "API HTTP error 403: Cloudflare blocked this HTTP client (error 1010)"
+        else:
+            message = http_error_message(code, headers) + (": " + reason if reason else "")
+        super().__init__(message)
+
+
+class _BytesBody:
+    def __init__(self, raw: bytes):
+        self._raw = raw
+
+    def read(self, n=16384):
+        return self._raw[:n]
 
 
 def _safe_reason(exc):
@@ -46,6 +61,85 @@ def _safe_reason(exc):
         return " ".join(scrub(reason).split())[:240]
     except (ValueError, AttributeError, TypeError, IndexError, OSError):
         return ""
+
+
+def _curl_bin() -> str | None:
+    return shutil.which("curl.exe") or shutil.which("curl")
+
+
+def _use_curl(name: str) -> bool:
+    # Python urllib's TLS fingerprint is Cloudflare 1010 on Groq from this PC.
+    # Windows curl.exe is allowed; keep the key in a header file, not argv.
+    return name == "groq" and bool(_curl_bin())
+
+
+def _cloudflare_1010(body: bytes) -> bool:
+    text = body.decode("utf-8", "replace")
+    return "1010" in text or "Access denied" in text
+
+
+def _parse_curl_headers(text: str) -> tuple[int, dict[str, str]]:
+    status = 0
+    headers: dict[str, str] = {}
+    lines = text.splitlines()
+    if lines:
+        bits = lines[0].split()
+        if len(bits) >= 2 and bits[1].isdigit():
+            status = int(bits[1])
+    for line in lines[1:]:
+        if ":" not in line:
+            continue
+        name, value = line.split(":", 1)
+        headers[name.strip()] = value.strip()
+    return status, headers
+
+
+def _curl_json_post(url: str, headers: dict[str, str], body: dict, timeout: float) -> dict:
+    """POST JSON with curl.exe so Groq is not blocked as a bot."""
+    curl = _curl_bin()
+    if not curl:
+        raise APIHTTPError(403, blocked=True)
+    seconds = max(1, int(timeout or 1))
+    data = json.dumps(body).encode("utf-8")
+    with tempfile.TemporaryDirectory() as folder:
+        payload = os.path.join(folder, "body.json")
+        header_file = os.path.join(folder, "headers.txt")
+        out_file = os.path.join(folder, "out.json")
+        hdr_path = os.path.join(folder, "resp.hdr")
+        with open(payload, "wb") as handle:
+            handle.write(data)
+        with open(header_file, "w", encoding="utf-8") as handle:
+            for name, value in headers.items():
+                handle.write(f"{name}: {value}\n")
+        try:
+            result = subprocess.run(
+                [curl, "-sS", "--http1.1", "--max-time", str(seconds),
+                 "-X", "POST", url, "-D", hdr_path, "-o", out_file,
+                 "-H", f"@{header_file}", "--data-binary", f"@{payload}"],
+                capture_output=True, timeout=seconds + 5,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("API request timed out") from None
+        raw = b""
+        if os.path.exists(out_file):
+            with open(out_file, "rb") as handle:
+                raw = handle.read()
+        status, response_headers = 0, {}
+        if os.path.exists(hdr_path):
+            dumped = open(hdr_path, encoding="utf-8", errors="replace").read()
+            status, response_headers = _parse_curl_headers(dumped)
+        if result.returncode != 0 or status >= 400 or status == 0:
+            _raise_http(status or 403, response_headers, raw, tools=None)
+        return json.loads(raw.decode("utf-8"))
+
+
+def _raise_http(code, headers, raw: bytes, tools):
+    if code == 403 and _cloudflare_1010(raw):
+        raise APIHTTPError(code, headers, blocked=True)
+    reason = _safe_reason(_BytesBody(raw)) if code in (400, 422) else ""
+    if tools is not None and code in (400, 422):
+        raise ToolsUnsupported("API rejected native tools" + (": " + reason if reason else ""))
+    raise APIHTTPError(code, headers, reason)
 
 
 @dataclass
@@ -90,25 +184,37 @@ class OpenAICompatibleBackend(Backend):
                 body.pop("stream")  # The default is a non-streaming response.
             if tools is not None:
                 body["tools"] = tools
-            request = urllib.request.Request(
-                self._endpoint(),
-                data=json.dumps(body).encode("utf-8"),
-                headers=headers,
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+            if _use_curl(self.name):
+                payload = _curl_json_post(self._endpoint(), headers, body,
+                                          timeout or self.timeout)
+            else:
+                request = urllib.request.Request(
+                    self._endpoint(),
+                    data=json.dumps(body).encode("utf-8"),
+                    headers=headers,
+                    method="POST",
+                )
+                try:
+                    with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:
+                        payload = json.loads(response.read().decode("utf-8"))
+                except urllib.error.HTTPError as exc:
+                    raw = b""
+                    try:
+                        raw = exc.read(16384)
+                    except OSError:
+                        raw = b""
+                    if (exc.code == 403 and _cloudflare_1010(raw) and _curl_bin()
+                            and self.name == "groq"):
+                        payload = _curl_json_post(self._endpoint(), headers, body,
+                                                  timeout or self.timeout)
+                    else:
+                        _raise_http(exc.code, exc.headers, raw, tools)
             message = payload["choices"][0]["message"]
             if not isinstance(message, dict):
                 raise ValueError("missing answer")
             return json.loads(json.dumps(message).replace(key, "[REDACTED]"))
-        except urllib.error.HTTPError as exc:
-            reason = _safe_reason(exc) if exc.code in (400, 422) else ""
-            if tools is not None and exc.code in (400, 422):
-                raise ToolsUnsupported("API rejected native tools" + (": " + reason if reason else "")) from None
-            # Auth and rate-limit bodies stay private. Only sanitized validation
-            # messages reach Result.error (which the CLI prints/logs).
-            raise APIHTTPError(exc.code, exc.headers, reason) from None
+        except (APIHTTPError, ToolsUnsupported):
+            raise
         except TimeoutError:
             raise RuntimeError("API request timed out") from None
         except urllib.error.URLError as exc:
@@ -171,7 +277,7 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
                                 model=m.get("openrouter", "qwen/qwen3-4b:free"),
                                 key_env="OPENROUTER_API_KEY"),
         OpenAICompatibleBackend("groq", base_url="https://api.groq.com/openai/v1",
-                                model=m.get("groq", "llama-3.3-70b-versatile"),
+                                model=m.get("groq", "openai/gpt-oss-20b"),
                                 key_env="GROQ_API_KEY"),
         OpenAICompatibleBackend(
             "cloudflare",

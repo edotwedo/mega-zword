@@ -56,3 +56,7 @@ def isolated_home(tmp_path, monkeypatch):
                 "CLOUDFLARE_ACCOUNT_ID", "ZAI_API_KEY", "GOOGLE_AI_API_KEY",
                 "NVIDIA_API_KEY", "MISTRAL_API_KEY"):
         monkeypatch.delenv(var, raising=False)
+    # Groq uses Windows curl.exe on this PC (urllib is Cloudflare 1010).
+    # Tests stay on mocked urllib unless they opt in.
+    from megazword import free_apis
+    monkeypatch.setattr(free_apis, "_curl_bin", lambda: None)
