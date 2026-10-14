@@ -160,15 +160,17 @@ and `/api/room/stop`.
 ### Hive floor
 
 The floor has one seat per AI: one CLI window each for claude, codex and grok
-(gemini when its week is back). HTTP models like groq have no window; they wait
-in the Hive.
+(gemini `agy` when its week is back). HTTP seats (groq, cloudflare, zai,
+gemini-api, mistral, cerebras, sambanova) get a persistent
+`megazword chat -m <name>` window on their own Windows desktop
+(`scripts/free_floor.ps1`). OpenRouter stays off. NVIDIA waits for a key.
 
 - `megazword floor`: Show each seat as seated, empty (no key or install) or out, and whether the minimum crew is ready. Saves `~/.megazword/floor.json`.
 - `megazword floor introduce [--room hive]`: Post the floor roll call to the room. It has no `@names`, so nobody wakes up until Phil assigns work.
 - `megazword floor peek [-n 10]`: Print the latest Hive messages (the shared log).
 - `megazword floor wait [--timeout 120]`: Block until a new Hive message lands. Every seat reads the same file; seats still cannot type into each other's CLI windows.
 - `megazword floor suggest bulk|edit|decide|review`: Print which seated model should take that kind of job. Empty and out seats are skipped. It prints `(no seat)` and exits 1 when nobody fits. It suggests only; nothing is sent.
-  - `megazword floor suggest bulk` → `groq` (first seated HTTP seat: groq, mistral, cloudflare, zai, gemini-api, then any other HTTP seat)
+  - `megazword floor suggest bulk` → `groq` (first seated HTTP seat: groq, cerebras, sambanova, cloudflare, zai, gemini-api, mistral)
   - `megazword floor suggest edit` → `codex` (then claude)
   - `megazword floor suggest decide` → `claude` (then grok, codex)
   - `megazword floor suggest review` → `claude` (then grok, codex)

@@ -160,9 +160,9 @@ def _seats(**statuses):
             for name, kind in kinds.items()]
 
 
-def test_suggest_bulk_prefers_groq_then_mistral_skipping_out_and_cli():
+def test_suggest_bulk_prefers_groq_then_cloudflare_skipping_out_and_cli():
     seats = _seats(claude="seated", groq="out", mistral="seated", cloudflare="seated")
-    assert floor.suggest_seat("bulk", seats) == "mistral"
+    assert floor.suggest_seat("bulk", seats) == "cloudflare"
     seats = _seats(claude="seated", groq="seated", mistral="seated")
     assert floor.suggest_seat("bulk", seats) == "groq"
     assert floor.suggest_seat("bulk", _seats(claude="seated")) is None

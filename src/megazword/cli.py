@@ -152,7 +152,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     retry = sub.add_parser("retry", help="last answer not good enough: ask a stronger AI")
     retry.add_argument("-m", "--model", help="force which AI tries next")
-    sub.add_parser("chat", help="start an interactive conversation")
+    chat = sub.add_parser("chat", help="start an interactive conversation")
+    chat.add_argument("-m", "--model", help="pin this AI for the whole session")
 
     room = sub.add_parser("room", help="Hive bot room: group chat between Phil and the bots")
     room_sub = room.add_subparsers(dest="action", metavar="ACTION")
@@ -473,7 +474,8 @@ def main(argv: list[str] | None = None,
 
     if args.command == "chat":
         from .chat import run
-        return run(backends, cfg, rater, statuses or plan_statuses)
+        return run(backends, cfg, rater, statuses or plan_statuses,
+                   start_model=getattr(args, "model", None))
 
     if args.command == "room":
         from . import room

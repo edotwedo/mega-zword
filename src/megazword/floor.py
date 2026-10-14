@@ -1,4 +1,4 @@
-"""Hive floor: one seat per model we can run. HTTP backends sit without a window."""
+"""Hive floor: one seat per model we can run. HTTP seats get a chat window."""
 
 from __future__ import annotations
 
@@ -13,7 +13,8 @@ from . import config
 from .backends import Backend
 
 CLI_SEATS = ("claude", "codex", "grok", "gemini")
-HTTP_SEATS = ("groq", "cloudflare", "zai", "gemini-api", "nvidia", "mistral", "openrouter")
+HTTP_SEATS = ("groq", "cloudflare", "zai", "gemini-api", "mistral",
+              "cerebras", "sambanova", "nvidia", "openrouter")
 MINIMUM_CLI = ("claude", "codex", "grok")
 
 
@@ -76,7 +77,8 @@ def ready(seats: list[Seat]) -> bool:
     return seated > 0
 
 
-BULK_ORDER = ("groq", "mistral", "cloudflare", "zai", "gemini-api")
+BULK_ORDER = ("groq", "cerebras", "sambanova", "cloudflare", "zai",
+              "gemini-api", "mistral")
 JOB_ORDER = {
     "edit": ("codex", "claude"),
     "decide": ("claude", "grok", "codex"),

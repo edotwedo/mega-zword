@@ -92,18 +92,26 @@ def _load_history(path) -> None:
 def run(backends: dict[str, Backend], cfg: config.Config,
         rater: Callable[[str], Rating], statuses: Callable[[], dict] | None = None,
         read: Callable[[str], str] = input, write: Callable[[str], None] = print,
-        project: str | None = None) -> int:
+        project: str | None = None, start_model: str | None = None) -> int:
     """Run chat until /quit or terminal EOF/interrupt. Input and output are injectable."""
     from . import cli
 
     memory = Memory(config.HOME, project or project_name(), cfg.memory_lines)
     turns: list[tuple[str, str]] = []
     pinned: str | None = None
+    if start_model:
+        if start_model not in backends:
+            write(f"Unknown AI '{start_model}'. Choose from: {', '.join(backends)}")
+            return 2
+        pinned = start_model
     use_context = False
     started = datetime.now(timezone.utc).replace(microsecond=0)  # log times are whole seconds
     if read is input:
         _load_history(config.HOME / "chat_history")
-    write("Mega Zword chat. Type /help for commands.")
+    if pinned:
+        write(f"Mega Zword chat. Pinned to {pinned}. Type /help for commands.")
+    else:
+        write("Mega Zword chat. Type /help for commands.")
     while True:
         try:
             message = _read_message(read)
