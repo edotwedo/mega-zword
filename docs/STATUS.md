@@ -1,6 +1,6 @@
 # Status
 
-**Active runner follow-up: Lantern-13 (Codex), 2026-10-14.** Fixing PR 46 review findings: pytest argument confinement, worker source test environment, difficulty settings and explicit test-edit permission. Own branch codex/worker-review-fixes-2026-10-14. Usage: Codex 77% 5-hour / 39% weekly; Claude 98% weekly; Grok 42% weekly. Lantern implements and tests; Quill reviews/integrates, no duplicated workers.
+**Runner review fixes ready: Lantern-13 (Codex), 2026-10-14.** All four PR 46 findings fixed: pytest argument confinement, worker source test environment, difficulty settings and explicit test-edit permission. Branch codex/worker-review-fixes-2026-10-14. Full suite 1050 passed; focused suite 111 passed; final source-environment refinement 2 passed; smoke 36/36; clean diff check. Quill reviews this patch before planner PR 44 integration. Exact handoff: docs/handoffs/2026-10-14-worker-review-fixes.md.
 
 **Parallel-worker runner ready: Lantern-13, 2026-10-14 (Sorrel-12 part 2).** `job_workers.run_pieces` handles separate worktrees, free coding-loop failover, one metered paid retry, file/test/secret/branch checks, commits and persisted results. No planner/CLI changes or merge to main. Full suite 1030 passed; final runner suite 12 passed; smoke 36/36. Quill-12 integrates with plan-only PR 44 and owns combine/review/push. Local Ollama live trials were correctly rejected (step cap/no edits); no real-model success claimed. Exact contract and validation: `docs/handoffs/2026-10-14-parallel-worker-runner.md`.
 

@@ -223,3 +223,67 @@ def test_planner_metadata_and_unicode_file_names_are_preserved(origin):
     assert report["id"] == "saved-plan" and report["planner"] == "test-planner"
     assert report["runner_status"] == "complete"
     assert git(Path(report["clone"]), "show", "job/saved-plan-1:notes/π.txt") == "implemented notes/π.txt"
+
+
+@pytest.mark.parametrize("args", [
+    ["--basetemp=/unrelated"], ["--basetemp", "../outside"], ["--base=/unrelated"],
+    ["--rootdir=.."], ["-c", "../pytest.ini"], ["-o", "cache_dir=../outside"],
+    ["--junitxml=../report.xml"], ["../tests"], ["C:/outside"], ["/outside"],
+    ["-p", "untrusted_plugin"], ["@outside-args.txt"],
+])
+def test_pytest_unsafe_options_and_targets_rejected_before_workers(args):
+    with pytest.raises(ValueError):
+        jobs._test(["pytest", *args])
+
+
+def test_pytest_selectors_and_reporting_options_allowed():
+    args = ["-q", "-x", "tests/test_a.py::test_one", "-k", "one or two", "--maxfail=2",
+            "--tb", "short", "-p", "no:cacheprovider"]
+    assert jobs._test(["pytest", *args])[3:] == tuple(args)
+
+
+@pytest.mark.parametrize("explicit", [False, True])
+def test_worker_tests_import_changed_src_checkout(origin, explicit):
+    seed = origin.parent / "seed"
+    (seed / "src").mkdir()
+    (seed / "src" / "worker_proof.py").write_text("VALUE = 'old'\n")
+    (seed / "tests").mkdir()
+    (seed / "tests" / "test_proof.py").write_text(
+        "from worker_proof import VALUE\ndef test_changed():\n    assert VALUE == 'new'\n")
+    (seed / "pyproject.toml").write_text("[tool.pytest.ini_options]\n")
+    git(seed, "add", ".")
+    git(seed, "commit", "-qm", "src fixture")
+    git(seed, "push", "-q", "origin", "main")
+    def edit(folder, prompt):
+        (folder / "src" / "worker_proof.py").write_text("VALUE = 'new'\n")
+        return "done"
+    report = run(origin, [piece(path="src/worker_proof.py", level="medium",
+                              test="pytest -q" if explicit else "")],
+                 {"codex": Paid("codex", action=edit)}, job_id=f"src-{explicit}")
+    assert report["results"][0]["status"] == "passed", report["results"]
+    assert report["results"][0]["tests"] == "passed"
+
+
+@pytest.mark.parametrize("name,level,model,effort", [
+    ("claude", "hard", "review-model", "high"),
+    ("codex", "medium", "coding-model", "medium"),
+])
+def test_worker_difficulty_settings_use_private_backend_copy(tmp_path, name, level, model, effort):
+    source = CLIBackend(name, exe=name, args=["original"])
+    settings = config.Config(levels={name: {level: (model, effort)}})
+    runner = jobs.Runner(settings, {name: source})
+    worker = runner._worker(tmp_path, jobs.Piece("piece", ("a.txt",), level), [], name)
+    assert model in worker.args
+    assert effort in worker.args or f"model_reasoning_effort={effort}" in worker.args
+    assert source.args == ["original"] and source.cwd != str(tmp_path)
+
+
+def test_runner_test_permission_comes_from_title_not_boilerplate(tmp_path):
+    free = Free("groq")
+    runner = jobs.Runner(cfg(), {"groq": free})
+    ordinary = runner._worker(tmp_path, jobs.Piece("fix behavior", ("tests/test_a.py",), "easy"), [free], None)
+    ordinary.run("Mega Zword runs the tests. Allowed files (exact paths): tests/test_a.py")
+    assert ordinary._allow_test_edits is False
+    assert not (tmp_path / "tests" / "test_a.py").exists()
+    intended = runner._worker(tmp_path, jobs.Piece("add tests", ("tests/test_a.py",), "easy"), [free], None)
+    assert intended.allow_test_edits is True
