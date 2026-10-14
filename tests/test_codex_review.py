@@ -115,7 +115,7 @@ try {{
   $k.Close(); [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree('{key}')
 }}
 """
-    out = subprocess.run(["powershell.exe", "-NoProfile", "-Command", ps], capture_output=True,
+    out = subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "RemoteSigned", "-Command", ps], capture_output=True,
                          text=True, timeout=60).stdout
     lines = dict(l.split("=", 1) for l in out.splitlines() if "=" in l)
     assert lines["RAW"] == r"%USERPROFILE%\bin;C:\dup;C:\dup;C:\New Dir"
