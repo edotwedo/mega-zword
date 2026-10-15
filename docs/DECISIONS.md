@@ -3,6 +3,8 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-15
+- Phil (Testlog-14 chat): restore ALL saved CLI tabs together in a fresh Terminal window on a separate dedicated Windows desktop at login. Do not disrupt open sessions to demonstrate it now. Implement using noninteractive tests; defer actual restart/restore testing until around 90% Codex usage and Phil's readiness. Do not reboot automatically at that threshold.
+- Phil (Testlog-14 chat): for interactive setup, prompt him and let him drive; no UI takeover unless he asks.
 - Phil (Testlog-14 chat): warn him before interactive tests open terminals, switch desktops or move focus; do not assume he will stop typing without knowing. Testlog will wait until he is ready for such tests. Background verification can continue without a keyboard handoff.
 - Phil (Testlog-14 chat): camera return must recognize Phil only, staying quiet for his mother, children, or other people. Enrollment is deliberate and local; use a Windows-user-encrypted face template. Existing generic face-presence trigger is disabled until an owner is enrolled.
 - Phil (Testlog-14 chat): the app must preserve the original chat when adding another, provide usable chat deletion, and make Hive Send start replies without requiring a separate Start click. Identify the current build visibly so an old runtime is distinguishable.
