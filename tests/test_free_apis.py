@@ -288,7 +288,8 @@ def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
 
 
 NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "nvidia-lightning",
-            "mistral")
+            "mistral", "tencent-glm-5.3-flash", "tencent-glm-5.3",
+            "tencent-kimi-k2.7-code", "tencent-kimi-k3")
 
 
 def test_free_backends_are_registered_and_routed_before_paid_plans():
@@ -495,11 +496,27 @@ def test_tencent_tokenhub_request_uses_deepseek_v4_pro_singapore_and_key(monkeyp
     assert json.loads(seen[0].data)["model"] == "deepseek-v4-pro"
 
 
-def test_tencent_is_explicit_only_until_inference_succeeds():
+def test_tencent_deepseek_remains_explicit_while_verified_models_are_routed():
     backends = default_backends()
     assert "tencent" in backends
     assert all("tencent" not in route for route in config.DEFAULT_ROUTE.values())
     assert "tencent" not in config.DEFAULT_FREE_FAILOVER
+    working = ("tencent-glm-5.3-flash", "tencent-glm-5.3",
+               "tencent-kimi-k2.7-code", "tencent-kimi-k3")
+    assert set(working).issubset(backends)
+    assert all(name in route for route in config.DEFAULT_ROUTE.values()
+               for name in working)
+    assert all(name in config.DEFAULT_FREE_FAILOVER for name in working)
+    assert all(backends[name].key_env == "TENCENT_TOKENHUB_API_KEY"
+               for name in working)
+    assert all(backends[name].base_url == backends["tencent"].base_url
+               for name in working)
+    assert {name: backends[name].model for name in working} == {
+        "tencent-glm-5.3-flash": "glm-5.3-flash",
+        "tencent-glm-5.3": "glm-5.3",
+        "tencent-kimi-k2.7-code": "kimi-k2.7-code",
+        "tencent-kimi-k3": "kimi-k3",
+    }
 
 
 @pytest.mark.parametrize("model", ['""', '123'])

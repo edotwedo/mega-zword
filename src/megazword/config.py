@@ -58,11 +58,17 @@ DEFAULT_ROUTE = {
     # Try configured zero-cost providers first at every difficulty. Missing
     # keys/servers are filtered; paid CLI plans remain quality fallbacks.
     # Mistral and other train-on-data services lead easy tasks (Phil, 2026-10-11).
-    "easy": ["mistral", "gemini-api", "openrouter", "groq", "cloudflare",
+    "easy": ["mistral", "gemini-api", "openrouter", "groq",
+             "tencent-glm-5.3-flash", "tencent-glm-5.3",
+             "tencent-kimi-k2.7-code", "tencent-kimi-k3", "cloudflare",
              "zai", "nvidia", "nvidia-lightning", "ollama", "gemini", "grok", "codex", "claude"],
-    "medium": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
+    "medium": ["openrouter", "groq", "tencent-glm-5.3-flash",
+               "tencent-glm-5.3", "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+               "cloudflare", "zai", "gemini-api",
                "mistral", "nvidia", "nvidia-lightning", "ollama", "gemini", "codex", "grok", "claude"],
-    "hard": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
+    "hard": ["openrouter", "groq", "tencent-glm-5.3-flash",
+             "tencent-glm-5.3", "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+             "cloudflare", "zai", "gemini-api",
              "mistral", "nvidia", "nvidia-lightning", "ollama", "gemini", "claude", "codex", "grok"],
 }
 
@@ -91,13 +97,21 @@ DEFAULT_FREE = {
     "nvidia": "meta/llama-3.1-8b-instruct",
     "nvidia-lightning": "nvidia/nemotron-3.5-lightning-30b-a3b",
     "tencent": "deepseek-v4-pro",
+    # Independently metered Tencent TokenHub free-trial services, verified
+    # with native tool calls. They share TENCENT_TOKENHUB_API_KEY.
+    "tencent-glm-5.3-flash": "glm-5.3-flash",
+    "tencent-glm-5.3": "glm-5.3",
+    "tencent-kimi-k2.7-code": "kimi-k2.7-code",
+    "tencent-kimi-k3": "kimi-k3",
     # The free account returns 429/code 1300 for Mistral Small but allows
     # Ministral 3B under the same key and API limits (verified 2026-10-14).
     "mistral": "ministral-3b-2512",
 }
 
 DEFAULT_FREE_FAILOVER = ["openrouter", "groq", "groq-120b", "groq-qwen",
-                         "groq-allam", "cloudflare", "zai", "gemini-api",
+                         "groq-allam", "tencent-glm-5.3-flash",
+                         "tencent-glm-5.3", "tencent-kimi-k2.7-code",
+                         "tencent-kimi-k3", "cloudflare", "zai", "gemini-api",
                          "gemini-api-31-lite",
                          "mistral", "nvidia", "nvidia-lightning", "ollama", "openrouter-dots",
                          "openrouter-nemotron-nano", "openrouter-nemotron-lightning",

@@ -318,6 +318,10 @@ FREE_KEYS = (
     ("nvidia", "NVIDIA_API_KEY"),
     ("nvidia-lightning", "NVIDIA_API_KEY"),
     ("tencent", "TENCENT_TOKENHUB_API_KEY"),
+    ("tencent-glm-5.3-flash", "TENCENT_TOKENHUB_API_KEY"),
+    ("tencent-glm-5.3", "TENCENT_TOKENHUB_API_KEY"),
+    ("tencent-kimi-k2.7-code", "TENCENT_TOKENHUB_API_KEY"),
+    ("tencent-kimi-k3", "TENCENT_TOKENHUB_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
 )
 
@@ -375,6 +379,15 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
             "tencent", base_url="https://tokenhub-intl.tencentcloudmaas.com/v1",
             model=m.get("tencent", "hy3"), key_env="TENCENT_TOKENHUB_API_KEY",
         ),
+        *[OpenAICompatibleBackend(
+            name, base_url="https://tokenhub-intl.tencentcloudmaas.com/v1",
+            model=m.get(name, model), key_env="TENCENT_TOKENHUB_API_KEY",
+        ) for name, model in (
+            ("tencent-glm-5.3-flash", "glm-5.3-flash"),
+            ("tencent-glm-5.3", "glm-5.3"),
+            ("tencent-kimi-k2.7-code", "kimi-k2.7-code"),
+            ("tencent-kimi-k3", "kimi-k3"),
+        )],
         # OpenRouter chooses the serving provider. Its training policy can
         # vary by endpoint (and configured model); unknown means scrub prompts.
         *[OpenAICompatibleBackend(name, base_url="https://openrouter.ai/api/v1",
