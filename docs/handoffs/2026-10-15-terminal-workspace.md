@@ -136,6 +136,39 @@ establish any remote setup, installation or authorization on that machine.
 
 ## Deferred reboot test: prompt Phil; do not take over
 
+### Post-restart relay repair, 2026-10-15
+
+Phil confirmed the new **Hive** virtual desktop; screenshots show all six
+colored tabs. Startup restoration is now physically observed. Screenshots also
+exposed terminal capability/color replies in Codex input, and Phil reported
+Backspace deleting whole words. These were relay defects, not a reason to repeat
+the Windows restart.
+
+`terminal_input.py` now reads this relay's own Windows console events, preserves
+modifiers and maps plain Backspace to DEL. Complete VT input replies are filtered
+before forwarding. Child capability/color queries are answered locally rather
+than forwarded to the outer terminal. Keyboard, protocol and automatic prompt
+writes share a lock. Initial/ongoing catch-ups consume new return events without
+queuing another summary; Ctrl+C clears a pending automatic summary. Typed drafts
+and unfinished bracketed pastes continue to block automatic submissions.
+
+Focused regressions include a real private two-ConPTY relay with a fake native
+client: terminal queries answered once and character Backspace delivered. These
+checks open no desktop windows, move no focus and make no model calls.
+Validation: full1185 passed in166.31s (108 existing deprecation warnings),
+focused37 passed; diff check clean. Full-suite output/exit code saved under
+`build/terminal-relay-pytest*` after the connection restart lost the prior run's
+result. No live native-client reload or physical keyboard retest performed.
+
+**Reload still requires Phil:** existing managed tabs retain the old Python
+relay. Save other seats' work, close the affected managed tabs (or their window),
+then open **Restore Hive**. No Windows reboot is needed. Do not close sessions,
+switch desktops or open test windows on Phil's behalf without readiness. After
+reload Phil should test plain Backspace on a disposable draft, then absence/
+return with idle/busy/draft tabs. Owner enrollment and owner-return were already
+observed; a non-owner return remains untested. The older checklist below is
+historical pre-restart guidance.
+
 **Ready for Phil's restart, 2026-10-15 11:44 PT:** Codex meter93% used (7%
 remaining). Snapshot refreshed: six seats, Grok/Claude/four Codex. All saved
 folders, installed executable resolution, Python dependencies, owner template,
