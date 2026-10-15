@@ -140,15 +140,15 @@ def test_test_command_timeout(tmp_path):
 
 
 def test_wall_timeout(tmp_path, monkeypatch):
-    loop, model = coding(tmp_path, [call("finish", summary="too late")], wall_timeout=0.01)
+    loop, model = coding(tmp_path, [call("finish", summary="too late")], wall_timeout=2)
     original = model.chat
     def slow(*args, **kwargs):
-        time.sleep(0.02)
+        time.sleep(2.02)
         return original(*args, **kwargs)
     monkeypatch.setattr(model, "chat", slow)
     assert "wall-clock" in loop.run("job").error
-    # 0.01 is not binary-exact; the cap must still be the wall, not the 0.02 sleep.
-    assert model.seen[0][2] <= 0.01 + 1e-8
+    # The call receives the remaining wall-clock budget, not the slower model delay.
+    assert model.seen[0][2] <= 2 + 1e-8
 
 
 def test_output_tail_and_no_model_commands(tmp_path):
@@ -411,6 +411,18 @@ def test_retry_obeys_wall_cap(tmp_path, monkeypatch):
     monkeypatch.setattr(agent.time, "sleep", sleeps.append)
     loop, _ = coding(tmp_path, [APIHTTPError(503)], wall_timeout=1)
     assert "wall-clock cap" in loop.run("job").error
+    assert not sleeps
+
+
+def test_rate_limit_beyond_wall_cap_keeps_retry_after_error(tmp_path, monkeypatch):
+    from megazword.free_apis import APIHTTPError
+    sleeps = []
+    monkeypatch.setattr(agent.time, "sleep", sleeps.append)
+    loop, _ = coding(tmp_path, [APIHTTPError(429, {"Retry-After": "300"})],
+                     wall_timeout=1)
+    error = loop.run("job").error
+    assert "HTTP error 429: rate limited" in error
+    assert "try again in 5 minutes" in error
     assert not sleeps
 
 

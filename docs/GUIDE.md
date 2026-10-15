@@ -533,12 +533,40 @@ megazword free test --provider groq
 megazword run -e -m groq "Fix the failing test in this folder, run tests, and summarize the change."
 ```
 
+For OpenRouter's changing free catalog, list models currently advertised at
+zero price with tool support before choosing an ID:
+
+```powershell
+megazword free models
+```
+
+This reads the public catalog without making an inference request. A listed
+model can still be throttled, unavailable to this app, or unable to complete a
+coding task; verify it with a bounded coding run before relying on it.
+
+To try one listed model directly, set its exact ID in your user config:
+
+```toml
+[free.openrouter]
+model = "google/gemma-4-31b-it:free"
+```
+
+Then run `megazword free test --provider openrouter` and, if it responds,
+`megazword run -e -m openrouter "Fix the failing test in this folder."`.
+Replace the sample ID with one from the live list; this setting overrides the
+default free router.
+
 `gemini-api` is the Google AI Studio API; `gemini` is the separate Gemini CLI
 identity. Ollama runs locally and needs no API key. The default free coding
 failover order is OpenRouter, Groq, Cloudflare, Z.AI, Gemini API, Mistral,
 NVIDIA, then Ollama. Mega Zword skips missing or marked-out providers. It waits
 between calls to respect each provider's configured pacing (Groq: 2 seconds;
 OpenRouter: 3; Gemini API: 6).
+
+Groq's GPT-OSS coding requests include its required parsed reasoning format.
+Groq offers a Free plan with rate limits, while its Developer plan bills GPT-OSS
+by token; check the account tier in Groq Console if avoiding any possible API
+charge. Mega Zword cannot determine that billing tier from the API key.
 
 On a rate limit (HTTP 429), Mega Zword uses the provider's `Retry-After` when
 available, marks that backend out until the reset, and tries another free

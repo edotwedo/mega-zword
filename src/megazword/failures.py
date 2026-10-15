@@ -1,7 +1,7 @@
 """Explain a failed AI call in plain English, with the fix.
 
-Kinds: usage limit (see limits.py), not logged in, network down, CLI
-missing, timeout. Anything else is left as the raw error. Only usage limits
+Kinds: usage limit (see limits.py), not logged in, model access, network down,
+CLI missing, timeout. Anything else is left as the raw error. Only usage limits
 ever mark an AI out: an auth or network problem is fixed by you, not by
 waiting, so the AI stays in the rotation.
 """
@@ -36,6 +36,9 @@ _AUTH = re.compile(
     r"|unauthori[sz]ed|\b401\b|\bforbidden\b|authentication (?:failed|required|error)|invalid api key"
     r"|invalid x-api-key|(?:token|session|credentials?) (?:has )?expired|expired (?:token|session)"
     r"|no api key|missing api key|run .{0,20}\blogin\b", re.I)
+_MODEL_ACCESS = re.compile(
+    r"only available on (?:agentic )?harnesses|model (?:is restricted|not available|access denied)"
+    r"|not available to this app|app-restricted|model gate", re.I)
 _NETWORK = re.compile(
     r"getaddrinfo|enotfound|eai_again|name or service not known|could not resolve host"
     r"|temporary failure in name resolution|nodename nor servname|network is unreachable"
@@ -59,6 +62,9 @@ def classify(ai: str, error: str) -> Failure | None:
     if detect_limit(text):
         return Failure("limit", f"{ai} is out of usage for now",
                        f"wait for the reset, or `megazword out {ai} --clear` if it's wrong")
+    if _MODEL_ACCESS.search(text):
+        return Failure("access", f"{ai}'s selected model is restricted for this app",
+                       "choose a model whose provider allows this app to use its API")
     if _AUTH.search(text):
         return Failure("auth", f"{ai} isn't logged in (or its login expired)",
                        LOGIN_FIX.get(ai, f"sign in to {ai} again"))

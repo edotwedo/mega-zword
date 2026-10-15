@@ -378,6 +378,10 @@ class AgentBackend(Backend):
                              else retry_seconds(exc.headers))
                 self._event("cooldown", seconds=delay, http_status=exc.code)
                 if self._deadline - time.monotonic() <= delay:
+                    if exc.code == 429:
+                        # Preserve the provider's real limit signal so routing
+                        # can mark this free endpoint out and try the next one.
+                        raise
                     raise TimeoutError("agent wall-clock cap reached during retry backoff") from None
                 if not self.control:
                     time.sleep(delay)
@@ -499,10 +503,16 @@ class AgentBackend(Backend):
                     continue
                 if not self._failover(exc):
                     raise
-                text_mode = True
+                # Retry with native tools on API backends. Several models
+                # (notably Groq GPT-OSS) return tool calls even when asked for
+                # Mega Zword's text protocol, which the provider can reject.
+                text_mode = (isinstance(self.model_backend, OllamaBackend)
+                             or not callable(getattr(self.model_backend, "chat", None)))
                 compacted = False
                 messages = self._text_history(messages)
                 messages.append({"role": "user", "content":
+                    "Continue the same task from the current files and tool results. "
+                    "The previous backend failed. Use the supplied tools." if not text_mode else
                     "Continue the same task from the current files and tool results. "
                     "The previous backend failed. Use the fenced JSON tool protocol."})
                 continue

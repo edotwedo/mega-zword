@@ -130,6 +130,10 @@ class OpenAICompatibleBackend(Backend):
                 # selection when tools are present. Google documents this field
                 # for its compatibility endpoint; be explicit for each API.
                 body["tool_choice"] = "auto"
+                # Groq requires parsed/hidden reasoning for GPT-OSS tool calls;
+                # its default raw format can reject an otherwise valid call.
+                if (self.name == "groq" and self.model.startswith("openai/gpt-oss-")):
+                    body["reasoning_format"] = "parsed"
             request = urllib.request.Request(
                 self._endpoint(),
                 data=json.dumps(body).encode("utf-8"),
@@ -157,7 +161,7 @@ class OpenAICompatibleBackend(Backend):
                 elif self.name == "mistral" and _mistral_rate_limited(raw):
                     reason = "Mistral rate limit exceeded (code 1300)"
                 raise APIHTTPError(exc.code, headers, reason) from None
-            reason = _safe_reason(exc) if exc.code in (400, 422) else ""
+            reason = _safe_reason(exc) if exc.code in (400, 403, 422) else ""
             if tools is not None and exc.code in (400, 422):
                 raise ToolsUnsupported("API rejected native tools" + (": " + reason if reason else "")) from None
             # Auth and rate-limit bodies stay private. Only sanitized validation

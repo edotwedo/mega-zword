@@ -100,9 +100,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
-    free = sub.add_parser("free", help="check configured free AI providers")
+    free = sub.add_parser("free", help="inspect and check free AI providers")
     free_sub = free.add_subparsers(dest="action", metavar="ACTION")
     free_sub.required = True
+    free_sub.add_parser("models", help="list current free, tool-capable OpenRouter models")
     free_test_parser = free_sub.add_parser("test", help="send one tiny prompt to configured free providers")
     from .free_test import PROVIDERS as FREE_TEST_PROVIDERS
     free_test_parser.add_argument("--provider", action="append", choices=FREE_TEST_PROVIDERS,
@@ -391,6 +392,10 @@ def main(argv: list[str] | None = None,
     if args.command == "free" and args.action == "test":
         from .free_test import command
         return command(backends, cfg.free, args.providers, cfg.out_now())
+
+    if args.command == "free" and args.action == "models":
+        from .openrouter_catalog import command
+        return command()
 
     if args.command == "projects":
         from .memory import list_projects

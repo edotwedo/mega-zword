@@ -15,6 +15,8 @@ CODEX_LIMIT = "ERROR: You’ve hit your usage limit. ... or try again at 2:39 AM
     ("codex", "401 Unauthorized: token expired", "auth", "codex login"),
     ("grok", "authentication failed", "auth", "grok login"),
     ("groq", "missing api key", "auth", "GROQ_API_KEY"),
+    ("openrouter", "HTTP 403: forbidden: model is only available on agentic harnesses",
+     "access", "provider allows this app"),
     ("claude", "getaddrinfo ENOTFOUND api.anthropic.com", "network", "connection"),
     ("codex", "Temporary failure in name resolution", "network", "connection"),
     ("grok", "'grok' is not installed or not on PATH", "missing", "doctor"),

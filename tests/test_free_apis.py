@@ -41,6 +41,26 @@ def test_request_and_answer(api, monkeypatch):
     assert result.backend == "test" and result.seconds >= 0
 
 
+def test_groq_gpt_oss_tool_requests_use_supported_reasoning_format(monkeypatch):
+    monkeypatch.setenv("TEST_API_KEY", "secret-test-credential")
+    groq = OpenAICompatibleBackend("groq", base_url="https://api.groq.com/openai/v1",
+                                   model="openai/gpt-oss-20b", key_env="TEST_API_KEY")
+
+    def fake(request, timeout):
+        body = json.loads(request.data)
+        assert body["tool_choice"] == "auto"
+        assert body["reasoning_format"] == "parsed"
+        assert body["tools"][0]["function"]["name"] == "finish"
+        return io.BytesIO(json.dumps({"choices": [{"message": {
+            "content": None, "tool_calls": [{"id": "t1", "type": "function",
+                "function": {"name": "finish", "arguments": '{"summary":"ok"}'}}]}}]}).encode())
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    message = groq.chat([{"role": "user", "content": "finish"}],
+                        [{"type": "function", "function": {"name": "finish"}}])
+    assert message["tool_calls"][0]["function"]["name"] == "finish"
+
+
 @pytest.mark.parametrize("value", [None, "", "a-key"])
 def test_available_without_network(api, monkeypatch, value):
     monkeypatch.delenv("TEST_API_KEY", raising=False)
@@ -91,6 +111,24 @@ def test_auth_errors_are_plain_and_never_leak_key(api, monkeypatch, code, word):
     assert "Traceback" not in result.error
     assert "secret-test-credential" not in repr(result)
     assert failures.classify("groq", result.error).kind == "auth"
+
+
+def test_agent_harness_model_restriction_is_reported_as_access_not_bad_key(api, monkeypatch):
+    from megazword import failures
+    body = json.dumps({"error": {"message":
+        "This model is only available on agentic harnesses. See https://openrouter.ai/apps"}}).encode()
+
+    def fail(*args, **kwargs):
+        raise urllib.error.HTTPError("https://example.test/chat/completions", 403,
+                                     "Forbidden", {}, io.BytesIO(body))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    result = api.run("synthetic probe")
+    assert "only available on agentic harnesses" in result.error
+    assert "https://" not in result.error
+    failure = failures.classify("openrouter", result.error)
+    assert failure.kind == "access"
+    assert "restricted for this app" in failure.reason
 
 
 @pytest.mark.parametrize("body", [b"not json", b"{}", b'{"choices":[]}',

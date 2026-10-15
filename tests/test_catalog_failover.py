@@ -69,6 +69,18 @@ def test_failure_after_edit_preserves_task_files_and_tests(tmp_path, error, caps
     assert "continuing with kimi" in capsys.readouterr().err
 
 
+def test_api_failover_retries_with_native_tools(tmp_path):
+    first = Scripted([APIHTTPError(429, {"Retry-After": "300"})])
+    first.name = "openrouter"
+    second = Scripted([call("finish", summary="continued with tools")])
+    second.name = "groq"
+    loop = agent.wrap(first, {"root": tmp_path}, fallback_backends=[second])
+    result = loop.run("Complete this coding task")
+    assert result.ok and "continued with tools" in result.text
+    assert second.seen[0][1] is not None
+    assert loop.backends_used == ["openrouter", "groq"]
+
+
 def test_cli_forced_order_skips_out_missing_and_duplicate_start(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     first = Scripted([APIHTTPError(429)])
