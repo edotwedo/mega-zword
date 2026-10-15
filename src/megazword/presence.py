@@ -62,9 +62,16 @@ class OpenCVCamera:
         ok, frame = self.capture.read()
         if not ok:
             raise ValueError("The local webcam stopped returning frames.")
-        gray = self.cv.cvtColor(self.cv.resize(frame, (320, 240)), self.cv.COLOR_BGR2GRAY)
-        faces = self.detector.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5,
-                                              minSize=(40, 40))
+        # A wide-angle webcam puts a normal seated face below 40px after a
+        # 320px downscale. Keep enough detail and preserve non-4:3 cameras.
+        height, width = frame.shape[:2]
+        target_width = min(width, 640)
+        target_height = max(1, round(height * target_width / width))
+        gray = self.cv.cvtColor(self.cv.resize(frame, (target_width, target_height)),
+                                self.cv.COLOR_BGR2GRAY)
+        gray = self.cv.equalizeHist(gray)
+        faces = self.detector.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4,
+                                              minSize=(24, 24))
         return len(faces) > 0
 
     def close(self):

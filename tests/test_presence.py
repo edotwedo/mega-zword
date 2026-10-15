@@ -128,3 +128,40 @@ def test_opencv_open_failure_releases_capture(monkeypatch):
     with pytest.raises(ValueError, match="Cannot open"):
         OpenCVCamera()
     assert closed == [True]
+
+
+@pytest.mark.parametrize("width,height", [(1280, 720), (640, 480), (320, 240)])
+def test_camera_detects_small_seated_face_without_distorting_frame(width, height):
+    from types import SimpleNamespace
+
+    class Frame:
+        shape = (height, width, 3)
+
+    resized = []
+    enhanced = []
+
+    def resize(frame, size):
+        resized.append(size)
+        # Model a face occupying 10% of this wide-angle webcam frame.
+        return {"face_width": size[0] * .1}
+
+    def equalize(gray):
+        enhanced.append(True)
+        return {**gray, "equalized": True}
+
+    def detect(gray, **options):
+        # A 320px/min40 pipeline rejects the seated face. The corrected
+        # pipeline must preserve a detectable face and improve contrast.
+        return [(0, 0, 32, 32)] if (
+            gray.get("equalized") and gray["face_width"] >= options["minSize"][0]
+        ) else []
+
+    camera = OpenCVCamera.__new__(OpenCVCamera)
+    camera.capture = SimpleNamespace(read=lambda: (True, Frame()))
+    camera.cv = SimpleNamespace(resize=resize, cvtColor=lambda frame, code: frame,
+                                equalizeHist=equalize, COLOR_BGR2GRAY=0)
+    camera.detector = SimpleNamespace(detectMultiScale=detect)
+    assert camera.read() is True
+    target_width = min(width, 640)
+    assert resized == [(target_width, round(height * target_width / width))]
+    assert enhanced == [True]

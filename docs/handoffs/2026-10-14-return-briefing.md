@@ -51,3 +51,39 @@ Restart the dashboard to load the button; reconnect MCP sessions for hive_status
 Each standalone session should then publish one accurate card. This feature does
 not promise awareness of terminals that never report, inject terminal keystrokes,
 or start unrelated paid/free jobs.
+
+## Physical camera fix, 2026-10-14 evening
+
+Testlog-14 followed up after Phil's first return test failed. Existing Cedar
+runtime at localhost8767 had missing cv2; installed opencv-python4.14.0.94 and
+numpy into Cedar's isolated Python3.13 environment. Webcam then opened, but the
+original detector missed Phil while seated: a live eight-frame local diagnostic
+found zero faces with the old 320px/min40 pipeline, one face in every frame with
+an aspect-preserving 640px/equalized/min24 pipeline. No frames were saved or sent.
+
+The patch preserves aspect ratio, caps width at 640 without upscaling, equalizes
+grayscale contrast, and detects smaller faces (min24, minNeighbors4). Tests model
+a seated face at 10% of the frame width and cover 16:9, 4:3 and smaller input.
+An unrelated Gemini fixture expired when UTC passed 2026-10-15; its assertion now
+uses a clock matching the fixture instead of today's date. No quota logic changed.
+
+The old 8767 process is elevated. Both normal and escalated Stop-Process returned
+Access denied. Its camera was disabled and no jobs/room were running before the
+restart attempt. Do not claim it was replaced or repaired. The corrected runtime
+is at **http://127.0.0.1:8768**, using this seat's source via an ignored local helper
+`build/briefing-runtime.py` and Cedar's isolated interpreter. No shared-checkout
+edits or second camera capture remain. The 8767 process stays idle with camera off.
+
+Verified end to end: corrected runtime reported face present, then return event 1;
+the open browser's briefing dialog changed from closed to open without a manual
+click. Phil confirmed he had looked away and returned, then said "cool".
+Camera is still on locally in 8768. Existing stale seat reports remain labeled;
+this does not establish that all terminal sessions are reporting.
+
+Routine fix is local Gitea only (`origin`), following Phil's workflow. No GitHub
+source mirror. CODEX_JOB.md remains untracked and uncommitted.
+
+Validation of this fix: full suite 1141 passed in 169.99s on the isolated
+Python3.13 interpreter; focused briefing/presence/dashboard suite 30 passed;
+Gemini/presence suite after the clock correction 28 passed; clean diff check.
+Existing Python3.13 is_reserved deprecation warnings remain unchanged.
