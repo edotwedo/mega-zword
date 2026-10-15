@@ -236,7 +236,9 @@ def test_gemini_meter_reads_agy_usage(monkeypatch):
     now = datetime(2026, 10, 11, tzinfo=timezone.utc)
     summary = meters.summarize(meter, {}, now)
     assert summary.state == "meter" and summary.used == pytest.approx(60)
-    assert pacing.status(meter, now).max_used_percent == pytest.approx(60)
+    # Keep the reset-relative assertion stable after this fixture's weekly
+    # reset time has passed in real time.
+    assert pacing.status(meter, now=datetime(2026, 10, 14, tzinfo=timezone.utc)).max_used_percent == pytest.approx(60)
 
 
 def test_gemini_meter_agy_failure_is_reported(monkeypatch, tmp_path):

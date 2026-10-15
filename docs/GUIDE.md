@@ -472,6 +472,7 @@ Night Shift does real work while you sleep. It reads `docs/QUEUE.md` on GitHub
   `megazword run "..." -m zai`. They are off the default route, except Mistral,
   which is first in `easy` once `MISTRAL_API_KEY` is set.
 - `megazword doctor` checks local setup without sending a prompt.
+- `megazword free test` sends one tiny prompt to each configured free API and reachable local Ollama, then prints each result and any short error.
 - `megazword export [-p PROJECT] [--since 7d] [--out FILE] [--force]` writes
   project memory, answers and run totals as Markdown. By default it prints to
   the terminal. `--since` accepts a duration such as `14d` or a UTC date.
