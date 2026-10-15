@@ -136,6 +136,14 @@ establish any remote setup, installation or authorization on that machine.
 
 ## Deferred reboot test: prompt Phil; do not take over
 
+**Ready for Phil's restart, 2026-10-15 11:44 PT:** Codex meter93% used (7%
+remaining). Snapshot refreshed: six seats, Grok/Claude/four Codex. All saved
+folders, installed executable resolution, Python dependencies, owner template,
+models and desktop helper passed a no-launch preflight. Startup boot action
+read back successfully; snapshot scheduled task last result0. Source25c6491 is
+saved on local Gitea main. No UI takeover or restart performed. Phil will do a
+full restart and Windows update; resume verification when he says back.
+
 1. When Phil is ready near 90% usage, save each active seat's state and refresh
    the snapshot. Coordinate any active work before he restarts Windows.
 2. Phil restarts and signs in. Verify one fresh Terminal window with all six
