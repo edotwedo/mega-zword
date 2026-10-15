@@ -59,11 +59,11 @@ DEFAULT_ROUTE = {
     # keys/servers are filtered; paid CLI plans remain quality fallbacks.
     # Mistral and other train-on-data services lead easy tasks (Phil, 2026-10-11).
     "easy": ["mistral", "gemini-api", "openrouter", "groq", "cloudflare",
-             "zai", "cerebras", "nvidia", "ollama", "gemini", "grok", "codex", "claude"],
+             "zai", "nvidia", "ollama", "gemini", "grok", "codex", "claude"],
     "medium": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-               "cerebras", "mistral", "nvidia", "ollama", "gemini", "codex", "grok", "claude"],
+               "mistral", "nvidia", "ollama", "gemini", "codex", "grok", "claude"],
     "hard": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-             "cerebras", "mistral", "nvidia", "ollama", "gemini", "claude", "codex", "grok"],
+             "mistral", "nvidia", "ollama", "gemini", "claude", "codex", "grok"],
 }
 
 DEFAULT_FREE = {
@@ -84,7 +84,7 @@ DEFAULT_FREE = {
 }
 
 DEFAULT_FREE_FAILOVER = ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-                         "cerebras", "mistral", "nvidia", "ollama"]
+                         "mistral", "nvidia", "ollama"]
 
 # API keys Mega Zword reads. On Windows a key set with
 # SetEnvironmentVariable(..., "User") is missing from shells and subprocesses

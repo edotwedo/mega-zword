@@ -287,7 +287,7 @@ def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
     assert "secret-test-credential" not in output
 
 
-NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "mistral", "cerebras")
+NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "mistral")
 
 
 def test_free_backends_are_registered_and_routed_before_paid_plans():
@@ -304,10 +304,13 @@ def test_free_backends_are_registered_and_routed_before_paid_plans():
     assert not backends["cloudflare"].trains_on_data
     assert not backends["nvidia"].trains_on_data
     assert backends["openrouter"].trains_on_data
+    assert "cerebras" in backends
+    assert all("cerebras" not in names for names in config.DEFAULT_ROUTE.values())
+    assert "cerebras" not in config.DEFAULT_FREE_FAILOVER
 
 
 def test_all_default_routes_try_free_backends_before_paid_plans():
-    free = {"openrouter", "groq", "cloudflare", "zai", "cerebras", "gemini-api", "gemini",
+    free = {"openrouter", "groq", "cloudflare", "zai", "gemini-api", "gemini",
             "mistral", "nvidia", "ollama"}
     paid = {"claude", "codex", "grok"}
     for route in config.DEFAULT_ROUTE.values():
@@ -361,7 +364,6 @@ def test_cloudflare_needs_account_id_and_puts_it_in_url(monkeypatch):
     ("gemini-api", "GOOGLE_AI_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
     ("nvidia", "NVIDIA_API_KEY"),
-    ("cerebras", "CEREBRAS_API_KEY"),
 ])
 def test_new_free_forced_run(name, key_env, monkeypatch, capsys):
     monkeypatch.setenv(key_env, "secret-test-credential")
