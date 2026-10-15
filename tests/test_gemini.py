@@ -232,9 +232,11 @@ def test_gemini_meter_reads_agy_usage(monkeypatch):
     assert by_name["weekly"].resets_at == datetime(2026, 10, 15, tzinfo=timezone.utc)
     # Antigravity's Claude/GPT pool is shown but never drives the Gemini meter.
     from megazword import meters, pacing
-    summary = meters.summarize(meter, {})
+    # Match the clock to this fixed quota fixture; wall time eventually expires it.
+    now = datetime(2026, 10, 11, tzinfo=timezone.utc)
+    summary = meters.summarize(meter, {}, now)
     assert summary.state == "meter" and summary.used == pytest.approx(60)
-    assert pacing.status(meter).max_used_percent == pytest.approx(60)
+    assert pacing.status(meter, now).max_used_percent == pytest.approx(60)
 
 
 def test_gemini_meter_agy_failure_is_reported(monkeypatch, tmp_path):
