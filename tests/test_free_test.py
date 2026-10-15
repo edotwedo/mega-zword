@@ -118,6 +118,43 @@ def test_selected_out_provider_is_skipped_without_failure(monkeypatch, capsys):
     assert not cli_backend.prompts
 
 
+def test_free_test_skips_stale_openrouter_alias_before_inference(monkeypatch, capsys):
+    from megazword.free_apis import OpenAICompatibleBackend
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    backend = OpenAICompatibleBackend("qwen-coder", base_url="https://openrouter.ai/api/v1",
+                                      model="qwen/qwen3-coder:free",
+                                      key_env="OPENROUTER_API_KEY")
+    monkeypatch.setattr(free_test.openrouter_catalog, "fetch_catalog",
+                        lambda: {"data": [model_record("other/model:free")]})
+    monkeypatch.setattr(backend, "run", lambda prompt: pytest.fail("stale ID must not be called"))
+
+    assert free_test.command({"qwen-coder": backend}, {}, ["qwen-coder"]) == 1
+    output = capsys.readouterr().out
+    assert "not verified as free and tool-capable" in output
+
+
+def model_record(model_id):
+    return {"id": model_id, "name": model_id, "pricing": {"prompt": "0", "completion": "0"},
+            "supported_parameters": ["tools"], "context_length": 1024}
+
+
+def test_free_test_calls_openrouter_model_listed_as_free(monkeypatch, capsys):
+    from megazword.backends import Result
+    from megazword.free_apis import OpenAICompatibleBackend
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    backend = OpenAICompatibleBackend("openrouter", base_url="https://openrouter.ai/api/v1",
+                                      model="openrouter/free", key_env="OPENROUTER_API_KEY")
+    monkeypatch.setattr(free_test.openrouter_catalog, "fetch_catalog",
+                        lambda: {"data": [model_record("openrouter/free")]})
+    calls = []
+    monkeypatch.setattr(backend, "run", lambda prompt: calls.append(prompt) or
+                        Result("openrouter", "ok", True, 0.1))
+
+    assert free_test.command({"openrouter": backend}, {}, ["openrouter"]) == 0
+    assert calls == ["Reply with: ok"]
+    assert "openrouter" in capsys.readouterr().out
+
+
 def test_free_test_cli_command_is_wired(monkeypatch, capsys):
     monkeypatch.setattr(free_test, "OllamaBackend",
                         lambda name, model: FakeBackend(name, available=False))

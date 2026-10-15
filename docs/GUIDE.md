@@ -624,6 +624,11 @@ Check the exact ID and price at
 checks configured identities but cannot reserve provider capacity; a free
 endpoint may still rate-limit or disappear.
 
+Before an OpenRouter request from `megazword free test`, Mega Zword checks that
+the configured model is still listed at zero price with tool support. Stale or
+unverified IDs are skipped with an explanation, which avoids 404 retries and
+accidental paid requests from this free-provider check.
+
 These three backends are marked as training on data conservatively: an unknown
 serving-provider policy counts as `True`, so prompts and file results are scrubbed.
 [OpenRouter's privacy policy](https://openrouter.ai/privacy/) explains that data
