@@ -210,7 +210,7 @@ def test_presets_config_and_routes(monkeypatch):
     assert backends["groq"].base_url == "https://api.groq.com/openai/v1"
     assert backends["openrouter"].key_env == "OPENROUTER_API_KEY"
     assert backends["groq"].key_env == "GROQ_API_KEY"
-    assert config.DEFAULT_FREE["openrouter"].endswith(":free")
+    assert config.DEFAULT_FREE["openrouter"] == "openrouter/free"
     assert config.DEFAULT_FREE["mistral"] == "ministral-3b-2512"
     assert default_backends()["mistral"].model == "ministral-3b-2512"
     assert cfg.route == config.DEFAULT_ROUTE
@@ -323,3 +323,8 @@ def test_provider_training_labels_match_developer_api_terms():
 def test_gemini_api_default_model_is_flash_lite():
     assert config.DEFAULT_FREE["gemini-api"] == "gemini-3.5-flash-lite"
     assert default_backends()["gemini-api"].model == "gemini-3.5-flash-lite"
+
+
+def test_openrouter_default_uses_free_router():
+    assert config.DEFAULT_FREE["openrouter"] == "openrouter/free"
+    assert default_backends()["openrouter"].model == "openrouter/free"

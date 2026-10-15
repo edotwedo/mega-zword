@@ -69,7 +69,7 @@ DEFAULT_FREE = {
     "deepseek": "deepseek/deepseek-chat-v3.1:free",
     "qwen-coder": "qwen/qwen3-coder:free",
     "ollama": "qwen2.5-coder:7b",
-    "openrouter": "qwen/qwen3-4b:free",
+    "openrouter": "openrouter/free",
     "groq": "llama-3.3-70b-versatile",
     "cloudflare": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "zai": "glm-4.5-flash",
