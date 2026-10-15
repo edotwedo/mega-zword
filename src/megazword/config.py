@@ -55,13 +55,15 @@ DEFAULT_GROK = {
 }
 
 DEFAULT_ROUTE = {
-    # First installed AI in each list wins. Placeholder order until usage
-    # tracking (build step 2) can rank them by remaining usage.
-    # Mistral first for small repetitive jobs (B15, Phil 2026-10-11); it is only
-    # used when MISTRAL_API_KEY is set.
-    "easy": ["mistral", "grok", "codex", "claude"],
-    "medium": ["codex", "claude", "grok"],
-    "hard": ["claude", "codex", "grok"],
+    # Try configured zero-cost providers first at every difficulty. Missing
+    # keys/servers are filtered; paid CLI plans remain quality fallbacks.
+    # Mistral and other train-on-data services lead easy tasks (Phil, 2026-10-11).
+    "easy": ["mistral", "gemini-api", "openrouter", "groq", "cloudflare",
+             "zai", "nvidia", "ollama", "grok", "codex", "claude"],
+    "medium": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
+               "mistral", "nvidia", "ollama", "codex", "grok", "claude"],
+    "hard": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
+             "mistral", "nvidia", "ollama", "claude", "codex", "grok"],
 }
 
 DEFAULT_FREE = {
@@ -80,8 +82,8 @@ DEFAULT_FREE = {
     "mistral": "ministral-3b-2512",
 }
 
-DEFAULT_FREE_FAILOVER = ["kimi", "qwen-coder", "deepseek", "groq", "gemini-api",
-                         "cloudflare", "mistral", "ollama"]
+DEFAULT_FREE_FAILOVER = ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
+                         "mistral", "nvidia", "ollama"]
 
 # API keys Mega Zword reads. On Windows a key set with
 # SetEnvironmentVariable(..., "User") is missing from shells and subprocesses

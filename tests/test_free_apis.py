@@ -215,7 +215,7 @@ def test_presets_config_and_routes(monkeypatch):
     assert default_backends()["mistral"].model == "ministral-3b-2512"
     assert cfg.route == config.DEFAULT_ROUTE
     generated = config.render_default(list(backends))
-    assert "openrouter" not in generated and "groq" not in generated
+    assert "openrouter" in generated and "groq" in generated
     assert {"openrouter", "groq"} <= default_backends(edit=True).keys()
 
 
@@ -251,20 +251,40 @@ def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
 NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "mistral")
 
 
-def test_b14_backends_exist_off_route_and_train_flags():
+def test_free_backends_are_registered_and_routed_before_paid_plans():
     backends = default_backends()
     for name in NEW_FREE:
         assert name in backends
         for level, names in config.DEFAULT_ROUTE.items():
-            # B15 (Phil): only Mistral is routed by default, first in `easy`.
-            assert name not in names or (name, level) == ("mistral", "easy")
+            assert name in names
         assert name in default_backends(edit=True)
+    assert "ollama" in backends
     assert not backends["zai"].trains_on_data
     assert backends["gemini-api"].trains_on_data
     assert backends["mistral"].trains_on_data
     assert not backends["cloudflare"].trains_on_data
     assert not backends["nvidia"].trains_on_data
-    assert not backends["openrouter"].trains_on_data
+    assert backends["openrouter"].trains_on_data
+
+
+def test_all_default_routes_try_free_backends_before_paid_plans():
+    free = {"openrouter", "groq", "cloudflare", "zai", "gemini-api",
+            "mistral", "nvidia", "ollama"}
+    paid = {"claude", "codex", "grok"}
+    for route in config.DEFAULT_ROUTE.values():
+        free_positions = [i for i, name in enumerate(route) if name in free]
+        paid_positions = [i for i, name in enumerate(route) if name in paid]
+        assert free_positions and paid_positions
+        assert max(free_positions) < min(paid_positions)
+    assert config.DEFAULT_FREE_FAILOVER[0] == "openrouter"
+    assert not ({"kimi", "qwen-coder", "deepseek"} & set(config.DEFAULT_FREE_FAILOVER))
+
+
+def test_openrouter_fallback_is_free_even_without_config_override():
+    from megazword.free_apis import free_backends
+    openrouter = next(b for b in free_backends({}) if b.name == "openrouter")
+    assert openrouter.model == "openrouter/free"
+    assert openrouter.trains_on_data
 
 
 def test_cloudflare_needs_account_id_and_puts_it_in_url(monkeypatch):

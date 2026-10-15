@@ -357,5 +357,5 @@ def test_ollama_backend_reports_client_errors(monkeypatch):
     assert result.text == ""
 
 
-def test_ollama_is_not_a_default_backend():
-    assert all(not isinstance(b, OllamaBackend) for b in default_backends().values())
+def test_ollama_is_available_as_a_zero_cost_default_backend():
+    assert isinstance(default_backends()["ollama"], OllamaBackend)

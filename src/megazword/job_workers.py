@@ -189,8 +189,9 @@ class Runner:
             free = [self.backends[n] for n in names if n in self.backends
                     and _free(self.backends[n]) and n not in self.cfg.out_now()
                     and self.backends[n].available()]
-            if piece.difficulty == "easy" and free:
-                # All fallbacks are free; one paid retry is owned by the runner.
+            if free:
+                # Give zero-cost workers first pass at every difficulty. One
+                # paid retry is still owned by the runner if that loop fails.
                 return free, paid
             if paid:
                 return [], paid
@@ -229,7 +230,7 @@ class Runner:
                       f"Allowed files (exact paths): {', '.join(piece.files)}\n"
                       "Edit only those files. Do not run git, commit, push or change unrelated files. "
                       "Mega Zword owns git and runs the tests. Keep the change small. Finish with a short summary.")
-            # An easy piece may get one paid retry after its free loop fails.
+            # Any piece may get one paid retry after its free loop fails.
             attempts = [(free, None)] if free else []
             if paid:
                 attempts.append(([], paid[0]))

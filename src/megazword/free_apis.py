@@ -206,7 +206,7 @@ def http_error_message(code: int, headers=None) -> str:
     return f"API HTTP error {code}"
 
 
-# Names shown in `megazword backends` / doctor. Never put these on DEFAULT_ROUTE.
+# Free API backends available to automatic routes when credentials are present.
 FREE_KEYS = (
     ("kimi", "OPENROUTER_API_KEY"),
     ("deepseek", "OPENROUTER_API_KEY"),
@@ -225,8 +225,8 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
     m = {**{k: v for k, v in models.items()}}
     return [
         OpenAICompatibleBackend("openrouter", base_url="https://openrouter.ai/api/v1",
-                                model=m.get("openrouter", "qwen/qwen3-4b:free"),
-                                key_env="OPENROUTER_API_KEY"),
+                                model=m.get("openrouter", "openrouter/free"),
+                                key_env="OPENROUTER_API_KEY", trains_on_data=True),
         OpenAICompatibleBackend("groq", base_url="https://api.groq.com/openai/v1",
                                 model=m.get("groq", "llama-3.3-70b-versatile"),
                                 key_env="GROQ_API_KEY"),

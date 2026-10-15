@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from pathlib import Path
+import subprocess
 
 from megazword.memory import (
     Memory,
@@ -103,3 +104,17 @@ def test_project_name_and_listing(tmp_path: Path) -> None:
     # allowed set in check_project
     allowed_checked = check_project(tmp_path, "brand-new", allowed={"brand-new"})
     assert allowed_checked == "brand-new"
+
+
+def test_project_name_hides_git_console(monkeypatch, tmp_path):
+    from megazword import backends, memory
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        return subprocess.CompletedProcess(cmd, 1, "", "not a repo")
+
+    monkeypatch.setattr(backends, "no_window", lambda: {"creationflags": 123})
+    monkeypatch.setattr(memory.subprocess, "run", fake_run)
+    assert memory.project_name(tmp_path) == tmp_path.name
+    assert calls[0][1]["creationflags"] == 123

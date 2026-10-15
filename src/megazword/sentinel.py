@@ -132,10 +132,11 @@ def _powershell(script: str) -> str:
     if not _is_windows():
         return ""
     try:
+        from .backends import no_window
         result = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=30)
+            timeout=30, **no_window())
     except subprocess.TimeoutExpired:  # callers handle OSError ("collect skipped")
         raise OSError("reading the event log took over 30s") from None
     if result.returncode != 0:
@@ -431,7 +432,8 @@ def install(yes: bool = False) -> int:
     ]
     for args in (create, logon):
         result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8",
-                                errors="replace")
+                                errors="replace",
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         if result.returncode != 0:
             print(f"[megazword] schtasks failed: {(result.stderr or result.stdout).strip()[:300]}",
                   file=sys.stderr)

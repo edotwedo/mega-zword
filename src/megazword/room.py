@@ -656,8 +656,9 @@ def post_summary(room: str, home: Path | None = None,
     gh = _gh_path() if post else None
     if gh:
         try:
+            from .backends import no_window
             res = subprocess.run([gh, "pr", "comment", "33", "--repo", "edotwedo/workshop", "--body", content],
-                                 capture_output=True, text=True, timeout=15)
+                                 capture_output=True, text=True, timeout=15, **no_window())
             if res.returncode == 0:
                 write(f"[megazword room] posted summary for '{room}' to Q (PR #33)")
                 return 0

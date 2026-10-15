@@ -152,6 +152,11 @@ def process_group() -> dict:
             if os.name == "nt" else {"start_new_session": True})
 
 
+def no_window() -> dict:
+    """Hide short console helpers launched from the windowless desktop app."""
+    return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
+
+
 def _kill_tree(proc: subprocess.Popen, reap: bool = True) -> None:
     """Kill a process and everything it started. With reap=False the caller
     is already reading the pipes and waiting on the process (dashboard jobs)."""
@@ -209,7 +214,7 @@ class CodexBackend(CLIBackend):
 class OllamaBackend(Backend):
     """A model on a local Ollama server.
 
-    Not added by default_backends(); the router registers the ones it wants.
+    Registered as a zero-cost local option; availability is checked before routing.
     `available` only checks that the server answers, not that `model` is pulled.
     """
 
@@ -424,6 +429,5 @@ def default_backends(edit: bool = False,
         except (ValueError, TypeError, OSError):
             free_models = Config().free
     backends.extend(free_backends(free_models))
-    if edit:
-        backends.append(OllamaBackend("ollama", model=free_models.get("ollama", "qwen2.5-coder:7b")))
+    backends.append(OllamaBackend("ollama", model=free_models.get("ollama", "qwen2.5-coder:7b")))
     return {b.name: b for b in backends}

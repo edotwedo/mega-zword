@@ -35,8 +35,9 @@ def project_name(cwd: Path | None = None) -> str:
     """Git repo folder name if inside one, else the current folder name."""
     cwd = cwd or Path.cwd()
     try:
+        from .backends import no_window
         top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd,
-                             capture_output=True, text=True, timeout=5)
+                             capture_output=True, text=True, timeout=5, **no_window())
         if top.returncode == 0 and top.stdout.strip():
             cwd = Path(top.stdout.strip())
     except (OSError, subprocess.SubprocessError):

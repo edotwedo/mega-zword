@@ -67,7 +67,7 @@ def test_init_discovers_gemini_without_adding_routes(monkeypatch, capsys, instal
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     monkeypatch.setattr(backends.shutil, "which", lambda name:
                         "fake-gemini.cmd" if installed and name == "gemini" else None)
-    monkeypatch.setattr(ollama, "reachable", lambda: False)
+    monkeypatch.setattr(ollama, "reachable", lambda *args, **kwargs: False)
     assert cli.main(["init"], cfg=config.Config()) == 0
     output = capsys.readouterr().out
     assert f"installed AIs: {'gemini' if installed else 'none'}" in output
