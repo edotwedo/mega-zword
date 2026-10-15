@@ -192,6 +192,20 @@ def test_near_exhausted_model_hops_before_another_request(tmp_path):
     assert loop.backends_used == ["groq", "groq-120b"]
 
 
+def test_persisted_near_exhaustion_skips_model_in_later_run(tmp_path, monkeypatch):
+    from megazword import free_apis
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    free_apis._record_request_quota("groq", 49, 1000, "30m")
+    first = Scripted([])
+    first.name = "groq"
+    second = Scripted([call("finish", summary="used next model")])
+    second.name = "groq-120b"
+    loop = agent.wrap(first, {"root": tmp_path}, fallback_backends=[second])
+    assert loop.run("next task").ok
+    assert not first.seen
+    assert loop.backends_used == ["groq", "groq-120b"]
+
+
 def test_switch_keeps_step_cap(tmp_path):
     first = Scripted([TimeoutError("timeout")])
     second = Scripted([call("list_files", glob="*")])

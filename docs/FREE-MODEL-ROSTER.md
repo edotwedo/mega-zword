@@ -67,14 +67,13 @@ Groq currently provides four separately metered, working model identities under
 one key. Google provides two working model identities under its Developer API
 key; `gemini` remains the separate Gemini CLI identity. OpenRouter provides one
 dynamic identity and five fixed tool-capable identities, but all six share the
-same account pool. Mega Zword checks
-provider rate-limit response headers and switches to the next free model on a
-subsequent call in the same coding run when 5% or fewer requests remain. On
-HTTP 429 it immediately fails over. Groq aliases share a conservative
-two-second call-start pace; that does not merge their provider-reported daily
-per-model quotas. This measured-header guard applies after a response in the
-current run; account usage by other apps is only visible once the provider
-reports fresh headers.
+same account pool. Mega Zword reads provider request-limit headers and switches
+at 5% remaining. It persists a low-water mark across runs until the reported
+reset, or one hour if the provider omits a reset header. An HTTP 429 also
+triggers immediate failover. Groq aliases share a conservative two-second
+call-start pace; that does not merge their provider-reported daily per-model
+quotas. Usage from other apps becomes visible when the provider returns fresh
+headers.
 
 ## Shared pools and candidates not yet usable today
 
@@ -108,8 +107,8 @@ privacy or data-handling policy; check the serving provider’s terms.
    (currently Groq's four, Google Gemini's two, and five OpenRouter tool-capable
    identities; the OpenRouter identities share one quota).
 2. Read provider-supplied remaining/limit headers after each successful call;
-   switch at 5% remaining and on 429. Keep 429 reset/backoff evidence per
-   identity, not per unrelated provider.
+   persist low-water status and switch at 5% remaining and on 429. Keep reset
+   and backoff evidence per identity, not per unrelated provider.
 3. Treat account-shared allocations as a single pool. Do not multiply a shared
    allowance by the number of model names or aliases.
 4. Before any expanded test, use a one-request prompt and record the model ID,

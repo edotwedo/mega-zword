@@ -347,13 +347,24 @@ def test_verified_openrouter_model_identities_keep_one_key_and_exact_free_ids():
 def test_successful_response_records_provider_request_quota(api, monkeypatch):
     class Response(io.BytesIO):
         headers = {"x-ratelimit-remaining-requests": "42",
-                   "x-ratelimit-limit-requests": "1000"}
+                   "x-ratelimit-limit-requests": "1000",
+                   "x-ratelimit-reset-requests": "30m"}
         def __enter__(self): return self
         def __exit__(self, *args): self.close()
     monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **kw: Response(
         json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()))
     assert api.run("hello").ok
     assert (api.remaining_requests, api.limit_requests) == (42, 1000)
+
+
+def test_low_request_quota_is_persisted_until_header_reset(api, monkeypatch, tmp_path):
+    from megazword import free_apis
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    free_apis._record_request_quota("test", 49, 1000, "30m")
+    assert free_apis.request_quota_low("test")
+    assert not free_apis.request_quota_low("another-model")
+    free_apis._record_request_quota("test", 900, 1000, "1h")
+    assert not free_apis.request_quota_low("test")
 
 
 def test_all_default_routes_try_free_backends_before_paid_plans():

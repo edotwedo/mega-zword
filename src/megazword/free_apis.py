@@ -6,6 +6,7 @@ import json
 import os
 import re
 import math
+import time
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 import urllib.error
@@ -13,6 +14,69 @@ import urllib.request
 from dataclasses import dataclass, field
 
 from .backends import Backend
+from .filelock import locked, write_atomic
+
+
+def _near_request_limit(remaining: int | None, limit: int | None) -> bool:
+    return bool(remaining is not None and limit
+                and remaining <= max(5, int(limit * 0.05)))
+
+
+def _request_reset_seconds(value: str | None) -> float:
+    """Parse provider duration headers (for example, ``1h2m3.4s``)."""
+    if not value:
+        return 3600
+    try:
+        number = float(value)
+        return max(1, number)
+    except (ValueError, TypeError):
+        pass
+    match = re.fullmatch(
+        r"(?:(\d+(?:\.\d+)?)h)?(?:(\d+(?:\.\d+)?)m)?"
+        r"(?:(\d+(?:\.\d+)?)s)?", value.strip(), re.I)
+    if not match or not any(match.groups()):
+        return 3600
+    hours, minutes, seconds = (float(part or 0) for part in match.groups())
+    return max(1, hours * 3600 + minutes * 60 + seconds)
+
+
+def request_quota_low(name: str) -> bool:
+    """Whether a recent response marked this identity low until its reset."""
+    from . import config
+    path = config.HOME / "request-quota.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        record = data.get(name, {})
+        return float(record.get("until", 0)) > time.time()
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
+def _record_request_quota(name: str, remaining: int | None,
+                          limit: int | None, reset: str | None) -> None:
+    """Persist only low-water marks; remove them when a fresh header recovers."""
+    from . import config
+    path = config.HOME / "request-quota.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with locked(path, timeout=2) as got:
+            if not got:
+                return
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = {}
+            if not isinstance(data, dict):
+                data = {}
+            if _near_request_limit(remaining, limit):
+                data[name] = {"remaining": remaining, "limit": limit,
+                              "until": time.time() + _request_reset_seconds(reset)}
+            else:
+                data.pop(name, None)
+            write_atomic(path, json.dumps(data, sort_keys=True))
+    except (OSError, TimeoutError, ValueError):
+        # A cache failure must not block an otherwise usable free API.
+        return
 
 
 class ToolsUnsupported(RuntimeError):
@@ -92,6 +156,11 @@ class OpenAICompatibleBackend(Backend):
     remaining_requests: int | None = field(default=None, init=False)
     limit_requests: int | None = field(default=None, init=False)
 
+    @property
+    def quota_near_limit(self) -> bool:
+        return (_near_request_limit(self.remaining_requests, self.limit_requests)
+                or request_quota_low(self.name))
+
     def _env_ok(self) -> bool:
         return bool(os.environ.get(self.key_env)) and all(os.environ.get(n) for n in self.extra_env)
 
@@ -149,6 +218,10 @@ class OpenAICompatibleBackend(Backend):
                     limit = headers.get("x-ratelimit-limit-requests")
                     self.remaining_requests = int(remaining) if remaining is not None else None
                     self.limit_requests = int(limit) if limit is not None else None
+                    if self.remaining_requests is not None and self.limit_requests is not None:
+                        _record_request_quota(
+                            self.name, self.remaining_requests, self.limit_requests,
+                            headers.get("x-ratelimit-reset-requests"))
                 except (TypeError, ValueError):
                     self.remaining_requests = self.limit_requests = None
                 payload = json.loads(response.read().decode("utf-8"))

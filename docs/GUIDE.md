@@ -571,7 +571,8 @@ charge. Mega Zword cannot determine that billing tier from the API key.
 The verified Groq roster also includes `groq-120b`, `groq-qwen` (Qwen 3.8
 27B), and `groq-allam` (Allam 2 7B). Groq's Free-plan request limits are per
 model; the coding loop reads the remaining-request headers and changes models
-when 5% or fewer remain. All four identities use the same API key and share a
+when 5% or fewer remain. The low-quota marker carries across runs until the
+provider's reset header expires it. All four identities use the same API key and share a
 conservative request pace. Run `megazword free test --provider groq-qwen` to
 check one identity. Gemini API `gemini-api-31-lite` selects the verified
 Gemini 3.1 Flash-Lite model; it remains distinct from the `gemini` CLI identity.

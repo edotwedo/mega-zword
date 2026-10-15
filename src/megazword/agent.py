@@ -340,10 +340,7 @@ class AgentBackend(Backend):
         sent = list(sent)  # retry interventions belong in history exactly once
         retries = 0
         while True:
-            remaining_requests = getattr(self.model_backend, "remaining_requests", None)
-            limit_requests = getattr(self.model_backend, "limit_requests", None)
-            if (remaining_requests is not None and limit_requests
-                    and remaining_requests <= max(5, int(limit_requests * 0.05))):
+            if getattr(self.model_backend, "quota_near_limit", False):
                 raise RuntimeError(
                     f"{self.model_backend.name} near its per-model request limit; switching free model")
             pace_call(self.model_backend.name, self.pace, self._deadline)
