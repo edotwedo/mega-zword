@@ -469,10 +469,10 @@ Night Shift does real work while you sleep. It reads `docs/QUEUE.md` on GitHub
 - `megazword backends` lists the AI CLIs and optional HTTP AIs (openrouter, groq,
   cloudflare, zai, gemini-api, nvidia, mistral), and whether each is
   available. Force one with
-  `megazword run "..." -m zai`. They are off the default route, except Mistral,
-  which is first in `easy` once `MISTRAL_API_KEY` is set.
+  `megazword run "..." -m zai`. Configured free APIs are included in the default
+  routes ahead of paid CLI subscriptions.
 - `megazword doctor` checks local setup without sending a prompt.
-- `megazword free test` sends one tiny prompt to each configured free API and reachable local Ollama, then prints each result and any short error.
+- `megazword free test` sends one tiny prompt to each configured free identity/API and reachable local Ollama. Use `--provider NAME` to test only one identity; repeat it to select several. Out-marked identities are reported as skipped without a call. `gemini` (Antigravity CLI) and `gemini-api` (Developer API) are separate choices.
 - `megazword export [-p PROJECT] [--since 7d] [--out FILE] [--force]` writes
   project memory, answers and run totals as Markdown. By default it prints to
   the terminal. `--since` accepts a duration such as `14d` or a UTC date.
@@ -500,7 +500,7 @@ Start with `megazword doctor`; each line below matches one of its check names.
 | `Ollama: WARN` | Start Ollama. Mega Zword can still rate prompts with its simple fallback rule. |
 | `rater model: WARN` | Pull the configured rating model, for example `ollama pull qwen2.5:1.5b`. |
 | A provider meter is `WARN` or stale | Reopen/sign in to that tool. Codex's snapshot updates when Codex runs; Grok and Gemini plan quotas are not read directly. |
-| `openrouter` / `groq` / `cloudflare` / `zai` / `gemini-api` / `nvidia` / `mistral` key is `WARN` | Set the matching env var (see `.env.example`). Cloudflare also needs `CLOUDFLARE_ACCOUNT_ID`. New terminal after. Keep keys private. These AIs stay off the default route until you add them in `[route]`, except `mistral`, which is first in `easy` once its key is set. `gemini-api` and `mistral` train on prompts. |
+| `openrouter` / `groq` / `cloudflare` / `zai` / `gemini-api` / `nvidia` / `mistral` key is `WARN` | Set the matching env var (see `.env.example`). Cloudflare also needs `CLOUDFLARE_ACCOUNT_ID`. New terminal after. Keep keys private. Configured free APIs are tried before paid CLI subscriptions at every difficulty. `gemini-api` and `mistral` train on prompts. |
 | `log: FAIL` | Check that your user can write to `%USERPROFILE%\.megazword`. |
 | Timeout or network failure during a run | Check the tool login, internet connection and `[timeouts]` in config. Rerun after the issue is fixed. |
 | The command is not found from another folder | Open a new terminal after install. Check that pipx's bin folder or `.venv\Scripts` is on your user PATH. |

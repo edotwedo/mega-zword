@@ -103,7 +103,11 @@ def build_parser() -> argparse.ArgumentParser:
     free = sub.add_parser("free", help="check configured free AI providers")
     free_sub = free.add_subparsers(dest="action", metavar="ACTION")
     free_sub.required = True
-    free_sub.add_parser("test", help="send one tiny prompt to each configured provider")
+    free_test_parser = free_sub.add_parser("test", help="send one tiny prompt to configured free providers")
+    from .free_test import PROVIDERS as FREE_TEST_PROVIDERS
+    free_test_parser.add_argument("--provider", action="append", choices=FREE_TEST_PROVIDERS,
+                                  dest="providers", metavar="NAME",
+                                  help="test only this identity; repeat to test several")
     sub.add_parser("plan", help="rank the AIs for new work by live spare usage")
     sub.add_parser("start", help="text start screen (plain `megazword` opens the app window)")
     sub.add_parser("projects", help="list projects with memory entries and last activity")
@@ -386,7 +390,7 @@ def main(argv: list[str] | None = None,
 
     if args.command == "free" and args.action == "test":
         from .free_test import command
-        return command(backends, cfg.free)
+        return command(backends, cfg.free, args.providers, cfg.out_now())
 
     if args.command == "projects":
         from .memory import list_projects

@@ -78,6 +78,46 @@ def test_free_test_checks_reachable_ollama(monkeypatch, capsys):
     assert "ollama" in capsys.readouterr().out
 
 
+def test_selected_providers_are_the_only_ones_called(monkeypatch, capsys):
+    monkeypatch.setattr(free_test, "OllamaBackend",
+                        lambda name, model: FakeBackend(name, available=False))
+    groq = FakeBackend("groq")
+    api = FakeBackend("gemini-api")
+
+    assert free_test.command({"groq": groq, "gemini-api": api}, {},
+                             ["gemini-api", "gemini-api"]) == 0
+
+    assert api.prompts == ["Reply with: ok"]
+    assert not groq.prompts
+    assert "gemini-api" in capsys.readouterr().out
+
+
+def test_selected_unavailable_provider_returns_failure(monkeypatch, capsys):
+    monkeypatch.setattr(free_test, "OllamaBackend",
+                        lambda name, model: FakeBackend(name, available=False))
+    api = FakeBackend("gemini-api", available=False)
+
+    assert free_test.command({"gemini-api": api}, {},
+                             ["gemini-api"]) == 1
+
+    output = capsys.readouterr().out
+    assert "gemini-api" in output and "not configured or unavailable" in output
+    assert not api.prompts
+
+
+def test_selected_out_provider_is_skipped_without_failure(monkeypatch, capsys):
+    monkeypatch.setattr(free_test, "OllamaBackend",
+                        lambda name, model: FakeBackend(name, available=False))
+    cli_backend = FakeBackend("gemini")
+
+    assert free_test.command({"gemini": cli_backend}, {}, ["gemini"],
+                             {"gemini"}) == 0
+
+    output = capsys.readouterr().out
+    assert "gemini" in output and "marked out; skipped" in output
+    assert not cli_backend.prompts
+
+
 def test_free_test_cli_command_is_wired(monkeypatch, capsys):
     monkeypatch.setattr(free_test, "OllamaBackend",
                         lambda name, model: FakeBackend(name, available=False))
@@ -85,3 +125,24 @@ def test_free_test_cli_command_is_wired(monkeypatch, capsys):
                       config.Config())
     assert result == 0
     assert "groq" in capsys.readouterr().out
+
+
+def test_free_test_cli_accepts_repeated_provider_selection(monkeypatch, capsys):
+    monkeypatch.setattr(free_test, "OllamaBackend",
+                        lambda name, model: FakeBackend(name, available=False))
+    api = FakeBackend("gemini-api")
+    groq = FakeBackend("groq")
+    result = cli.main(["free", "test", "--provider", "gemini-api",
+                       "--provider", "gemini-api"],
+                      {"gemini-api": api, "groq": groq}, config.Config())
+    assert result == 0
+    assert api.prompts == ["Reply with: ok"]
+    assert not groq.prompts
+
+
+def test_free_test_cli_rejects_unknown_provider_before_network(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["free", "test", "--provider", "unknown-provider"],
+                 {"groq": FakeBackend("groq")}, config.Config())
+    assert exc.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err

@@ -268,7 +268,7 @@ def test_free_backends_are_registered_and_routed_before_paid_plans():
 
 
 def test_all_default_routes_try_free_backends_before_paid_plans():
-    free = {"openrouter", "groq", "cloudflare", "zai", "gemini-api",
+    free = {"openrouter", "groq", "cloudflare", "zai", "gemini-api", "gemini",
             "mistral", "nvidia", "ollama"}
     paid = {"claude", "codex", "grok"}
     for route in config.DEFAULT_ROUTE.values():
@@ -278,6 +278,17 @@ def test_all_default_routes_try_free_backends_before_paid_plans():
         assert max(free_positions) < min(paid_positions)
     assert config.DEFAULT_FREE_FAILOVER[0] == "openrouter"
     assert not ({"kimi", "qwen-coder", "deepseek"} & set(config.DEFAULT_FREE_FAILOVER))
+
+
+def test_gemini_cli_and_developer_api_are_distinct_backends():
+    from megazword.backends import GeminiBackend, default_backends
+    from megazword.free_apis import OpenAICompatibleBackend
+    backends = default_backends()
+    assert isinstance(backends["gemini"], GeminiBackend)
+    assert isinstance(backends["gemini-api"], OpenAICompatibleBackend)
+    assert backends["gemini"].name != backends["gemini-api"].name
+    assert all("gemini-api" in route and "gemini" in route
+               for route in config.DEFAULT_ROUTE.values())
 
 
 def test_openrouter_fallback_is_free_even_without_config_override():

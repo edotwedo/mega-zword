@@ -454,7 +454,7 @@ class AgentBackend(Backend):
                     {"role": "user", "content": prompt}]
         text_mode = self.text_protocol or isinstance(self.model_backend, OllamaBackend)
         compacted = False
-        for _ in range(self.max_steps):
+        for step in range(self.max_steps):
             messages.extend(self._checkpoint())
             if len(json.dumps(messages)) > 24000:
                 # Completed tool exchanges need not be resent indefinitely. Keep
@@ -472,6 +472,12 @@ class AgentBackend(Backend):
             if remaining <= 0:
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
             sent = _scrub_values(messages) if self.trains_on_data else messages
+            sent = list(sent)
+            sent[0] = {**sent[0], "content": sent[0]["content"] + (
+                f"\nExecution budget: {self.max_steps - step} tool steps remaining. "
+                "Batch related file reads, make the requested edits before running tests, "
+                "run focused tests once, then finish. Do not repeat inspections unless "
+                "needed to recover from a truncated result.")}
             try:
                 reply = self._model_call(sent, text_mode)
             except ToolsUnsupported:

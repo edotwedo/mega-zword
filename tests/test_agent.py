@@ -70,6 +70,22 @@ def test_step_cap(tmp_path):
     assert not result.ok and "step cap" in result.error and loop.request_count == 2
 
 
+def test_agent_prompt_tracks_remaining_tool_steps_without_rewriting_history(tmp_path):
+    (tmp_path / "source.txt").write_text("source")
+    loop, model = coding(tmp_path, [call("read_file", path="source.txt"),
+                                   call("finish", summary="done")], max_steps=2)
+
+    assert loop.run("inspect source").ok
+
+    first_system = model.seen[0][0][0]["content"]
+    second_system = model.seen[1][0][0]["content"]
+    assert "2 tool steps remaining" in first_system
+    assert "1 tool steps remaining" in second_system
+    # Runtime guidance is ephemeral; it does not accumulate in the conversation.
+    assert first_system.count("Execution budget:") == 1
+    assert second_system.count("Execution budget:") == 1
+
+
 @pytest.mark.parametrize("first", [ToolsUnsupported("tools"), {"content": "bad JSON"}])
 def test_text_fallback_and_bad_json_recovery(tmp_path, first):
     loop, model = coding(tmp_path, [first, {"content": '```json\n' + json.dumps({

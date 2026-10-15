@@ -62,18 +62,22 @@ def test_gemini_edit_is_excluded_and_explained(capsys):
 
 
 @pytest.mark.parametrize("installed", [False, True])
-def test_init_discovers_gemini_without_adding_routes(monkeypatch, capsys, installed):
+def test_init_keeps_gemini_identities_separate(monkeypatch, capsys, tmp_path, installed):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_AI_API_KEY", raising=False)
+    monkeypatch.setattr(config, "HOME", tmp_path)
     monkeypatch.setattr(backends.shutil, "which", lambda name:
                         "fake-gemini.cmd" if installed and name == "gemini" else None)
     monkeypatch.setattr(ollama, "reachable", lambda *args, **kwargs: False)
     assert cli.main(["init"], cfg=config.Config()) == 0
     output = capsys.readouterr().out
     assert f"installed AIs: {'gemini' if installed else 'none'}" in output
-    assert all("gemini" not in route for route in config.Config().route.values())
-    assert all("gemini" not in route for route in
-               config.load(config.HOME / "config.toml").route.values())
+    assert all("gemini" in route and "gemini-api" in route
+               for route in config.Config().route.values())
+    generated = config.load(config.HOME / "config.toml").route
+    assert all(("gemini" in route) is installed for route in generated.values())
+    assert all("gemini-api" not in route for route in generated.values())
 
 
 @pytest.mark.parametrize("installed", [False, True])

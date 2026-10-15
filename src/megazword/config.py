@@ -59,11 +59,11 @@ DEFAULT_ROUTE = {
     # keys/servers are filtered; paid CLI plans remain quality fallbacks.
     # Mistral and other train-on-data services lead easy tasks (Phil, 2026-10-11).
     "easy": ["mistral", "gemini-api", "openrouter", "groq", "cloudflare",
-             "zai", "nvidia", "ollama", "grok", "codex", "claude"],
+             "zai", "nvidia", "ollama", "gemini", "grok", "codex", "claude"],
     "medium": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-               "mistral", "nvidia", "ollama", "codex", "grok", "claude"],
+               "mistral", "nvidia", "ollama", "gemini", "codex", "grok", "claude"],
     "hard": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-             "mistral", "nvidia", "ollama", "claude", "codex", "grok"],
+             "mistral", "nvidia", "ollama", "gemini", "claude", "codex", "grok"],
 }
 
 DEFAULT_FREE = {

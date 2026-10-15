@@ -8,7 +8,7 @@ import re
 from .backends import Backend, OllamaBackend
 
 PROVIDERS = (
-    "groq", "gemini-api", "mistral", "cloudflare", "openrouter", "kimi",
+    "groq", "gemini-api", "gemini", "mistral", "cloudflare", "openrouter", "kimi",
     "deepseek", "qwen-coder", "nvidia", "zai", "ollama",
 )
 PROMPT = "Reply with: ok"
@@ -28,15 +28,25 @@ def _safe_reason(reason: str) -> str:
     return reason[:160] or "request failed"
 
 
-def command(backends: dict[str, Backend], free_models: dict[str, str]) -> int:
-    """Probe only configured APIs and a reachable local Ollama server."""
+def command(backends: dict[str, Backend], free_models: dict[str, str],
+            selected: list[str] | None = None, out: set[str] | None = None) -> int:
+    """Probe selected free identities; out-marked providers are never called."""
     ollama = OllamaBackend("ollama", model=free_models.get("ollama", "qwen2.5-coder:7b"))
     providers = {**backends, "ollama": ollama}
-    rows: list[tuple[str, bool, float, str]] = []
+    names = list(dict.fromkeys(PROVIDERS if selected is None else selected))
+    out = out or set()
+    rows: list[tuple[str, bool | None, float, str]] = []
+    explicitly_selected_failure = False
 
-    for name in PROVIDERS:
+    for name in names:
+        if name in out:
+            rows.append((name, None, 0, "marked out; skipped"))
+            continue
         backend = providers.get(name)
         if backend is None or not backend.available():
+            if selected is not None:
+                explicitly_selected_failure = True
+                rows.append((name, None, 0, "not configured or unavailable"))
             continue
         backend.timeout = min(backend.timeout, TIMEOUT_SECONDS)
         result = backend.run(PROMPT)
@@ -45,8 +55,10 @@ def command(backends: dict[str, Backend], free_models: dict[str, str]) -> int:
     print(f"{'provider':<14} {'status':<8} {'seconds':>7}  reason")
     print("-" * 58)
     for name, ok, seconds, reason in rows:
-        print(f"{name:<14} {'ok' if ok else 'failed':<8} {seconds:>7.1f}  {reason}")
+        status = "ok" if ok is True else "failed" if ok is False else "skipped"
+        print(f"{name:<14} {status:<8} {seconds:>7.1f}  {reason}")
     if not rows:
         print("No configured free providers found.")
         return 0
-    return 0 if all(ok for _, ok, _, _ in rows) else 1
+    return 0 if not explicitly_selected_failure and all(
+        ok is not False for _, ok, _, _ in rows) else 1
