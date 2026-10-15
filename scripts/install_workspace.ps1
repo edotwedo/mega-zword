@@ -18,7 +18,9 @@ $desktop = [Environment]::GetFolderPath('Desktop')
 Shortcut $desktop 'Restore Hive' 'restore'
 Shortcut $desktop 'Catch me up - terminal' 'catch-up'
 Shortcut $desktop 'Enroll my face' 'enroll'
-Shortcut ([Environment]::GetFolderPath('Startup')) 'Hive owner camera' 'watch'
+# Replace our existing camera-only Startup shortcut with the restore+camera bootstrap.
+# Creating a shortcut does not run it; live restoration is deferred to Phil's restart.
+Shortcut ([Environment]::GetFolderPath('Startup')) 'Hive owner camera' 'boot'
 $appEntry = Join-Path $PSScriptRoot 'desktop_entry.pyw'
 $startMenu = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs'
 $backup = Join-Path $env:USERPROFILE '.megazword\workspace\shortcut-backups'

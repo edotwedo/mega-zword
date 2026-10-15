@@ -14,13 +14,28 @@ Phil's scope is a terminal workflow, separate from dashboard saved status cards.
   Combined with active Codex writer locks and Grok registry: six saved seats.
 - Data stays under `~/.megazword/workspace/`. Closed seats remain saved through
   reboot. Exact IDs replace ambiguous `--last`/`--continue` restores.
-- Restore uses the existing **ai workshop** virtual desktop (or creates **Hive**
-  if no such desktop exists) and a named Terminal window. Configured tab order,
+- Restore now uses a dedicated **Hive** virtual desktop, never the existing
+  **ai workshop** desktop. It waits for Windows to confirm the desktop switch,
+  then makes one `wt -w new` invocation containing all eligible saved tabs.
+  This requests a fresh Terminal window regardless of existing window names.
+  Configured tab order,
   titles and colors survive restoration. Capturing drag-reorders, original tab
   color-picker choices, arbitrary panes and pixel positions is not implemented.
 - Already-open writers are skipped. Existing unmanaged tabs are not controlled
   through keystroke injection. Close them when ready and use **Restore Hive** to
   get managed tabs. This chat was not terminated to demonstrate restoration.
+- The existing Startup shortcut now runs **boot**, not camera-only **watch**:
+  refresh the snapshot, request the full saved restore, then run the owner
+  watcher. Startup refresh failure falls back to the saved roster; Explorer or
+  Terminal launch failures get up to three attempts. Installing the shortcut
+  does not execute it. This is an interactive login workflow, after Windows
+  sign-in, not a pre-login service.
+- Saved PIDs are checked against process creation time/client name so recycled
+  PIDs after reboot do not hide seats. A frozen manifest gives each launch batch
+  stable session/index mappings even if a five-minute snapshot changes.
+- Missing folders/clients are recorded per seat instead of aborting other tabs.
+  Local diagnostics: `boot-status.json` and `restore-status.json`. Launch request
+  counts alone are not proof that every native client started successfully.
 
 ## Return summaries and owner recognition
 
@@ -36,14 +51,18 @@ Phil's scope is a terminal workflow, separate from dashboard saved status cards.
 - Phil clarified **only him**, not his mother, children or other faces. The old
   dashboard generic-face camera at 8768 was turned off. New identity enrollment
   is deliberately manual: **Enroll my face**, only Phil in view, SPACE for five
-  poses, ESC to cancel. Enrollment has not been completed by the agent.
+  poses, ESC to cancel. Phil completed enrollment at 08:58:39 PT. The encrypted
+  template was saved and the watcher started; a local `owner return` event was
+  subsequently observed. Phil reported only one missing client opened, which
+  matches the old behavior of skipping live seats and reusing ai workshop.
 - YuNet detects faces; SFace compares local embeddings at cosine threshold .50.
   Templates are encrypted for Phil's Windows account using DPAPI. No frames or
   plaintext templates are saved, uploaded or sent to models. The local watcher
   starts after enrollment and through its Startup shortcut on later logins.
 - Existing 15-second absence / two-second stable return / 120-second cooldown
-  gates are retained. Physical owner/non-owner acceptance still needs testing
-  after Phil enrolls. Recognition is a convenience, not a security boundary.
+  gates are retained. Non-owner rejection and the complete restored-terminal
+  return workflow still need physical testing. Recognition is a convenience,
+  not a security boundary.
 - Public assets were downloaded from pinned OpenCV Zoo commit
   `47534e27c9851bb1128ccc0102f1145e27f23f98` and VirtualDesktopAccessor release
   `2024-12-16-windows11`. Model hashes match their Git LFS pointers; download
@@ -64,6 +83,23 @@ Phil's scope is a terminal workflow, separate from dashboard saved status cards.
 - A sidebar build label distinguishes this deployment from older servers.
 
 ## Validation
+
+**Latest correction:** unit tests mock all desktop switches, native launches,
+and camera startup. Actual new-window/desktop/login behavior is intentionally
+unverified until Phil's planned restart around **90% Codex five-hour usage**.
+Do not reopen windows, switch desktops or restart to test it now. No automatic
+restart or threshold timer was created. Phil drives interactive steps.
+
+- Focused workspace/presence/briefing suite: 50 passed. This includes all-six
+  batch launch, ai workshop exclusion, stale PID rejection, login ordering,
+  snapshot fallback/retry, and frozen-manifest regressions.
+- Full suite for this correction: **1172 passed in 179.25s**, 108 existing
+  deprecation warnings. `git diff --check` passed. No live Terminal launch,
+  desktop switch, camera/app restart or reboot was used for these checks.
+- Startup shortcut readback confirms a windowless Python **boot** action; it
+  was installed without invoking boot or restore.
+
+Earlier validation (before the fresh-window/login correction):
 
 - Full suite: 1158 passed in 156.62s, 108 existing deprecation warnings.
 - Subsequent focused suite: 145 passed (includes additional workspace regressions
@@ -97,3 +133,17 @@ switch desktops. No further UI actions were taken after his objection. New
 AGENTS rule: warn first and wait for readiness before tests move keyboard focus,
 open test windows or switch desktops. His mention of a spare computer does not
 establish any remote setup, installation or authorization on that machine.
+
+## Deferred reboot test: prompt Phil; do not take over
+
+1. When Phil is ready near 90% usage, save each active seat's state and refresh
+   the snapshot. Coordinate any active work before he restarts Windows.
+2. Phil restarts and signs in. Verify one fresh Terminal window with all six
+   saved tabs on the dedicated **Hive** desktop, correct native session IDs,
+   models, tab order and configured colors. Inspect individual failure reasons
+   if any saved seat cannot resume.
+3. Read boot/restore diagnostics and compare with actual native client state;
+   do not infer success from launch-request counts.
+4. Test Phil's 15-second absence/two-second return and the queued summaries in
+   managed tabs, including a busy client and an unfinished input draft. Test a
+   non-owner return separately if Phil chooses. Verify helpers stay invisible.

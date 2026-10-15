@@ -47,10 +47,10 @@ class ReturnQueue:
                 and now - max(self.last_key, self.last_output) >= 3)
 
 
-def run_tab(index, root):
+def run_tab(index, root, manifest=None):
     import msvcrt
     from winpty import PtyProcess
-    tabs = ws.load(root / 'snapshot.json').get('tabs', [])
+    tabs = ws.load(manifest or root / 'snapshot.json').get('tabs', [])
     if index is None or not 0 <= index < len(tabs):
         raise ValueError('Unknown saved tab')
     tab = tabs[index]
@@ -63,12 +63,14 @@ def run_tab(index, root):
         if tab['client'] == 'codex' and ws.session_locked(tab['session']):
             print('This conversation is already open; skipped.')
             return 0
-        ws.save(marker, {'pid': os.getpid(), 'started': time.time()})
+        import psutil
+        process_started = psutil.Process().create_time()
+        ws.save(marker, {'pid': os.getpid(), 'started': time.time(), 'process_started': process_started})
         size = shutil.get_terminal_size()
         submitted = time.time()
         child = PtyProcess.spawn(ws.command(tab), cwd=tab['cwd'], dimensions=(size.lines, size.columns))
         queue = ReturnQueue(ws.load(root / 'return.json').get('event', 0))
-        ws.save(marker, {'pid': os.getpid(), 'ready': time.time()})
+        ws.save(marker, {'pid': os.getpid(), 'ready': time.time(), 'process_started': process_started})
 
         def output():
             while child.isalive():

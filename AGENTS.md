@@ -14,6 +14,9 @@ repo is the only handoff. Nothing lives only in a chat.
   windows, switching Windows desktops, or moving keyboard focus, tell Phil what
   will happen and wait until he is ready. He may be typing in another app.
   Background checks and file edits do not need keyboard handoff.
+  Phil normally drives interactive setup from short prompts; take over the UI
+  only when he asks. The terminal reboot/restore test is explicitly deferred
+  until Phil is ready near 90% Codex usage; never reboot at a meter threshold.
 - **Usage first, every time (Phil).** Before you start, claim or hand out any work: run `megazword usage`
   (on Phil's PC) or read the usage board in Q
   (https://github.com/edotwedo/workshop/pull/33#issuecomment-6115098816; over 30 minutes old means the

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import uuid
 
 from .filelock import locked, write_atomic
 
@@ -59,14 +61,38 @@ def session_locked(session_id, user_home=None):
     return False
 
 
-def alive(pid):
+def alive(pid, started=None, name=None):
     if not isinstance(pid, int) or pid <= 0:
         return False
     import psutil
     try:
-        return psutil.Process(int(pid)).is_running()
+        process = psutil.Process(int(pid))
+        return (process.is_running()
+                and (started is None or abs(process.create_time() - started) < 3)
+                and (name is None or process.name().lower() == name.lower()))
     except (psutil.Error, TypeError, ValueError):
         return False
+
+
+def registered_start(item):
+    try:
+        if item.get('startedAt'):
+            return float(item['startedAt']) / 1000
+        return datetime.fromisoformat(item['opened_at'].replace('Z', '+00:00')).timestamp()
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def runtime_alive(runtime):
+    # Old PIDs can belong to unrelated processes after a restart.
+    if not runtime.get('pid'):
+        return False
+    started = runtime.get('process_started')
+    if started is None:
+        import psutil
+        if runtime.get('ready', runtime.get('started', 0)) < psutil.boot_time():
+            return False
+    return alive(runtime.get('pid'), started=started)
 
 
 def discover(user_home=None):
@@ -82,19 +108,21 @@ def discover(user_home=None):
                     found.append(dict(client='codex', session=sid, cwd=cwd.removeprefix('\\\\?\\'),
                                       model=model, log=rollout, active=True))
     for item in load(user_home / '.grok/active_sessions.json', []):
-        if alive(item.get('pid')):
+        started = registered_start(item)
+        if alive(item.get('pid'), started=started, name='grok.exe'):
             sid, cwd = item['session_id'], item['cwd']
             from urllib.parse import quote
             folder = user_home / '.grok/sessions' / quote(cwd, safe='') / sid
             meta = load(folder / 'summary.json')
             found.append(dict(client='grok', session=sid, cwd=cwd,
                               model=meta.get('current_model_id'), log=str(folder / 'updates.jsonl'),
-                              active=True, pid=item['pid']))
+                              active=True, pid=item['pid'], pid_started=started))
     for path in (user_home / '.claude/sessions').glob('*.json'):
         item = load(path)
-        if item.get('kind') == 'interactive' and alive(item.get('pid')):
+        started = registered_start(item)
+        if item.get('kind') == 'interactive' and alive(item.get('pid'), started=started, name='claude.exe'):
             found.append(dict(client='claude', session=item['sessionId'], cwd=item['cwd'],
-                              active=True, pid=item['pid'], status_file=str(path)))
+                              active=True, pid=item['pid'], pid_started=started, status_file=str(path)))
     return found
 
 
@@ -213,7 +241,7 @@ def desktop(root):
     for i in range(count):
         name = ctypes.create_string_buffer(256)
         dll.GetDesktopName(i, name, 256)
-        if name.value.lower() in (b'hive', b'ai workshop'):
+        if name.value == b'Hive':
             target = i
             break
     if target is None:
@@ -224,44 +252,112 @@ def desktop(root):
             raise OSError('Could not name the Hive desktop')
     if dll.GoToDesktopNumber(target) < 0:
         raise OSError('Could not switch to the Hive desktop')
+    deadline = time.monotonic() + 5
+    while dll.GetCurrentDesktopNumber() != target:
+        if time.monotonic() >= deadline:
+            raise OSError('Windows did not finish switching to the Hive desktop')
+        time.sleep(.1)
     return target
 
 
 def restore(root=None, preview=False):
     root = root or home()
+    if preview:
+        return _restore(root, preview=True)
+    with locked(root / 'restore-batch', timeout=0) as acquired:
+        if not acquired:
+            return []
+        return _restore(root)
+
+
+def terminal_batch(plans):
+    """One invocation, always a new window, containing every planned tab."""
+    args = ['wt.exe', '-w', 'new']
+    for i, plan in enumerate(plans):
+        if i:
+            args.append(';')
+        args.extend(plan[3:])
+    return args
+
+
+def _restore(root, preview=False):
+    root = root or home()
     tabs = load(root / 'snapshot.json').get('tabs', [])
     if not tabs:
         raise ValueError('No saved terminal sessions. Run workspace snapshot first.')
-    plans = []
+    plans, selected, skipped = [], [], []
     for i, tab in enumerate(tabs):
         # Check again at launch. Never resume over a live writer.
         active = (session_locked(tab['session']) if tab['client'] == 'codex'
-                  else alive(tab.get('pid')))
+                  else alive(tab.get('pid'), started=tab.get('pid_started'), name=tab['client'] + '.exe'))
         runtime = load(root / f"tab-{tab['session']}.json")
-        if active or alive(runtime.get('pid')):
+        if active or runtime_alive(runtime):
+            skipped.append({'session': tab['session'], 'reason': 'already open'})
             continue
         if not Path(tab['cwd']).is_dir():
+            skipped.append({'session': tab['session'], 'reason': 'folder missing'})
             continue
-        command(tab)  # validate availability before switching desktop
-        args = ['wt.exe', '-w', 'Hive', 'new-tab', '--title', tab['title'],
+        try:
+            command(tab)  # validate availability before switching desktop
+        except ValueError as exc:
+            skipped.append({'session': tab['session'], 'reason': str(exc)})
+            continue
+        args = ['wt.exe', '-w', 'new', 'new-tab', '--title', tab['title'],
                 '--suppressApplicationTitle', '--tabColor', tab['color'], '-d', tab['cwd'],
                 str(Path(sys.executable).with_name('python.exe')) if Path(sys.executable).name.lower() == 'pythonw.exe' else sys.executable,
-                '-m', 'megazword.workspace', 'tab', str(i)]
+                '-m', 'megazword.workspace', 'tab', str(len(selected))]
         plans.append(args)
+        selected.append(tab)
     if not preview and plans:
-        desktop(root)
-        env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1]))
+        target = desktop(root)
+        # Each batch gets an immutable roster: snapshot updates cannot change its tab indexes.
+        manifest = root / 'launches' / f'{uuid.uuid4().hex}.json'
+        save(manifest, {'tabs': selected})
         for args in plans:
-            subprocess.run(args, env=env, check=True,
-                           creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            args += ['--manifest', str(manifest)]
+        env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1]))
+        subprocess.run(terminal_batch(plans), env=env, check=True,
+                       creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        save(root / 'restore-status.json', {'time': time.time(), 'desktop': target,
+             'opened': [t['session'] for t in selected], 'skipped': skipped})
+    elif not preview:
+        save(root / 'restore-status.json', {'time': time.time(), 'opened': [], 'skipped': skipped})
     return plans
+
+
+def boot(root=None):
+    """Login entry point: restore saved tabs, then keep owner-return watching alive."""
+    root = root or home()
+    with locked(root / 'login-bootstrap', timeout=0) as acquired:
+        if not acquired:
+            return 0
+        warnings = []
+        try:
+            snapshot(root)
+        except Exception as exc:
+            warnings.append(f'Snapshot refresh: {exc}')
+        for attempt in range(3):
+            try:
+                plans = restore(root)
+                save(root / 'boot-status.json', {'state': 'launch requested' if plans else 'nothing to launch',
+                     'time': time.time(), 'tabs_requested': len(plans), 'warnings': warnings})
+                break
+            except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                warnings.append(f'Restore attempt {attempt+1}: {exc}')
+                if attempt < 2:
+                    time.sleep(10)  # Explorer and the Terminal alias may still be starting.
+        else:
+            save(root / 'boot-status.json', {'state': 'restore failed', 'time': time.time(), 'warnings': warnings})
+        from .face_identity import watch
+        return watch(root)
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['snapshot', 'restore', 'status', 'tab', 'watch', 'enroll', 'catch-up'])
+    parser.add_argument('action', choices=['snapshot', 'restore', 'status', 'tab', 'watch', 'enroll', 'catch-up', 'boot'])
     parser.add_argument('index', nargs='?', type=int)
     parser.add_argument('--preview', action='store_true')
+    parser.add_argument('--manifest', type=Path)
     args = parser.parse_args(argv)
     root = home()
     if args.action == 'snapshot':
@@ -276,7 +372,9 @@ def main(argv=None):
         save(root / 'return.json', {'event': time.time()})
     elif args.action == 'tab':
         from .workspace_terminal import run_tab
-        return run_tab(args.index, root)
+        return run_tab(args.index, root, manifest=args.manifest)
+    elif args.action == 'boot':
+        return boot(root)
     else:
         from .face_identity import enroll, watch
         return enroll(root) if args.action == 'enroll' else watch(root)

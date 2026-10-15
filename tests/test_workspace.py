@@ -10,6 +10,120 @@ from megazword.workspace_terminal import ReturnQueue, escape_input
 from megazword.face_identity import matches
 
 
+def test_all_six_saved_tabs_launch_in_one_fresh_window(tmp_path, monkeypatch):
+    rows = [dict(tab(), session=f'seat-{i}', cwd=str(tmp_path), title=f'Seat {i}') for i in range(6)]
+    w.save(tmp_path / 'snapshot.json', {'tabs': rows})
+    monkeypatch.setattr(w, 'session_locked', lambda _: False)
+    monkeypatch.setattr(w, 'command', lambda _: ['fake-cli'])
+    calls = []
+    monkeypatch.setattr(w, 'desktop', lambda _: calls.append('desktop') or 2)
+    monkeypatch.setattr(w.subprocess, 'run', lambda args, **kw: calls.append((args, kw)))
+    plans = w.restore(tmp_path)
+    assert len(plans) == 6
+    assert calls[0] == 'desktop' and len(calls) == 2
+    args, options = calls[1]
+    assert args[:3] == ['wt.exe', '-w', 'new']
+    assert args.count('new-tab') == 6 and args.count(';') == 5
+    assert args.count('--tabColor') == 6
+    assert options['check'] is True
+    assert options['creationflags'] == getattr(w.subprocess, 'CREATE_NO_WINDOW', 0)
+    manifest = plans[0][-1]
+    assert all(plan[-2:] == ['--manifest', manifest] for plan in plans)
+    # A timer snapshot cannot change the sessions or index order of a pending batch.
+    w.save(tmp_path / 'snapshot.json', {'tabs': list(reversed(rows))})
+    assert [t['session'] for t in w.load(manifest)['tabs']] == [f'seat-{i}' for i in range(6)]
+    assert w.load(tmp_path / 'restore-status.json')['opened'] == [f'seat-{i}' for i in range(6)]
+
+
+def test_missing_seat_does_not_prevent_other_saved_seats_restoring(tmp_path, monkeypatch):
+    rows = [dict(tab(), session='missing', cwd=str(tmp_path / 'gone')),
+            dict(tab(), session='valid', cwd=str(tmp_path))]
+    w.save(tmp_path / 'snapshot.json', {'tabs': rows})
+    monkeypatch.setattr(w, 'session_locked', lambda _: False)
+    monkeypatch.setattr(w, 'command', lambda _: ['fake-cli'])
+    monkeypatch.setattr(w, 'desktop', lambda _: 1)
+    monkeypatch.setattr(w.subprocess, 'run', lambda *a, **kw: None)
+    assert len(w.restore(tmp_path)) == 1
+    status = w.load(tmp_path / 'restore-status.json')
+    assert status['opened'] == ['valid']
+    assert status['skipped'] == [{'session': 'missing', 'reason': 'folder missing'}]
+
+
+def test_dedicated_desktop_does_not_reuse_ai_workshop(tmp_path, monkeypatch):
+    class Function:
+        def __init__(self, fn):
+            self.fn = fn
+        def __call__(self, *args):
+            return self.fn(*args)
+    calls = []
+    def name(index, buffer, size):
+        buffer.value = [b'Main', b'ai workshop'][index]
+        return 0
+    dll = SimpleNamespace(
+        GetDesktopCount=Function(lambda: 2), GetDesktopName=Function(name),
+        CreateDesktop=Function(lambda: calls.append('create') or 2),
+        SetDesktopName=Function(lambda i, name: calls.append((i, name)) or 0),
+        GetCurrentDesktopNumber=Function(lambda: 2),
+        GoToDesktopNumber=Function(lambda i: calls.append(('switch', i)) or 0))
+    monkeypatch.setattr(w.ctypes, 'CDLL', lambda _: dll)
+    assert w.desktop(tmp_path) == 2
+    assert calls == ['create', (2, b'Hive'), ('switch', 2)]
+
+
+def test_stale_pid_after_boot_cannot_hide_a_saved_session(monkeypatch):
+    import sys
+    process = SimpleNamespace(is_running=lambda: True, create_time=lambda: 2000,
+                              name=lambda: 'grok.exe')
+    monkeypatch.setitem(sys.modules, 'psutil', SimpleNamespace(
+        Process=lambda _: process, boot_time=lambda: 1900, Error=OSError))
+    assert not w.alive(123, started=1000, name='grok.exe')
+    assert not w.runtime_alive({'pid': 123, 'ready': 1000})
+    assert w.alive(123, started=2000, name='grok.exe')
+    assert not w.alive(123, started=2000, name='claude.exe')
+
+
+def test_login_restores_before_starting_owner_watcher(tmp_path, monkeypatch):
+    from megazword import face_identity
+    calls = []
+    monkeypatch.setattr(w, 'snapshot', lambda root: calls.append('snapshot'))
+    monkeypatch.setattr(w, 'restore', lambda root: calls.append('restore') or [[], []])
+    monkeypatch.setattr(face_identity, 'watch', lambda root: calls.append('watch') or 0)
+    assert w.boot(tmp_path) == 0
+    assert calls == ['snapshot', 'restore', 'watch']
+    status = w.load(tmp_path / 'boot-status.json')
+    assert status['state'] == 'launch requested' and status['tabs_requested'] == 2
+
+
+def test_login_can_use_saved_roster_when_snapshot_refresh_fails(tmp_path, monkeypatch):
+    from megazword import face_identity
+    def broken(_):
+        raise OSError('native registry not ready')
+    monkeypatch.setattr(w, 'snapshot', broken)
+    attempts = []
+    def restore(_):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise OSError('Explorer not ready')
+        return [[]]
+    monkeypatch.setattr(w, 'restore', restore)
+    delays = []
+    monkeypatch.setattr(w.time, 'sleep', delays.append)
+    monkeypatch.setattr(face_identity, 'watch', lambda root: 0)
+    assert w.boot(tmp_path) == 0
+    assert len(attempts) == 2 and delays == [10]
+    status = w.load(tmp_path / 'boot-status.json')
+    assert status['state'] == 'launch requested'
+    assert 'native registry' in status['warnings'][0]
+
+
+def test_boot_command_dispatches_without_an_interactive_test(tmp_path, monkeypatch):
+    monkeypatch.setattr(w, 'home', lambda: tmp_path)
+    calls = []
+    monkeypatch.setattr(w, 'boot', lambda root: calls.append(root) or 0)
+    assert w.main(['boot']) == 0
+    assert calls == [tmp_path]
+
+
 def tab(client='codex'):
     return dict(client=client, session='abc-123', cwd='folder', title='My work',
                 model='chosen-model', color='#123456', active=True)
