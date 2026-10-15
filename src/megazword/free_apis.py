@@ -117,8 +117,10 @@ class OpenAICompatibleBackend(Backend):
         if not key or not self._env_ok():
             raise RuntimeError("API key not set")
         try:
+            from . import __version__
             headers = {"Authorization": f"Bearer {key}",
-                       "Content-Type": "application/json", **self.extra_headers}
+                       "Content-Type": "application/json",
+                       "User-Agent": f"megazword/{__version__}", **self.extra_headers}
             body = {"model": self.model, "messages": messages, "stream": False}
             if self.name == "cloudflare":
                 body.pop("stream")  # The default is a non-streaming response.
@@ -228,7 +230,7 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
                                 model=m.get("openrouter", "openrouter/free"),
                                 key_env="OPENROUTER_API_KEY", trains_on_data=True),
         OpenAICompatibleBackend("groq", base_url="https://api.groq.com/openai/v1",
-                                model=m.get("groq", "llama-3.3-70b-versatile"),
+                                model=m.get("groq", "openai/gpt-oss-20b"),
                                 key_env="GROQ_API_KEY"),
         OpenAICompatibleBackend(
             "cloudflare",

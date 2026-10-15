@@ -27,6 +27,7 @@ def test_request_and_answer(api, monkeypatch):
         assert request.get_method() == "POST"
         assert request.get_header("Authorization") == "Bearer secret-test-credential"
         assert request.get_header("Content-type") == "application/json"
+        assert request.get_header("User-agent") == "megazword/0.1.0b1"
         assert timeout == 7
         assert json.loads(request.data) == {
             "model": "test-model", "messages": [{"role": "user", "content": "hello ☃"}],
