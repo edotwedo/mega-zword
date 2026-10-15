@@ -1,6 +1,6 @@
 # Status
 
-**Active: none.**
+**Active: Testlog-14 (Codex), 2026-10-15 15:38 PT.** Phil confirms reboot created Hive desktop and screenshots show all six tabs. Fixing visible terminal control-reply pollution, whole-word Backspace and interrupted/repeated return prompts. Current Codex seat only: usage3% five-hour/17%week, Claude100%week, Grok92%week, Gemini out. No keyboard/focus takeover or live terminal relaunch without Phil's readiness. Next: raw modifier-aware console input, buffered protocol filtering, input/prompt serialization and targeted regressions; safely stage reload for managed tabs.
 
 **Restart preflight ready: Testlog-14 (Codex), 2026-10-15 11:44 PT.** Phil reports7% remaining and will perform a full Windows restart/update when this seat is done. Live meter confirms Codex93% five-hour used/16% weekly. Refreshed six-session snapshot (Grok, Claude, four Codex); all saved folders, native executable resolution, Python dependencies, encrypted owner template, face models and desktop helper verified without invoking a client. Startup shortcut readback confirms existing pythonw + boot action; snapshot task last result0. Source25c6491 is on local Gitea main; only CODEX_JOB.md intentionally untracked. No GUI control, restore or reboot performed. Next: Phil saves other work, restarts/updates Windows and signs in; then says "back". Read boot-status.json/restore-status.json and observe actual six-tab fresh window on dedicated Hive desktop. Current test remains unverified until that restart. Prompt Phil; he drives UI.
 
