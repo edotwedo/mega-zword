@@ -3,6 +3,7 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-15
+- Phil (Testlog-14 chat): save terminal session restoration metadata about every five minutes without model calls; provide one simple launcher restoring exact CLI sessions and asking for a brief current-work summary. Use a dedicated Windows desktop. Preserve tab colors/order when inexpensive; avoid costly cosmetic work.
 - Phil (Testlog-14 chat): the intended camera feature serves the terminal workflow: one terminal workspace with roughly 4–6 tabs, various instances/models, restored by a simple launcher, and a camera return asking each instance for a fresh short status/update/next steps across the terminal. A dashboard briefing is useful but does not satisfy this workflow. Background command popups must be silent and invisible. This corrects the narrower 2026-10-14 dashboard/saved-card interpretation.
 
 ## 2026-10-14
