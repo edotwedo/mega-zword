@@ -19,7 +19,7 @@ PROVIDERS = (
     "mistral", "cloudflare", "openrouter", "kimi",
     "deepseek", "qwen-coder", "openrouter-dots", "openrouter-nemotron-nano",
     "openrouter-nemotron-lightning", "openrouter-laguna-s", "openrouter-laguna-xs",
-    "nvidia", "zai", "ollama",
+    "nvidia", "nvidia-lightning", "zai", "tencent", "ollama",
 )
 PROMPT = "Reply with: ok"
 TIMEOUT_SECONDS = 30

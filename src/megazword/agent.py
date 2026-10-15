@@ -22,7 +22,8 @@ from .filelock import locked, write_atomic
 from .agent_quality import check_tests, is_test_path
 
 DEFAULT_PACE = {"gemini-api": 6, "mistral": 2, "groq": 2, "cloudflare": 1,
-                "openrouter": 3, "nvidia": 2, "zai": 2, "cerebras": 2, "ollama": 0}
+                "openrouter": 3, "nvidia": 2, "zai": 2, "cerebras": 2,
+                "tencent": 2, "ollama": 0}
 
 
 def pace_call(name, pace, deadline):
@@ -33,6 +34,8 @@ def pace_call(name, pace, deadline):
         name = "groq"  # Same API key; retain a conservative shared request pace.
     elif name == "gemini-api-31-lite":
         name = "gemini-api"  # Same project key; preserve safe shared pacing.
+    elif name.startswith("nvidia-"):
+        name = "nvidia"  # One Developer key; don't fan out concurrent requests.
     gap = pace.get(name, DEFAULT_PACE.get(name, 0))
     if gap <= 0:
         return

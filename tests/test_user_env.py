@@ -7,11 +7,14 @@ def test_fills_missing_known_keys_only():
     env = {"GROQ_API_KEY": ""}
     store = {"GROQ_API_KEY": "fake-groq", "MISTRAL_API_KEY": "fake-mistral",
              "CEREBRAS_API_KEY": "fake-cerebras",
+             "TENCENT_TOKENHUB_API_KEY": "fake-tencent",
              "SOME_OTHER_KEY": "nope"}
     copied = config.load_user_env(read=store.get, env=env)
-    assert sorted(copied) == ["CEREBRAS_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY"]
+    assert sorted(copied) == ["CEREBRAS_API_KEY", "GROQ_API_KEY", "MISTRAL_API_KEY",
+                              "TENCENT_TOKENHUB_API_KEY"]
     assert env == {"GROQ_API_KEY": "fake-groq", "MISTRAL_API_KEY": "fake-mistral",
-                   "CEREBRAS_API_KEY": "fake-cerebras"}
+                   "CEREBRAS_API_KEY": "fake-cerebras",
+                   "TENCENT_TOKENHUB_API_KEY": "fake-tencent"}
 
 
 def test_does_not_overwrite_set_vars():

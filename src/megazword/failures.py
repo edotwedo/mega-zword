@@ -30,6 +30,7 @@ LOGIN_FIX = {
     "nvidia": "set NVIDIA_API_KEY (see `megazword doctor`)",
     "cerebras": "set CEREBRAS_API_KEY (see `megazword doctor`)",
     "mistral": "set MISTRAL_API_KEY (see `megazword doctor`)",
+    "tencent": "set TENCENT_TOKENHUB_API_KEY (see `megazword doctor`)",
 }
 
 _AUTH = re.compile(

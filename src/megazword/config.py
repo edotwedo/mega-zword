@@ -59,11 +59,11 @@ DEFAULT_ROUTE = {
     # keys/servers are filtered; paid CLI plans remain quality fallbacks.
     # Mistral and other train-on-data services lead easy tasks (Phil, 2026-10-11).
     "easy": ["mistral", "gemini-api", "openrouter", "groq", "cloudflare",
-             "zai", "nvidia", "ollama", "gemini", "grok", "codex", "claude"],
+             "zai", "nvidia", "nvidia-lightning", "ollama", "gemini", "grok", "codex", "claude"],
     "medium": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-               "mistral", "nvidia", "ollama", "gemini", "codex", "grok", "claude"],
+               "mistral", "nvidia", "nvidia-lightning", "ollama", "gemini", "codex", "grok", "claude"],
     "hard": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-             "mistral", "nvidia", "ollama", "gemini", "claude", "codex", "grok"],
+             "mistral", "nvidia", "nvidia-lightning", "ollama", "gemini", "claude", "codex", "grok"],
 }
 
 DEFAULT_FREE = {
@@ -89,6 +89,8 @@ DEFAULT_FREE = {
     "gemini-api-31-lite": "gemini-3.1-flash-lite",
     "cerebras": "qwen-3.8-27b",
     "nvidia": "meta/llama-3.1-8b-instruct",
+    "nvidia-lightning": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "tencent": "deepseek-v4-pro",
     # The free account returns 429/code 1300 for Mistral Small but allows
     # Ministral 3B under the same key and API limits (verified 2026-10-14).
     "mistral": "ministral-3b-2512",
@@ -97,7 +99,7 @@ DEFAULT_FREE = {
 DEFAULT_FREE_FAILOVER = ["openrouter", "groq", "groq-120b", "groq-qwen",
                          "groq-allam", "cloudflare", "zai", "gemini-api",
                          "gemini-api-31-lite",
-                         "mistral", "nvidia", "ollama", "openrouter-dots",
+                         "mistral", "nvidia", "nvidia-lightning", "ollama", "openrouter-dots",
                          "openrouter-nemotron-nano", "openrouter-nemotron-lightning",
                          "openrouter-laguna-s", "openrouter-laguna-xs"]
 
@@ -108,6 +110,7 @@ USER_ENV_KEYS = (
     "GROQ_API_KEY", "OPENROUTER_API_KEY", "CLOUDFLARE_API_TOKEN",
     "CLOUDFLARE_ACCOUNT_ID", "ZAI_API_KEY", "GOOGLE_AI_API_KEY",
     "NVIDIA_API_KEY", "MISTRAL_API_KEY", "CEREBRAS_API_KEY",
+    "TENCENT_TOKENHUB_API_KEY",
 )
 
 

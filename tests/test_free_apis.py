@@ -287,7 +287,8 @@ def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
     assert "secret-test-credential" not in output
 
 
-NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "mistral")
+NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "nvidia-lightning",
+            "mistral")
 
 
 def test_free_backends_are_registered_and_routed_before_paid_plans():
@@ -303,6 +304,13 @@ def test_free_backends_are_registered_and_routed_before_paid_plans():
     assert backends["mistral"].trains_on_data
     assert not backends["cloudflare"].trains_on_data
     assert not backends["nvidia"].trains_on_data
+    assert not backends["nvidia-lightning"].trains_on_data
+    assert backends["tencent"].model == "deepseek-v4-pro"
+    assert backends["tencent"].key_env == "TENCENT_TOKENHUB_API_KEY"
+    assert backends["tencent"].base_url == "https://tokenhub-intl.tencentcloudmaas.com/v1"
+    assert backends["nvidia-lightning"].model == "nvidia/nemotron-3.5-lightning-30b-a3b"
+    assert backends["nvidia-lightning"].key_env == backends["nvidia"].key_env
+    assert backends["nvidia-lightning"].base_url == backends["nvidia"].base_url
     assert backends["openrouter"].trains_on_data
     assert "cerebras" in backends
     assert all("cerebras" not in names for names in config.DEFAULT_ROUTE.values())
@@ -344,6 +352,27 @@ def test_verified_openrouter_model_identities_keep_one_key_and_exact_free_ids():
     assert all(name in config.DEFAULT_FREE_FAILOVER for name in models)
 
 
+def test_nvidia_lightning_alias_uses_verified_free_endpoint_and_shared_pacing():
+    from megazword.free_apis import free_backends
+    backend = {b.name: b for b in free_backends(config.DEFAULT_FREE)}["nvidia-lightning"]
+    assert backend.model == "nvidia/nemotron-3.5-lightning-30b-a3b"
+    assert backend.key_env == "NVIDIA_API_KEY"
+    assert "nvidia-lightning" in config.DEFAULT_FREE_FAILOVER
+    assert all("nvidia-lightning" in route for route in config.DEFAULT_ROUTE.values())
+
+
+def test_nvidia_model_aliases_share_provider_pacing_file(tmp_path, monkeypatch):
+    from megazword import agent
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setattr(agent.time, "sleep", lambda _: None)
+    deadline = agent.time.monotonic() + 5
+    pace = {"nvidia": 0.001}
+    agent.pace_call("nvidia", pace, deadline)
+    agent.pace_call("nvidia-lightning", pace, deadline)
+    assert (tmp_path / "agent-pace" / "nvidia.json").exists()
+    assert not (tmp_path / "agent-pace" / "nvidia-lightning.json").exists()
+
+
 def test_successful_response_records_provider_request_quota(api, monkeypatch):
     class Response(io.BytesIO):
         headers = {"x-ratelimit-remaining-requests": "42",
@@ -369,7 +398,7 @@ def test_low_request_quota_is_persisted_until_header_reset(api, monkeypatch, tmp
 
 def test_all_default_routes_try_free_backends_before_paid_plans():
     free = {"openrouter", "groq", "cloudflare", "zai", "gemini-api", "gemini",
-            "mistral", "nvidia", "ollama"}
+            "mistral", "nvidia", "tencent", "ollama"}
     paid = {"claude", "codex", "grok"}
     for route in config.DEFAULT_ROUTE.values():
         free_positions = [i for i, name in enumerate(route) if name in free]
@@ -445,6 +474,32 @@ def test_cerebras_free_model_defaults_and_override(monkeypatch):
     assert cerebras.key_env == "CEREBRAS_API_KEY"
     models["cerebras"] = "gpt-oss-120b"
     assert {b.name: b for b in free_backends(models)}["cerebras"].model == "gpt-oss-120b"
+
+
+def test_tencent_tokenhub_request_uses_deepseek_v4_pro_singapore_and_key(monkeypatch):
+    from megazword.free_apis import free_backends
+    monkeypatch.setenv("TENCENT_TOKENHUB_API_KEY", "secret-test-credential")
+    backend = {b.name: b for b in free_backends(config.DEFAULT_FREE)}["tencent"]
+    seen = []
+
+    def fake(request, timeout):
+        seen.append(request)
+        return reply("ok")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    result = backend.run("Reply with ok")
+    assert result.ok and result.text == "ok"
+    assert seen[0].full_url == (
+        "https://tokenhub-intl.tencentcloudmaas.com/v1/chat/completions")
+    assert seen[0].get_header("Authorization") == "Bearer secret-test-credential"
+    assert json.loads(seen[0].data)["model"] == "deepseek-v4-pro"
+
+
+def test_tencent_is_explicit_only_until_inference_succeeds():
+    backends = default_backends()
+    assert "tencent" in backends
+    assert all("tencent" not in route for route in config.DEFAULT_ROUTE.values())
+    assert "tencent" not in config.DEFAULT_FREE_FAILOVER
 
 
 @pytest.mark.parametrize("model", ['""', '123'])

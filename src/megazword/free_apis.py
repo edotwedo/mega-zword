@@ -316,6 +316,8 @@ FREE_KEYS = (
     ("gemini-api-31-lite", "GOOGLE_AI_API_KEY"),
     ("cerebras", "CEREBRAS_API_KEY"),
     ("nvidia", "NVIDIA_API_KEY"),
+    ("nvidia-lightning", "NVIDIA_API_KEY"),
+    ("tencent", "TENCENT_TOKENHUB_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
 )
 
@@ -353,6 +355,11 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
             key_env="NVIDIA_API_KEY",
         ),
         OpenAICompatibleBackend(
+            "nvidia-lightning", base_url="https://integrate.api.nvidia.com/v1",
+            model=m.get("nvidia-lightning", "nvidia/nemotron-3.5-lightning-30b-a3b"),
+            key_env="NVIDIA_API_KEY",
+        ),
+        OpenAICompatibleBackend(
             "cerebras", base_url="https://api.cerebras.ai/v1",
             model=m.get("cerebras", "qwen-3.8-27b"),
             key_env="CEREBRAS_API_KEY",
@@ -361,6 +368,12 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
             "mistral", base_url="https://api.mistral.ai/v1",
             model=m.get("mistral", "ministral-3b-2512"),
             key_env="MISTRAL_API_KEY", trains_on_data=True,
+        ),
+        # The International Singapore site uses a separate key space from
+        # Tencent's China site, despite both consoles offering Singapore.
+        OpenAICompatibleBackend(
+            "tencent", base_url="https://tokenhub-intl.tencentcloudmaas.com/v1",
+            model=m.get("tencent", "hy3"), key_env="TENCENT_TOKENHUB_API_KEY",
         ),
         # OpenRouter chooses the serving provider. Its training policy can
         # vary by endpoint (and configured model); unknown means scrub prompts.
