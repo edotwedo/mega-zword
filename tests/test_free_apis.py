@@ -307,6 +307,53 @@ def test_free_backends_are_registered_and_routed_before_paid_plans():
     assert "cerebras" in backends
     assert all("cerebras" not in names for names in config.DEFAULT_ROUTE.values())
     assert "cerebras" not in config.DEFAULT_FREE_FAILOVER
+    assert {"groq-120b", "groq-qwen", "groq-allam"}.issubset(backends)
+    assert "gemini-api-31-lite" in backends
+    assert {"openrouter-dots", "openrouter-nemotron-nano",
+            "openrouter-nemotron-lightning", "openrouter-laguna-s",
+            "openrouter-laguna-xs"}.issubset(backends)
+    assert all(name in config.DEFAULT_FREE_FAILOVER
+               for name in ("groq-120b", "groq-qwen", "groq-allam"))
+
+
+def test_groq_model_aliases_use_verified_ids_and_shared_key(monkeypatch):
+    from megazword.free_apis import free_backends
+    backends = {b.name: b for b in free_backends(config.DEFAULT_FREE)}
+    expected = {"groq": "openai/gpt-oss-20b", "groq-120b": "openai/gpt-oss-120b",
+                "groq-qwen": "qwen/qwen3.8-27b", "groq-allam": "allam-2-7b"}
+    assert {name: backends[name].model for name in expected} == expected
+    assert all(backends[name].key_env == "GROQ_API_KEY" for name in expected)
+    assert all(backends[name].base_url == backends["groq"].base_url for name in expected)
+    monkeypatch.setenv("GROQ_API_KEY", "secret-test-credential")
+    assert all(backends[name].available() for name in expected)
+    assert backends["gemini-api-31-lite"].model == "gemini-3.1-flash-lite"
+    assert backends["gemini-api-31-lite"].key_env == backends["gemini-api"].key_env
+
+
+def test_verified_openrouter_model_identities_keep_one_key_and_exact_free_ids():
+    from megazword.free_apis import free_backends
+    models = {"openrouter-dots": "dots-studio/dots-3-note-preview:free",
+              "openrouter-nemotron-nano": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+              "openrouter-nemotron-lightning": "nvidia/nemotron-3.5-lightning:free",
+              "openrouter-laguna-s": "poolside/laguna-s-2.1:free",
+              "openrouter-laguna-xs": "poolside/laguna-xs-2.1:free"}
+    backends = {b.name: b for b in free_backends(config.DEFAULT_FREE)}
+    assert {name: backends[name].model for name in models} == models
+    assert all(backends[name].key_env == "OPENROUTER_API_KEY" for name in models)
+    assert all(backends[name].trains_on_data for name in models)
+    assert all(name in config.DEFAULT_FREE_FAILOVER for name in models)
+
+
+def test_successful_response_records_provider_request_quota(api, monkeypatch):
+    class Response(io.BytesIO):
+        headers = {"x-ratelimit-remaining-requests": "42",
+                   "x-ratelimit-limit-requests": "1000"}
+        def __enter__(self): return self
+        def __exit__(self, *args): self.close()
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **kw: Response(
+        json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()))
+    assert api.run("hello").ok
+    assert (api.remaining_requests, api.limit_requests) == (42, 1000)
 
 
 def test_all_default_routes_try_free_backends_before_paid_plans():

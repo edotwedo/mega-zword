@@ -70,12 +70,23 @@ DEFAULT_FREE = {
     "kimi": "moonshotai/kimi-k2.6:free",
     "deepseek": "deepseek/deepseek-chat-v3.1:free",
     "qwen-coder": "qwen/qwen3-coder:free",
+    # Fixed OpenRouter identities with successful bounded tool-call probes.
+    "openrouter-dots": "dots-studio/dots-3-note-preview:free",
+    "openrouter-nemotron-nano": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "openrouter-nemotron-lightning": "nvidia/nemotron-3.5-lightning:free",
+    "openrouter-laguna-s": "poolside/laguna-s-2.1:free",
+    "openrouter-laguna-xs": "poolside/laguna-xs-2.1:free",
     "ollama": "qwen2.5-coder:7b",
     "openrouter": "openrouter/free",
     "groq": "openai/gpt-oss-20b",
+    # Groq quotas are per model; these identities share one key and RPM pace.
+    "groq-120b": "openai/gpt-oss-120b",
+    "groq-qwen": "qwen/qwen3.8-27b",
+    "groq-allam": "allam-2-7b",
     "cloudflare": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "zai": "glm-4.5-flash",
     "gemini-api": "gemini-3.5-flash-lite",
+    "gemini-api-31-lite": "gemini-3.1-flash-lite",
     "cerebras": "qwen-3.8-27b",
     "nvidia": "meta/llama-3.1-8b-instruct",
     # The free account returns 429/code 1300 for Mistral Small but allows
@@ -83,8 +94,12 @@ DEFAULT_FREE = {
     "mistral": "ministral-3b-2512",
 }
 
-DEFAULT_FREE_FAILOVER = ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-                         "mistral", "nvidia", "ollama"]
+DEFAULT_FREE_FAILOVER = ["openrouter", "groq", "groq-120b", "groq-qwen",
+                         "groq-allam", "cloudflare", "zai", "gemini-api",
+                         "gemini-api-31-lite",
+                         "mistral", "nvidia", "ollama", "openrouter-dots",
+                         "openrouter-nemotron-nano", "openrouter-nemotron-lightning",
+                         "openrouter-laguna-s", "openrouter-laguna-xs"]
 
 # API keys Mega Zword reads. On Windows a key set with
 # SetEnvironmentVariable(..., "User") is missing from shells and subprocesses

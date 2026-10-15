@@ -89,6 +89,8 @@ class OpenAICompatibleBackend(Backend):
     key_env: str = ""
     extra_env: tuple[str, ...] = ()
     extra_headers: dict[str, str] = field(default_factory=dict)
+    remaining_requests: int | None = field(default=None, init=False)
+    limit_requests: int | None = field(default=None, init=False)
 
     def _env_ok(self) -> bool:
         return bool(os.environ.get(self.key_env)) and all(os.environ.get(n) for n in self.extra_env)
@@ -132,7 +134,7 @@ class OpenAICompatibleBackend(Backend):
                 body["tool_choice"] = "auto"
                 # Groq requires parsed/hidden reasoning for GPT-OSS tool calls;
                 # its default raw format can reject an otherwise valid call.
-                if (self.name == "groq" and self.model.startswith("openai/gpt-oss-")):
+                if (self.name.startswith("groq") and self.model.startswith("openai/gpt-oss-")):
                     body["reasoning_format"] = "parsed"
             request = urllib.request.Request(
                 self._endpoint(),
@@ -141,6 +143,14 @@ class OpenAICompatibleBackend(Backend):
                 method="POST",
             )
             with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:
+                headers = getattr(response, "headers", {})
+                try:
+                    remaining = headers.get("x-ratelimit-remaining-requests")
+                    limit = headers.get("x-ratelimit-limit-requests")
+                    self.remaining_requests = int(remaining) if remaining is not None else None
+                    self.limit_requests = int(limit) if limit is not None else None
+                except (TypeError, ValueError):
+                    self.remaining_requests = self.limit_requests = None
                 payload = json.loads(response.read().decode("utf-8"))
             message = payload["choices"][0]["message"]
             if not isinstance(message, dict):
@@ -218,10 +228,19 @@ FREE_KEYS = (
     ("deepseek", "OPENROUTER_API_KEY"),
     ("qwen-coder", "OPENROUTER_API_KEY"),
     ("openrouter", "OPENROUTER_API_KEY"),
+    ("openrouter-dots", "OPENROUTER_API_KEY"),
+    ("openrouter-nemotron-nano", "OPENROUTER_API_KEY"),
+    ("openrouter-nemotron-lightning", "OPENROUTER_API_KEY"),
+    ("openrouter-laguna-s", "OPENROUTER_API_KEY"),
+    ("openrouter-laguna-xs", "OPENROUTER_API_KEY"),
     ("groq", "GROQ_API_KEY"),
+    ("groq-120b", "GROQ_API_KEY"),
+    ("groq-qwen", "GROQ_API_KEY"),
+    ("groq-allam", "GROQ_API_KEY"),
     ("cloudflare", "CLOUDFLARE_API_TOKEN"),
     ("zai", "ZAI_API_KEY"),
     ("gemini-api", "GOOGLE_AI_API_KEY"),
+    ("gemini-api-31-lite", "GOOGLE_AI_API_KEY"),
     ("cerebras", "CEREBRAS_API_KEY"),
     ("nvidia", "NVIDIA_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
@@ -279,4 +298,17 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
               ("kimi", "moonshotai/kimi-k2.6:free"),
               ("deepseek", "deepseek/deepseek-chat-v3.1:free"),
               ("qwen-coder", "qwen/qwen3-coder:free"))],
+        *[OpenAICompatibleBackend(name, base_url=base,
+                                  model=m.get(name, model), key_env=key,
+                                  trains_on_data=trains)
+          for name, base, model, key, trains in (
+              ("groq-120b", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b", "GROQ_API_KEY", False),
+              ("groq-qwen", "https://api.groq.com/openai/v1", "qwen/qwen3.8-27b", "GROQ_API_KEY", False),
+              ("groq-allam", "https://api.groq.com/openai/v1", "allam-2-7b", "GROQ_API_KEY", False),
+              ("gemini-api-31-lite", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-3.1-flash-lite", "GOOGLE_AI_API_KEY", True),
+              ("openrouter-dots", "https://openrouter.ai/api/v1", "dots-studio/dots-3-note-preview:free", "OPENROUTER_API_KEY", True),
+              ("openrouter-nemotron-nano", "https://openrouter.ai/api/v1", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "OPENROUTER_API_KEY", True),
+              ("openrouter-nemotron-lightning", "https://openrouter.ai/api/v1", "nvidia/nemotron-3.5-lightning:free", "OPENROUTER_API_KEY", True),
+              ("openrouter-laguna-s", "https://openrouter.ai/api/v1", "poolside/laguna-s-2.1:free", "OPENROUTER_API_KEY", True),
+              ("openrouter-laguna-xs", "https://openrouter.ai/api/v1", "poolside/laguna-xs-2.1:free", "OPENROUTER_API_KEY", True))],
     ]

@@ -8,11 +8,18 @@ import re
 from .backends import Backend, OllamaBackend
 from . import openrouter_catalog
 
-OPENROUTER_PROVIDERS = {"openrouter", "kimi", "deepseek", "qwen-coder"}
+OPENROUTER_PROVIDERS = {"openrouter", "kimi", "deepseek", "qwen-coder",
+                        "openrouter-dots", "openrouter-nemotron-nano",
+                        "openrouter-nemotron-lightning", "openrouter-laguna-s",
+                        "openrouter-laguna-xs"}
 
 PROVIDERS = (
-    "groq", "gemini-api", "gemini", "mistral", "cloudflare", "openrouter", "kimi",
-    "deepseek", "qwen-coder", "nvidia", "zai", "ollama",
+    "groq", "groq-120b", "groq-qwen", "groq-allam", "gemini-api",
+    "gemini-api-31-lite", "gemini",
+    "mistral", "cloudflare", "openrouter", "kimi",
+    "deepseek", "qwen-coder", "openrouter-dots", "openrouter-nemotron-nano",
+    "openrouter-nemotron-lightning", "openrouter-laguna-s", "openrouter-laguna-xs",
+    "nvidia", "zai", "ollama",
 )
 PROMPT = "Reply with: ok"
 TIMEOUT_SECONDS = 30

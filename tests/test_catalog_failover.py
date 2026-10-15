@@ -149,6 +149,49 @@ def test_alias_pacing_shares_openrouter_quota(monkeypatch):
     assert reservations[0].name == "openrouter.json"
 
 
+def test_groq_model_pacing_is_shared_across_model_identities(monkeypatch):
+    reservations = []
+    monkeypatch.setattr(agent, "write_atomic", lambda path, value: reservations.append(path))
+    for name in ("groq", "groq-120b", "groq-qwen", "groq-allam"):
+        _real_pace_call(name, {"groq": 0.001}, agent.time.monotonic() + 10)
+    assert len(reservations) == 4
+    assert all(path == reservations[0] for path in reservations)
+    assert reservations[0].name == "groq.json"
+
+
+def test_gemini_api_model_identities_share_project_pacing(monkeypatch):
+    reservations = []
+    monkeypatch.setattr(agent, "write_atomic", lambda path, value: reservations.append(path))
+    for name in ("gemini-api", "gemini-api-31-lite"):
+        _real_pace_call(name, {"gemini-api": 0.001}, agent.time.monotonic() + 10)
+    assert reservations[0] == reservations[1]
+    assert reservations[0].name == "gemini-api.json"
+
+
+def test_fixed_openrouter_model_identities_share_the_daily_pool_pacing(monkeypatch):
+    reservations = []
+    monkeypatch.setattr(agent, "write_atomic", lambda path, value: reservations.append(path))
+    for name in ("openrouter", "openrouter-dots", "openrouter-nemotron-lightning"):
+        _real_pace_call(name, {"openrouter": 0.001}, agent.time.monotonic() + 10)
+    assert all(path == reservations[0] for path in reservations)
+    assert reservations[0].name == "openrouter.json"
+
+
+def test_near_exhausted_model_hops_before_another_request(tmp_path):
+    first = Scripted([])
+    first.name = "groq"
+    first.remaining_requests = 49
+    first.limit_requests = 1000
+    second = Scripted([call("finish", summary="continued on next quota")])
+    second.name = "groq-120b"
+    loop = agent.wrap(first, {"root": tmp_path}, fallback_backends=[second])
+    result = loop.run("complete this tiny task")
+    assert result.ok and "next quota" in result.text
+    assert not first.seen
+    assert len(second.seen) == 1
+    assert loop.backends_used == ["groq", "groq-120b"]
+
+
 def test_switch_keeps_step_cap(tmp_path):
     first = Scripted([TimeoutError("timeout")])
     second = Scripted([call("list_files", glob="*")])

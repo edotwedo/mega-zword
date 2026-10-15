@@ -568,6 +568,28 @@ Groq offers a Free plan with rate limits, while its Developer plan bills GPT-OSS
 by token; check the account tier in Groq Console if avoiding any possible API
 charge. Mega Zword cannot determine that billing tier from the API key.
 
+The verified Groq roster also includes `groq-120b`, `groq-qwen` (Qwen 3.8
+27B), and `groq-allam` (Allam 2 7B). Groq's Free-plan request limits are per
+model; the coding loop reads the remaining-request headers and changes models
+when 5% or fewer remain. All four identities use the same API key and share a
+conservative request pace. Run `megazword free test --provider groq-qwen` to
+check one identity. Gemini API `gemini-api-31-lite` selects the verified
+Gemini 3.1 Flash-Lite model; it remains distinct from the `gemini` CLI identity.
+See [the live-tested roster](FREE-MODEL-ROSTER.md) for the current quotas,
+shared-pool cautions and multilingual candidates.
+
+OpenRouter's dynamic `openrouter` route selects a current free model. Five
+fixed OpenRouter identities also passed a required-tool probe:
+`openrouter-dots`, `openrouter-nemotron-nano`,
+`openrouter-nemotron-lightning`, `openrouter-laguna-s`, and
+`openrouter-laguna-xs`. They share the same daily request pool and are placed
+after independent free providers in automatic fallback. For example:
+
+```powershell
+megazword free test --provider openrouter-nemotron-lightning
+megazword run -e -m openrouter-laguna-s "Fix the failing test in this folder."
+```
+
 **Cerebras is optional and not in automatic free routing.** Create a key at
 [cloud.cerebras.ai](https://cloud.cerebras.ai). Current pricing offers a $5
 starter credit, then pay-as-you-go. To opt in, set `CEREBRAS_API_KEY` and
