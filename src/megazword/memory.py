@@ -36,7 +36,8 @@ def project_name(cwd: Path | None = None) -> str:
     cwd = cwd or Path.cwd()
     try:
         top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=cwd,
-                             capture_output=True, text=True, timeout=5)
+                             capture_output=True, text=True, timeout=5,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         if top.returncode == 0 and top.stdout.strip():
             cwd = Path(top.stdout.strip())
     except (OSError, subprocess.SubprocessError):

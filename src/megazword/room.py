@@ -657,7 +657,8 @@ def post_summary(room: str, home: Path | None = None,
     if gh:
         try:
             res = subprocess.run([gh, "pr", "comment", "33", "--repo", "edotwedo/workshop", "--body", content],
-                                 capture_output=True, text=True, timeout=15)
+                                 capture_output=True, text=True, timeout=15,
+                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             if res.returncode == 0:
                 write(f"[megazword room] posted summary for '{room}' to Q (PR #33)")
                 return 0

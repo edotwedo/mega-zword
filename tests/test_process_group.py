@@ -10,6 +10,32 @@ from megazword.backends import process_group
 from megazword import backends
 
 
+def test_background_event_reader_hides_powershell(monkeypatch):
+    from megazword import sentinel
+    calls = []
+    monkeypatch.setattr(sentinel, "_is_windows", lambda: True)
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    def run(cmd, **kw):
+        calls.append((cmd, kw))
+        return SimpleNamespace(returncode=0, stdout="  event data  ", stderr="")
+    monkeypatch.setattr(subprocess, "run", run)
+    assert sentinel._powershell("Get-WinEvent") == "event data"
+    assert calls[0][0][0] == "powershell"
+    assert calls[0][1]["creationflags"] == subprocess.CREATE_NO_WINDOW
+
+
+def test_background_project_lookup_hides_git(monkeypatch, tmp_path):
+    from megazword import memory
+    calls = []
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    def run(cmd, **kw):
+        calls.append((cmd, kw))
+        return SimpleNamespace(returncode=0, stdout=str(tmp_path / "my-project"))
+    monkeypatch.setattr(subprocess, "run", run)
+    assert memory.project_name(tmp_path) == "my-project"
+    assert calls[0][1]["creationflags"] == subprocess.CREATE_NO_WINDOW
+
+
 def test_process_group_hides_console_on_windows():
     flags = process_group()
     if os.name == "nt":
