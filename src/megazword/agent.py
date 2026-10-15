@@ -22,7 +22,7 @@ from .filelock import locked, write_atomic
 from .agent_quality import check_tests, is_test_path
 
 DEFAULT_PACE = {"gemini-api": 6, "mistral": 2, "groq": 2, "cloudflare": 1,
-                "openrouter": 3, "nvidia": 2, "zai": 2, "ollama": 0}
+                "openrouter": 3, "nvidia": 2, "zai": 2, "cerebras": 2, "ollama": 0}
 
 
 def pace_call(name, pace, deadline):

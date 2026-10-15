@@ -222,6 +222,7 @@ FREE_KEYS = (
     ("cloudflare", "CLOUDFLARE_API_TOKEN"),
     ("zai", "ZAI_API_KEY"),
     ("gemini-api", "GOOGLE_AI_API_KEY"),
+    ("cerebras", "CEREBRAS_API_KEY"),
     ("nvidia", "NVIDIA_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
 )
@@ -258,6 +259,11 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
             "nvidia", base_url="https://integrate.api.nvidia.com/v1",
             model=m.get("nvidia", "meta/llama-3.1-8b-instruct"),
             key_env="NVIDIA_API_KEY",
+        ),
+        OpenAICompatibleBackend(
+            "cerebras", base_url="https://api.cerebras.ai/v1",
+            model=m.get("cerebras", "qwen-3.8-27b"),
+            key_env="CEREBRAS_API_KEY",
         ),
         OpenAICompatibleBackend(
             "mistral", base_url="https://api.mistral.ai/v1",

@@ -287,7 +287,7 @@ def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
     assert "secret-test-credential" not in output
 
 
-NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "mistral")
+NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "mistral", "cerebras")
 
 
 def test_free_backends_are_registered_and_routed_before_paid_plans():
@@ -307,7 +307,7 @@ def test_free_backends_are_registered_and_routed_before_paid_plans():
 
 
 def test_all_default_routes_try_free_backends_before_paid_plans():
-    free = {"openrouter", "groq", "cloudflare", "zai", "gemini-api", "gemini",
+    free = {"openrouter", "groq", "cloudflare", "zai", "cerebras", "gemini-api", "gemini",
             "mistral", "nvidia", "ollama"}
     paid = {"claude", "codex", "grok"}
     for route in config.DEFAULT_ROUTE.values():
@@ -361,6 +361,7 @@ def test_cloudflare_needs_account_id_and_puts_it_in_url(monkeypatch):
     ("gemini-api", "GOOGLE_AI_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
     ("nvidia", "NVIDIA_API_KEY"),
+    ("cerebras", "CEREBRAS_API_KEY"),
 ])
 def test_new_free_forced_run(name, key_env, monkeypatch, capsys):
     monkeypatch.setenv(key_env, "secret-test-credential")
@@ -371,6 +372,19 @@ def test_new_free_forced_run(name, key_env, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "answer" in out
     assert "secret-test-credential" not in out
+
+
+def test_cerebras_free_model_defaults_and_override(monkeypatch):
+    from megazword.free_apis import OpenAICompatibleBackend, free_backends
+    models = dict(config.DEFAULT_FREE)
+    backends = {b.name: b for b in free_backends(models)}
+    cerebras = backends["cerebras"]
+    assert isinstance(cerebras, OpenAICompatibleBackend)
+    assert cerebras.base_url == "https://api.cerebras.ai/v1"
+    assert cerebras.model == "qwen-3.8-27b"
+    assert cerebras.key_env == "CEREBRAS_API_KEY"
+    models["cerebras"] = "gpt-oss-120b"
+    assert {b.name: b for b in free_backends(models)}["cerebras"].model == "gpt-oss-120b"
 
 
 @pytest.mark.parametrize("model", ['""', '123'])

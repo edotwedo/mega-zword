@@ -59,11 +59,11 @@ DEFAULT_ROUTE = {
     # keys/servers are filtered; paid CLI plans remain quality fallbacks.
     # Mistral and other train-on-data services lead easy tasks (Phil, 2026-10-11).
     "easy": ["mistral", "gemini-api", "openrouter", "groq", "cloudflare",
-             "zai", "nvidia", "ollama", "gemini", "grok", "codex", "claude"],
+             "zai", "cerebras", "nvidia", "ollama", "gemini", "grok", "codex", "claude"],
     "medium": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-               "mistral", "nvidia", "ollama", "gemini", "codex", "grok", "claude"],
+               "cerebras", "mistral", "nvidia", "ollama", "gemini", "codex", "grok", "claude"],
     "hard": ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-             "mistral", "nvidia", "ollama", "gemini", "claude", "codex", "grok"],
+             "cerebras", "mistral", "nvidia", "ollama", "gemini", "claude", "codex", "grok"],
 }
 
 DEFAULT_FREE = {
@@ -76,6 +76,7 @@ DEFAULT_FREE = {
     "cloudflare": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "zai": "glm-4.5-flash",
     "gemini-api": "gemini-3.5-flash-lite",
+    "cerebras": "qwen-3.8-27b",
     "nvidia": "meta/llama-3.1-8b-instruct",
     # The free account returns 429/code 1300 for Mistral Small but allows
     # Ministral 3B under the same key and API limits (verified 2026-10-14).
@@ -83,7 +84,7 @@ DEFAULT_FREE = {
 }
 
 DEFAULT_FREE_FAILOVER = ["openrouter", "groq", "cloudflare", "zai", "gemini-api",
-                         "mistral", "nvidia", "ollama"]
+                         "cerebras", "mistral", "nvidia", "ollama"]
 
 # API keys Mega Zword reads. On Windows a key set with
 # SetEnvironmentVariable(..., "User") is missing from shells and subprocesses
@@ -91,7 +92,7 @@ DEFAULT_FREE_FAILOVER = ["openrouter", "groq", "cloudflare", "zai", "gemini-api"
 USER_ENV_KEYS = (
     "GROQ_API_KEY", "OPENROUTER_API_KEY", "CLOUDFLARE_API_TOKEN",
     "CLOUDFLARE_ACCOUNT_ID", "ZAI_API_KEY", "GOOGLE_AI_API_KEY",
-    "NVIDIA_API_KEY", "MISTRAL_API_KEY",
+    "NVIDIA_API_KEY", "MISTRAL_API_KEY", "CEREBRAS_API_KEY",
 )
 
 

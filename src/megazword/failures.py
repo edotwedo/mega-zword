@@ -28,6 +28,7 @@ LOGIN_FIX = {
     "zai": "set ZAI_API_KEY (see `megazword doctor`)",
     "gemini-api": "set GOOGLE_AI_API_KEY (see `megazword doctor`)",
     "nvidia": "set NVIDIA_API_KEY (see `megazword doctor`)",
+    "cerebras": "set CEREBRAS_API_KEY (see `megazword doctor`)",
     "mistral": "set MISTRAL_API_KEY (see `megazword doctor`)",
 }
 

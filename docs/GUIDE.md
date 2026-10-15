@@ -522,6 +522,7 @@ setx GOOGLE_AI_API_KEY "<your-key>"
 setx MISTRAL_API_KEY "<your-key>"
 setx ZAI_API_KEY "<your-key>"
 setx NVIDIA_API_KEY "<your-key>"
+setx CEREBRAS_API_KEY "<your-key>"
 setx CLOUDFLARE_API_TOKEN "<your-token>"
 setx CLOUDFLARE_ACCOUNT_ID "<your-account-id>"
 ```
@@ -530,6 +531,7 @@ Check one provider, then give it a coding task:
 
 ```powershell
 megazword free test --provider groq
+megazword free test --provider cerebras
 megazword run -e -m groq "Fix the failing test in this folder, run tests, and summarize the change."
 ```
 
@@ -558,8 +560,8 @@ default free router.
 
 `gemini-api` is the Google AI Studio API; `gemini` is the separate Gemini CLI
 identity. Ollama runs locally and needs no API key. The default free coding
-failover order is OpenRouter, Groq, Cloudflare, Z.AI, Gemini API, Mistral,
-NVIDIA, then Ollama. Mega Zword skips missing or marked-out providers. It waits
+failover order is OpenRouter, Groq, Cloudflare, Z.AI, Gemini API, Cerebras,
+Mistral, NVIDIA, then Ollama. Mega Zword skips missing or marked-out providers. It waits
 between calls to respect each provider's configured pacing (Groq: 2 seconds;
 OpenRouter: 3; Gemini API: 6).
 
@@ -567,6 +569,11 @@ Groq's GPT-OSS coding requests include its required parsed reasoning format.
 Groq offers a Free plan with rate limits, while its Developer plan bills GPT-OSS
 by token; check the account tier in Groq Console if avoiding any possible API
 charge. Mega Zword cannot determine that billing tier from the API key.
+
+The Cerebras Free tier costs $0 with lower rate limits. Its shared-inference
+`qwen-3.8-27b` model supports multi-turn tool use and is the default here. Set
+`CEREBRAS_API_KEY` to enable it. This integration has not been live-tested
+because no key is configured in this environment.
 
 On a rate limit (HTTP 429), Mega Zword uses the provider's `Retry-After` when
 available, marks that backend out until the reset, and tries another free
@@ -668,7 +675,7 @@ and files under `tests/` require the job to mention tests.
 On an API failure (including 429 or a timeout), the coding loop tries the next
 available free backend within the same run, even when you select one with `-m`.
 The default order after the selected backend is OpenRouter, Groq, Cloudflare,
-Z.AI, Gemini API, Mistral, NVIDIA, then Ollama. Configure `[agent].failover_order`
+Z.AI, Gemini API, Cerebras, Mistral, NVIDIA, then Ollama. Configure `[agent].failover_order`
 to change it. Missing keys, unavailable local Ollama and backends marked out in
 config are skipped. Each backend is tried at most once in this order. The task,
 tool observations, current files, test results and quality gate carry forward;
@@ -688,7 +695,7 @@ Optional settings in `~/.megazword/config.toml`:
 ```toml
 [agent]
 # [] disables automatic backend switching. Only free/API/local backend names.
-failover_order = ["openrouter", "groq", "cloudflare", "zai", "gemini-api", "mistral", "nvidia", "ollama"]
+failover_order = ["openrouter", "groq", "cloudflare", "zai", "gemini-api", "cerebras", "mistral", "nvidia", "ollama"]
 max_steps = 30
 max_chars = 12000
 call_timeout = 60

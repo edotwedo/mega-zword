@@ -12,7 +12,7 @@ OPENROUTER_PROVIDERS = {"openrouter", "kimi", "deepseek", "qwen-coder"}
 
 PROVIDERS = (
     "groq", "gemini-api", "gemini", "mistral", "cloudflare", "openrouter", "kimi",
-    "deepseek", "qwen-coder", "nvidia", "zai", "ollama",
+    "deepseek", "qwen-coder", "nvidia", "zai", "cerebras", "ollama",
 )
 PROMPT = "Reply with: ok"
 TIMEOUT_SECONDS = 30
