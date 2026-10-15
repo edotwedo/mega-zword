@@ -3,6 +3,7 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-15
+- Phil (Testlog-14 chat): warn him before interactive tests open terminals, switch desktops or move focus; do not assume he will stop typing without knowing. Testlog will wait until he is ready for such tests. Background verification can continue without a keyboard handoff.
 - Phil (Testlog-14 chat): camera return must recognize Phil only, staying quiet for his mother, children, or other people. Enrollment is deliberate and local; use a Windows-user-encrypted face template. Existing generic face-presence trigger is disabled until an owner is enrolled.
 - Phil (Testlog-14 chat): the app must preserve the original chat when adding another, provide usable chat deletion, and make Hive Send start replies without requiring a separate Start click. Identify the current build visibly so an old runtime is distinguishable.
 - Phil (Testlog-14 chat): save terminal session restoration metadata about every five minutes without model calls; provide one simple launcher restoring exact CLI sessions and asking for a brief current-work summary. Use a dedicated Windows desktop. Preserve tab colors/order when inexpensive; avoid costly cosmetic work.

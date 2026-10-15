@@ -6,10 +6,10 @@ $entry = Join-Path $PSScriptRoot 'workspace_entry.pyw'
 $windowless = Join-Path (Split-Path $Python -Parent) 'pythonw.exe'
 if (-not (Test-Path -LiteralPath $windowless)) { throw 'pythonw.exe is required' }
 $shell = New-Object -ComObject WScript.Shell
-function Shortcut([string]$folder, [string]$name, [string]$action) {
+function Shortcut([string]$folder, [string]$name, [string]$action, [string]$EntryPoint = $entry) {
     $link = $shell.CreateShortcut((Join-Path $folder "$name.lnk"))
     $link.TargetPath = $windowless
-    $link.Arguments = "`"$entry`" $action"
+    $link.Arguments = "`"$EntryPoint`" $action"
     $link.WorkingDirectory = $repo
     $link.Description = $name
     $link.Save()
@@ -19,6 +19,19 @@ Shortcut $desktop 'Restore Hive' 'restore'
 Shortcut $desktop 'Catch me up - terminal' 'catch-up'
 Shortcut $desktop 'Enroll my face' 'enroll'
 Shortcut ([Environment]::GetFolderPath('Startup')) 'Hive owner camera' 'watch'
+$appEntry = Join-Path $PSScriptRoot 'desktop_entry.pyw'
+$startMenu = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs'
+$backup = Join-Path $env:USERPROFILE '.megazword\workspace\shortcut-backups'
+New-Item -ItemType Directory -Path $backup -Force | Out-Null
+foreach ($folder in @($desktop, $startMenu)) {
+    $oldLink = Join-Path $folder 'Mega Zword.lnk'
+    $backupName = if ($folder -eq $desktop) { 'desktop.lnk' } else { 'start-menu.lnk' }
+    $backupLink = Join-Path $backup $backupName
+    if ((Test-Path -LiteralPath $oldLink) -and -not (Test-Path -LiteralPath $backupLink)) {
+        Copy-Item -LiteralPath $oldLink -Destination $backupLink
+    }
+    Shortcut $folder 'Mega Zword' '' $appEntry
+}
 # Preserve the older Hive-resume launcher; the new Restore Hive shortcut is silent.
 $env:PYTHONPATH = Join-Path $repo 'src'
 & $Python -c 'from megazword.workspace import home, import_legacy; p=home().parent/"hive-resume.ps1"; print("Imported",import_legacy(home(),p),"saved launcher seats") if p.exists() else None'

@@ -77,10 +77,23 @@ Phil's scope is a terminal workflow, separate from dashboard saved status cards.
   queued 80-word catch-up instruction after a completed turn. No AI client was
   invoked. This exposed and fixed startup timestamp and terminal device-response
   handling; terminal protocol replies no longer look like a typed user draft.
-- Final live app deployment evidence is recorded below after completion.
+- Owned 8768 server restarted only after confirming no active jobs or room.
+  Live API reports source build `41270ca`. Phil's actual older8767 browser page
+  was moved to8768, keeping selected chat t2. No unfinished draft was present.
+  Browser visibly verified both delete controls, the build label, Hive Send and
+  absence of a normal Start button. Screenshot: `build/updated-hive.png`.
+- Desktop and Start-menu Mega Zword shortcuts now launch this checkout's
+  `scripts/desktop_entry.pyw`, targeting8768. Prior shortcuts are backed up under
+  `~/.megazword/workspace/shortcut-backups` when they existed.
 
 ## Operational notes
 
 Keep this checkout and Cedar's isolated `.venv` available: shortcuts/tasks refer
 to them. The shared installation remains owned by other seats and unchanged.
 `CODEX_JOB.md` stays untracked. Routine Git delivery uses local Gitea only.
+
+Phil objected to unannounced interactive terminal tests. They did briefly
+switch desktops. No further UI actions were taken after his objection. New
+AGENTS rule: warn first and wait for readiness before tests move keyboard focus,
+open test windows or switch desktops. His mention of a spare computer does not
+establish any remote setup, installation or authorization on that machine.
