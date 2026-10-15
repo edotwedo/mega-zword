@@ -38,6 +38,18 @@ def test_say_start_and_view(app):
     assert view["turn_count"] == 1 and not view["running"]
 
 
+def test_send_can_post_and_start_the_reply_in_one_request(app):
+    app.room_say({'text': 'What is next? @claude', 'start': True, 'turns': 2})
+    app._room_thread.join(10)
+    assert [m['author'] for m in app.room_view()['messages']] == ['phil', 'claude']
+
+
+def test_invalid_send_options_do_not_post_an_unanswered_message(app):
+    with pytest.raises(ValueError, match='turns'):
+        app.room_say({'text': 'hello', 'start': True, 'turns': 500})
+    assert app.room_view()['messages'] == []
+
+
 def test_start_twice_is_refused_and_stop_sets_flag(app, monkeypatch):
     import threading
     gate = threading.Event()

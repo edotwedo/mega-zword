@@ -193,6 +193,9 @@ main[hidden], #hive[hidden] { display:none; }
 .new-chat select { flex:1; min-width:0; }
 #chat[hidden] { display:none; }
 .chat-tab-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chat-tab-row { display:flex; gap:4px; min-width:0; align-items:center; }
+.chat-tab-row .nav-tab { flex:1; }
+.chat-tab-row .chat-tab-delete { flex:0 0 32px; padding:6px; min-height:36px; }
 #brief-dialog { width:min(780px, calc(100vw - 24px)); max-height:85vh; overflow:auto;
   color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); }
 #brief-dialog::backdrop { background:#0009; }
@@ -216,7 +219,7 @@ main[hidden], #hive[hidden] { display:none; }
       <select id="new-tab-ai" aria-label="AI for a new chat tab"><option value="auto">auto</option></select>
       <button id="new-tab" type="button" aria-label="New chat tab" title="New chat tab">+</button>
     </div></div>
-  <div class="side-status"><span class="live-dot">● LIVE</span><br>Local workspace</div>
+  <div class="side-status"><span class="live-dot">● LIVE</span><br>Local workspace<br><span id="build-info"></span></div>
 </aside>
 <div class="workspace" id="home">
 <header>
@@ -317,7 +320,7 @@ main[hidden], #hive[hidden] { display:none; }
     </div>
     <div class="row">
       <label>Turns <input id="room-turn-cap" type="number" min="1" max="50" value="12" aria-label="Room turn limit"></label>
-      <button id="room-start" type="button" class="go">Start</button>
+      <button id="room-start" type="button" class="go" hidden>Resume replies</button>
       <button id="room-pause" type="button">Pause</button>
       <button id="room-stop" type="button">Stop</button>
       <span class="note">Pause takes effect after the current bot reply.</span>
@@ -332,7 +335,7 @@ main[hidden], #hive[hidden] { display:none; }
       <input id="chat-rename" aria-label="Chat tab name" maxlength="80" style="flex:1 1 160px;min-width:0">
       <button id="chat-rename-save" type="button">Rename</button>
       <button id="chat-new-session" type="button">New session</button>
-      <button id="chat-close" type="button">Close tab</button>
+      <button id="chat-close" type="button">Delete chat</button>
     </div>
     <div class="room-messages" id="chat-messages" role="region" aria-label="Chat messages" aria-live="polite" tabindex="0"></div>
     <label class="prompt-label" for="chat-input">&gt;_ <span class="sr-only">Your message</span></label>
@@ -861,6 +864,7 @@ async function load(refresh) {
       toast(got.error || "could not load"); project = ""; return load(refresh);
     }
     state = got;
+    $("build-info").textContent = state.build ? `Build ${state.build}` : "Older server";
     renderProjects(state);
     setChatTabs(state.tabs); renderChatAis();
     if (!load.opened) {  // deep link on first load: #hive or #tab-t1
@@ -931,9 +935,13 @@ $("refresh").onclick = () => load(true);
 
 let roomPollTimer = null, currentView = "home";
 function setView(view) {
+  const previous = currentView;
+  if (previous.startsWith("tab:") && previous !== view)
+    chatDrafts.set(previous.slice(4), $("chat-input").value);
   const tab = view.startsWith("tab:") ? chatTab(view.slice(4)) : null;
   if (view.startsWith("tab:") && !tab) view = "home";  // closed elsewhere
   currentView = view;
+  if (previous !== view) $("chat-input").value = view.startsWith("tab:") ? chatDrafts.get(view.slice(4)) || "" : "";
   const hive = view === "hive";
   $("home-view").hidden = view !== "home";
   $("hive").hidden = !hive;
@@ -953,9 +961,10 @@ function setView(view) {
 let chatTabs = [];
 const chatTab = id => chatTabs.find(t => t.id === id);
 const chatBusy = new Set();
+const chatDrafts = new Map();
 function renderChatTabs() {
-  $("chat-tabs").innerHTML = chatTabs.map(t => `<button class="nav-tab" type="button" data-tab="${esc(t.id)}"
-    aria-pressed="${currentView === "tab:" + t.id}" title="${esc(t.title)} · ${esc(t.ai)} · ${esc(t.project)}"><span class="nav-icon" aria-hidden="true">${chatBusy.has(t.id) ? "…" : "▸"}</span><span class="chat-tab-label">${esc(t.title)}</span></button>`).join("");
+  $("chat-tabs").innerHTML = chatTabs.map(t => `<div class="chat-tab-row"><button class="nav-tab" type="button" data-tab="${esc(t.id)}"
+    aria-pressed="${currentView === "tab:" + t.id}" title="${esc(t.title)} · ${esc(t.ai)} · ${esc(t.project)}"><span class="nav-icon" aria-hidden="true">${chatBusy.has(t.id) ? "…" : "▸"}</span><span class="chat-tab-label">${esc(t.title)}</span></button><button class="chat-tab-delete" type="button" data-close-tab="${esc(t.id)}" aria-label="Delete ${esc(t.title)} chat" title="Delete chat">×</button></div>`).join("");
 }
 function renderChatAis() {
   const sel = $("new-tab-ai"), cur = sel.value || "auto";
@@ -995,7 +1004,7 @@ async function reloadChatTabs() {
 async function sendChat() {
   const id = currentView.slice(4), text = $("chat-input").value.trim();
   if (!currentView.startsWith("tab:") || !text || chatBusy.has(id)) return;
-  chatBusy.add(id); $("chat-input").value = ""; setView(currentView);
+  chatBusy.add(id); chatDrafts.delete(id); $("chat-input").value = ""; setView(currentView);
   try {
     const res = await post("/api/tabs/send", {id, prompt: text, context: $("chat-context").checked});
     if (!res.ok) { toast(res.error || "no answer"); if (currentView === "tab:" + id) $("chat-input").value = text; }
@@ -1012,8 +1021,8 @@ function renderRoom(data) {
     <span>Last speaker: <b>${esc(data.last_speaker || "none")}</b></span>`;
   $("room-status").textContent = data.running
     ? data.paused ? "Pause requested; the current reply will finish first." : "Room is running."
-    : data.paused ? "Room is paused. Start resumes from the latest message." : "Room is idle.";
-  $("room-start").textContent = data.paused && !data.running ? "Resume" : "Start";
+    : data.paused ? "Room is paused. Send a message to continue, or resume the pending reply." : "Ready. Send a message to get a reply.";
+  $("room-start").hidden = !data.paused || data.running;
   $("room-start").disabled = data.running;
   $("room-pause").disabled = !data.running || data.paused;
   $("room-stop").disabled = !data.running && !data.paused;
@@ -1049,7 +1058,8 @@ $("tab-hive").onclick = () => setView("hive");
 $("room-send").onclick = async () => {
   const text = $("room-input").value.trim(); if (!text) return;
   $("room-send").disabled = true;
-  try { await post("/api/room/say", {room:"hive", text}); $("room-input").value = ""; await loadRoom(); }
+  try { await post("/api/room/say", {room:"hive", text, start:true,
+    turns:Number($("room-turn-cap").value), project:state?.launch_project}); $("room-input").value = ""; await loadRoom(); }
   catch (e) { toast(e.message); }
   $("room-send").disabled = false;
 };
@@ -1060,6 +1070,8 @@ $("room-start").onclick = () => {
   roomAction("/api/room/start", {turns, project: state?.launch_project});
 };
 $("chat-tabs").addEventListener("click", e => {
+  const close = e.target.closest("button[data-close-tab]");
+  if (close) { deleteChat(close.dataset.closeTab); return; }
   const b = e.target.closest("button[data-tab]"); if (b) setView("tab:" + b.dataset.tab); });
 $("new-tab").onclick = async () => {
   try {
@@ -1085,16 +1097,16 @@ $("chat-rename-save").onclick = async () => {
   try { await post("/api/tabs/rename", {id: currentView.slice(4), title}); $("chat-rename").blur(); await reloadChatTabs(); setView(currentView); }
   catch (e) { toast(e.message); }
 };
-$("chat-close").onclick = async () => {
-  const b = $("chat-close");
-  if (b.dataset.confirm !== "1") {  // two clicks, no browser dialog
-    b.dataset.confirm = "1"; b.textContent = "Click again to close";
-    setTimeout(() => { b.dataset.confirm = ""; b.textContent = "Close tab"; }, 4000); return;
+async function deleteChat(id) {
+  try {
+    await post("/api/tabs/close", {id});
+    chatDrafts.delete(id);
+    if (currentView === "tab:" + id) setView("home");
+    await reloadChatTabs();
   }
-  b.dataset.confirm = ""; b.textContent = "Close tab";
-  try { await post("/api/tabs/close", {id: currentView.slice(4)}); await reloadChatTabs(); setView("home"); }
   catch (e) { toast(e.message); }
-};
+}
+$("chat-close").onclick = () => currentView.startsWith("tab:") && deleteChat(currentView.slice(4));
 $("room-pause").onclick = () => roomAction("/api/room/pause");
 $("room-stop").onclick = () => roomAction("/api/room/stop");
 load();

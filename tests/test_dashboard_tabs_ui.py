@@ -107,6 +107,59 @@ def test_page_has_the_tab_controls_with_labels():
     assert "confirm(" not in html  # browser dialogs block the app window; close uses two clicks
 
 
+def test_plus_preserves_original_history_and_separate_drafts(tmp_path):
+    out = run(f"""
+setChatTabs({TABS}); setView('tab:t1');
+$('chat-input').value = 'unfinished original draft';
+post = async () => ({{id:'t3'}});
+reloadChatTabs = async () => setChatTabs([...chatTabs, {{id:'t3',title:'New',ai:'auto',project:'default',history:[]}}]);
+$('new-tab').onclick().then(() => {{
+  out.newDraft = $('chat-input').value;
+  $('chat-input').value = 'new chat draft'; setView('tab:t1');
+  out.originalDraft = $('chat-input').value; out.originalHistory = $('chat-messages').innerHTML;
+  setView('tab:t3'); out.restoredNewDraft = $('chat-input').value;
+  console.log(JSON.stringify(out)); process.exit(0);
+}});
+""", tmp_path)
+    assert out['newDraft'] == ''
+    assert out['originalDraft'] == 'unfinished original draft'
+    assert 'Use **salt**' in out['originalHistory']
+    assert out['restoredNewDraft'] == 'new chat draft'
+
+
+def test_delete_chat_removes_selected_tab_without_clearing_another(tmp_path):
+    out = run(f"""
+setChatTabs({TABS}); setView('tab:t1');
+post = async (path, body) => {{out.deleted = body.id; chatTabs = chatTabs.filter(t => t.id !== body.id);}};
+reloadChatTabs = async () => setChatTabs(chatTabs);
+deleteChat('t2').then(() => {{
+  out.view = currentView; out.history = $('chat-messages').innerHTML;
+  out.remaining = chatTabs.map(t => t.id);
+  console.log(JSON.stringify(out)); process.exit(0);
+}});
+""", tmp_path)
+    assert out['deleted'] == 't2'
+    assert out['remaining'] == ['t1']
+    assert out['view'] == 'tab:t1'
+    assert 'Use **salt**' in out['history']
+
+
+def test_hive_send_requests_reply_without_separate_start(tmp_path):
+    out = run("""
+$('room-input').value = 'What is next?'; $('room-turn-cap').value = '12';
+post = async (path, body) => {out.path = path; out.body = body;};
+loadRoom = async () => {};
+$('room-send').onclick().then(() => {
+  out.input = $('room-input').value;
+  console.log(JSON.stringify(out)); process.exit(0);
+});
+""", tmp_path)
+    assert out['path'] == '/api/room/say'
+    assert out['body']['start'] is True
+    assert out['body']['text'] == 'What is next?'
+    assert out['input'] == ''
+
+
 def test_session_marker_note_and_busy_reset(tmp_path):
     out = run("""
 setChatTabs([{id:'t1', title:'Work', ai:'claude', project:'p', history:[],

@@ -17,6 +17,8 @@ dev = ["pytest>=8"]
 app = ["pywebview>=5"]
 # Local face presence only; no model service or camera-image uploads.
 camera = ["opencv-python>=4.8,<5"]
+# Native Windows Terminal relay, process inventory and local owner matching.
+workspace = ["psutil>=7", "pywinpty>=3; sys_platform == 'win32'", "opencv-python>=4.8,<5"]
 
 [project.scripts]
 megazword = "megazword.cli:main"

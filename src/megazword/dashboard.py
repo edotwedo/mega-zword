@@ -182,8 +182,11 @@ class App:
         self._jobs_lock = threading.Lock()
         self._n = 0
         self._room_thread: threading.Thread | None = None
+        self._room_lock = threading.RLock()
         self._room_session: tuple[str, str] | None = None  # (room, session id) started here
-        self.camera = CameraWatcher()
+        from .face_identity import OwnerCamera
+        from .workspace import home as workspace_home
+        self.camera = CameraWatcher(factory=lambda: OwnerCamera(workspace_home()))
 
     def briefing_view(self) -> dict:
         data = briefing.snapshot()
@@ -218,6 +221,7 @@ class App:
             jobs = list(self.jobs.values())
         return {
             "now": now.isoformat(),
+            "build": os.environ.get("MEGAZWORD_BUILD", "development"),
             "project": project,
             "launch_project": self.project,
             "working_folder": str(Path.cwd().resolve()),
@@ -421,10 +425,23 @@ class App:
         text = str(body.get("text") or "").strip()
         if not text:
             raise ValueError("empty message")
-        room.say(name, text, author="phil", write=lambda s: None)
-        return self.room_view(name)
+        with self._room_lock:
+            if body.get("start") is True:
+                turns = body.get("turns")
+                if turns is not None and (type(turns) is not int or not 1 <= turns <= 50):
+                    raise ValueError("turns must be 1-50")
+                if body.get("project"):
+                    self.project_for(body["project"])
+            room.say(name, text, author="phil", write=lambda s: None)
+            if body.get("start") is True and not self.room_running():
+                return self.room_start({**body, "room": name})
+            return self.room_view(name)
 
     def room_start(self, body: dict) -> dict:
+        with self._room_lock:
+            return self._start_room(body)
+
+    def _start_room(self, body: dict) -> dict:
         name = self._room_name(body.get("room"))
         if self.room_running():
             raise ValueError("the room is already running; stop it first")

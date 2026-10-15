@@ -3,6 +3,8 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-15
+- Phil (Testlog-14 chat): camera return must recognize Phil only, staying quiet for his mother, children, or other people. Enrollment is deliberate and local; use a Windows-user-encrypted face template. Existing generic face-presence trigger is disabled until an owner is enrolled.
+- Phil (Testlog-14 chat): the app must preserve the original chat when adding another, provide usable chat deletion, and make Hive Send start replies without requiring a separate Start click. Identify the current build visibly so an old runtime is distinguishable.
 - Phil (Testlog-14 chat): save terminal session restoration metadata about every five minutes without model calls; provide one simple launcher restoring exact CLI sessions and asking for a brief current-work summary. Use a dedicated Windows desktop. Preserve tab colors/order when inexpensive; avoid costly cosmetic work.
 - Phil (Testlog-14 chat): the intended camera feature serves the terminal workflow: one terminal workspace with roughly 4–6 tabs, various instances/models, restored by a simple launcher, and a camera return asking each instance for a fresh short status/update/next steps across the terminal. A dashboard briefing is useful but does not satisfy this workflow. Background command popups must be silent and invisible. This corrects the narrower 2026-10-14 dashboard/saved-card interpretation.
 
