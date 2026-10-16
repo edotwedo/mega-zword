@@ -270,6 +270,7 @@ section { box-shadow:none; }
   <label class="meta">project <select id="project" title="Memory, notes, runs and answers follow this project"></select></label>
   <span class="meta" id="meta">loading…</span>
   <button id="catch-up" type="button">Catch me up</button>
+  <button id="reload-app" type="button" title="Reload the window and reconnect to the app server">Reload app</button>
   <span class="note" id="camera-indicator" role="status"></span>
   <button id="refresh" aria-label="Refresh usage meters" title="Re-read the usage meters now">↻</button>
 </header>
@@ -421,6 +422,7 @@ section { box-shadow:none; }
 <script>
 const TOKEN = "__MZ_TOKEN__";
 const $ = id => document.getElementById(id);
+$("reload-app").onclick = () => location.reload();
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const aiTag = n => `<span class="ai ${esc(n)}">${esc(n)}</span>`;
 const AICOLOR = {claude:"var(--claude)", codex:"var(--codex)", grok:"var(--grok)", ollama:"var(--local)"};

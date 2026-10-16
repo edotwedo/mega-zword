@@ -2,6 +2,9 @@
 
 ## Source review entrypoint repair (2026-10-15)
 
+- **Reload app** in the header reloads the whole page and reconnects after an
+  update. The arrow button remains **Refresh usage meters**.
+
 - The CLI now detects code-review requests itself, including requests sent by an
   older dashboard without review flags. Mega Zword reviews use installed source
   and explicitly identify the application as the target, rather than model weights.

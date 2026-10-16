@@ -372,7 +372,8 @@ history; they do not use this CLI-session feature. Grok's installed CLI supports
 
 The project selector switches the memory, notes, runs, answers and job output shown. The
 page refreshes its state periodically; **Refresh meters** rereads the usage
-sources immediately.
+sources immediately. **Reload app** reloads the whole page and reconnects after
+an app update. Save an unfinished message before reloading.
 
 - **Run a task:** enter a prompt and send it. Auto selection follows routes and
   pacing; the AI menu forces an installed tool. Check project memory to add

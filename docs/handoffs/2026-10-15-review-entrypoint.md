@@ -30,3 +30,5 @@ window; it can be replaced in background after package install. Keep native chat
 and camera watcher intact; preserve prior terminal-restore limitations.
 CODEX_JOB.md must remain untracked. See STATUS for final delivery/build.
 
+
+Runtime proof: full1286 passed in184.00s; focused202/final2 passed. Installed source5c296db matched57 package/UI files in both environments; six Tencent identities retained. Phil reopened7c04108 while we worked and sent jobs; those completed, then its verified idle system-Python server (no native window support) was safely replaced. Actual runtime5c296db PID22492. Actual dashboard Tencent Flash probe read routing.py and returned scoped file/line evidence in4 requests. Newer user Retry records were retained. No full-project audit claimed. Final Reload app UI addition has98 passing layout/accessibility checks; install/claim release follows.
