@@ -48,7 +48,7 @@ not a comprehensive review of every module.
 
 Final policy/CLI checks127 passed, including legacy Retry. Combined full-suite
 with six Tencent models:1279 passed in181.90s,115 existing deprecation warnings.
-Wheel/source byte comparison is clean. Installed build is recorded in STATUS. Installed app must be
+Wheel/source byte comparison is clean. Source build ce501da is installed in both dashboard venv and system Python311; installed source bytes match. Desktop/Start Menu shortcuts identify ce501da, with backups retained. GitHub branch codex/source-grounded-self-review is published; this handoff accompanies the main advance on local Gitea and GitHub. Active claim released for the waiting worker. Installed app must be
 closed/reopened by Phil to load new in-memory code. Do not stop live jobs or
 touch terminal chats/desktops/focus. Prior guarded camera helper and worker UI
 remain intact. No Windows restart needed. CODEX_JOB.md remains untracked.
