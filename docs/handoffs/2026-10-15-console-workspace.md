@@ -36,3 +36,5 @@ appearance is not claimed visually verified. Static/JS/accessibility tests cover
 the layout and controls. Phil can visually check by closing/reopening the same
 Mega Zword shortcut after installation. Preview helper was stopped. No reboot.
 CODEX_JOB.md stays untracked. Preserve prior camera/terminal handoff limitations.
+
+Delivery: source7c04108 installed in app venv and system Python311. All57 package/UI files match source in both, and all six Tencent identities remain. Desktop/Start Menu shortcuts label7c04108; backups retained. Full1283 passed (186.47s), final tabs/run-control28 passed (including the extra context test), layout/accessibility98 passed. Local Gitea main and codex/console-layout-2026-10-15 saved. No GitHub source mirror for this routine update. Claim released. Phil closes/reopens app and visually checks it.
