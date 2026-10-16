@@ -78,6 +78,32 @@ def test_hive_lists_real_workers_and_targets_without_starting_one_shot(app):
     assert not app.room_running()
 
 
+def test_self_review_gets_read_only_source_tools_without_edit_checkbox(app):
+    job_id = app.run({'prompt': "access your code. make a plan. dont' use any paid usage", 'project': 'proj'})['job']
+    command = app.jobs[job_id].cmd
+    assert '--review' in command and '--free-only' in command and '-e' not in command
+
+
+def test_self_review_inspects_installed_megazword_code(app):
+    from pathlib import Path
+    app.project = 'mega-zword'
+    job_id = app.run({'prompt': 'Review your code', 'project': 'mega-zword'})['job']
+    command = app.jobs[job_id].cmd
+    assert command[command.index('--review-root') + 1] == str(Path(dashboard.__file__).resolve().parent)
+
+
+def test_dashboard_child_handles_unicode_input_and_output_even_with_legacy_env(monkeypatch):
+    import os, sys, time
+    monkeypatch.setenv('PYTHONIOENCODING', 'cp1252')
+    job = dashboard.Job('unicode', 'unicode test', [sys.executable, '-c',
+        'import sys; print("review: " + sys.stdin.read() + " \\u2192 \\u4e2d\\u6587")'], 'café')
+    deadline = time.monotonic() + 10
+    while not job.view()['done'] and time.monotonic() < deadline:
+        time.sleep(.01)
+    view = job.view()
+    assert view['code'] == 0 and view['out'].strip() == 'review: café → 中文'
+
+
 def test_day_chart_counts_all_runs_not_just_recent_sixty(app):
     stamp = datetime.now(timezone.utc).isoformat()
     app.cfg.log_path.write_text("\n".join(json.dumps({

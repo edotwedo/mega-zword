@@ -74,6 +74,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("-p", "--project", help="project name (default: current repo/folder)")
     run.add_argument("-e", "--edit", action="store_true",
                      help="let the AI change files in the current folder")
+    run.add_argument('--review', action='store_true', help='inspect source with read-only tools using free API/local models')
+    run.add_argument('--review-root', type=Path, help='source folder for --review (default: current folder)')
+    run.add_argument('--free-only', action='store_true', help='exclude subscription CLI and paid-model fallbacks')
     run.add_argument("--compare", metavar="AIS",
                      help="same prompt on 2-3 AIs at once, e.g. claude,codex")
 
@@ -536,6 +539,14 @@ def main(argv: list[str] | None = None,
     if not prompt.strip():
         print("No prompt given.", file=sys.stderr)
         return 2
+    from .request_mode import free_only, free_backend
+    args.free_only = args.free_only or free_only(prompt) or args.review
+    if args.review and (args.edit or args.compare):
+        print('[megazword] read-only review cannot be combined with editing or compare', file=sys.stderr)
+        return 2
+
+    def permitted(backend):
+        return not args.free_only or free_backend(backend)
 
     if args.compare:
         from . import compare
@@ -548,6 +559,9 @@ def main(argv: list[str] | None = None,
             names = compare.parse_names(args.compare, backends)
         except ValueError as exc:
             print(f"[megazword] {exc}", file=sys.stderr)
+            return 2
+        if any(not permitted(backends[name]) for name in names):
+            print('[megazword] free-only request excludes a selected compare backend', file=sys.stderr)
             return 2
         memory = Memory(config.HOME, args.project or project_name(), cfg.memory_lines)
         sent = with_context(prompt, memory.context_block()) if args.context else prompt
@@ -571,6 +585,9 @@ def main(argv: list[str] | None = None,
             print(f"Unknown AI '{args.model}'. Choose from: {', '.join(backends)}",
                   file=sys.stderr)
             return 2
+        if not permitted(backend):
+            print('[megazword] free-only request excludes the selected backend; choose a free API/local model', file=sys.stderr)
+            return 2
         chain = [backend]
         print(f"[megazword] using {grok_label(backend)} (you chose it)", file=sys.stderr)
     else:
@@ -579,6 +596,7 @@ def main(argv: list[str] | None = None,
         out = cfg.out_now()
         chain = candidates(rating, cfg.route, backends, (statuses or plan_statuses)(), out,
                            cfg.log_path)
+        chain = [b for b in chain if permitted(b)]
         if not chain:
             print(f"[megazword] no installed AI for a {rating.level} task; "
                   f"check the route in {config.HOME / 'config.toml'}", file=sys.stderr)
@@ -593,12 +611,12 @@ def main(argv: list[str] | None = None,
 
     memory = Memory(config.HOME, args.project or project_name(), cfg.memory_lines)
     sent = with_context(prompt, memory.context_block()) if args.context else prompt
-    if args.edit:
+    if args.edit or args.review:
         from .agent import wrap
         from .backends import OllamaBackend
         from .free_apis import OpenAICompatibleBackend
         reviewer = None
-        if cfg.agent.get("reviewer"):
+        if cfg.agent.get("reviewer") and not args.review and not args.free_only:
             # Never reuse the CLI backends configured with edit permissions.
             reviewers = default_backends(edit=False, free_models=cfg.free, lean=cfg.lean)
             if "claude" in reviewers:
@@ -613,13 +631,22 @@ def main(argv: list[str] | None = None,
                               cfg.log_path)
         fallbacks = [backends[name] for name in order if name in backends
                      and name not in cfg.out_now()
+                     and permitted(backends[name])
                      and isinstance(backends[name], (OpenAICompatibleBackend, OllamaBackend))]
         for backend in [*chain, *fallbacks]:
             backend.timeout = cfg.timeouts.get(backend.name, backend.timeout)
-        chain = [wrap(b, cfg.agent, reviewer, fallbacks) if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))
+        settings = dict(cfg.agent)
+        if args.free_only:
+            settings['reviewer'] = ''
+        if args.review:
+            settings.update(read_only=True, root=args.review_root or Path.cwd(), reviewer='')
+            print(f'[megazword] read-only code review: {settings["root"]}; free API/local fallbacks only', file=sys.stderr)
+        chain = [wrap(b, settings, reviewer, fallbacks) if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))
                  else b for b in chain]
     # Forced CLI AIs never escalate. Free coding agents can switch internally.
-    code = execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model))
+    code = execute(sent, prompt, chain, cfg, memory, rating, forced=bool(args.model),
+                   policy={'free_only':args.free_only, 'review':args.review, 'edit':args.edit,
+                           'review_root':str(args.review_root or Path.cwd()) if args.review else None})
     if args.edit:
         from .agent import AgentBackend
         if any(isinstance(b, AgentBackend) for b in chain):
@@ -646,7 +673,7 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
             start_after: str | None = None, prior_answer: str | None = None,
             on_answer: Callable[[str], None] | None = None,
             tab_id: str | None = None,
-            on_result: Callable | None = None) -> int:
+            on_result: Callable | None = None, policy: dict | None = None) -> int:
     """Run the chain with escalation, log every attempt, print the answer,
     and remember the run so `megazword retry` can pick it up."""
     first_line = prompt.strip().splitlines()[0][:80]
@@ -700,7 +727,7 @@ def execute(sent: str, prompt: str, chain: list[Backend], cfg: config.Config,
     if on_result is not None:
         on_result(result)
     save_last_run(sent, prompt, [b.name for b in chain], result.backend, result.text,
-                  memory.project, rating.level if rating else None, tab_id=tab_id)
+                  memory.project, rating.level if rating else None, tab_id=tab_id, policy=policy)
     if on_answer is None:
         print(result.text)
     else:
@@ -790,14 +817,14 @@ def last_run_path():
 
 
 def save_last_run(sent, prompt, chain, backend, answer, project, level,
-                  tab_id: str | None = None) -> None:
+                  tab_id: str | None = None, policy: dict | None = None) -> None:
     import json
     from .filelock import write_atomic
     # Atomic: a parallel job finishing at the same time can't leave half a file.
     write_atomic(last_run_path(), json.dumps({"sent": sent, "prompt": prompt, "chain": chain,
                                               "backend": backend, "answer": answer,
                                               "project": project, "rating": level,
-                                              "tab_id": tab_id}))
+                                              "tab_id": tab_id, 'policy':policy or {}}))
     from . import answers
     answers.add(prompt, answer, backend, project, level, tab_id=tab_id)
 
@@ -810,6 +837,19 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
         print("[megazword] nothing to retry yet; run something first", file=sys.stderr)
         return 2
     last = json.loads(path.read_text(encoding="utf-8"))
+    from .request_mode import free_only, free_backend, code_review
+    policy = last.get('policy') or {}
+    reviewing = policy.get('review') or (not policy.get('edit') and code_review(last['prompt']))
+    must_free = policy.get('free_only') or free_only(last['prompt']) or reviewing
+    if reviewing or policy.get('edit'):
+        argv = ['run', last['prompt'], '-p', last['project']]
+        root = policy.get('review_root') or (Path(__file__).resolve().parent if last['project'] == 'mega-zword' else Path.cwd())
+        argv += ['--review', '--review-root', str(root)] if reviewing else ['-e']
+        if must_free:
+            argv.append('--free-only')
+        if args.model:
+            argv += ['-m', args.model]
+        return main(argv, backends=backends, cfg=cfg)
     memory = Memory(config.HOME, last["project"], cfg.memory_lines)
     level = last.get("rating") or "medium"
     if level == "easy":
@@ -831,6 +871,8 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
     chain = [backends[n] for n in names
              if n in backends and (n == last["backend"]
                                    or (n not in cfg.out_now() and backends[n].available()))]
+    if must_free:
+        chain = [b for b in chain if free_backend(b)]
     if not any(b.name != last["backend"] for b in chain):
         print(f"[megazword] no AI left to try after {last['backend']}", file=sys.stderr)
         return 1
@@ -838,7 +880,7 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
           file=sys.stderr)
     return execute(last["sent"], last["prompt"], chain, cfg, memory, rating,
                    forced=bool(args.model), start_after=last["backend"],
-                   prior_answer=last["answer"], on_answer=on_answer)
+                   prior_answer=last["answer"], on_answer=on_answer, policy={'free_only':bool(must_free)})
 
 
 if __name__ == "__main__":

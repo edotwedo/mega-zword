@@ -96,12 +96,15 @@ class Usage:
 class Job:
     def __init__(self, job_id: str, label: str, cmd: list[str], stdin: str):
         self.id, self.label = job_id, label
+        self.mode = 'review' if '--review' in cmd else 'edit' if '-e' in cmd else 'chat'
         self.started = datetime.now(timezone.utc).isoformat()
         self.out: list[str] = []
         self.err: list[str] = []
         self.code: int | None = None
-        self.control = Control(config.HOME / "run-controls" / uuid.uuid4().hex) if "-e" in cmd else None
+        self.control = Control(config.HOME / "run-controls" / uuid.uuid4().hex) if ("-e" in cmd or '--review' in cmd) else None
         env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONUTF8'] = '1'
         env.pop(CONTROL_ENV, None)
         env["MEGAZWORD_SEAT"] = "dashboard-" + uuid.uuid4().hex[:12]
         if self.control:
@@ -151,6 +154,7 @@ class Job:
 
     def view(self) -> dict:
         return {"id": self.id, "label": self.label, "started": self.started,
+                "mode": self.mode,
                 "out": "".join(self.out), "err": "".join(self.err),
                 "done": self.code is not None, "code": self.code,
                 "activity": self.control.view() if self.control else None}
@@ -301,6 +305,16 @@ class App:
         if not prompt:
             raise ValueError("empty prompt")
         args = ["run", "-p", self.project_for(body.get("project"))]
+        from .request_mode import code_review, free_only
+        reviewing = not body.get('edit') and (body.get('review') is True or code_review(prompt))
+        if reviewing:
+            args.append('--review')
+            if self.project_for(body.get('project')) == 'mega-zword':
+                # Inspect the code the user is actually running, even when their
+                # shared repository checkout is older than the installed build.
+                args += ['--review-root', str(Path(__file__).resolve().parent)]
+        if body.get('free_only') is True or free_only(prompt) or reviewing or body.get('edit'):
+            args.append('--free-only')
         model = body.get("model") or ""
         picks = [str(n) for n in body.get("compare") or []]
         if body.get("edit"):

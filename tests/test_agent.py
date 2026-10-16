@@ -54,6 +54,92 @@ def test_edit_tests_finish(tmp_path):
     assert loop.request_count == 3
 
 
+def test_read_only_review_reads_source_and_refuses_writes_and_tests(tmp_path):
+    (tmp_path / 'source.py').write_text('def route():\n    return "free"\n')
+    loop, model = coding(tmp_path, [call('finish', summary='Generic guesses'),
+        call('write_file', path='source.py', text='damaged'), call('run_tests'),
+        call('read_file', path='source.py'),
+        call('finish', summary='source.py:2 returns a free route; inspect fallback handling next.')], read_only=True)
+    result = loop.run('Review the code without edits')
+    assert result.ok and 'source.py:2' in result.text
+    assert (tmp_path / 'source.py').read_text() == 'def route():\n    return "free"\n'
+    assert {t['function']['name'] for t in model.seen[0][1]} == {'list_files','read_file','finish'}
+    history = str(model.seen[-1][0])
+    assert 'Read source files before finishing' in history
+    assert 'read-only review: writes and commands are unavailable' in history
+    assert '2:     return' in history
+
+
+def test_cli_review_has_no_subscription_or_reviewer_fallback(tmp_path, monkeypatch, capsys):
+    from megazword.cli import main
+    from megazword.rater import Rating
+    from tests.test_cli import FakeBackend
+    monkeypatch.chdir(tmp_path)
+    (tmp_path/'a.py').write_text('x = 1\n')
+    model = Scripted([call('read_file', path='a.py'), call('finish', summary='a.py:1 defines x.')])
+    paid = FakeBackend('codex', fail=True)
+    cfg = config.Config(log_path=tmp_path/'log.jsonl', route={'hard':['codex','groq']},
+                        quality_check=False, agent={'reviewer':'claude'})
+    assert main(['run','review code; no paid usage','--review'], {'codex':paid,'groq':model},
+                cfg, lambda _: Rating('hard','test','fake'), dict) == 0
+    last = json.loads((config.HOME/'last_run.json').read_text())
+    assert last['chain'] == ['groq']
+    assert 'a.py:1' in capsys.readouterr().out
+
+
+def test_no_paid_prompt_rejects_forced_subscription_before_call(tmp_path, capsys):
+    from megazword.cli import main
+    from tests.test_cli import FakeBackend
+    paid = FakeBackend('codex', fail=True)
+    cfg = config.Config(log_path=tmp_path/'log.jsonl')
+    assert main(['run',"dont' use any paid usage",'-m','codex'], {'codex':paid}, cfg) == 2
+    assert not cfg.log_path.exists()
+    assert 'free-only request excludes' in capsys.readouterr().err
+
+
+def test_free_only_refuses_paid_openrouter_override(tmp_path):
+    from megazword.cli import main
+    model = Scripted([])
+    model.base_url = 'https://openrouter.ai/api/v1'
+    model.model = 'vendor/paid-model'
+    assert main(['run','no paid usage','-m','groq'], {'groq':model},
+                config.Config(log_path=tmp_path/'log.jsonl')) == 2
+    assert model.seen == []
+
+
+def test_retry_does_not_reintroduce_paid_fallbacks(tmp_path, capsys):
+    from megazword.cli import save_last_run, retry_last
+    from types import SimpleNamespace
+    from tests.test_cli import FakeBackend
+    save_last_run('no paid usage','no paid usage',['groq'],'groq','answer','test','hard',
+                  policy={'free_only':True})
+    model = Scripted([])
+    paid = FakeBackend('codex', fail=True)
+    cfg = config.Config(log_path=tmp_path/'log.jsonl',route={'hard':['codex','groq']})
+    assert retry_last(SimpleNamespace(model=None),{'groq':model,'codex':paid},cfg) == 1
+    assert model.seen == [] and not cfg.log_path.exists()
+    assert 'no AI left to try' in capsys.readouterr().err
+
+
+def test_review_free_policy_accepts_all_configured_tencent_identities():
+    from megazword.backends import default_backends
+    from megazword.routing import TENCENT_BACKENDS
+    from megazword.request_mode import free_backend
+    models = default_backends()
+    assert all(free_backend(models[name]) for name in TENCENT_BACKENDS)
+
+
+def test_retry_upgrades_legacy_prompt_only_code_review(tmp_path, monkeypatch):
+    from megazword import cli
+    from types import SimpleNamespace
+    cli.save_last_run('access your code','access your code',['groq'],'groq','generic answer','mega-zword','hard')
+    calls = []
+    monkeypatch.setattr(cli, 'main', lambda argv, **kw: calls.append(argv) or 0)
+    assert cli.retry_last(SimpleNamespace(model=None),{},config.Config()) == 0
+    assert '--review' in calls[0] and '--free-only' in calls[0]
+    assert calls[0][calls[0].index('--review-root')+1] == str(__import__('pathlib').Path(cli.__file__).resolve().parent)
+
+
 @pytest.mark.parametrize("path", ["../escape", ".git/config", ".env", ".env.local",
                                    "nested/.git/config", "C:/outside"])
 def test_paths_refused(tmp_path, path):

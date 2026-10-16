@@ -705,7 +705,7 @@ function renderJob(j) {
     };
   }
   el.innerHTML = `<div class="err"><span class="sr-only">${j.done ? (j.code === 0 ? "Completed" : "Failed") : "Running"}: </span><span aria-hidden="true">${j.done ? (j.code === 0 ? "✓" : "✗") : '<span class="spin"></span>'}</span>
-    <b>${esc(j.label)}</b>${j.done ? "" : ` <span class="t">${secs}s</span>
+    <b>${esc(j.label)}</b>${j.mode === 'review' ? ' · read-only source review' : ''}${j.done ? "" : ` <span class="t">${secs}s</span>
     <button class="cancel" data-job="${esc(j.id)}" style="padding:1px 8px;font-size:12px">Cancel</button>`}
     <pre>${esc(j.err.trim())}</pre></div>
     ${activity ? `<div class="note">${esc(activity.backend || "starting")} · ${esc(activity.model || "")} · ${esc(activity.phase || "starting")} · ${esc(activity.requests || "0")} requests

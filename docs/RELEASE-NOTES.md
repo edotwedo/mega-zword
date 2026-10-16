@@ -1,5 +1,23 @@
 # Release notes
 
+## Mega Zword: Source-Grounded Self-Review (2026-10-15)
+
+- Code inspection requests in the dashboard now use the existing tool loop in
+  read-only mode, even without the editing checkbox. Mega Zword self-reviews read
+  the installed source rather than an older checkout. Reviews must read files and
+  cite actual file/line evidence; writes, commands and tests are unavailable.
+- `megazword run --review [--review-root PATH]` exposes the same review mode.
+  File reads stay bounded to the review root; no wholesale source dump is sent.
+- `--free-only` and explicit no-paid prompts exclude subscription CLI fallbacks
+  and paid OpenRouter overrides. Free coding mode also sets this routing policy.
+  Review/edit mode and routing restrictions survive Retry. Provider-account free
+  quotas still apply; this does not change billing or payment settings.
+- Dashboard children use UTF-8 for input/output. Reviews show tool activity and
+  their read-only mode instead of silently acting like context-free chat.
+- A live Tencent trial probe read actual routing.py and returned cited findings
+  in two requests, without edits. This verifies source access, not the quality of
+  a whole-project review or current promotion research; no browser tool is supplied.
+
 ## Beta 3.0 (not tagged yet)
 
 Not released yet. The installed version is still `0.1.0b1` until the lead
