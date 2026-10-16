@@ -2,6 +2,10 @@
 
 Newest first. Don't reopen these without Phil.
 
+## 2026-10-16
+- Phil (Cedar-27 chat): turn off automatic activity after repeated return-to-camera interruptions. Disabled all five installed MegaZword scheduled tasks, removed the Hive owner-camera Startup shortcut from Startup (retained locally under `.megazword/disabled-autostart`), and stopped both owner-camera watcher processes. Keep existing chats open. Earlier scheduled/automatic-work directions do not authorize re-enabling these helpers; wait for Phil's explicit request.
+- Phil (Cedar-27 chat): audit uncommitted Mega Zword changes and either commit useful work or delete obsolete work. Preserve the explicitly excluded, untracked `CODEX_JOB.md`.
+
 ## 2026-10-15
 - Phil (Testlog-14 chat): Enter should send in the app's message boxes; Shift+Enter inserts a new line. Provide an explicit Reload app control, distinct from refreshing usage meters.
 - Phil (Testlog-14 chat): simplify the app's typing and response area to a Matrix-style console. Use a dark background, green monospace text, a plain transcript above the prompt, and expandable options. Unrelated personal history must not enter job context; audit project and conversation boundaries before packaging.
