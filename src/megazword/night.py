@@ -185,6 +185,12 @@ def cache_clone(repo: str) -> Path:
 
 
 def default_branch(clone: Path) -> str:
+    """origin/main (or master) when it exists. The server's HEAD is only a fallback:
+    local Gitea's default branch was an old feature branch (agy/b1-room) on 2026-10-16,
+    and a job built from it ran against five-day-old code."""
+    for name in ("origin/main", "origin/master"):
+        if git(["rev-parse", "--verify", "--quiet", name], clone).returncode == 0:
+            return name
     res = git(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], clone)
     name = res.stdout.strip() if res.returncode == 0 else ""
     return name or "origin/main"

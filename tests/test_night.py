@@ -379,3 +379,22 @@ def test_paid_capacity_rechecked_before_call(origin):
     out = worker.run_job(night.parse_queue(QUEUE.format(repo=origin))[0])
     assert out.status == "skipped" and "no fresh capacity" in out.reason
     assert not ai.calls and list(heads(origin)) == ["main"]
+
+
+def test_default_branch_prefers_main_over_a_stale_remote_head(tmp_path):
+    import subprocess
+    from megazword import night
+    bare = tmp_path / "r.git"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(bare)], check=True)
+    seed = tmp_path / "s"
+    subprocess.run(["git", "clone", "-q", str(bare), str(seed)], check=True, capture_output=True)
+    for args in (["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", str(seed), *args], check=True)
+    (seed / "a").write_text("1")
+    subprocess.run(["git", "-C", str(seed), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(seed), "commit", "-qm", "c"], check=True)
+    subprocess.run(["git", "-C", str(seed), "push", "-q", "origin", "HEAD:main", "HEAD:old"], check=True)
+    subprocess.run(["git", "-C", str(bare), "symbolic-ref", "HEAD", "refs/heads/old"], check=True)
+    clone = tmp_path / "c"
+    subprocess.run(["git", "clone", "-q", str(bare), str(clone)], check=True, capture_output=True)
+    assert night.default_branch(clone) == "origin/main"

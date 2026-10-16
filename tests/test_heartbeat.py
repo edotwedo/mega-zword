@@ -160,3 +160,39 @@ def test_install_needs_valid_times_and_yes(capsys):
     assert heartbeat.install("9am", 2, "23:00") == 2
     assert heartbeat.install("09:00", 2, "23:00") == 0
     assert "add --yes" in capsys.readouterr().out
+
+
+def test_step_names_the_existing_handoff_as_the_log(monkeypatch):
+    _fake_clone(monkeypatch)
+    seen = {}
+
+    class Runner:
+        def run_job(self, job):
+            seen["task"] = job.task
+            return night.Outcome(job, "failed", reason="x")
+    heartbeat.beat({}, config.Config(), runner=Runner(), write=lambda s: None)
+    assert "in docs/handoffs/k.md, append" in seen["task"].replace("\n", " ")
+    assert "roadmap-2.md" not in seen["task"]
+
+
+def test_notes_only_change_is_not_merged(tmp_path):
+    bare = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(bare)], check=True)
+    seed = tmp_path / "seed"
+    subprocess.run(["git", "clone", "-q", str(bare), str(seed)], check=True, capture_output=True)
+    for args in (["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+        _git(seed, *args)
+    (seed / "a.py").write_text("x = 1\n")
+    _git(seed, "add", ".")
+    _git(seed, "commit", "-qm", "base")
+    _git(seed, "push", "-q", "origin", "HEAD:main")
+    (seed / "docs" / "handoffs").mkdir(parents=True)
+    (seed / "docs" / "handoffs" / "roadmap-4.md").write_text("plan\n")
+    _git(seed, "add", ".")
+    _git(seed, "commit", "-qm", "notes")
+    _git(seed, "push", "-q", "origin", "HEAD:refs/heads/night/n-1")
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", str(bare), str(clone)], check=True, capture_output=True)
+    text = heartbeat.merge(clone, "night/n-1", {}, None,
+                           review_fn=lambda *a, **k: pytest.fail("no review for notes-only"))
+    assert text == "not merged: only notes changed, no real progress"

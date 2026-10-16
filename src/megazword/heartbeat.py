@@ -35,11 +35,15 @@ STEP = """ROADMAP item {num}: {title}
 
 {body}
 {handoff}
-Do the NEXT small, testable step toward this item only: one focused change that keeps
-the whole test suite passing. Read docs/STATUS.md, AGENTS.md and the files you change
-first. Add tests for what you add. In the item's handoff file (create
-docs/handoffs/roadmap-{num}.md if there is none), append one dated line under a
-"## Heartbeat log" heading: what you did, and the exact next step."""
+Do the NEXT small, testable step toward this item only: one focused change to source
+code, tests or user docs that keeps the whole test suite passing. Writing plans, notes or
+copies of this text is not a step. Read docs/STATUS.md, AGENTS.md and the files you change
+first. Add tests for what you add. Then, in {log_file}, append one dated line under a
+"## Heartbeat log" heading: what you did, and the exact next step. Do not create any other
+handoff file."""
+
+# A step that only touches these paths made no real progress and is not merged.
+LOG_ONLY = ("docs/handoffs/", "docs/STATUS.md", "docs/ROADMAP.md")
 
 
 @dataclass
@@ -138,6 +142,9 @@ def merge(clone: Path, branch: str, backends, cfg, review_fn=None) -> str:
         ahead = night.git(["merge-base", "--is-ancestor", "origin/main", f"origin/{branch}"], work)
         if ahead.returncode != 0:
             return "not merged: main moved while the job ran; the next beat starts fresh"
+        names = night.git(["diff", "--name-only", f"origin/main...origin/{branch}"], work).stdout.split()
+        if names and all(n.startswith(LOG_ONLY) for n in names):
+            return "not merged: only notes changed, no real progress"
         diff, _ = review.change(work, "origin/main")
         if review.clip(diff)[1]:
             return "not merged: change too big to review in one pass; needs a person"
@@ -172,7 +179,9 @@ def beat(backends, cfg: config.Config, runner=None, merger=merge, write=print) -
             return _done(write, why)
         refs = HANDOFF.findall(item.body)
         handoff = "".join(f"\nHandoff {ref}:\n{_show(clone, ref)}\n" for ref in refs[:1])
-        task = STEP.format(num=item.num, title=item.title, body=item.body, handoff=handoff)
+        log_file = refs[0] if refs else f"docs/handoffs/roadmap-{item.num}.md"
+        task = STEP.format(num=item.num, title=item.title, body=item.body, handoff=handoff,
+                           log_file=log_file)
         job = night.Job(0, " ", GITEA, task, item.done_when)
         shift = runner or night.Night(backends, log=lambda s: write(f"[heartbeat] {s}"), cfg=cfg)
         out = shift.run_job(job)
