@@ -54,6 +54,17 @@ def test_edit_tests_finish(tmp_path):
     assert loop.request_count == 3
 
 
+def test_coding_agent_can_fetch_bounded_public_url(monkeypatch, tmp_path):
+    from megazword import public_fetch
+    monkeypatch.setattr(public_fetch, "fetch_public_url", lambda url: "Fetched public page: page text")
+    loop, model = coding(tmp_path, [call("fetch_public_url", url="https://example.com/docs"),
+                                    call("finish", summary="The docs describe the API.")])
+    result = loop.run("Read the public API docs and summarize them")
+    assert result.ok
+    assert "Fetched public page: page text" in model.seen[-1][0][-1]["content"]
+    assert "fetch_public_url" in {tool["function"]["name"] for tool in model.seen[0][1]}
+
+
 def test_read_only_review_reads_source_and_refuses_writes_and_tests(tmp_path):
     (tmp_path / 'source.py').write_text('def route():\n    return "free"\n')
     loop, model = coding(tmp_path, [call('finish', summary='Generic guesses'),

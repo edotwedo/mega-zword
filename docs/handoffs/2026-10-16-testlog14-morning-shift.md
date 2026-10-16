@@ -34,9 +34,32 @@ while he is at work on Friday, 2026-10-16, from 5:00 to 11:00 AM Pacific.
   says both prices are zero and tool calls are supported. It explicitly warns
   that catalog entries are not verified endpoints. The task may improve this
   candidate workflow, but must not activate or call a new provider.
-- The earlier 11:43 PM public-URL tool task remains separate and must finish
-  before its code is treated as complete. The morning's first model inspects
-  its result and avoids duplicating it.
+- The earlier 11:43 PM Kimi public-URL task failed at the 60-step cap after
+  259.8 seconds, with no usable answer or tracked diff. Testlog-14 recovered
+  that task before the morning shift by adding `fetch_public_url` to the coding
+  agent. The morning's first model is now instructed to verify that source and
+  its tests, avoid duplicating the feature, and use the slot for a grounded
+  audit step.
+
+## Recovery completed before the morning shift
+
+- `src/megazword/public_fetch.py` implements direct HTTPS GETs on port 443,
+  credential-shaped query rejection, public-DNS/IP validation, IP-pinned
+  connections with original-host TLS checks, redirect revalidation, a three
+  redirect limit, bounded DNS/connection/read time, 256 KiB response limit,
+  text/HTML/XHTML/JSON allowlist, and script/style text removal.
+- `src/megazword/agent.py` exposes it only to coding mode. Read-only reviews
+  retain their existing list/read/finish tool set. `docs/AGENT-ACCESS.md`
+  documents the scope and limits.
+- Focused agent/fetch tests pass (108). The final full suite passed (1303 in
+  177.20s). No live network
+  fetch was used for testing.
+- The morning test runner now strips API credential variables but removes
+  `MEGAZWORD_NO_USER_ENV`; setting that flag caused the Windows user-env test to
+  fail by disabling the behavior under test. The corrected full suite passed.
+- One additional read-only DeepSeek review attempt produced no output after
+  roughly 3.5 minutes and was canceled; implementation was source-grounded by
+  Testlog-14. No paid model was used.
 
 ## Schedule and safeguards
 

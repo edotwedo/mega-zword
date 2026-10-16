@@ -1,8 +1,10 @@
-# Free public-URL tool: scheduled implementation run
+# Free public-URL tool: scheduled run and recovery
 
-- **For:** Testlog-14 (Codex), to review and integrate the scheduled free-model result.
-- **Status:** open; one-time run is scheduled for 2026-10-15 23:43 America/Los_Angeles.
-- **Done when:** inspect the model's patch and `run.log`, verify the security tests and full relevant suite, update `docs/STATUS.md`, then commit and push the reviewed result to local Gitea `origin`. Never commit `CODEX_JOB.md` or push routine work to GitHub.
+- **For:** Testlog-14 (Codex), recovery of Phil's free public-URL tool task.
+- **Status:** the 2026-10-15 23:43 run failed; recovered in the current worktree and awaiting final local-Gitea push.
+- **Observed result:** Tencent Kimi K2.7 Code ran for 259.8 seconds, hit the agent's 60-step cap, returned no usable answer, and left no tracked diff. The local Mega Zword `[agent]` config sets `max_steps = 60` and `wall_timeout = 1800`; the earlier handoff's 30-step / 10-minute values described defaults and were stale. The run hit its step cap before the outer 15-minute launcher limit.
+- **Validation:** focused agent/fetch tests: 108 passed. Full suite: 1303 passed in 177.20s on the final source. Morning runner dry-run and `git diff --check` pass. No live public URL request has been made.
+- **Done when:** finish final review, record the local-Gitea commit hash here and in `docs/STATUS.md`, then push the reviewed result to local Gitea `origin`. Never commit `CODEX_JOB.md` or push routine work to GitHub.
 
 ## Why and scope
 
@@ -25,4 +27,4 @@ Get-Content "$env:LOCALAPPDATA\MegaZword\FreeToolsContinuation\2026-10-15-2343\s
 Get-Content "$env:LOCALAPPDATA\MegaZword\FreeToolsContinuation\2026-10-15-2343\run.log"
 ```
 
-Dry-run validation passed without making a model request. Do not claim the scheduled coding work has completed until `status.json` reports `completed` and the log has been reviewed.
+The scheduled run did not complete; its status is `failed` and its log records the agent step-cap error. Testlog-14 then implemented the capability directly after the free model run failed. One read-only DeepSeek review attempt also produced no output after roughly 3.5 minutes and was canceled; the implementation was completed from direct source inspection. The 5:00 AM morning runner is instructed to inspect the recovered source and tests, avoid duplicating the fetch tool, and proceed to a source-grounded audit step.

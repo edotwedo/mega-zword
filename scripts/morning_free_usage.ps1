@@ -29,7 +29,7 @@ $labels = @(
 )
 $prompts = @(
 @'
-Continue Mega Zword's tool-access and free-usage work in this checkout. First inspect the prior scheduled public-HTTPS read-tool change and its focused tests. Keep any implementation bounded to public HTTPS text retrieval, with SSRF/redirect/size/time protections. If that work is already complete and tested, do not duplicate it; read the audit summary in docs/handoffs/2026-10-16-testlog14-morning-shift.md and use this slot for one source-grounded audit step. Never access local credentials, authenticated pages, cloud consoles, billing or accounts. Do not read or edit CODEX_JOB.md. Update docs/STATUS.md with the exact result and next step.
+Continue Mega Zword's tool-access and free-usage work in this checkout. The separate 11:43 PM Kimi run failed at the 60-step cap without a usable answer or tracked diff; Testlog-14 has since implemented the bounded public-HTTPS fetch in src/megazword/public_fetch.py with tests. Verify the current source and tests, do not duplicate the fetch implementation, then use this slot for one source-grounded audit step from the handoff. Never access local credentials, authenticated pages, cloud consoles, billing or accounts. Do not read or edit CODEX_JOB.md. Update docs/STATUS.md with the exact result and next step.
 '@,
 @'
 Read the audit summary in docs/handoffs/2026-10-16-testlog14-morning-shift.md, then verify its config.py hypotheses against the current source: the __mz_marker__ collision, _statements complexity/diagnostics, no-op write semantics, deferred filelock import, and parse_until units. Reproduce before changing anything. Choose at most one material, demonstrable defect for a focused fix/test; do not rewrite the parser or add unsupported behavior just to match the audit. Do not read or edit CODEX_JOB.md. Update docs/STATUS.md with evidence and the precise next step. The outer runner will run the full test suite and handle local-Gitea commits; do not run git.
@@ -88,7 +88,7 @@ function Run-Process([string]$File, [string]$Arguments, [string]$Cwd, [int]$Time
                 $info.EnvironmentVariables.Remove($key)
             }
         }
-        $info.EnvironmentVariables['MEGAZWORD_NO_USER_ENV'] = '1'
+        $info.EnvironmentVariables.Remove('MEGAZWORD_NO_USER_ENV') | Out-Null
         $info.EnvironmentVariables['MEGAZWORD_NO_APP'] = '1'
         $info.EnvironmentVariables['MEGAZWORD_HOME'] = Join-Path $stateDir 'test-home'
         $info.EnvironmentVariables['GIT_TERMINAL_PROMPT'] = '0'
