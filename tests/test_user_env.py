@@ -27,6 +27,7 @@ def test_does_not_overwrite_set_vars():
 def test_uses_os_environ_by_default(monkeypatch):
     for name in config.USER_ENV_KEYS:
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv("MEGAZWORD_NO_USER_ENV", raising=False)  # Night Shift sets it
     config.load_user_env(read={"NVIDIA_API_KEY": "fake-nvidia"}.get)
     assert os.environ["NVIDIA_API_KEY"] == "fake-nvidia"
     assert "GROQ_API_KEY" not in os.environ
