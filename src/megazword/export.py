@@ -30,7 +30,8 @@ def cutoff(value: str, now: datetime) -> datetime:
 
 
 def redact(value: object) -> str:
-    text = str(value)
+    from .keys import redact_known
+    text = redact_known(str(value))
     # Known environment keys plus common provider key formats, including keys
     # accidentally pasted into a saved prompt. Never read or export config values.
     for name, secret in os.environ.items():

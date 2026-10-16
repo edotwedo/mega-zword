@@ -32,6 +32,8 @@ _PRIVATE = re.compile(r"(?i)[^\s'\"]*[\\/](?:\.claude|\.codex|\.grok|\.megazword
 
 def scrub(text: str) -> str:
     """The prompt with secrets and private paths replaced by MASK."""
+    from .keys import redact_known
+    text = redact_known(text, MASK)
     for pattern in _PATTERNS:
         text = pattern.sub(MASK, text)
     text = _ASSIGN.sub(lambda m: m.group(1) + MASK, text)

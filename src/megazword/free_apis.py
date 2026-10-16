@@ -1,4 +1,4 @@
-"""Opt-in chat APIs. Credentials stay in the environment and HTTP headers."""
+"""Opt-in chat APIs. Credentials stay in local storage and HTTP headers."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ import urllib.request
 from dataclasses import dataclass, field
 
 from .backends import Backend
+from .keys import get_key, redact_known, redact_payload
 from .filelock import locked, write_atomic
 
 
@@ -248,6 +249,7 @@ def _safe_reason(exc):
             if value and (re.search(r"KEY|TOKEN|SECRET|PASSWORD", name, re.I)
                           or name == "CLOUDFLARE_ACCOUNT_ID"):
                 reason = reason.replace(value, "[REDACTED]")
+        reason = redact_known(reason)
         reason = re.sub(r"https?://\S+|Bearer\s+\S+", "[REDACTED]", reason, flags=re.I)
         return " ".join(scrub(reason).split())[:240]
     except (ValueError, AttributeError, TypeError, IndexError, OSError):
@@ -270,14 +272,14 @@ class OpenAICompatibleBackend(Backend):
                 or request_quota_low(self.name))
 
     def _env_ok(self) -> bool:
-        return bool(os.environ.get(self.key_env)) and all(os.environ.get(n) for n in self.extra_env)
+        return bool(get_key(self.key_env)) and all(get_key(n) for n in self.extra_env)
 
     def available(self) -> bool:
         return self._env_ok()
 
     def _endpoint(self) -> str:
         url = self.base_url
-        account = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
+        account = (get_key("CLOUDFLARE_ACCOUNT_ID") or "")
         if "{account}" in url:
             url = url.replace("{account}", account)
         return url.rstrip("/") + "/chat/completions"
@@ -305,7 +307,7 @@ class OpenAICompatibleBackend(Backend):
     def chat(self, messages: list[dict], tools: list[dict] | None = None,
              timeout: float | None = None) -> dict:
         """One OpenAI chat turn, preserving native tool calls."""
-        key = os.environ.get(self.key_env)
+        key = get_key(self.key_env)
         if not key or not self._env_ok():
             raise RuntimeError("API key not set")
         try:
@@ -313,11 +315,11 @@ class OpenAICompatibleBackend(Backend):
             headers = {"Authorization": f"Bearer {key}",
                        "Content-Type": "application/json",
                        "User-Agent": f"megazword/{__version__}", **self.extra_headers}
-            body = {"model": self.model, "messages": messages, "stream": False}
+            body = {"model": self.model, "messages": redact_payload(messages), "stream": False}
             if self.name == "cloudflare":
                 body.pop("stream")  # The default is a non-streaming response.
             if tools is not None:
-                body["tools"] = tools
+                body["tools"] = redact_payload(tools)
                 # OpenAI-compatible providers do not all default to automatic
                 # selection when tools are present. Google documents this field
                 # for its compatibility endpoint; be explicit for each API.
@@ -344,7 +346,7 @@ class OpenAICompatibleBackend(Backend):
             message = payload["choices"][0]["message"]
             if not isinstance(message, dict):
                 raise ValueError("missing answer")
-            return json.loads(json.dumps(message).replace(key, "[REDACTED]"))
+            return redact_payload(message)
         except (APIHTTPError, ToolsUnsupported):
             raise
         except urllib.error.HTTPError as exc:

@@ -42,15 +42,17 @@ class Backend:
         return True
 
     def run(self, prompt: str) -> Result:
+        from .keys import redact_known
         start = time.monotonic()
         try:
+            prompt = redact_known(prompt)
             if self.trains_on_data:  # B15: the one light guard for AIs that train on prompts
                 from .guard import scrub
                 prompt = scrub(prompt)
             text = self._run(prompt)
-            return Result(self.name, text.strip(), True, time.monotonic() - start)
+            return Result(self.name, redact_known(text.strip()), True, time.monotonic() - start)
         except Exception as exc:  # report any failure as a result, never crash the router
-            return Result(self.name, "", False, time.monotonic() - start, str(exc))
+            return Result(self.name, "", False, time.monotonic() - start, redact_known(str(exc)))
 
     def _run(self, prompt: str) -> str:
         raise NotImplementedError

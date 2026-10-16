@@ -22,7 +22,7 @@ COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "job"),
     "See": ("start", "usage", "credits", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "free"),
-    "Set up": ("init", "doctor", "out", "backends", "app", "mcp"),
+    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp"),
     "Memory": ("note", "decide", "import-hive"),
 }
 
@@ -101,6 +101,9 @@ def build_parser() -> argparse.ArgumentParser:
     exp.add_argument("--since", default="7d", help="window start: Nd or YYYY-MM-DD (UTC; default: 7d)")
     exp.add_argument("--out", type=Path, help="output file (default: stdout)")
     exp.add_argument("--force", action="store_true", help="replace an existing output file")
+
+    keys = sub.add_parser("keys", help="check keys or copy them to the Windows vault")
+    keys.add_argument("action", nargs="?", choices=("show", "move"), default="show")
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
@@ -337,6 +340,9 @@ def main(argv: list[str] | None = None,
     if argv is None:  # real CLI run, not a test calling main([...])
         config.load_user_env()
     args = build_parser().parse_args(argv)
+    if args.command == "keys":
+        from .keys import command
+        return command(args.action)
     if args.command == "brief":
         from .briefing import command
         return command(args)

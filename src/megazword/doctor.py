@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from .keys import get_key
 import shutil
 import subprocess
 import sys
@@ -70,9 +71,9 @@ def checks(home: Path | None = None) -> list[Check]:
 
     from .free_apis import FREE_KEYS
     for name, key_env in FREE_KEYS:
-        present = bool(os.environ.get(key_env))
+        present = bool(get_key(key_env))
         if name == "cloudflare":
-            present = present and bool(os.environ.get("CLOUDFLARE_ACCOUNT_ID"))
+            present = present and bool(get_key("CLOUDFLARE_ACCOUNT_ID"))
         found.append(Check("OK" if present else "WARN", name,
                            "key set" if present else "key not set"))
 

@@ -11,6 +11,9 @@ from megazword import config
 def isolated_home(tmp_path, monkeypatch):
     """Never let tests touch the real ~/.megazword."""
     monkeypatch.setattr(config, "HOME", tmp_path / "home")
+    # Never read or write the real Windows credential store during tests.
+    from megazword import credential_store
+    monkeypatch.setattr(credential_store, "_api", lambda: None)
     # Usage meters read CLI logins under the user's home; point them at an
     # empty folder so no test can reach a real login or the network.
     from megazword import usage_sources

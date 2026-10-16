@@ -775,3 +775,25 @@ Runs stop on a cap or error and leave edits for review. The normal run log recor
 the request count, backend switch history, requests by backend and estimated tokens.
 Stats count those model requests and use
 the coding run's final outcome for their success rate.
+
+## Keymaster: keep provider keys in Windows Credential Manager
+
+`megazword keys` shows each key's name, source (`env`, `vault`, or `missing`),
+and a metadata check: `ok`, `rejected (401/403)`, `rate limited`, or `no answer`.
+It makes at most one GET per provider, with no model inference or retries.
+An `ok` metadata response does not guarantee model access or available free quota.
+Missing or unsupported metadata endpoints show `no answer`.
+
+Run `megazword keys move` yourself once to copy configured Windows user-environment
+keys into Credential Manager. Each copy is read back and verified. Nothing is
+removed automatically. The command prints optional PowerShell lines to remove
+verified user-environment copies; restart apps and shells afterward to discard
+inherited copies. Conflicting process/user values are skipped for you to resolve.
+Environment values take precedence, so existing setups continue working.
+Non-Windows systems keep using environment variables.
+
+No AI model should ever receive a key value. Keymaster prints only names and
+status, sends authentication only to the provider, and includes vault values in
+secret scrubbing. Never paste real keys into chats or commit them. Credential
+Manager protects stored values; programs running as your Windows user can still
+access them. This is not isolation from other programs on your account.
