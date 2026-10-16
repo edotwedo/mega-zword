@@ -19,7 +19,7 @@ cushion; (2) finish big coding projects with many models working together.
    Done when: keys load from Credential Manager, the check table works, tests use fakes. Phil: run the one-time move command.
 3. [phil] **Roadmap heartbeat.** (built 2026-10-16 by Juniper-16: `megazword heartbeat`; waiting on Phil's run times to schedule) A windowless scheduled run copies the next open item here into docs/QUEUE.md for Night Shift (own branch, tests, usage floors, STOP file). Night Shift must push to local Gitea, not GitHub.
    Done when: a scheduled run picks the right item, and nothing runs ahead of order. Phil: approve run times before install (all tasks were turned off 2026-10-16 after popups).
-4. [ ] **Credit scout.** Pull the providers behind OpenRouter, the LiteLLM price list and models.dev; research regional providers (Alibaba Model Studio first); check each offer against 2 sources; auto-test new free models for tool calls and a small coding task; report what's new.
+4. [ ] **Credit scout.** (steps: docs/handoffs/2026-10-16-credit-scout.md) Pull the providers behind OpenRouter, the LiteLLM price list and models.dev; research regional providers (Alibaba Model Studio first); check each offer against 2 sources; auto-test new free models for tool calls and a small coding task; report what's new.
    Done when: `megazword scout` prints a verified list of new leads and tested models. Phil: signups.
 5. [ ] **Team engine.** Planner writes a shared brief; parallel builders each take one piece; tests decide; several attempts on hard pieces; cross-family review; scoreboard of who is good at what.
    Done when: one real piece of another project (e.g. Up Dawg) is finished mostly on free credits.
