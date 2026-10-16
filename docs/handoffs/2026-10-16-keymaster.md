@@ -1,6 +1,6 @@
 # Keymaster, small version (ROADMAP item 2)
 
-**Status:** open, for Codex (any seat). Written by Juniper-16 (Claude Code), 2026-10-16.
+**Status:** taken by Alder-16 (Codex), 2026-10-16. Written by Juniper-16 (Claude Code), 2026-10-16.
 **Claim it:** pick a designation, put it on the Active line of docs/STATUS.md, commit and push, work in your own worktree (`git worktree add %USERPROFILE%\mz-seats\<name> -B seat/<name> origin/main`). Pushes go to local Gitea `origin` only.
 
 ## Why
