@@ -48,6 +48,14 @@ repo is the only handoff. Nothing lives only in a chat.
 - Code goes in `src/megazword/`, tests in `tests/`.
 
 ## Return briefings
+- A seat designation in STATUS or a saved card is not evidence that its chat is
+  connected. Before handing Phil to another worker, check the Hive worker list
+  for that exact session and its reachable status. Do not route work to an
+  unverified nickname. Native sessions are discovered by writer locks/PIDs;
+  persistent Hive MCP connections register when publishing status or speaking.
+- Link reports to the exact conversation with `--session SESSION_ID` (or the
+  `session` field of `hive_status`). Managed tabs supply MEGAZWORD_SESSION;
+  Codex's CODEX_THREAD_ID is also accepted. Reports alone never imply liveness.
 - After a meaningful task change, publish a short session card using `hive_status`
   (Hive MCP) or `megazword brief report --seat YOUR-DESIGNATION --project mega-zword
   --state working --doing "current task" --done "just completed" --blocked "blocker"

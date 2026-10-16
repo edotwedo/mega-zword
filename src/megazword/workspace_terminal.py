@@ -76,9 +76,13 @@ def run_tab(index, root, manifest=None):
         ws.save(marker, {'pid': os.getpid(), 'started': time.time(), 'process_started': process_started})
         size = shutil.get_terminal_size()
         submitted = time.time()
-        child = PtyProcess.spawn(ws.command(tab), cwd=tab['cwd'], dimensions=(size.lines, size.columns))
+        env = dict(os.environ, MEGAZWORD_SESSION=tab['session'], MEGAZWORD_CLIENT=tab['client'])
+        child = PtyProcess.spawn(ws.command(tab), cwd=tab['cwd'], env=env, dimensions=(size.lines, size.columns))
         queue = ReturnQueue(ws.load(root / 'return.json').get('event', 0), summary_inflight=True)
-        ws.save(marker, {'pid': os.getpid(), 'ready': time.time(), 'process_started': process_started})
+        ws.save(marker, {'pid': os.getpid(), 'ready': time.time(), 'process_started': process_started,
+                         'inbox_version': 1})
+        from . import workers
+        worker_id = f"{tab['client']}-{tab['session']}"
         writer = threading.RLock()
         try:
             with ConsoleInput() as console:
@@ -128,13 +132,20 @@ def run_tab(index, root, manifest=None):
                         now = time.monotonic()
                         if idle and now - queue.last_output >= 3:
                             queue.summary_inflight = False
+                        message = workers.pending(worker_id)
+                        safe = (not queue.dirty and not queue.summary_inflight and idle
+                                and now - max(queue.last_key, queue.last_output) >= 3)
                         if (not console.pending() and not incoming.stream.buffer and not incoming.paste
-                                and queue.ready(idle, now)):
-                            prompt = ws.PROMPT
+                                and (queue.ready(idle, now) or (message and safe))):
+                            prompt = (f"Phil sent this to your existing worker session: {message['text']}\n"
+                                      "Reply in Hive with hive_say if available; otherwise reply here."
+                                      if message else ws.PROMPT)
                             if outgoing.bracketed:
                                 prompt = '\x1b[200~' + prompt + '\x1b[201~'
                             with writer:
                                 child.write(prompt + '\r')
+                                if message:
+                                    workers.acknowledge(worker_id, message['id'])
                                 queue.sent()
                                 submitted = time.time()
                         size = shutil.get_terminal_size()

@@ -192,7 +192,7 @@ $('chat-new-session').onclick().then(() => {
     assert out["input"] == "" and out["busy"] is False
 
 
-def test_floor_line_shows_ready_and_seated_names(tmp_path):
+def test_floor_line_labels_provider_availability_separately_from_workers(tmp_path):
     out = run("""
 renderFloor({floor: {ready: true, seats: [
   {name: 'claude', kind: 'cli', status: 'seated'}, {name: 'codex', kind: 'cli', status: 'out'},
@@ -205,11 +205,27 @@ out.missing = snap().floor; out.hiveMissing = snap()['hive-floor'].html;
 """, tmp_path)
     assert out["hiveReady"] == out["ready"]  # Hive panel shows the same line as Home
     assert out["hiveMissing"] == ""
-    assert ">ready<" in out["ready"] and "claude" in out["ready"]
+    assert "Providers available:" in out["ready"] and "claude" in out["ready"]
     assert "codex" not in out["ready"] and "grok" not in out["ready"]  # only seated names
     assert "<b>x</b>" not in out["ready"] and "&lt;b&gt;x&lt;/b&gt;" in out["ready"]
-    assert "not ready" in out["empty"] and "none" in out["empty"]
+    assert "Providers available:" in out["empty"] and "none" in out["empty"]
     assert out["missing"]["html"] == ""  # older servers without `floor` show nothing
+
+
+def test_worker_roster_escapes_names_and_offers_only_reachable_recipients(tmp_path):
+    out = run("""
+renderWorkers([
+ {id:'real-worker',seat:'<b>actual</b>',client:'codex',session:'session-one',connected:true,reachable:true,state:'working',doing:'<img src=x>'},
+ {id:'saved-only',seat:'Old report',connected:false,reachable:false,state:'working',doing:'old task'}]);
+out.workers = snap()['hive-workers'].html;
+out.recipients = snap()['worker-target'].html;
+out.announceEnabled = !document.getElementById('workers-announce').disabled;
+""", tmp_path)
+    assert 'connected' in out['workers'] and 'offline / unverified' in out['workers']
+    assert '<b>actual</b>' not in out['workers'] and '&lt;b&gt;actual&lt;/b&gt;' in out['workers']
+    assert '<img' not in out['workers'] and '&lt;img' in out['workers']
+    assert 'real-worker' in out['recipients'] and 'saved-only' not in out['recipients']
+    assert out['announceEnabled']
 
 
 def test_deep_link_opens_a_tab_once(tmp_path):

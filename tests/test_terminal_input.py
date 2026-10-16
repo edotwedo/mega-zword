@@ -127,13 +127,15 @@ def test_owned_private_console_reads_actual_backspace_without_any_ui(tmp_path):
 
 
 @pytest.mark.skipif(os.name != 'nt', reason='Windows ConPTY relay')
-def test_real_relay_filters_queries_and_delivers_character_backspace(tmp_path):
+@pytest.mark.parametrize('automatic', [False, True])
+def test_real_relay_filters_queries_and_delivers_character_backspace(tmp_path, automatic):
     """Two private ConPTYs, actual run_tab, fake native client; zero AI calls."""
     from pathlib import Path
     from threading import Thread
     from winpty import PtyProcess
     from megazword import workspace as ws
     result = tmp_path / 'received.json'
+    status = tmp_path / 'native-status.txt'
     client = tmp_path / 'client.py'
     client.write_text(
         'import ctypes, json, os\n'
@@ -145,18 +147,25 @@ def test_real_relay_filters_queries_and_delivers_character_backspace(tmp_path):
         'api.SetConsoleMode.argtypes = [w.HANDLE, w.DWORD]\n'
         'api.SetConsoleMode(api.GetStdHandle(w.DWORD(-10).value), 0x200)\n'
         'print("\\x1b[c\\x1b]10;?\\x07CLIENT_READY", flush=True)\n'
+        f'Path({str(status)!r}).write_text("idle")\n'
         'data = b""\n'
         'while not data.endswith(b"\\r"):\n'
         '    data += os.read(0, 4096)\n'
         f'Path({str(result)!r}).write_text(json.dumps(data.decode()))\n'
     )
     ws.save(tmp_path / 'snapshot.json', {'tabs': [
-        {'session': 'fake-probe', 'client': 'test', 'cwd': str(tmp_path)}]})
+        {'session': 'fake-probe', 'client': 'test', 'cwd': str(tmp_path), 'log': str(status)}]})
+    if automatic:
+        ws.save(tmp_path / 'worker-inbox' / 'test-fake-probe' / 'message.json',
+                {'id': 'message', 'text': 'Identify your worker session', 'state': 'queued'})
     relay = tmp_path / 'relay.py'
     relay.write_text(
         'from pathlib import Path\n'
         'from megazword import workspace as ws\n'
+        'from megazword import config\n'
         'from megazword.workspace_terminal import run_tab\n'
+        f'config.HOME = Path({str(tmp_path)!r})\n'
+        'ws.native_idle = lambda tab: True\n'
         f'ws.command = lambda tab: [{sys.executable!r}, {str(client)!r}]\n'
         f'run_tab(0, Path({str(tmp_path)!r}))\n'
     )
@@ -184,12 +193,17 @@ def test_real_relay_filters_queries_and_delivers_character_backspace(tmp_path):
         assert 'CLIENT_READY' in ''.join(output), ''.join(output)
         # The outer ConPTY emits its own DA query before Python starts.
         assert '\x1b]10;?' not in ''.join(output)
-        child.write('abc\x7f\r')
+        if not automatic:
+            child.write('abc\x7f\r')
         while not result.exists() and time.monotonic() < deadline:
             time.sleep(.02)
         assert result.exists(), ''.join(output)
         received = json.loads(result.read_text())
-        assert received.endswith('abc\x7f\r'), repr(received)
+        if automatic:
+            assert 'Identify your worker session' in received
+            assert ws.load(tmp_path / 'worker-inbox' / 'test-fake-probe' / 'message.json')['state'] == 'delivered'
+        else:
+            assert received.endswith('abc\x7f\r'), repr(received)
         assert received.count('\x1b[?1;2c') == 1
         assert received.count('\x1b]10;rgb:cccc/cccc/cccc\x1b\\') == 1
     finally:

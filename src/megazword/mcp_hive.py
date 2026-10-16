@@ -12,7 +12,16 @@ import os
 import sys
 from typing import Any, BinaryIO
 
-from . import __version__, briefing, floor, room
+from . import __version__, briefing, floor, room, workers
+
+_worker_seat = ''
+
+
+def worker_messages():
+    if not _worker_seat:
+        return ''
+    messages = workers.receive(_worker_seat)
+    return ''.join(f'\n[Phil to {_worker_seat}] {text}' for text in messages)
 
 PROTOCOL_VERSION = "2024-11-05"
 SUPPORTED_PROTOCOL_VERSIONS = (PROTOCOL_VERSION,)
@@ -30,6 +39,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "seat": {"type": "string", "description": "Session designation or MEGAZWORD_SEAT"},
+                "session": {"type": "string", "description": "Exact native conversation ID, if known"},
                 "project": {"type": "string"},
                 "state": {"type": "string", "enum": list(briefing.STATES)},
                 "doing": {"type": "string"}, "done": {"type": "string"},
@@ -99,7 +109,7 @@ def hive_read(args: dict) -> str:
     if n <= 0 and msgs:  # like `floor peek -n 0`: cursor only
         return f"(after={len(msgs)})"
     recent = msgs[-n:] if n > 0 else []
-    return f"{_lines(recent) or '(no messages yet)'}\n(after={len(msgs)})"
+    return f"{_lines(recent) or '(no messages yet)'}\n(after={len(msgs)})" + worker_messages()
 
 
 def hive_say(args: dict) -> str:
@@ -108,6 +118,9 @@ def hive_say(args: dict) -> str:
         raise ValueError("text is required")
     room_name = args.get("room") or "hive"
     author = args.get("author") or os.environ.get("MEGAZWORD_SEAT") or "bot"
+    if author != 'bot':
+        global _worker_seat
+        _worker_seat = workers.connect(author)
     out: list[str] = []
     room.say(room_name, text, author=author, write=out.append)
     floor.hear(author)
@@ -125,12 +138,14 @@ def hive_wait(args: dict) -> str:
     # Pin the baseline here so the reply can carry the next cursor.
     after = len(room.read_messages(room_name)) if after is None else max(0, int(after))
     msgs = floor.wait_for(room_name, after=after, timeout=timeout)
-    return f"{_lines(msgs) or '(no new hive message)'}\n(after={after + len(msgs)})"
+    return f"{_lines(msgs) or '(no new hive message)'}\n(after={after + len(msgs)})" + worker_messages()
 
 
 def hive_status(args: dict) -> str:
+    global _worker_seat
     card = briefing.publish(args)
-    return f"Saved report for {card['seat']}."
+    _worker_seat = workers.connect(card['seat'], card.get('session'))
+    return f"Saved report for {card['seat']}." + worker_messages()
 
 
 HANDLERS = {"hive_read": hive_read, "hive_say": hive_say, "hive_wait": hive_wait,

@@ -248,12 +248,14 @@ class App:
         }
 
     def floor_state(self, now: datetime | None = None) -> dict:
+        from . import workers
         seats = floor.roster(self.backends, self.cfg.out_until, now)
         skip = floor.auth_failed(self.cfg.log_path)
         return {
             "seats": [{"name": s.name, "kind": s.kind, "status": s.status} for s in seats],
             "ready": floor.ready(seats),
             "suggest": {k: floor.suggest_seat(k, seats, skip) for k in floor.JOB_KINDS},
+            "workers": workers.roster(),
         }
 
     # --- actions ---------------------------------------------------------
@@ -412,13 +414,21 @@ class App:
         return self._room_thread is not None and self._room_thread.is_alive()
 
     def room_view(self, name: object = None, n: int = 50) -> dict:
+        from . import workers
         name = self._room_name(name)
         state = room.load_state(name)
         return {"room": name, "running": self.room_running(), "paused": state.paused,
                 "primary": state.primary,
                 "turn_count": state.turn_count, "turn_cap": state.turn_cap,
                 "last_speaker": state.last_speaker,
-                "messages": [asdict(m) for m in room.read_messages(name)[-n:]]}
+                "messages": [asdict(m) for m in room.read_messages(name)[-n:]],
+                "workers": workers.roster()}
+
+    def worker_send(self, body: dict) -> dict:
+        from . import workers
+        result = workers.send(str(body.get('target') or ''), body.get('text', ''))
+        room.say(self.cfg.room_name, body['text'], author='phil → workers', write=lambda _: None)
+        return result
 
     def room_say(self, body: dict) -> dict:
         name = self._room_name(body.get("room"))
@@ -595,6 +605,7 @@ def make_handler(app: App, port: int, remote: bool = False):
                           "/api/tabs/send": app.tabs_send,
                           "/api/tabs/new-session": app.tabs_new_session,
                           "/api/room/say": app.room_say,
+                          "/api/workers/send": app.worker_send,
                           "/api/room/start": app.room_start,
                           "/api/room/pause": app.room_pause,
                           "/api/room/stop": app.room_stop}.get(self.path)

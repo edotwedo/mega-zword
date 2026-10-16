@@ -310,13 +310,17 @@ main[hidden], #hive[hidden] { display:none; }
   <section class="wide">
     <h2 id="hive-title">Hive room</h2>
     <div id="hive-floor" class="note" role="status" style="margin:0 0 8px"></div>
+    <div id="hive-workers" aria-label="Worker sessions"></div>
+    <p class="note">Connected sessions are checked locally. Saved reports alone do not prove a worker is online. Terminal messages wait for an idle turn and an empty input line.</p>
     <p class="room-status" id="room-status" role="status" aria-live="polite">Room is idle.</p>
     <div class="row" id="room-summary" aria-label="Room status"></div>
     <div class="room-messages" id="room-messages" role="region" aria-label="Hive room messages" tabindex="0"></div>
     <label class="prompt-label" for="room-input">&gt;_ <span class="sr-only">Your message to the room</span></label>
+    <label>Send to <select id="worker-target" aria-label="Message recipient"><option value="">Room replies (separate one-shot bots)</option></select></label>
     <div class="row room-compose">
       <textarea id="room-input" aria-label="Your message to the room" placeholder="Say something to the room. Use @claude, @codex, @grok or @gemini to choose who replies."></textarea>
       <button id="room-send" type="button">Send</button>
+      <button id="workers-announce" type="button">Announce to connected workers</button>
     </div>
     <div class="row">
       <label>Turns <input id="room-turn-cap" type="number" min="1" max="50" value="12" aria-label="Room turn limit"></label>
@@ -507,8 +511,8 @@ function renderFloor(s) {
   let html = "";
   if (f) {
     const seated = (f.seats || []).filter(x => x.status === "seated").map(x => x.name);
-    html = `Floor: <b class="${f.ready ? "ok" : "warn"}">${f.ready ? "ready" : "not ready"}</b>`
-      + ` · seated ${seated.length ? seated.map(aiTag).join(", ") : '<span class="empty">none</span>'}`;
+    html = `Providers available: ${seated.length ? seated.map(aiTag).join(", ") : '<span class="empty">none</span>'}`;
+    renderWorkers(f.workers || []);
   }
   $("floor").innerHTML = html; $("hive-floor").innerHTML = html;
 }
@@ -1015,6 +1019,7 @@ async function sendChat() {
 }
 
 function renderRoom(data) {
+  renderWorkers(data.workers || []);
   const turnsLeft = Math.max(0, data.turn_cap - data.turn_count);
   $("room-summary").innerHTML = `<span>Primary project: <b>${esc(data.primary)}</b></span>
     <span>Turns: <b>${data.turn_count}/${data.turn_cap}</b> (${turnsLeft} left)</span>
@@ -1055,9 +1060,44 @@ async function roomAction(path, body = {}) {
 
 $("tab-home").onclick = () => setView("home");
 $("tab-hive").onclick = () => setView("hive");
+function renderWorkers(workers) {
+  const signature = JSON.stringify(workers);
+  if ($("hive-workers").dataset.signature === signature) return;
+  $("hive-workers").dataset.signature = signature;
+  const oldOpen = document.getElementById('worker-history')?.open;
+  const row = w => `<article class="room-message"><b>${esc(w.seat)}</b> · ${w.connected ? 'connected' : 'offline / unverified'} · ${w.connected ? esc(w.state) : 'last reported ' + esc(w.state)}`
+    + `<div>${esc(w.doing || 'Task not reported')}${w.session ? ' · session ' + esc(w.session) : ''}</div>`
+    + `<div>${w.reachable ? 'Messages can be queued' : w.connected ? 'Reopen this managed tab or connect Hive MCP to receive messages' : 'Saved report only; cannot receive messages'}</div></article>`;
+  const connected = workers.filter(w => w.connected), offline = workers.filter(w => !w.connected);
+  $("hive-workers").innerHTML = '<h3>Connected worker sessions</h3>' + connected.map(row).join('')
+    + (connected.length ? '' : '<p class="empty">No connected worker sessions found.</p>')
+    + (offline.length ? `<details id="worker-history" ${oldOpen ? 'open' : ''}><summary>Saved reports (${offline.length}; offline / unverified)</summary>${offline.map(row).join('')}</details>` : '');
+  const select = $("worker-target"), selected = select.value;
+  select.innerHTML = '<option value="">Room replies (separate one-shot bots)</option>'
+    + workers.filter(w => w.reachable).map(w => `<option value="${esc(w.id)}">${esc(w.seat)} (${esc(w.client)})</option>`).join('');
+  if (selected && !workers.some(w => w.reachable && w.id === selected)) {
+    select.innerHTML += `<option value="${esc(selected)}">Worker disconnected — choose a recipient</option>`;
+  }
+  select.value = selected; // Never silently redirect a worker's draft to a one-shot bot.
+  $("workers-announce").disabled = !workers.some(w => w.reachable);
+}
+async function sendToWorkers(target, text) {
+  const result = await post('/api/workers/send', {target, text});
+  toast(`Queued for ${result.queued.join(', ')}. Delivery waits for the worker.`);
+  $("room-input").value = '';
+  await loadRoom();
+}
+$("workers-announce").onclick = async () => {
+  const text = $("room-input").value.trim(); if (!text) return;
+  try { await sendToWorkers('*', text); } catch (e) { toast(e.message); }
+};
 $("room-send").onclick = async () => {
   const text = $("room-input").value.trim(); if (!text) return;
   $("room-send").disabled = true;
+  if ($("worker-target").value) {
+    try { await sendToWorkers($("worker-target").value, text); } catch (e) { toast(e.message); }
+    $("room-send").disabled = false; return;
+  }
   try { await post("/api/room/say", {room:"hive", text, start:true,
     turns:Number($("room-turn-cap").value), project:state?.launch_project}); $("room-input").value = ""; await loadRoom(); }
   catch (e) { toast(e.message); }

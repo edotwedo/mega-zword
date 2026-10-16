@@ -260,14 +260,14 @@ def desktop(root):
     return target
 
 
-def restore(root=None, preview=False):
+def restore(root=None, preview=False, automatic=False):
     root = root or home()
     if preview:
-        return _restore(root, preview=True)
+        return _restore(root, preview=True, automatic=automatic)
     with locked(root / 'restore-batch', timeout=0) as acquired:
         if not acquired:
             return []
-        return _restore(root)
+        return _restore(root, automatic=automatic)
 
 
 def terminal_batch(plans):
@@ -280,19 +280,26 @@ def terminal_batch(plans):
     return args
 
 
-def _restore(root, preview=False):
+def _restore(root, preview=False, automatic=False):
     root = root or home()
     tabs = load(root / 'snapshot.json').get('tabs', [])
     if not tabs:
         raise ValueError('No saved terminal sessions. Run workspace snapshot first.')
     plans, selected, skipped = [], [], []
+    # A Terminal launch request is not a successful native session. Never keep
+    # opening failed tabs on camera return; an explicit Restore Hive retries.
+    attempts = load(root / 'launch-attempts.json')
     for i, tab in enumerate(tabs):
         # Check again at launch. Never resume over a live writer.
         active = (session_locked(tab['session']) if tab['client'] == 'codex'
                   else alive(tab.get('pid'), started=tab.get('pid_started'), name=tab['client'] + '.exe'))
         runtime = load(root / f"tab-{tab['session']}.json")
         if active or runtime_alive(runtime):
+            attempts.pop(tab['session'], None)
             skipped.append({'session': tab['session'], 'reason': 'already open'})
+            continue
+        if automatic and tab['session'] in attempts:
+            skipped.append({'session': tab['session'], 'reason': 'previous launch unconfirmed; use Restore Hive to retry'})
             continue
         if not Path(tab['cwd']).is_dir():
             skipped.append({'session': tab['session'], 'reason': 'folder missing'})
@@ -304,8 +311,9 @@ def _restore(root, preview=False):
             continue
         args = ['wt.exe', '-w', 'new', 'new-tab', '--title', tab['title'],
                 '--suppressApplicationTitle', '--tabColor', tab['color'], '-d', tab['cwd'],
-                str(Path(sys.executable).with_name('python.exe')) if Path(sys.executable).name.lower() == 'pythonw.exe' else sys.executable,
-                '-m', 'megazword.workspace', 'tab', str(len(selected))]
+                  '--',
+                  str(Path(sys.executable).with_name('python.exe')) if Path(sys.executable).name.lower() == 'pythonw.exe' else sys.executable,
+                  '-m', 'megazword.workspace', 'tab', str(len(selected))]
         plans.append(args)
         selected.append(tab)
     if not preview and plans:
@@ -315,12 +323,18 @@ def _restore(root, preview=False):
         save(manifest, {'tabs': selected})
         for args in plans:
             args += ['--manifest', str(manifest)]
+        # Record before launching so even a failed wt process cannot make a
+        # camera-return retry storm. Manual restore always permits another try.
+        for tab in selected:
+            attempts[tab['session']] = {'requested': time.time(), 'manifest': str(manifest)}
+        save(root / 'launch-attempts.json', attempts)
         env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1]))
         subprocess.run(terminal_batch(plans), env=env, check=True,
                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         save(root / 'restore-status.json', {'time': time.time(), 'desktop': target,
-             'opened': [t['session'] for t in selected], 'skipped': skipped})
+               'requested': [t['session'] for t in selected], 'opened': [], 'skipped': skipped})
     elif not preview:
+        save(root / 'launch-attempts.json', attempts)
         save(root / 'restore-status.json', {'time': time.time(), 'opened': [], 'skipped': skipped})
     return plans
 

@@ -134,7 +134,11 @@ def watch(root):
                 if gate.observe(camera.read(), time.monotonic()):
                     save(root / 'return.json', {'event': time.time(), 'trigger': 'owner return'})
                     from .workspace import restore
-                    restore(root)
+                    try:
+                        restore(root, automatic=True)
+                    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+                        save(root / 'camera-status.json', {'state': 'restore failed; watcher continues',
+                             'time': time.time(), 'error': str(exc)})
                 time.sleep(.25)
         finally:
             camera.close()

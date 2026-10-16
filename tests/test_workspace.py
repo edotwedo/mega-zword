@@ -32,7 +32,38 @@ def test_all_six_saved_tabs_launch_in_one_fresh_window(tmp_path, monkeypatch):
     # A timer snapshot cannot change the sessions or index order of a pending batch.
     w.save(tmp_path / 'snapshot.json', {'tabs': list(reversed(rows))})
     assert [t['session'] for t in w.load(manifest)['tabs']] == [f'seat-{i}' for i in range(6)]
-    assert w.load(tmp_path / 'restore-status.json')['opened'] == [f'seat-{i}' for i in range(6)]
+    assert w.load(tmp_path / 'restore-status.json')['requested'] == [f'seat-{i}' for i in range(6)]
+    assert w.load(tmp_path / 'restore-status.json')['opened'] == []
+    assert args.count('--') == 6
+
+
+def test_owner_return_does_not_repeat_an_unconfirmed_launch(tmp_path, monkeypatch):
+    w.save(tmp_path / 'snapshot.json', {'tabs': [dict(tab(), cwd=str(tmp_path))]})
+    monkeypatch.setattr(w, 'session_locked', lambda _: False)
+    monkeypatch.setattr(w, 'command', lambda _: ['fake-cli'])
+    calls = []
+    monkeypatch.setattr(w, 'desktop', lambda _: 2)
+    monkeypatch.setattr(w.subprocess, 'run', lambda *a, **kw: calls.append(a))
+    assert len(w.restore(tmp_path, automatic=True)) == 1
+    assert w.restore(tmp_path, automatic=True) == []
+    assert w.restore(tmp_path, automatic=True) == []
+    assert len(calls) == 1
+    assert 'previous launch unconfirmed' in w.load(tmp_path / 'restore-status.json')['skipped'][0]['reason']
+    assert len(w.restore(tmp_path)) == 1  # explicit Restore Hive retries
+    assert len(calls) == 2
+
+
+def test_launch_failure_is_not_retried_by_owner_camera(tmp_path, monkeypatch):
+    w.save(tmp_path / 'snapshot.json', {'tabs': [dict(tab(), cwd=str(tmp_path))]})
+    monkeypatch.setattr(w, 'session_locked', lambda _: False)
+    monkeypatch.setattr(w, 'command', lambda _: ['fake-cli'])
+    monkeypatch.setattr(w, 'desktop', lambda _: 2)
+    def broken(*a, **kw):
+        raise OSError('launch failed')
+    monkeypatch.setattr(w.subprocess, 'run', broken)
+    with pytest.raises(OSError):
+        w.restore(tmp_path, automatic=True)
+    assert w.restore(tmp_path, automatic=True) == []
 
 
 def test_missing_seat_does_not_prevent_other_saved_seats_restoring(tmp_path, monkeypatch):
@@ -45,7 +76,7 @@ def test_missing_seat_does_not_prevent_other_saved_seats_restoring(tmp_path, mon
     monkeypatch.setattr(w.subprocess, 'run', lambda *a, **kw: None)
     assert len(w.restore(tmp_path)) == 1
     status = w.load(tmp_path / 'restore-status.json')
-    assert status['opened'] == ['valid']
+    assert status['requested'] == ['valid']
     assert status['skipped'] == [{'session': 'missing', 'reason': 'folder missing'}]
 
 

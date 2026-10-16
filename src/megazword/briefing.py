@@ -42,6 +42,9 @@ def publish(body: dict, home: Path | None = None, now=None) -> dict:
             "project": _text(body.get("project", ""), "project", 120),
             **{key: _text(body.get(key, ""), key) for key in FIELDS},
             "updated": (now or datetime.now(timezone.utc)).isoformat()}
+    session = body.get('session') or os.getenv('MEGAZWORD_SESSION') or os.getenv('CODEX_THREAD_ID')
+    if session:
+        card['session'] = _seat(session)
     path = (home or config.HOME) / "briefings" / f"{seat}.json"
     with locked(path):
         write_atomic(path, json.dumps(card, ensure_ascii=False) + "\n")
@@ -62,6 +65,7 @@ def snapshot(home: Path | None = None, now=None) -> dict:
                 raise ValueError("invalid card")
             age = max(0, (now - stamp).total_seconds())
             cards.append({"seat": seat, "state": card["state"],
+                          "session": card.get('session', ''),
                           "project": _text(card.get("project", ""), "project", 120),
                           **{k: _text(card.get(k, ""), k) for k in FIELDS},
                           "updated": stamp.isoformat(), "age_seconds": int(age),
@@ -92,6 +96,7 @@ def add_parser(sub):
     parser = sub.add_parser("brief", help="catch up from saved session reports; no AI calls")
     parser.add_argument("action", nargs="?", choices=("show", "report"), default="show")
     parser.add_argument("--seat", help="session designation (or MEGAZWORD_SEAT)")
+    parser.add_argument("--session", help="exact native conversation ID for the worker list")
     parser.add_argument("--project", default="")
     parser.add_argument("--state", choices=STATES, default="working")
     for field in FIELDS:
@@ -135,7 +140,7 @@ def command(args) -> int:
     if args.action == "report":
         try:
             card = publish({key: getattr(args, key) for key in
-                            ("seat", "project", "state", *FIELDS)})
+                            ("seat", "project", "state", "session", *FIELDS)})
         except ValueError as exc:
             print(f"[megazword] {exc}")
             return 2

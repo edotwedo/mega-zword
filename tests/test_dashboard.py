@@ -67,6 +67,17 @@ def test_state_has_floor(app):
     json.dumps(f)
 
 
+def test_hive_lists_real_workers_and_targets_without_starting_one_shot(app):
+    from megazword import workers
+    workers.connect('reachable-seat')
+    data = app.room_view()
+    assert any(w['seat'] == 'reachable-seat' and w['reachable'] for w in data['workers'])
+    result = app.worker_send({'target': 'reachable-seat', 'text': 'Which chat are you?'})
+    assert result['queued'] == ['reachable-seat']
+    assert workers.receive('reachable-seat') == ['Which chat are you?']
+    assert not app.room_running()
+
+
 def test_day_chart_counts_all_runs_not_just_recent_sixty(app):
     stamp = datetime.now(timezone.utc).isoformat()
     app.cfg.log_path.write_text("\n".join(json.dumps({
