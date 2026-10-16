@@ -19,7 +19,7 @@ price lists, are where direct free tiers and signup grants hide.
   routing.py, ledger.py, review.py, heartbeat.py or night.py.
 
 ## Steps (do the first one not yet done; tick it here with date and commit)
-1. [ ] `providers_from_endpoints(payload) -> list[str]`: parse OpenRouter's
+1. [x] (2026-10-16, written by free model nvidia via heartbeat on night/2026-10-16-2; test mocks fixed by Juniper-16) `providers_from_endpoints(payload) -> list[str]`: parse OpenRouter's
    `GET https://openrouter.ai/api/v1/models/{author}/{slug}/endpoints` response
    (`{"data": {"endpoints": [{"provider_name": ..., "pricing": {...}}, ...]}}`) into sorted,
    unique provider names; plus `fetch_endpoints(model_id)`. Tests: normal payload,
@@ -53,3 +53,6 @@ Upstage, Chutes, GitHub Models.
 ## Done when
 `megazword scout` lists providers from both sources with new ones first, tests pass with
 fakes, GUIDE has the section, and ROADMAP item 4 is ticked.
+
+## Heartbeat log
+- 2026-10-16: step 1 done (scout.providers_from_endpoints, fetch_endpoints, 4 tests). openrouter, groq and zai hit the 60-step cap first; nvidia finished with one broken mock. Next: step 2, zero_price_litellm.
