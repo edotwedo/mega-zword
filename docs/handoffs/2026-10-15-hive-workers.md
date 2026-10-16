@@ -40,6 +40,12 @@ from suppressed launch retries. No model was called for these checks.
 
 ## Verification and next step
 
+Source6608cae saved on local Gitea main/seat branch. Built wheel installed in both
+dashboard venv and system Python311; all eight app/worker source/UI files in the
+dashboard installation byte-match this checkout. Desktop and Start Menu shortcuts
+show build6608cae, with previous shortcuts backed up. No app window was opened,
+closed or restarted by this seat. Reopening the app is Phil's next step.
+
 Full suite1267 passed (191.63s); final worker/UI checks19 passed after optional-
 dependency and disconnected-recipient checks. Private real two-ConPTY tests cover
 character Backspace and addressed-message delivery. Headless Chrome exercised the
