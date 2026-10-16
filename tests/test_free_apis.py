@@ -42,7 +42,9 @@ def test_request_and_answer(api, monkeypatch):
 
 
 def test_groq_gpt_oss_tool_requests_use_supported_reasoning_format(monkeypatch):
+    from megazword import free_apis
     monkeypatch.setenv("TEST_API_KEY", "secret-test-credential")
+    monkeypatch.setattr(free_apis, "_use_curl", lambda *args: False)
     groq = OpenAICompatibleBackend("groq", base_url="https://api.groq.com/openai/v1",
                                    model="openai/gpt-oss-20b", key_env="TEST_API_KEY")
 
@@ -59,6 +61,70 @@ def test_groq_gpt_oss_tool_requests_use_supported_reasoning_format(monkeypatch):
     message = groq.chat([{"role": "user", "content": "finish"}],
                         [{"type": "function", "function": {"name": "finish"}}])
     assert message["tool_calls"][0]["function"]["name"] == "finish"
+
+
+def test_groq_curl_transport_keeps_key_out_of_arguments_and_tracks_limits(monkeypatch):
+    from types import SimpleNamespace
+    from megazword import free_apis
+
+    monkeypatch.setenv("TEST_API_KEY", "secret-test-credential")
+    monkeypatch.setattr(free_apis, "_use_curl", lambda name, *args: name == "groq")
+    monkeypatch.setattr(free_apis, "_curl_bin", lambda: "curl.exe")
+    recorded = []
+    monkeypatch.setattr(free_apis, "_record_request_quota",
+                        lambda *args: recorded.append(args))
+    groq = OpenAICompatibleBackend("groq", timeout=7,
+                                   base_url="https://api.groq.com/openai/v1",
+                                   model="openai/gpt-oss-20b", key_env="TEST_API_KEY")
+
+    def fake_run(args, **kwargs):
+        assert "secret-test-credential" not in " ".join(args)
+        assert "@-" in args
+        header_path = args[args.index("-H") + 1][1:]
+        assert "Bearer secret-test-credential" in open(header_path, encoding="utf-8").read()
+        assert json.loads(kwargs["input"]) == {
+            "model": "openai/gpt-oss-20b",
+            "messages": [{"role": "user", "content": "hello"}],
+            "stream": False,
+        }
+        headers_path = args[args.index("-D") + 1]
+        with open(headers_path, "w", encoding="utf-8") as handle:
+            handle.write("HTTP/1.1 200 OK\r\nX-RateLimit-Remaining-Requests: 42\r\n"
+                         "X-RateLimit-Limit-Requests: 60\r\n"
+                         "X-RateLimit-Reset-Requests: 1m\r\n\r\n")
+        return SimpleNamespace(returncode=0, stdout=reply().read())
+
+    monkeypatch.setattr(free_apis.subprocess, "run", fake_run)
+    message = groq.chat([{"role": "user", "content": "hello"}])
+    assert message["content"] == " answer "
+    assert groq.remaining_requests == 42 and groq.limit_requests == 60
+    assert recorded == [("groq", 42, 60, "1m")]
+
+
+def test_groq_curl_cloudflare_block_is_specific_and_secret_safe(monkeypatch):
+    from types import SimpleNamespace
+    from megazword import free_apis
+
+    monkeypatch.setattr(free_apis, "_curl_bin", lambda: "curl.exe")
+
+    def fake_run(args, **kwargs):
+        headers_path = args[args.index("-D") + 1]
+        with open(headers_path, "w", encoding="utf-8") as handle:
+            handle.write("HTTP/1.1 403 Forbidden\r\n\r\n")
+        return SimpleNamespace(returncode=0,
+                               stdout=b"Error 1010: Access denied for Bearer secret")
+
+    monkeypatch.setattr(free_apis.subprocess, "run", fake_run)
+    with pytest.raises(free_apis.APIHTTPError) as caught:
+        free_apis._curl_json_post("https://example.test", {}, {}, 5)
+    assert str(caught.value) == \
+        "API HTTP error 403: Cloudflare blocked this HTTP client (error 1010)"
+    assert "Bearer secret" not in repr(caught.value)
+
+
+def test_retry_after_accepts_lowercase_curl_header():
+    from megazword.free_apis import retry_seconds
+    assert retry_seconds({"retry-after": "37"}) == 37
 
 
 @pytest.mark.parametrize("value", [None, "", "a-key"])
@@ -261,7 +327,9 @@ def test_presets_config_and_routes(monkeypatch):
 @pytest.mark.parametrize("name, key_env", [("openrouter", "OPENROUTER_API_KEY"),
                                            ("groq", "GROQ_API_KEY")])
 def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
+    from megazword import free_apis
     monkeypatch.setattr("megazword.ollama.reachable", lambda *a, **k: False)
+    monkeypatch.setattr(free_apis, "_use_curl", lambda *args: False)
     monkeypatch.setenv(key_env, "secret-test-credential")
     calls = []
     def fake(request, **kwargs):

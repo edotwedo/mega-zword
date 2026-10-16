@@ -6,10 +6,14 @@ import json
 import os
 import re
 import math
+import shutil
+import subprocess
+import tempfile
 import time
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 
@@ -86,10 +90,114 @@ class ToolsUnsupported(RuntimeError):
 class APIHTTPError(RuntimeError):
     """HTTP status for retries, optionally with a sanitized validation reason."""
 
-    def __init__(self, code, headers=None, reason=""):
+    def __init__(self, code, headers=None, reason="", blocked=False):
         self.code = code
         self.retry_after = retry_seconds(headers) if code == 429 else None
-        super().__init__(http_error_message(code, headers) + (": " + reason if reason else ""))
+        if blocked:
+            message = "API HTTP error 403: Cloudflare blocked this HTTP client (error 1010)"
+        else:
+            message = http_error_message(code, headers) + (": " + reason if reason else "")
+        super().__init__(message)
+
+
+class _BytesBody:
+    def __init__(self, raw: bytes):
+        self._raw = raw
+
+    def read(self, n=16384):
+        return self._raw[:n]
+
+
+def _curl_bin() -> str | None:
+    return shutil.which("curl.exe") or shutil.which("curl")
+
+
+def _use_curl(name: str, url: str | None = None) -> bool:
+    # This PC's Python TLS fingerprint is blocked by Cloudflare on Groq.
+    # curl reads the authorization header from a temporary file, not argv.
+    return (name == "groq" and bool(_curl_bin()) and url is not None
+            and urllib.parse.urlsplit(url).hostname == "api.groq.com")
+
+
+def _cloudflare_1010(body: bytes) -> bool:
+    text = body.decode("utf-8", "replace").lower()
+    return "1010" in text or "access denied" in text
+
+
+def _parse_curl_headers(text: str) -> tuple[int, dict[str, str]]:
+    status = 0
+    headers: dict[str, str] = {}
+    for line in text.splitlines():
+        if line.upper().startswith("HTTP/"):
+            fields = line.split()
+            status = int(fields[1]) if len(fields) > 1 and fields[1].isdigit() else 0
+            headers = {}
+        elif ":" in line:
+            name, value = line.split(":", 1)
+            headers[name.strip().lower()] = value.strip()
+    return status, headers
+
+
+def _header(headers, name: str):
+    if headers is None:
+        return None
+    direct = headers.get(name)
+    if direct is not None:
+        return direct
+    target = name.lower()
+    return next((value for key, value in headers.items()
+                 if str(key).lower() == target), None)
+
+
+def _curl_json_post(url: str, headers: dict[str, str], body: dict,
+                    timeout: float, tools: list[dict] | None = None
+                    ) -> tuple[dict, dict[str, str]]:
+    """POST JSON through curl without exposing credentials in process args."""
+    curl = _curl_bin()
+    if not curl:
+        raise RuntimeError("API connection failed: curl is unavailable")
+    seconds = max(1, int(timeout or 1))
+    with tempfile.TemporaryDirectory() as folder:
+        header_file = os.path.join(folder, "headers.txt")
+        response_headers_file = os.path.join(folder, "response-headers.txt")
+        with open(header_file, "w", encoding="utf-8", newline="\n") as handle:
+            for name, value in headers.items():
+                if any(char in name or char in value for char in "\r\n"):
+                    raise RuntimeError("invalid API request header")
+                handle.write(f"{name}: {value}\n")
+        try:
+            result = subprocess.run(
+                [curl, "-sS", "--http1.1", "--max-time", str(seconds),
+                 "-X", "POST", url, "-D", response_headers_file,
+                 "-H", f"@{header_file}", "--data-binary", "@-"],
+                input=json.dumps(body).encode("utf-8"),
+                capture_output=True, timeout=seconds + 5,
+            )
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("API request timed out") from None
+        raw = result.stdout or b""
+        header_text = ""
+        if os.path.exists(response_headers_file):
+            with open(response_headers_file, encoding="utf-8", errors="replace") as handle:
+                header_text = handle.read()
+        code, response_headers = _parse_curl_headers(header_text)
+        if code >= 400:
+            _raise_http(code, response_headers, raw, tools)
+        if result.returncode != 0 or code == 0:
+            raise RuntimeError("API connection failed: unable to connect (network or DNS)")
+        try:
+            return json.loads(raw.decode("utf-8")), response_headers
+        except (ValueError, UnicodeError):
+            raise RuntimeError("API returned an invalid or empty chat response") from None
+
+
+def _raise_http(code, headers, raw: bytes, tools):
+    if code == 403 and _cloudflare_1010(raw):
+        raise APIHTTPError(code, headers, blocked=True)
+    reason = _safe_reason(_BytesBody(raw)) if code in (400, 403, 422) else ""
+    if tools is not None and code in (400, 422):
+        raise ToolsUnsupported("API rejected native tools" + (": " + reason if reason else ""))
+    raise APIHTTPError(code, headers, reason)
 
 
 def _cloudflare_daily_quota_exhausted(raw: bytes) -> bool:
@@ -174,6 +282,19 @@ class OpenAICompatibleBackend(Backend):
             url = url.replace("{account}", account)
         return url.rstrip("/") + "/chat/completions"
 
+    def _record_rate_limit_headers(self, headers) -> None:
+        try:
+            remaining = _header(headers, "x-ratelimit-remaining-requests")
+            limit = _header(headers, "x-ratelimit-limit-requests")
+            self.remaining_requests = int(remaining) if remaining is not None else None
+            self.limit_requests = int(limit) if limit is not None else None
+            if self.remaining_requests is not None and self.limit_requests is not None:
+                _record_request_quota(
+                    self.name, self.remaining_requests, self.limit_requests,
+                    _header(headers, "x-ratelimit-reset-requests"))
+        except (TypeError, ValueError):
+            self.remaining_requests = self.limit_requests = None
+
     def _run(self, prompt: str) -> str:
         message = self.chat([{"role": "user", "content": prompt}])
         content = message.get("content")
@@ -205,30 +326,27 @@ class OpenAICompatibleBackend(Backend):
                 # its default raw format can reject an otherwise valid call.
                 if (self.name.startswith("groq") and self.model.startswith("openai/gpt-oss-")):
                     body["reasoning_format"] = "parsed"
-            request = urllib.request.Request(
-                self._endpoint(),
-                data=json.dumps(body).encode("utf-8"),
-                headers=headers,
-                method="POST",
-            )
-            with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:
-                headers = getattr(response, "headers", {})
-                try:
-                    remaining = headers.get("x-ratelimit-remaining-requests")
-                    limit = headers.get("x-ratelimit-limit-requests")
-                    self.remaining_requests = int(remaining) if remaining is not None else None
-                    self.limit_requests = int(limit) if limit is not None else None
-                    if self.remaining_requests is not None and self.limit_requests is not None:
-                        _record_request_quota(
-                            self.name, self.remaining_requests, self.limit_requests,
-                            headers.get("x-ratelimit-reset-requests"))
-                except (TypeError, ValueError):
-                    self.remaining_requests = self.limit_requests = None
-                payload = json.loads(response.read().decode("utf-8"))
+            if _use_curl(self.name, self._endpoint()):
+                payload, response_headers = _curl_json_post(
+                    self._endpoint(), headers, body, timeout or self.timeout, tools)
+                self._record_rate_limit_headers(response_headers)
+            else:
+                request = urllib.request.Request(
+                    self._endpoint(),
+                    data=json.dumps(body).encode("utf-8"),
+                    headers=headers,
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:
+                    response_headers = getattr(response, "headers", {})
+                    self._record_rate_limit_headers(response_headers)
+                    payload = json.loads(response.read().decode("utf-8"))
             message = payload["choices"][0]["message"]
             if not isinstance(message, dict):
                 raise ValueError("missing answer")
             return json.loads(json.dumps(message).replace(key, "[REDACTED]"))
+        except (APIHTTPError, ToolsUnsupported):
+            raise
         except urllib.error.HTTPError as exc:
             if exc.code == 429 and self.name in {"cloudflare", "mistral"}:
                 try:
@@ -266,7 +384,7 @@ class OpenAICompatibleBackend(Backend):
 
 def retry_seconds(headers=None) -> float:
     """Keep Retry-After precision for numeric seconds or an HTTP-date."""
-    retry = (headers.get("Retry-After") if headers is not None else None) or ""
+    retry = _header(headers, "Retry-After") or ""
     try:
         seconds = float(str(retry).strip())
         return max(0, seconds) if math.isfinite(seconds) else 120

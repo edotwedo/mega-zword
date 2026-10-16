@@ -24,6 +24,7 @@ REPO = Path(__file__).resolve().parent.parent
 
 def call_with(monkeypatch, exc):
     monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    monkeypatch.setattr(free_apis, "_use_curl", lambda *args: False)
 
     def boom(*a, **k):
         raise exc
