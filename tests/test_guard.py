@@ -53,7 +53,8 @@ def test_trainers_go_first_for_easy_only():
 
 
 def test_default_easy_route_starts_with_verified_tencent_group():
-    assert DEFAULT_ROUTE["easy"][:4] == [
+    assert DEFAULT_ROUTE["easy"][:6] == [
         "tencent-glm-5.3-flash", "tencent-glm-5.3",
         "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+        "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
     ]

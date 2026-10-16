@@ -40,6 +40,24 @@ def test_free_test_checks_available_providers_once_and_omits_unconfigured(
     assert groq.timeout == free_test.TIMEOUT_SECONDS
 
 
+def test_free_test_includes_all_six_tencent_models():
+    names = {
+        "tencent-glm-5.3-flash", "tencent-glm-5.3",
+        "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+        "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
+    }
+    assert names.issubset(free_test.PROVIDERS)
+    assert "tencent" not in free_test.PROVIDERS
+
+
+def test_free_test_allows_slow_tencent_replies(monkeypatch):
+    monkeypatch.setattr(free_test, "OllamaBackend",
+                        lambda name, model: FakeBackend(name, available=False))
+    backend = FakeBackend("tencent-kimi-k3")
+    assert free_test.command({backend.name: backend}, {}, [backend.name]) == 0
+    assert backend.timeout == 180
+
+
 def test_free_test_reports_failures_and_redacts_credentials(monkeypatch, capsys):
     monkeypatch.setenv("TEST_API_KEY", "secret-provider-token")
     monkeypatch.setenv("CLOUDFLARE_ACCOUNT_ID", "secret-account-id")

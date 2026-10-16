@@ -62,14 +62,19 @@ DEFAULT_ROUTE = {
     # instruction to use Tencent now takes precedence.
     "easy": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
              "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+             "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
              "mistral", "gemini-api", "openrouter", "groq", "cloudflare",
              "zai", "nvidia", "nvidia-lightning", "ollama", "gemini", "grok", "codex", "claude"],
     "medium": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
-               "tencent-kimi-k2.7-code", "tencent-kimi-k3", "openrouter", "groq",
+               "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+               "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
+               "openrouter", "groq",
                "cloudflare", "zai", "gemini-api",
                "mistral", "nvidia", "nvidia-lightning", "ollama", "gemini", "codex", "grok", "claude"],
     "hard": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
-             "tencent-kimi-k2.7-code", "tencent-kimi-k3", "openrouter", "groq",
+             "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+             "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
+             "openrouter", "groq",
              "cloudflare", "zai", "gemini-api",
              "mistral", "nvidia", "nvidia-lightning", "ollama", "gemini", "claude", "codex", "grok"],
 }
@@ -100,11 +105,13 @@ DEFAULT_FREE = {
     "nvidia-lightning": "nvidia/nemotron-3.5-lightning-30b-a3b",
     "tencent": "deepseek-v4-pro",
     # Independently metered Tencent TokenHub free-trial services, verified
-    # with native tool calls. They share TENCENT_TOKENHUB_API_KEY.
+    # with normal coding prompts and native tool calls. They share one key.
     "tencent-glm-5.3-flash": "glm-5.3-flash",
     "tencent-glm-5.3": "glm-5.3",
     "tencent-kimi-k2.7-code": "kimi-k2.7-code",
     "tencent-kimi-k3": "kimi-k3",
+    "tencent-deepseek-v4-pro": "deepseek-v4-pro",
+    "tencent-deepseek-v4-flash-vision-exp": "deepseek/deepseek-v4-flash-vision-exp",
     # The free account returns 429/code 1300 for Mistral Small but allows
     # Ministral 3B under the same key and API limits (verified 2026-10-14).
     "mistral": "ministral-3b-2512",
@@ -112,6 +119,8 @@ DEFAULT_FREE = {
 
 DEFAULT_FREE_FAILOVER = ["tencent-glm-5.3-flash", "tencent-glm-5.3",
                          "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+                         "tencent-deepseek-v4-pro",
+                         "tencent-deepseek-v4-flash-vision-exp",
                          "openrouter", "groq", "groq-120b", "groq-qwen",
                          "groq-allam", "cloudflare", "zai", "gemini-api",
                          "gemini-api-31-lite",

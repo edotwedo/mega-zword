@@ -10,6 +10,8 @@ TENCENT_BACKENDS = (
     "tencent-glm-5.3",
     "tencent-kimi-k2.7-code",
     "tencent-kimi-k3",
+    "tencent-deepseek-v4-pro",
+    "tencent-deepseek-v4-flash-vision-exp",
 )
 
 

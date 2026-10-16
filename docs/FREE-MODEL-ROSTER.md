@@ -1,11 +1,11 @@
 # Free model roster and quota plan
 
 Checked 2026-10-16. "Catalog" means a provider lists a model; "answered" means
-we made one bounded, tiny request and got a response. These are different
-claims. Rates change by plan, model and account, so account headers and provider
-dashboards take precedence over this snapshot.
+we sent a bounded request and got a response. Probe size and tool support are
+recorded per row. Rates change by plan, model and account, so account headers
+and provider dashboards take precedence over this snapshot.
 
-**Automatic priority:** the four verified Tencent TokenHub services lead each
+**Automatic priority:** the six verified Tencent TokenHub services lead each
 easy, medium and hard route, and lead free coding failover. Mega Zword rotates
 the primary choice toward the service with the fewest estimated tokens in its
 local run log, so one healthy model does not take every task while the others
@@ -25,12 +25,20 @@ models are tried before the other free providers and plan-based CLI fallbacks.
 | Gemini API `gemini-api-31-lite` | `gemini-3.1-flash-lite` | Answered; 5 output tokens | Independent per-model quota under the same Google AI project key; shared conservative request pace. |
 | Z.AI `zai` | `glm-4.5-flash` | Earlier coding probe passed; live health probe on Oct 15 answered in 12.3 seconds. | Z.AI's exact key/model allowance was not published in the checked docs; use the account console and response headers. Chinese-origin GLM retained. |
 | Mistral `mistral` | `ministral-3b-2512` | Earlier free-mode coding check passed; live health probe on Oct 15 answered in 0.7 seconds. | Free mode includes monthly API usage; per-model request-per-second and token-per-minute limits are shown in the account's Limits page. They vary by organization/model, so there is no honest universal number to put here. |
-| Tencent TokenHub `tencent-glm-5.3-flash` | `glm-5.3-flash` | Oct 15: HTTP 200, answered a tiny coding question, then returned the required native `finish` tool call. | Free Trial only; console lists 1,000,000 TPM and 60 RPM for this service. Shares the Tencent key; separate per-service quota. |
-| Tencent TokenHub `tencent-glm-5.3` | `glm-5.3` | Oct 15: HTTP 200, answered a tiny coding question and returned the required native `finish` tool call. | Free Trial only; console lists 1,000,000 TPM and 60 RPM for this service. Shares the Tencent key; separate per-service quota. |
-| Tencent TokenHub `tencent-kimi-k2.7-code` | `kimi-k2.7-code` | Oct 15: HTTP 200, answered a tiny coding question and returned the required native `finish` tool call. | Free Trial only; console lists 1,000,000 TPM and 60 RPM for this service. Shares the Tencent key; separate per-service quota. |
-| Tencent TokenHub `tencent-kimi-k3` | `kimi-k3` | Oct 15: HTTP 200, answered a tiny coding question and returned the required native `finish` tool call. | Free Trial only; console lists 1,000,000 TPM and 60 RPM for this service. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-glm-5.3-flash` | `glm-5.3-flash` | Oct 16: HTTP 200; completed a normal coding task and returned Mega Zword's native `finish` tool call in 45.9s. | Claimed 1M free-trial tokens; 99.7% remained after the test. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-glm-5.3` | `glm-5.3` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 45.7s on retry. The initial 75s probe limit was too short. | Claimed 1M free-trial tokens; 99.4% remained after tests. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-kimi-k2.7-code` | `kimi-k2.7-code` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 24.2s. | Claimed 1M free-trial tokens; 99.9% remained after the test. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-kimi-k3` | `kimi-k3` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 111.5s on retry. The initial 75s probe limit was too short. | Claimed 1M free-trial tokens; 99.7% remained after tests. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-deepseek-v4-pro` | `deepseek-v4-pro` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 14.8s. | Claimed 1M free-trial tokens; 99.8% remained after the test. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-deepseek-v4-flash-vision-exp` | `deepseek/deepseek-v4-flash-vision-exp` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 11.1s. | Claimed 1M free-trial tokens; 99.8% remained after the test. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
 | NVIDIA NIM `nvidia` | `nvidia/nemotron-3-super-120b-a12b` in user config | Oct 15: live health answered; isolated `megazword run -e -m nvidia` coding job completed in 42.0 seconds using five requests; independent pytest: 7 passed. Direct DeepSeek V4.1 Flash previously timed out; DeepSeek Coder 6.7B returned 404. | NVIDIA Developer Program hosted API access is free for prototyping, development, and testing. The current published terms exclude serving real end users without NVIDIA AI Enterprise; no numeric hosted RPM quota was published in the checked docs. |
 | OpenRouter `openrouter` | `openrouter/free` dynamically selects a current free endpoint | Tool-call probe succeeded at $0; OpenRouter selected `nvidia/nemotron-3.5-lightning:free` and returned the expected `finish` tool call. Five fixed catalog models also passed the same tool probe. | The funded account reports $10 credits, $0 usage and is no longer on the free tier. OpenRouter documents 1,000 free-model requests/day at $10+ credits and 20 RPM. Failed attempts may still consume daily requests. |
+
+Tencent's Usage Statistics page logged successful responses for all six models
+and the Activation page showed each free-trial meter falling, with 99.4% or more
+remaining. The billing page showed $0.00 available credit and no current-month
+bill data yet; Tencent warns billing records can lag, so this is not a final
+settled-bill check. No billing switches were changed during testing.
 
 ## OpenRouter exact free catalog: bounded tool-call sweep
 

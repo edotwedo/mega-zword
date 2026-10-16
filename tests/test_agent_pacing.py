@@ -45,8 +45,10 @@ def test_tencent_model_aliases_share_provider_pacing(tmp_path, monkeypatch):
     monkeypatch.setattr(agent.time, "sleep", sleep)
     agent.pace_call("tencent-glm-5.3-flash", {"tencent": 2}, 200)
     agent.pace_call("tencent-kimi-k3", {"tencent": 2}, 200)
-    assert sleeps == [2]
-    assert float((config.HOME / "agent-pace/tencent.json").read_text()) == 102
+    agent.pace_call("tencent-deepseek-v4-pro", {"tencent": 2}, 200)
+    agent.pace_call("tencent-deepseek-v4-flash-vision-exp", {"tencent": 2}, 200)
+    assert sleeps == [2, 2, 2]
+    assert float((config.HOME / "agent-pace/tencent.json").read_text()) == 106
 
 
 def test_pacing_wall_cap_prevents_request(tmp_path, monkeypatch):

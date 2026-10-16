@@ -19,7 +19,11 @@ PROVIDERS = (
     "mistral", "cloudflare", "openrouter", "kimi",
     "deepseek", "qwen-coder", "openrouter-dots", "openrouter-nemotron-nano",
     "openrouter-nemotron-lightning", "openrouter-laguna-s", "openrouter-laguna-xs",
-    "nvidia", "nvidia-lightning", "zai", "tencent", "ollama",
+    "nvidia", "nvidia-lightning", "zai",
+    "tencent-glm-5.3-flash", "tencent-glm-5.3",
+    "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+    "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
+    "ollama",
 )
 PROMPT = "Reply with: ok"
 TIMEOUT_SECONDS = 30
@@ -79,7 +83,8 @@ def command(backends: dict[str, Backend], free_models: dict[str, str],
                 reason = catalog_error or "model is not verified as free and tool-capable in the current catalog"
                 rows.append((name, False, 0, reason))
                 continue
-        backend.timeout = min(backend.timeout, TIMEOUT_SECONDS)
+        timeout = 180 if name.startswith("tencent-") else TIMEOUT_SECONDS
+        backend.timeout = min(backend.timeout, timeout)
         result = backend.run(PROMPT)
         rows.append((name, result.ok, result.seconds, "" if result.ok else _safe_reason(result.error)))
 

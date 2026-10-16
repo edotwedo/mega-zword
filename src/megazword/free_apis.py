@@ -440,6 +440,8 @@ FREE_KEYS = (
     ("tencent-glm-5.3", "TENCENT_TOKENHUB_API_KEY"),
     ("tencent-kimi-k2.7-code", "TENCENT_TOKENHUB_API_KEY"),
     ("tencent-kimi-k3", "TENCENT_TOKENHUB_API_KEY"),
+    ("tencent-deepseek-v4-pro", "TENCENT_TOKENHUB_API_KEY"),
+    ("tencent-deepseek-v4-flash-vision-exp", "TENCENT_TOKENHUB_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
 )
 
@@ -505,6 +507,9 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
             ("tencent-glm-5.3", "glm-5.3"),
             ("tencent-kimi-k2.7-code", "kimi-k2.7-code"),
             ("tencent-kimi-k3", "kimi-k3"),
+            ("tencent-deepseek-v4-pro", "deepseek-v4-pro"),
+            ("tencent-deepseek-v4-flash-vision-exp",
+             "deepseek/deepseek-v4-flash-vision-exp"),
         )],
         # OpenRouter chooses the serving provider. Its training policy can
         # vary by endpoint (and configured model); unknown means scrub prompts.
