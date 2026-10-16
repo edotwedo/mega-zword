@@ -87,6 +87,22 @@ def test_cli_review_has_no_subscription_or_reviewer_fallback(tmp_path, monkeypat
     assert 'a.py:1' in capsys.readouterr().out
 
 
+def test_old_dashboard_audit_prompt_gets_tools_at_cli_entrypoint(tmp_path, monkeypatch):
+    from megazword import cli
+    monkeypatch.chdir(tmp_path)
+    model = Scripted([call('read_file', path='routing.py', start=1, end=45),
+                      call('finish', summary='routing.py:8 defines the Tencent backend group.')])
+    prompt = "i want you to do a full audit of your code.  Then i want you to suggest possible upgrade paths."
+    cfg = config.Config(log_path=tmp_path/'log.jsonl', quality_check=False)
+    # Exact old-server shape: no --review, --review-root or --free-only.
+    assert cli.main(['run',prompt,'-p','mega-zword','-m','groq'], {'groq':model}, cfg) == 0
+    last = json.loads((config.HOME/'last_run.json').read_text())
+    assert last['policy']['review'] and last['policy']['free_only']
+    assert last['policy']['review_root'] == str(__import__('pathlib').Path(cli.__file__).resolve().parent)
+    assert "not the model's weights" in last['sent']
+    assert 'routing.py:8' in last['answer']
+
+
 def test_no_paid_prompt_rejects_forced_subscription_before_call(tmp_path, capsys):
     from megazword.cli import main
     from tests.test_cli import FakeBackend

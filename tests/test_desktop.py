@@ -43,6 +43,34 @@ def test_older_pywebview_still_starts():
     assert web.started == [{}]
 
 
+def test_explicit_launch_refreshes_only_owned_idle_old_server():
+    from types import SimpleNamespace
+    class Owner:
+        stopped = False
+        command = "from megazword.cli import main; main(['dashboard','--port','8768','--app'])"
+        def cmdline(self): return ['pythonw.exe', '-c', self.command]
+        def exe(self): return 'pythonw.exe'
+        def terminate(self): self.stopped = True
+        def wait(self, timeout): pass
+    for same_build, busy, running_job, running_room, owned, expected in [
+        (False, False, False, False, True, True),
+        (True, False, False, False, True, False),
+        (False, True, False, False, True, False),
+        (False, False, True, False, True, False),
+        (False, False, False, True, True, False),
+        (False, False, False, False, False, False),
+    ]:
+        owner = Owner()
+        if not owned: owner.command = 'unrelated service'
+        state = {'build': 'new' if same_build else 'old', 'busy':busy,
+                 'jobs':[{'done':not running_job}]}
+        process_api = SimpleNamespace(net_connections=lambda **kw:[SimpleNamespace(
+            laddr=SimpleNamespace(port=8768),status='LISTEN',pid=123)],Process=lambda _:owner)
+        read = lambda path: state if path=='/api/state' else {'running':running_room}
+        assert desktop.refresh_idle_dashboard(8768,'new',processes=process_api,read=read) == expected
+        assert owner.stopped == expected
+
+
 def test_icon_is_a_multi_size_ico():
     data = open(desktop.icon_path(), "rb").read()
     reserved, kind, count = struct.unpack("<HHH", data[:6])

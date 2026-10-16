@@ -91,6 +91,8 @@ INSTRUCTIONS = (
 READ_TOOLS = [t for t in TOOLS if t['function']['name'] in ('list_files', 'read_file', 'finish')]
 REVIEW_INSTRUCTIONS = (
     "You are reviewing the actual Mega Zword work folder through read-only tools. "
+    "References to 'your code' mean the application source available through these tools, "
+    "not your model weights, training data, or provider infrastructure. "
     "Inspect relevant source files before proposing improvements. Never change files, "
     "run commands, or claim to have inspected files you did not read. Cite file:line "
     "evidence, prioritize concrete findings, and state the limited review scope. "

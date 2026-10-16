@@ -1,5 +1,14 @@
 # Release notes
 
+## Source review entrypoint repair (2026-10-15)
+
+- The CLI now detects code-review requests itself, including requests sent by an
+  older dashboard without review flags. Mega Zword reviews use installed source
+  and explicitly identify the application as the target, rather than model weights.
+- An explicit desktop launch can refresh an older idle server owned by Mega Zword.
+  Running jobs, room replies, unknown port owners and unchanged builds are preserved.
+  A missing process inventory dependency leaves the existing server alone.
+
 ## Mega Zword: Console Workspace (2026-10-15)
 
 - Home, Hive and chat tabs use a plain green-on-black monospace console.

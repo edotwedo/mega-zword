@@ -21,6 +21,54 @@ SIZE = (1280, 860)
 MIN_SIZE = (420, 560)
 
 
+def refresh_idle_dashboard(port: int, expected_build: str, *, processes=None, read=None) -> bool:
+    """On an explicit app launch, replace only an owned, idle, older server."""
+    import json
+    import urllib.request
+    if not expected_build or expected_build == 'development':
+        return False
+    def fetch(path):
+        with urllib.request.urlopen(f'http://127.0.0.1:{port}{path}', timeout=2) as response:
+            return json.load(response)
+    read = read or fetch
+    try:
+        state = read('/api/state')
+        if state.get('build') == expected_build:
+            return False
+        # Older dashboards returned all jobs; newer ones expose global busy state.
+        if state.get('busy') or any(not job.get('done') for job in state.get('jobs', [])):
+            return False
+        if read('/api/room').get('running'):
+            return False
+        if processes is None:
+            import psutil
+            processes = psutil
+        listeners = [c for c in processes.net_connections(kind='tcp')
+                     if c.laddr.port == port and c.status == 'LISTEN']
+        if len(listeners) != 1:
+            return False
+        owner = processes.Process(listeners[0].pid)
+        args = owner.cmdline()
+        # Never terminate an unknown port owner, CLI chat, relay or camera helper.
+        if Path(owner.exe()).name.lower() not in ('python.exe', 'pythonw.exe') or '-c' not in args:
+            return False
+        code = args[args.index('-c') + 1]
+        if not all(part in code for part in ('from megazword.cli import main', "'dashboard'",
+                                             "'--port'", repr(str(port)))) or not any(
+                flag in code for flag in ("'--app'", "'--no-browser'")):
+            return False
+        # Recheck work immediately before stopping the old server.
+        state = read('/api/state')
+        if state.get('busy') or any(not job.get('done') for job in state.get('jobs', [])) or read('/api/room').get('running'):
+            return False
+        owner.terminate()
+        owner.wait(timeout=5)
+        return True
+    except Exception:
+        # A missing inventory dependency or denied process access must be harmless.
+        return False
+
+
 def available() -> bool:
     """True when pywebview is installed (it's an optional extra)."""
     try:

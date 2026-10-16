@@ -227,6 +227,7 @@ class App:
         with self._jobs_lock:
             jobs = [job for job_id, job in self.jobs.items()
                     if self._job_projects.get(job_id, self.project) == project]
+            busy = any(not job.view()['done'] for job in self.jobs.values())
         return {
             "now": now.isoformat(),
             "build": os.environ.get("MEGAZWORD_BUILD", "development"),
@@ -250,6 +251,7 @@ class App:
             "memory": [asdict(e) for e in reversed(memory.recent(40))],
             "answers": answers.recent(20, project),
             "jobs": [{**j.view(), 'project': project} for j in reversed(jobs)][:10],
+            "busy": busy or self.room_running(),
             "tabs": tabs.list_tabs(),
             "sentinel": sentinel.summary(),
             "floor": self.floor_state(now),
@@ -671,6 +673,9 @@ def serve(port: int = 8765, project: str | None = None, open_browser: bool = Tru
               "(see `tailscale ip -4`)", file=sys.stderr)
         return 2
     remote = host not in LOOPBACK
+    if open_browser and app_window and not remote:
+        from .desktop import refresh_idle_dashboard
+        refresh_idle_dashboard(port, os.environ.get('MEGAZWORD_BUILD', ''))
     app = App(config.load(), project or project_name())
     try:
         server = Server((host, port), make_handler(app, port, remote))

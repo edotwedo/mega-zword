@@ -540,7 +540,11 @@ def main(argv: list[str] | None = None,
     if not prompt.strip():
         print("No prompt given.", file=sys.stderr)
         return 2
-    from .request_mode import free_only, free_backend
+    from .request_mode import free_only, free_backend, code_review
+    # Enforce at the child entrypoint too: older dashboards can omit --review.
+    args.review = args.review or (not args.edit and not args.compare and code_review(prompt))
+    if args.review and not args.review_root and (args.project or project_name()) == 'mega-zword':
+        args.review_root = Path(__file__).resolve().parent
     args.free_only = args.free_only or free_only(prompt) or args.review
     if args.review and (args.edit or args.compare):
         print('[megazword] read-only review cannot be combined with editing or compare', file=sys.stderr)
@@ -612,6 +616,12 @@ def main(argv: list[str] | None = None,
 
     memory = Memory(config.HOME, args.project or project_name(), cfg.memory_lines)
     sent = with_context(prompt, memory.context_block()) if args.context else prompt
+    if args.review:
+        sent = (f"[Source review target: {memory.project}. Review the application/project source "
+                f"at {args.review_root or Path.cwd()} using the supplied read-only tools. "
+                "'Your code' means this application's files, not the model's weights or training system. "
+                "Inspect files before answering; identify missing files rather than giving a generic audit framework.]\n\n"
+                + sent)
     if args.edit or args.review:
         from .agent import wrap
         from .backends import OllamaBackend
