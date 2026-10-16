@@ -39,6 +39,13 @@ silently upgraded to main.
 
 ## Automatic activity
 
+Follow-up: Phil requested Sentinel remain active if it does not consume AI
+usage. The exact scheduled collector source was verified against this checkout:
+it reads Windows events and makes HTTP availability/notification requests,
+without invoking AI models. Re-enabled only `MegaZword-Sentinel` on its existing
+five-minute schedule and requested one check. All other automatic jobs remain
+disabled. The list below records the earlier blanket stop, before this exception.
+
 Before this audit, at Phil's request, disabled:
 
 - `MegaZword-FreeTools-Testlog14`: one-time free-model continuation.
