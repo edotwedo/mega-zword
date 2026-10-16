@@ -469,9 +469,10 @@ Night Shift does real work while you sleep. It reads `docs/QUEUE.md` on GitHub
 - `megazword backends` lists the AI CLIs and optional HTTP AIs (openrouter, groq,
   cloudflare, zai, gemini-api, nvidia, mistral), and whether each is
   available. Force one with
-  `megazword run "..." -m zai`. They are off the default route, except Mistral,
-  which is first in `easy` once `MISTRAL_API_KEY` is set.
+  `megazword run "..." -m zai`. Configured free APIs are included in the default
+  routes ahead of paid CLI subscriptions.
 - `megazword doctor` checks local setup without sending a prompt.
+- `megazword free test` sends one tiny prompt to each configured free identity/API and reachable local Ollama. Use `--provider NAME` to test only one identity; repeat it to select several. Out-marked identities are reported as skipped without a call. `gemini` (Antigravity CLI) and `gemini-api` (Developer API) are separate choices.
 - `megazword export [-p PROJECT] [--since 7d] [--out FILE] [--force]` writes
   project memory, answers and run totals as Markdown. By default it prints to
   the terminal. `--since` accepts a duration such as `14d` or a UTC date.
@@ -499,7 +500,7 @@ Start with `megazword doctor`; each line below matches one of its check names.
 | `Ollama: WARN` | Start Ollama. Mega Zword can still rate prompts with its simple fallback rule. |
 | `rater model: WARN` | Pull the configured rating model, for example `ollama pull qwen2.5:1.5b`. |
 | A provider meter is `WARN` or stale | Reopen/sign in to that tool. Codex's snapshot updates when Codex runs; Grok and Gemini plan quotas are not read directly. |
-| `openrouter` / `groq` / `cloudflare` / `zai` / `gemini-api` / `nvidia` / `mistral` key is `WARN` | Set the matching env var (see `.env.example`). Cloudflare also needs `CLOUDFLARE_ACCOUNT_ID`. New terminal after. Keep keys private. These AIs stay off the default route until you add them in `[route]`, except `mistral`, which is first in `easy` once its key is set. `gemini-api` and `mistral` train on prompts. |
+| `openrouter` / `groq` / `cloudflare` / `zai` / `gemini-api` / `nvidia` / `mistral` key is `WARN` | Set the matching env var (see `.env.example`). Cloudflare also needs `CLOUDFLARE_ACCOUNT_ID`. New terminal after. Keep keys private. Configured free APIs are tried before paid CLI subscriptions at every difficulty. `gemini-api` and `mistral` train on prompts. |
 | `log: FAIL` | Check that your user can write to `%USERPROFILE%\.megazword`. |
 | Timeout or network failure during a run | Check the tool login, internet connection and `[timeouts]` in config. Rerun after the issue is fixed. |
 | The command is not found from another folder | Open a new terminal after install. Check that pipx's bin folder or `.venv\Scripts` is on your user PATH. |
@@ -509,7 +510,103 @@ For the available commands and options on this version, use `megazword --help`.
 
 ## Free AIs that code
 
-### Kimi, DeepSeek and Qwen Coder through OpenRouter
+### Quick start
+
+Set only the provider keys you have. In PowerShell, replace each placeholder and
+open a new terminal after running `setx`:
+
+```powershell
+setx OPENROUTER_API_KEY "<your-key>"
+setx GROQ_API_KEY "<your-key>"
+setx GOOGLE_AI_API_KEY "<your-key>"
+setx MISTRAL_API_KEY "<your-key>"
+setx ZAI_API_KEY "<your-key>"
+setx NVIDIA_API_KEY "<your-key>"
+setx CLOUDFLARE_API_TOKEN "<your-token>"
+setx CLOUDFLARE_ACCOUNT_ID "<your-account-id>"
+```
+
+Check one provider, then give it a coding task:
+
+```powershell
+megazword free test --provider groq
+megazword run -e -m groq "Fix the failing test in this folder, run tests, and summarize the change."
+```
+
+For OpenRouter's changing free catalog, list models currently advertised at
+zero price with tool support before choosing an ID:
+
+```powershell
+megazword free models
+```
+
+This reads the public catalog without making an inference request. A listed
+model can still be throttled, unavailable to this app, or unable to complete a
+coding task; verify it with a bounded coding run before relying on it.
+
+To try one listed model directly, set its exact ID in your user config:
+
+```toml
+[free.openrouter]
+model = "google/gemma-4-31b-it:free"
+```
+
+Then run `megazword free test --provider openrouter` and, if it responds,
+`megazword run -e -m openrouter "Fix the failing test in this folder."`.
+Replace the sample ID with one from the live list; this setting overrides the
+default free router.
+
+`gemini-api` is the Google AI Studio API; `gemini` is the separate Gemini CLI
+identity. Ollama runs locally and needs no API key. The default free coding
+failover order is OpenRouter, Groq, Cloudflare, Z.AI, Gemini API, Mistral,
+NVIDIA, then Ollama. Mega Zword skips missing or marked-out providers. It waits
+between calls to respect each provider's configured pacing (Groq: 2 seconds;
+OpenRouter: 3; Gemini API: 6).
+
+Groq's GPT-OSS coding requests include its required parsed reasoning format.
+Groq offers a Free plan with rate limits, while its Developer plan bills GPT-OSS
+by token; check the account tier in Groq Console if avoiding any possible API
+charge. Mega Zword cannot determine that billing tier from the API key.
+
+The verified Groq roster also includes `groq-120b`, `groq-qwen` (Qwen 3.8
+27B), and `groq-allam` (Allam 2 7B). Groq's Free-plan request limits are per
+model; the coding loop reads the remaining-request headers and changes models
+when 5% or fewer remain. The low-quota marker carries across runs until the
+provider's reset header expires it. All four identities use the same API key and share a
+conservative request pace. Run `megazword free test --provider groq-qwen` to
+check one identity. Gemini API `gemini-api-31-lite` selects the verified
+Gemini 3.1 Flash-Lite model; it remains distinct from the `gemini` CLI identity.
+See [the live-tested roster](FREE-MODEL-ROSTER.md) for the current quotas,
+shared-pool cautions and multilingual candidates.
+
+OpenRouter's dynamic `openrouter` route selects a current free model. Five
+fixed OpenRouter identities also passed a required-tool probe:
+`openrouter-dots`, `openrouter-nemotron-nano`,
+`openrouter-nemotron-lightning`, `openrouter-laguna-s`, and
+`openrouter-laguna-xs`. They share the same daily request pool and are placed
+after independent free providers in automatic fallback. For example:
+
+```powershell
+megazword free test --provider openrouter-nemotron-lightning
+megazword run -e -m openrouter-laguna-s "Fix the failing test in this folder."
+```
+
+**Cerebras is optional and not in automatic free routing.** Create a key at
+[cloud.cerebras.ai](https://cloud.cerebras.ai). Current pricing offers a $5
+starter credit, then pay-as-you-go. To opt in, set `CEREBRAS_API_KEY` and
+select `-m cerebras`; check the balance and pricing first. The default model is
+`qwen-3.8-27b`, which supports multi-turn tool use. No key is configured here
+and no live request has been sent.
+
+On a rate limit (HTTP 429), Mega Zword uses the provider's `Retry-After` when
+available, marks that backend out until the reset, and tries another free
+backend. If the mark is stale, clear it with `megazword out groq --clear`.
+After editing tests, the quality gate requires a non-constant assertion or
+`pytest.raises` and a call to imported production code. This is a structural
+check, not proof the test is correct; review the changes and run the project's
+tests.
+
+### OpenRouter model aliases
 
 Sign in with Google at [openrouter.ai](https://openrouter.ai), open **Keys**,
 then **Create Key**. Keep the key private. Save it in PowerShell:
@@ -519,34 +616,48 @@ setx OPENROUTER_API_KEY "paste-your-key-here"
 ```
 
 Open a new terminal. One key enables `kimi`, `deepseek`, `qwen-coder` and
-`openrouter`. Select them for a normal answer or a coding run:
+`openrouter`. The current free catalog is routed by `openrouter`:
 
 ```powershell
-megazword run -m kimi "Explain this function"
-megazword run -e -m kimi "Fix the failing test in this folder"
-megazword run -e -m qwen-coder "Fix the failing test in this folder"
+megazword run -m openrouter "Explain this function"
+megazword run -e -m openrouter "Fix the failing test in this folder"
 ```
 
-Override model IDs in `~/.megazword/config.toml`:
+Those aliases need a current model ID configured before use. For a model chosen
+from OpenRouter's current free catalog, use the `openrouter` identity instead:
+
+```powershell
+megazword run -m openrouter "Explain this function"
+megazword run -e -m openrouter "Fix the failing test in this folder"
+```
+
+These names use OpenRouter model IDs saved in `~/.megazword/config.toml`.
+OpenRouter changes its free catalog often. As of 2026-10-15, the configured
+Kimi K2.6, DeepSeek V3.1 and Qwen3 Coder `:free` IDs were absent from its live
+model catalog, and Qwen Coder returned HTTP 404. Check for a current `$0`
+model with tool support before setting an override; a model name without
+`:free` may spend OpenRouter credit.
+
+For example, update an alias only after confirming its current free ID:
 
 ```toml
 [free.kimi]
-model = "moonshotai/kimi-k2.6:free"
+model = "<current-free-model-id>"
 [free.deepseek]
-model = "deepseek/deepseek-chat-v3.1:free"
+model = "<current-free-model-id>"
 [free.qwen-coder]
-model = "qwen/qwen3-coder:free"
+model = "<current-free-model-id>"
 ```
 
-Check the exact ID and price at [openrouter.ai/models](https://openrouter.ai/models)
-before using it: IDs and free endpoints change. The defaults prefer published
-`:free` variants, including [Kimi K2.6](https://openrouter.ai/moonshotai/kimi-k2.6:free),
-[DeepSeek V3.1](https://openrouter.ai/deepseek/deepseek-chat-v3.1:free) and
-[Qwen3 Coder](https://openrouter.ai/qwen/qwen3-coder:free).
-To choose the newest K-series instead of the free default, check
-[Kimi Latest](https://openrouter.ai/~moonshotai/kimi-latest) and set its model ID;
-that alias can be paid. Mega Zword never upgrades a free ID to a paid ID automatically.
-Free models still have quota limits; paid IDs spend OpenRouter credit.
+Check the exact ID and price at
+[openrouter.ai/models](https://openrouter.ai/models). `megazword free test`
+checks configured identities but cannot reserve provider capacity; a free
+endpoint may still rate-limit or disappear.
+
+Before an OpenRouter request from `megazword free test`, Mega Zword checks that
+the configured model is still listed at zero price with tool support. Stale or
+unverified IDs are skipped with an explanation, which avoids 404 retries and
+accidental paid requests from this free-provider check.
 
 These three backends are marked as training on data conservatively: an unknown
 serving-provider policy counts as `True`, so prompts and file results are scrubbed.
@@ -562,9 +673,10 @@ Free API models can edit files through Mega Zword's own coding loop:
 megazword run -e -m groq "Fix the failing test in this folder. Run tests and summarize the change."
 ```
 
-Set the provider's API key as described below. This also works with `openrouter`,
+Set the provider's API key as described in Quick start above. This also works with `openrouter`,
 `kimi`, `deepseek`, `qwen-coder`, `gemini-api`, `mistral`, `cloudflare`, `zai`, and `nvidia`. Availability and quota
-still depend on the provider. No live API call was used to test this feature.
+still depend on the provider. The coding loop has been live-verified with Groq's
+GPT-OSS 20B and several other free API and local backends.
 For local Ollama, pull the configured model, then use `-m ollama`. Its default is
 `qwen2.5-coder:7b`; change it under `[free.ollama]` with `model = "your-model"`.
 If that model is missing, the coding loop uses the first installed model reported
@@ -584,12 +696,13 @@ tool calls in a row prompt the model to finish. Edits to `test_*.py`, `*_test.py
 and files under `tests/` require the job to mention tests.
 
 On an API failure (including 429 or a timeout), the coding loop tries the next
-available free backend within the same run, even with `-m kimi`. Your selected
-backend goes first, followed by `kimi`, `qwen-coder`, `deepseek`, `groq`,
-`gemini-api`, `cloudflare`, `mistral`, `ollama`. Missing keys, unavailable local
-Ollama and backends marked out in config are skipped. Each backend is tried at
-most once in this order. The task, tool observations, current files, test results
-and quality gate carry forward; the step and wall-clock caps do not reset.
+available free backend within the same run, even when you select one with `-m`.
+The default order after the selected backend is OpenRouter, Groq, Cloudflare,
+Z.AI, Gemini API, Mistral, NVIDIA, then Ollama. Configure `[agent].failover_order`
+to change it. Missing keys, unavailable local Ollama and backends marked out in
+config are skipped. Each backend is tried at most once in this order. The task,
+tool observations, current files, test results and quality gate carry forward;
+the step and wall-clock caps do not reset.
 The terminal reports each switch. CLI coders keep their usual routing.
 When there are no remaining fallback candidates, 429, 500, 502 and 503 retain
 the three retries after 2, 5 and 10 seconds. Tool-format rejections first try the
@@ -605,7 +718,7 @@ Optional settings in `~/.megazword/config.toml`:
 ```toml
 [agent]
 # [] disables automatic backend switching. Only free/API/local backend names.
-failover_order = ["kimi", "qwen-coder", "deepseek", "groq", "gemini-api", "cloudflare", "mistral", "ollama"]
+failover_order = ["openrouter", "groq", "cloudflare", "zai", "gemini-api", "mistral", "nvidia", "ollama"]
 max_steps = 30
 max_chars = 12000
 call_timeout = 60

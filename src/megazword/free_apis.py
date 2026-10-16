@@ -6,13 +6,77 @@ import json
 import os
 import re
 import math
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
 from .backends import Backend
+from .filelock import locked, write_atomic
+
+
+def _near_request_limit(remaining: int | None, limit: int | None) -> bool:
+    return bool(remaining is not None and limit
+                and remaining <= max(5, int(limit * 0.05)))
+
+
+def _request_reset_seconds(value: str | None) -> float:
+    """Parse provider duration headers (for example, ``1h2m3.4s``)."""
+    if not value:
+        return 3600
+    try:
+        number = float(value)
+        return max(1, number)
+    except (ValueError, TypeError):
+        pass
+    match = re.fullmatch(
+        r"(?:(\d+(?:\.\d+)?)h)?(?:(\d+(?:\.\d+)?)m)?"
+        r"(?:(\d+(?:\.\d+)?)s)?", value.strip(), re.I)
+    if not match or not any(match.groups()):
+        return 3600
+    hours, minutes, seconds = (float(part or 0) for part in match.groups())
+    return max(1, hours * 3600 + minutes * 60 + seconds)
+
+
+def request_quota_low(name: str) -> bool:
+    """Whether a recent response marked this identity low until its reset."""
+    from . import config
+    path = config.HOME / "request-quota.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        record = data.get(name, {})
+        return float(record.get("until", 0)) > time.time()
+    except (OSError, ValueError, TypeError, AttributeError):
+        return False
+
+
+def _record_request_quota(name: str, remaining: int | None,
+                          limit: int | None, reset: str | None) -> None:
+    """Persist only low-water marks; remove them when a fresh header recovers."""
+    from . import config
+    path = config.HOME / "request-quota.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with locked(path, timeout=2) as got:
+            if not got:
+                return
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = {}
+            if not isinstance(data, dict):
+                data = {}
+            if _near_request_limit(remaining, limit):
+                data[name] = {"remaining": remaining, "limit": limit,
+                              "until": time.time() + _request_reset_seconds(reset)}
+            else:
+                data.pop(name, None)
+            write_atomic(path, json.dumps(data, sort_keys=True))
+    except (OSError, TimeoutError, ValueError):
+        # A cache failure must not block an otherwise usable free API.
+        return
 
 
 class ToolsUnsupported(RuntimeError):
@@ -26,6 +90,39 @@ class APIHTTPError(RuntimeError):
         self.code = code
         self.retry_after = retry_seconds(headers) if code == 429 else None
         super().__init__(http_error_message(code, headers) + (": " + reason if reason else ""))
+
+
+def _cloudflare_daily_quota_exhausted(raw: bytes) -> bool:
+    """Recognize Workers AI's daily free-allocation error, not capacity 429s."""
+    try:
+        payload = json.loads(raw.decode("utf-8", "replace"))
+        errors = payload.get("errors", [])
+        return any(
+            isinstance(error, dict)
+            and str(error.get("code", "")) in {"3036", "4006"}
+            and "daily free allocation" in str(error.get("message", "")).lower()
+            for error in errors
+        )
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def _cloudflare_daily_reset_seconds(now: datetime | None = None) -> int:
+    """Workers AI's free allocation resets at midnight UTC."""
+    now = now or datetime.now(timezone.utc)
+    now = now.astimezone(timezone.utc)
+    reset = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    return max(1, math.ceil((reset - now).total_seconds()))
+
+
+def _mistral_rate_limited(raw: bytes) -> bool:
+    """Recognize Mistral's documented structured 429 response without echoing it."""
+    try:
+        payload = json.loads(raw.decode("utf-8", "replace"))
+        return (payload.get("type") == "rate_limited"
+                and str(payload.get("code", "")) == "1300")
+    except (ValueError, TypeError, AttributeError):
+        return False
 
 
 def _safe_reason(exc):
@@ -56,6 +153,13 @@ class OpenAICompatibleBackend(Backend):
     key_env: str = ""
     extra_env: tuple[str, ...] = ()
     extra_headers: dict[str, str] = field(default_factory=dict)
+    remaining_requests: int | None = field(default=None, init=False)
+    limit_requests: int | None = field(default=None, init=False)
+
+    @property
+    def quota_near_limit(self) -> bool:
+        return (_near_request_limit(self.remaining_requests, self.limit_requests)
+                or request_quota_low(self.name))
 
     def _env_ok(self) -> bool:
         return bool(os.environ.get(self.key_env)) and all(os.environ.get(n) for n in self.extra_env)
@@ -84,13 +188,23 @@ class OpenAICompatibleBackend(Backend):
         if not key or not self._env_ok():
             raise RuntimeError("API key not set")
         try:
+            from . import __version__
             headers = {"Authorization": f"Bearer {key}",
-                       "Content-Type": "application/json", **self.extra_headers}
+                       "Content-Type": "application/json",
+                       "User-Agent": f"megazword/{__version__}", **self.extra_headers}
             body = {"model": self.model, "messages": messages, "stream": False}
             if self.name == "cloudflare":
                 body.pop("stream")  # The default is a non-streaming response.
             if tools is not None:
                 body["tools"] = tools
+                # OpenAI-compatible providers do not all default to automatic
+                # selection when tools are present. Google documents this field
+                # for its compatibility endpoint; be explicit for each API.
+                body["tool_choice"] = "auto"
+                # Groq requires parsed/hidden reasoning for GPT-OSS tool calls;
+                # its default raw format can reject an otherwise valid call.
+                if (self.name.startswith("groq") and self.model.startswith("openai/gpt-oss-")):
+                    body["reasoning_format"] = "parsed"
             request = urllib.request.Request(
                 self._endpoint(),
                 data=json.dumps(body).encode("utf-8"),
@@ -98,13 +212,39 @@ class OpenAICompatibleBackend(Backend):
                 method="POST",
             )
             with urllib.request.urlopen(request, timeout=timeout or self.timeout) as response:
+                headers = getattr(response, "headers", {})
+                try:
+                    remaining = headers.get("x-ratelimit-remaining-requests")
+                    limit = headers.get("x-ratelimit-limit-requests")
+                    self.remaining_requests = int(remaining) if remaining is not None else None
+                    self.limit_requests = int(limit) if limit is not None else None
+                    if self.remaining_requests is not None and self.limit_requests is not None:
+                        _record_request_quota(
+                            self.name, self.remaining_requests, self.limit_requests,
+                            headers.get("x-ratelimit-reset-requests"))
+                except (TypeError, ValueError):
+                    self.remaining_requests = self.limit_requests = None
                 payload = json.loads(response.read().decode("utf-8"))
             message = payload["choices"][0]["message"]
             if not isinstance(message, dict):
                 raise ValueError("missing answer")
             return json.loads(json.dumps(message).replace(key, "[REDACTED]"))
         except urllib.error.HTTPError as exc:
-            reason = _safe_reason(exc) if exc.code in (400, 422) else ""
+            if exc.code == 429 and self.name in {"cloudflare", "mistral"}:
+                try:
+                    raw = exc.read(16384)
+                except OSError:
+                    raw = b""
+                reason = ""
+                headers = exc.headers
+                if self.name == "cloudflare" and _cloudflare_daily_quota_exhausted(raw):
+                    headers = dict(exc.headers or {})
+                    headers["Retry-After"] = str(_cloudflare_daily_reset_seconds())
+                    reason = "daily free allocation exhausted; resets at 00:00 UTC"
+                elif self.name == "mistral" and _mistral_rate_limited(raw):
+                    reason = "Mistral rate limit exceeded (code 1300)"
+                raise APIHTTPError(exc.code, headers, reason) from None
+            reason = _safe_reason(exc) if exc.code in (400, 403, 422) else ""
             if tools is not None and exc.code in (400, 422):
                 raise ToolsUnsupported("API rejected native tools" + (": " + reason if reason else "")) from None
             # Auth and rate-limit bodies stay private. Only sanitized validation
@@ -155,17 +295,33 @@ def http_error_message(code: int, headers=None) -> str:
     return f"API HTTP error {code}"
 
 
-# Names shown in `megazword backends` / doctor. Never put these on DEFAULT_ROUTE.
+# Free API backends available to automatic routes when credentials are present.
 FREE_KEYS = (
     ("kimi", "OPENROUTER_API_KEY"),
     ("deepseek", "OPENROUTER_API_KEY"),
     ("qwen-coder", "OPENROUTER_API_KEY"),
     ("openrouter", "OPENROUTER_API_KEY"),
+    ("openrouter-dots", "OPENROUTER_API_KEY"),
+    ("openrouter-nemotron-nano", "OPENROUTER_API_KEY"),
+    ("openrouter-nemotron-lightning", "OPENROUTER_API_KEY"),
+    ("openrouter-laguna-s", "OPENROUTER_API_KEY"),
+    ("openrouter-laguna-xs", "OPENROUTER_API_KEY"),
     ("groq", "GROQ_API_KEY"),
+    ("groq-120b", "GROQ_API_KEY"),
+    ("groq-qwen", "GROQ_API_KEY"),
+    ("groq-allam", "GROQ_API_KEY"),
     ("cloudflare", "CLOUDFLARE_API_TOKEN"),
     ("zai", "ZAI_API_KEY"),
     ("gemini-api", "GOOGLE_AI_API_KEY"),
+    ("gemini-api-31-lite", "GOOGLE_AI_API_KEY"),
+    ("cerebras", "CEREBRAS_API_KEY"),
     ("nvidia", "NVIDIA_API_KEY"),
+    ("nvidia-lightning", "NVIDIA_API_KEY"),
+    ("tencent", "TENCENT_TOKENHUB_API_KEY"),
+    ("tencent-glm-5.3-flash", "TENCENT_TOKENHUB_API_KEY"),
+    ("tencent-glm-5.3", "TENCENT_TOKENHUB_API_KEY"),
+    ("tencent-kimi-k2.7-code", "TENCENT_TOKENHUB_API_KEY"),
+    ("tencent-kimi-k3", "TENCENT_TOKENHUB_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
 )
 
@@ -174,10 +330,10 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
     m = {**{k: v for k, v in models.items()}}
     return [
         OpenAICompatibleBackend("openrouter", base_url="https://openrouter.ai/api/v1",
-                                model=m.get("openrouter", "qwen/qwen3-4b:free"),
-                                key_env="OPENROUTER_API_KEY"),
+                                model=m.get("openrouter", "openrouter/free"),
+                                key_env="OPENROUTER_API_KEY", trains_on_data=True),
         OpenAICompatibleBackend("groq", base_url="https://api.groq.com/openai/v1",
-                                model=m.get("groq", "llama-3.3-70b-versatile"),
+                                model=m.get("groq", "openai/gpt-oss-20b"),
                                 key_env="GROQ_API_KEY"),
         OpenAICompatibleBackend(
             "cloudflare",
@@ -193,8 +349,8 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
         ),
         OpenAICompatibleBackend(
             "gemini-api", base_url="https://generativelanguage.googleapis.com/v1beta/openai",
-            # Alias for Google's current Flash; pinned names like gemini-2.0-flash get retired (404).
-            model=m.get("gemini-api", "gemini-flash-latest"),
+            # Stable free-tier model with function calling; verified in the edit loop (2026-10-14).
+            model=m.get("gemini-api", "gemini-3.5-flash-lite"),
             key_env="GOOGLE_AI_API_KEY", trains_on_data=True,
         ),
         OpenAICompatibleBackend(
@@ -203,10 +359,35 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
             key_env="NVIDIA_API_KEY",
         ),
         OpenAICompatibleBackend(
+            "nvidia-lightning", base_url="https://integrate.api.nvidia.com/v1",
+            model=m.get("nvidia-lightning", "nvidia/nemotron-3.5-lightning-30b-a3b"),
+            key_env="NVIDIA_API_KEY",
+        ),
+        OpenAICompatibleBackend(
+            "cerebras", base_url="https://api.cerebras.ai/v1",
+            model=m.get("cerebras", "qwen-3.8-27b"),
+            key_env="CEREBRAS_API_KEY",
+        ),
+        OpenAICompatibleBackend(
             "mistral", base_url="https://api.mistral.ai/v1",
-            model=m.get("mistral", "mistral-small-latest"),
+            model=m.get("mistral", "ministral-3b-2512"),
             key_env="MISTRAL_API_KEY", trains_on_data=True,
         ),
+        # The International Singapore site uses a separate key space from
+        # Tencent's China site, despite both consoles offering Singapore.
+        OpenAICompatibleBackend(
+            "tencent", base_url="https://tokenhub-intl.tencentcloudmaas.com/v1",
+            model=m.get("tencent", "hy3"), key_env="TENCENT_TOKENHUB_API_KEY",
+        ),
+        *[OpenAICompatibleBackend(
+            name, base_url="https://tokenhub-intl.tencentcloudmaas.com/v1",
+            model=m.get(name, model), key_env="TENCENT_TOKENHUB_API_KEY",
+        ) for name, model in (
+            ("tencent-glm-5.3-flash", "glm-5.3-flash"),
+            ("tencent-glm-5.3", "glm-5.3"),
+            ("tencent-kimi-k2.7-code", "kimi-k2.7-code"),
+            ("tencent-kimi-k3", "kimi-k3"),
+        )],
         # OpenRouter chooses the serving provider. Its training policy can
         # vary by endpoint (and configured model); unknown means scrub prompts.
         *[OpenAICompatibleBackend(name, base_url="https://openrouter.ai/api/v1",
@@ -216,4 +397,17 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
               ("kimi", "moonshotai/kimi-k2.6:free"),
               ("deepseek", "deepseek/deepseek-chat-v3.1:free"),
               ("qwen-coder", "qwen/qwen3-coder:free"))],
+        *[OpenAICompatibleBackend(name, base_url=base,
+                                  model=m.get(name, model), key_env=key,
+                                  trains_on_data=trains)
+          for name, base, model, key, trains in (
+              ("groq-120b", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b", "GROQ_API_KEY", False),
+              ("groq-qwen", "https://api.groq.com/openai/v1", "qwen/qwen3.8-27b", "GROQ_API_KEY", False),
+              ("groq-allam", "https://api.groq.com/openai/v1", "allam-2-7b", "GROQ_API_KEY", False),
+              ("gemini-api-31-lite", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-3.1-flash-lite", "GOOGLE_AI_API_KEY", True),
+              ("openrouter-dots", "https://openrouter.ai/api/v1", "dots-studio/dots-3-note-preview:free", "OPENROUTER_API_KEY", True),
+              ("openrouter-nemotron-nano", "https://openrouter.ai/api/v1", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "OPENROUTER_API_KEY", True),
+              ("openrouter-nemotron-lightning", "https://openrouter.ai/api/v1", "nvidia/nemotron-3.5-lightning:free", "OPENROUTER_API_KEY", True),
+              ("openrouter-laguna-s", "https://openrouter.ai/api/v1", "poolside/laguna-s-2.1:free", "OPENROUTER_API_KEY", True),
+              ("openrouter-laguna-xs", "https://openrouter.ai/api/v1", "poolside/laguna-xs-2.1:free", "OPENROUTER_API_KEY", True))],
     ]

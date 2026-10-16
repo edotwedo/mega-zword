@@ -52,5 +52,8 @@ def test_trainers_go_first_for_easy_only():
     assert "mistral" not in [b.name for b in hard]
 
 
-def test_default_easy_route_starts_with_mistral():
-    assert DEFAULT_ROUTE["easy"][0] == "mistral"
+def test_default_easy_route_starts_with_verified_tencent_group():
+    assert DEFAULT_ROUTE["easy"][:4] == [
+        "tencent-glm-5.3-flash", "tencent-glm-5.3",
+        "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+    ]

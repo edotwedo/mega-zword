@@ -232,7 +232,8 @@ def _send(tab_id: str, prompt: str, backends: dict[str, Backend], cfg: config.Co
         rating = rater(message)
         apply_levels(backends, rating.level, cfg.grok, cfg.levels)
         chain = cli.candidates(rating, cfg.route, backends,
-                               (statuses or cli.plan_statuses)(), cfg.out_now())
+                               (statuses or cli.plan_statuses)(), cfg.out_now(),
+                               cfg.log_path)
         if not chain:
             return {"ok": False, "id": tab_id, "error":
                     f"no installed AI for a {rating.level} task", "answer": "",

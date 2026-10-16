@@ -196,7 +196,8 @@ def run(backends: dict[str, Backend], cfg: config.Config,
                 rating = rater(message)  # rate the new message, not the whole chat
                 apply_levels(turn_backends, rating.level, cfg.grok, cfg.levels)
                 chain = cli.candidates(rating, cfg.route, turn_backends,
-                                       (statuses or cli.plan_statuses)(), cfg.out_now())
+                                       (statuses or cli.plan_statuses)(), cfg.out_now(),
+                                       cfg.log_path)
                 if not chain:
                     write(f"[megazword] no installed AI for a {rating.level} task")
                     continue

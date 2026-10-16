@@ -22,13 +22,22 @@ from .filelock import locked, write_atomic
 from .agent_quality import check_tests, is_test_path
 
 DEFAULT_PACE = {"gemini-api": 6, "mistral": 2, "groq": 2, "cloudflare": 1,
-                "openrouter": 3, "nvidia": 2, "zai": 2, "ollama": 0}
+                "openrouter": 3, "nvidia": 2, "zai": 2, "cerebras": 2,
+                "tencent": 2, "ollama": 0}
 
 
 def pace_call(name, pace, deadline):
     """Reserve a call start while holding a cross-process provider lock."""
-    if name in ("kimi", "deepseek", "qwen-coder"):
+    if name in ("kimi", "deepseek", "qwen-coder") or name.startswith("openrouter-"):
         name = "openrouter"  # One key/quota and pacing lock across aliases.
+    elif name.startswith("groq-"):
+        name = "groq"  # Same API key; retain a conservative shared request pace.
+    elif name == "gemini-api-31-lite":
+        name = "gemini-api"  # Same project key; preserve safe shared pacing.
+    elif name.startswith("nvidia-"):
+        name = "nvidia"  # One Developer key; don't fan out concurrent requests.
+    elif name.startswith("tencent-"):
+        name = "tencent"  # One TokenHub key; pace all free-trial services together.
     gap = pace.get(name, DEFAULT_PACE.get(name, 0))
     if gap <= 0:
         return
@@ -336,6 +345,9 @@ class AgentBackend(Backend):
         sent = list(sent)  # retry interventions belong in history exactly once
         retries = 0
         while True:
+            if getattr(self.model_backend, "quota_near_limit", False):
+                raise RuntimeError(
+                    f"{self.model_backend.name} near its per-model request limit; switching free model")
             pace_call(self.model_backend.name, self.pace, self._deadline)
             remaining = self._deadline - time.monotonic()
             if remaining <= 0:
@@ -378,6 +390,10 @@ class AgentBackend(Backend):
                              else retry_seconds(exc.headers))
                 self._event("cooldown", seconds=delay, http_status=exc.code)
                 if self._deadline - time.monotonic() <= delay:
+                    if exc.code == 429:
+                        # Preserve the provider's real limit signal so routing
+                        # can mark this free endpoint out and try the next one.
+                        raise
                     raise TimeoutError("agent wall-clock cap reached during retry backoff") from None
                 if not self.control:
                     time.sleep(delay)
@@ -454,7 +470,7 @@ class AgentBackend(Backend):
                     {"role": "user", "content": prompt}]
         text_mode = self.text_protocol or isinstance(self.model_backend, OllamaBackend)
         compacted = False
-        for _ in range(self.max_steps):
+        for step in range(self.max_steps):
             messages.extend(self._checkpoint())
             if len(json.dumps(messages)) > 24000:
                 # Completed tool exchanges need not be resent indefinitely. Keep
@@ -472,6 +488,12 @@ class AgentBackend(Backend):
             if remaining <= 0:
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
             sent = _scrub_values(messages) if self.trains_on_data else messages
+            sent = list(sent)
+            sent[0] = {**sent[0], "content": sent[0]["content"] + (
+                f"\nExecution budget: {self.max_steps - step} tool steps remaining. "
+                "Batch related file reads, make the requested edits before running tests, "
+                "run focused tests once, then finish. Do not repeat inspections unless "
+                "needed to recover from a truncated result.")}
             try:
                 reply = self._model_call(sent, text_mode)
             except ToolsUnsupported:
@@ -493,10 +515,16 @@ class AgentBackend(Backend):
                     continue
                 if not self._failover(exc):
                     raise
-                text_mode = True
+                # Retry with native tools on API backends. Several models
+                # (notably Groq GPT-OSS) return tool calls even when asked for
+                # Mega Zword's text protocol, which the provider can reject.
+                text_mode = (isinstance(self.model_backend, OllamaBackend)
+                             or not callable(getattr(self.model_backend, "chat", None)))
                 compacted = False
                 messages = self._text_history(messages)
                 messages.append({"role": "user", "content":
+                    "Continue the same task from the current files and tool results. "
+                    "The previous backend failed. Use the supplied tools." if not text_mode else
                     "Continue the same task from the current files and tool results. "
                     "The previous backend failed. Use the fenced JSON tool protocol."})
                 continue

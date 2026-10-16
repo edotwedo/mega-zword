@@ -176,6 +176,17 @@ def test_unread_or_exhausted_paid_meter_prevents_run(origin):
     assert report["results"][0]["status"] == "skipped" and not paid.calls
 
 
+@pytest.mark.parametrize("level", ["medium", "hard"])
+def test_free_worker_gets_first_pass_before_paid_worker(origin, level):
+    free = Free("groq")
+    paid = Paid("codex")
+    report = run(origin, [piece(level=level)], {"groq": free, "codex": paid},
+                 job_id=f"free-first-{level}")
+    assert report["results"][0]["status"] == "passed"
+    assert report["results"][0]["tried"][0] == "groq"
+    assert not paid.calls
+
+
 def test_lock_and_unsafe_test_command(origin):
     with pytest.raises(ValueError):
         run(origin, [piece(test="python -c 'delete everything'")], {})

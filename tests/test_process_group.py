@@ -45,6 +45,12 @@ def test_process_group_hides_console_on_windows():
         assert flags.get("start_new_session") is True
 
 
+def test_short_helpers_use_no_console_flag_on_windows(monkeypatch):
+    monkeypatch.setattr(backends, "os", SimpleNamespace(name="nt"))
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    assert backends.no_window() == {"creationflags": 0x08000000}
+
+
 def _pid_alive(pid: int) -> bool:
     if os.name != "nt":
         try:

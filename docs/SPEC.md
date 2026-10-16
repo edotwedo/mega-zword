@@ -41,9 +41,10 @@ on it. The old system is only a place to copy open work from, then retire.
 1. **Built:** run prompts through supported CLI/API backends, rate difficulty,
    choose a tool, and log each attempt. Use `megazword run`, `backends`, and
    `doctor`. Ollama rates locally when reachable; a simple fallback rule works
-   when it is not. OpenRouter and Groq are optional forced backends and are not
-   in the default routes. Gemini is optional, read-only, and not routed by
-   default.
+   when it is not. Configured free APIs and Ollama are tried before subscription
+   CLIs at every difficulty. Gemini Developer API (`gemini-api`) and the
+   Antigravity CLI identity (`gemini`) remain separate; the CLI is an out-aware,
+   read-only fallback and is excluded from edit mode.
 2. **Built, partly estimated:** usage meters and reset-aware pacing are in
    `megazword usage`, the start screen, and Dashboard Plans & Pace. Claude uses
    its usage endpoint; Codex uses its latest local session snapshot; Grok,

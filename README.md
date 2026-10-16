@@ -4,7 +4,7 @@
 
 Mega Zword is a Python command line tool that routes prompts to installed AI command line tools such as Claude Code, Codex, and Grok. It rates task difficulty, tracks its own runs, checks available plan usage, and tries another AI when one fails.
 
-Gemini is optional: use `megazword run -m gemini` with a prompt on stdin. Google retired the Gemini CLI for personal accounts on 2026-06-18, so Mega Zword uses its successor, the Antigravity CLI (`agy`), when it is on PATH, and falls back to an old `gemini` install otherwise. Install agy, run `agy` once to sign in, then check with `megazword doctor`. It runs read-only (`agy -p --mode plan`), is excluded from `--edit` and default routes, and `megazword usage` reads its quota from `agy -p /usage --output-format json` (the Gemini models pool drives the meter; Antigravity's Claude/GPT pool is shown but ignored).
+Gemini has two separate identities: `gemini-api` is the Google AI Studio Developer API; `gemini` is the Antigravity CLI (`agy`, with an old Gemini CLI fallback). The API is in the free-first routes. The CLI is a separate no-cost fallback identity after the free APIs/local model, respects its out mark, runs read-only, and stays excluded from `--edit`. Install agy, run `agy` once to sign in, then check with `megazword doctor`. `megazword usage` reads the CLI quota from `agy -p /usage --output-format json` (the Gemini models pool drives the meter; Antigravity's Claude/GPT pool is shown but ignored).
 
 **Status:** Beta 1 (v0.1.0b1, 2026-10-11). Tested on Windows; CI runs on Windows and Linux.
 
@@ -16,7 +16,7 @@ Gemini is optional: use `megazword run -m gemini` with a prompt on stdin. Google
 - **Hive room:** a group chat between you and the AIs (see below).
 - **Chat tabs:** several conversations in the app, one AI per tab.
 - **Sentinel:** logs reboots, logins and network drops; optional alerts.
-- **Free HTTP backends:** OpenRouter, Groq, Cloudflare, Z.ai, Google AI Studio, NVIDIA NIM and Mistral, key from env, never routed by default (Mistral excepted, see below).
+- **Free-first routing:** configured free APIs and local Ollama get first attempts at every difficulty; Gemini API and Antigravity CLI remain separate identities. Paid CLI subscriptions are fallbacks.
 
 ## Requirements
 

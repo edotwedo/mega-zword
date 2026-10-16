@@ -132,10 +132,11 @@ def _powershell(script: str) -> str:
     if not _is_windows():
         return ""
     try:
+        from .backends import no_window
         result = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=30, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            timeout=30, **no_window())
     except subprocess.TimeoutExpired:  # callers handle OSError ("collect skipped")
         raise OSError("reading the event log took over 30s") from None
     if result.returncode != 0:

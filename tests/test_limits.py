@@ -67,6 +67,19 @@ def test_run_marks_out_and_moves_on(cfg, capsys):
     assert not called
 
 
+def test_rate_limit_is_reported_as_rate_limit(cfg, capsys):
+    cfg.route = {"easy": ["mistral", "claude"], "medium": [], "hard": []}
+    mistral = FakeBackend("mistral", fail=True)
+    mistral._run = lambda p: (_ for _ in ()).throw(
+        RuntimeError("API HTTP error 429: rate limited, try again in 2 minutes"))
+    backends = {"mistral": mistral, "claude": FakeBackend("claude", reply="c")}
+
+    assert main(["run", "hi"], backends, cfg, rated("easy"), dict) == 0
+    err = capsys.readouterr().err
+    assert "mistral hit its rate limit; marked out until" in err
+    assert "mistral hit its usage limit" not in err
+
+
 def test_agy_quota_message_reads_run_together_reset():
     # Captured live from agy on Phil's PC, 2026-10-11 (Gemini weekly quota used up).
     text = ("error: Individual quota reached. Please upgrade your subscription to increase "

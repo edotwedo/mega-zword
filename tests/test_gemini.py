@@ -62,18 +62,22 @@ def test_gemini_edit_is_excluded_and_explained(capsys):
 
 
 @pytest.mark.parametrize("installed", [False, True])
-def test_init_discovers_gemini_without_adding_routes(monkeypatch, capsys, installed):
+def test_init_keeps_gemini_identities_separate(monkeypatch, capsys, tmp_path, installed):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_AI_API_KEY", raising=False)
+    monkeypatch.setattr(config, "HOME", tmp_path)
     monkeypatch.setattr(backends.shutil, "which", lambda name:
                         "fake-gemini.cmd" if installed and name == "gemini" else None)
-    monkeypatch.setattr(ollama, "reachable", lambda: False)
+    monkeypatch.setattr(ollama, "reachable", lambda *args, **kwargs: False)
     assert cli.main(["init"], cfg=config.Config()) == 0
     output = capsys.readouterr().out
     assert f"installed AIs: {'gemini' if installed else 'none'}" in output
-    assert all("gemini" not in route for route in config.Config().route.values())
-    assert all("gemini" not in route for route in
-               config.load(config.HOME / "config.toml").route.values())
+    assert all("gemini" in route and "gemini-api" in route
+               for route in config.Config().route.values())
+    generated = config.load(config.HOME / "config.toml").route
+    assert all(("gemini" in route) is installed for route in generated.values())
+    assert all("gemini-api" not in route for route in generated.values())
 
 
 @pytest.mark.parametrize("installed", [False, True])
@@ -236,7 +240,9 @@ def test_gemini_meter_reads_agy_usage(monkeypatch):
     now = datetime(2026, 10, 11, tzinfo=timezone.utc)
     summary = meters.summarize(meter, {}, now)
     assert summary.state == "meter" and summary.used == pytest.approx(60)
-    assert pacing.status(meter, now).max_used_percent == pytest.approx(60)
+    # Keep the reset-relative assertion stable after this fixture's weekly
+    # reset time has passed in real time.
+    assert pacing.status(meter, now=datetime(2026, 10, 14, tzinfo=timezone.utc)).max_used_percent == pytest.approx(60)
 
 
 def test_gemini_meter_agy_failure_is_reported(monkeypatch, tmp_path):

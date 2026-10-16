@@ -34,6 +34,21 @@ def test_shared_provider_gap_and_independent_provider(tmp_path, monkeypatch):
     assert float((config.HOME / "agent-pace/groq.json").read_text()) == 102
 
 
+def test_tencent_model_aliases_share_provider_pacing(tmp_path, monkeypatch):
+    ticks = [100.0]
+    sleeps = []
+    monkeypatch.setattr(agent.time, "time", lambda: ticks[0])
+    monkeypatch.setattr(agent.time, "monotonic", lambda: ticks[0])
+    def sleep(seconds):
+        sleeps.append(seconds)
+        ticks[0] += seconds
+    monkeypatch.setattr(agent.time, "sleep", sleep)
+    agent.pace_call("tencent-glm-5.3-flash", {"tencent": 2}, 200)
+    agent.pace_call("tencent-kimi-k3", {"tencent": 2}, 200)
+    assert sleeps == [2]
+    assert float((config.HOME / "agent-pace/tencent.json").read_text()) == 102
+
+
 def test_pacing_wall_cap_prevents_request(tmp_path, monkeypatch):
     monkeypatch.setattr(agent.time, "time", lambda: 100)
     monkeypatch.setattr(agent.time, "monotonic", lambda: 100)
@@ -103,7 +118,8 @@ def test_default_provider_gaps():
                     if isinstance(n, ast.Assign) and any(
                         isinstance(t, ast.Name) and t.id == "DEFAULT_PACE" for t in n.targets))
     assert defaults == {"gemini-api": 6, "mistral": 2, "groq": 2, "cloudflare": 1,
-                        "openrouter": 3, "nvidia": 2, "zai": 2, "ollama": 0}
+                        "openrouter": 3, "nvidia": 2, "zai": 2,
+                        "cerebras": 2, "tencent": 2, "ollama": 0}
 
 
 def test_cli_reviewer_uses_api_fake(tmp_path, monkeypatch, capsys):

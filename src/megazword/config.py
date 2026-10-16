@@ -55,31 +55,69 @@ DEFAULT_GROK = {
 }
 
 DEFAULT_ROUTE = {
-    # First installed AI in each list wins. Placeholder order until usage
-    # tracking (build step 2) can rank them by remaining usage.
-    # Mistral first for small repetitive jobs (B15, Phil 2026-10-11); it is only
-    # used when MISTRAL_API_KEY is set.
-    "easy": ["mistral", "grok", "codex", "claude"],
-    "medium": ["codex", "claude", "grok"],
-    "hard": ["claude", "codex", "grok"],
+    # Try configured zero-cost providers first at every difficulty. Missing
+    # keys/servers are filtered; paid CLI plans remain quality fallbacks.
+    # Verified Tencent trial services lead while their per-model free grants last.
+    # Easy tasks previously favored train-on-data services; Phil's 2026-10-16
+    # instruction to use Tencent now takes precedence.
+    "easy": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
+             "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+             "mistral", "gemini-api", "openrouter", "groq", "cloudflare",
+             "zai", "nvidia", "nvidia-lightning", "ollama", "gemini", "grok", "codex", "claude"],
+    "medium": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
+               "tencent-kimi-k2.7-code", "tencent-kimi-k3", "openrouter", "groq",
+               "cloudflare", "zai", "gemini-api",
+               "mistral", "nvidia", "nvidia-lightning", "ollama", "gemini", "codex", "grok", "claude"],
+    "hard": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
+             "tencent-kimi-k2.7-code", "tencent-kimi-k3", "openrouter", "groq",
+             "cloudflare", "zai", "gemini-api",
+             "mistral", "nvidia", "nvidia-lightning", "ollama", "gemini", "claude", "codex", "grok"],
 }
 
 DEFAULT_FREE = {
     "kimi": "moonshotai/kimi-k2.6:free",
     "deepseek": "deepseek/deepseek-chat-v3.1:free",
     "qwen-coder": "qwen/qwen3-coder:free",
+    # Fixed OpenRouter identities with successful bounded tool-call probes.
+    "openrouter-dots": "dots-studio/dots-3-note-preview:free",
+    "openrouter-nemotron-nano": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "openrouter-nemotron-lightning": "nvidia/nemotron-3.5-lightning:free",
+    "openrouter-laguna-s": "poolside/laguna-s-2.1:free",
+    "openrouter-laguna-xs": "poolside/laguna-xs-2.1:free",
     "ollama": "qwen2.5-coder:7b",
-    "openrouter": "qwen/qwen3-4b:free",
-    "groq": "llama-3.3-70b-versatile",
+    "openrouter": "openrouter/free",
+    "groq": "openai/gpt-oss-20b",
+    # Groq quotas are per model; these identities share one key and RPM pace.
+    "groq-120b": "openai/gpt-oss-120b",
+    "groq-qwen": "qwen/qwen3.8-27b",
+    "groq-allam": "allam-2-7b",
     "cloudflare": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "zai": "glm-4.5-flash",
-    "gemini-api": "gemini-flash-latest",
+    "gemini-api": "gemini-3.5-flash-lite",
+    "gemini-api-31-lite": "gemini-3.1-flash-lite",
+    "cerebras": "qwen-3.8-27b",
     "nvidia": "meta/llama-3.1-8b-instruct",
-    "mistral": "mistral-small-latest",
+    "nvidia-lightning": "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "tencent": "deepseek-v4-pro",
+    # Independently metered Tencent TokenHub free-trial services, verified
+    # with native tool calls. They share TENCENT_TOKENHUB_API_KEY.
+    "tencent-glm-5.3-flash": "glm-5.3-flash",
+    "tencent-glm-5.3": "glm-5.3",
+    "tencent-kimi-k2.7-code": "kimi-k2.7-code",
+    "tencent-kimi-k3": "kimi-k3",
+    # The free account returns 429/code 1300 for Mistral Small but allows
+    # Ministral 3B under the same key and API limits (verified 2026-10-14).
+    "mistral": "ministral-3b-2512",
 }
 
-DEFAULT_FREE_FAILOVER = ["kimi", "qwen-coder", "deepseek", "groq", "gemini-api",
-                         "cloudflare", "mistral", "ollama"]
+DEFAULT_FREE_FAILOVER = ["tencent-glm-5.3-flash", "tencent-glm-5.3",
+                         "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+                         "openrouter", "groq", "groq-120b", "groq-qwen",
+                         "groq-allam", "cloudflare", "zai", "gemini-api",
+                         "gemini-api-31-lite",
+                         "mistral", "nvidia", "nvidia-lightning", "ollama", "openrouter-dots",
+                         "openrouter-nemotron-nano", "openrouter-nemotron-lightning",
+                         "openrouter-laguna-s", "openrouter-laguna-xs"]
 
 # API keys Mega Zword reads. On Windows a key set with
 # SetEnvironmentVariable(..., "User") is missing from shells and subprocesses
@@ -87,7 +125,8 @@ DEFAULT_FREE_FAILOVER = ["kimi", "qwen-coder", "deepseek", "groq", "gemini-api",
 USER_ENV_KEYS = (
     "GROQ_API_KEY", "OPENROUTER_API_KEY", "CLOUDFLARE_API_TOKEN",
     "CLOUDFLARE_ACCOUNT_ID", "ZAI_API_KEY", "GOOGLE_AI_API_KEY",
-    "NVIDIA_API_KEY", "MISTRAL_API_KEY",
+    "NVIDIA_API_KEY", "MISTRAL_API_KEY", "CEREBRAS_API_KEY",
+    "TENCENT_TOKENHUB_API_KEY",
 )
 
 

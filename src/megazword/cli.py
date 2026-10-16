@@ -15,12 +15,13 @@ from .backends import Backend, apply_levels, default_backends, grok_label
 from .briefing import track_run
 from .escalate import escalate, looks_failed
 from .rater import Rating, rate
+from .routing import tencent_first
 
 
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room", "night", "job"),
     "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
-            "sentinel", "floor", "brief"),
+            "sentinel", "floor", "brief", "free"),
     "Set up": ("init", "doctor", "out", "backends", "app", "mcp"),
     "Memory": ("note", "decide", "import-hive"),
 }
@@ -100,6 +101,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("backends", help="list AIs and whether they're installed")
     sub.add_parser("usage", help="show each AI plan's current usage")
+    free = sub.add_parser("free", help="inspect and check free AI providers")
+    free_sub = free.add_subparsers(dest="action", metavar="ACTION")
+    free_sub.required = True
+    free_sub.add_parser("models", help="list current free, tool-capable OpenRouter models")
+    free_test_parser = free_sub.add_parser("test", help="send one tiny prompt to configured free providers")
+    from .free_test import PROVIDERS as FREE_TEST_PROVIDERS
+    free_test_parser.add_argument("--provider", action="append", choices=FREE_TEST_PROVIDERS,
+                                  dest="providers", metavar="NAME",
+                                  help="test only this identity; repeat to test several")
     sub.add_parser("plan", help="rank the AIs for new work by live spare usage")
     sub.add_parser("start", help="text start screen (plain `megazword` opens the app window)")
     sub.add_parser("projects", help="list projects with memory entries and last activity")
@@ -256,7 +266,7 @@ LEVELS = ("easy", "medium", "hard")
 
 def candidates(rating: Rating, route: dict[str, list[str]],
                backends: dict[str, Backend], statuses: dict | None = None,
-               out: set[str] = frozenset()) -> list[Backend]:
+               out: set[str] = frozenset(), log_path: Path | None = None) -> list[Backend]:
     """Installed AIs to try, in order: this difficulty's route (ranked by
     pacing when statuses are given), then stronger routes as fallbacks.
     AIs in `out` (marked out of usage in config) are skipped."""
@@ -272,7 +282,12 @@ def candidates(rating: Rating, route: dict[str, list[str]],
     if rating.level == "easy":
         # B15 (Phil): AIs that train on prompts go first for small repetitive jobs.
         chain.sort(key=lambda b: not getattr(b, "trains_on_data", False))
-    return chain
+    # Phil asked that the verified Tencent trial pool lead while its free grants
+    # last. Spread primary requests across those independent services by logged
+    # estimated tokens, then use the normal free-first route as fallback.
+    names = tencent_first([b.name for b in chain], log_path)
+    by_name = {b.name: b for b in chain}
+    return [by_name[name] for name in names]
 
 
 def opens_app() -> bool:
@@ -379,6 +394,14 @@ def main(argv: list[str] | None = None,
 
     if args.command == "usage":
         return show_usage()
+
+    if args.command == "free" and args.action == "test":
+        from .free_test import command
+        return command(backends, cfg.free, args.providers, cfg.out_now())
+
+    if args.command == "free" and args.action == "models":
+        from .openrouter_catalog import command
+        return command()
 
     if args.command == "projects":
         from .memory import list_projects
@@ -554,7 +577,8 @@ def main(argv: list[str] | None = None,
         rating = rater(prompt)
         apply_levels(backends, rating.level, cfg.grok, cfg.levels)
         out = cfg.out_now()
-        chain = candidates(rating, cfg.route, backends, (statuses or plan_statuses)(), out)
+        chain = candidates(rating, cfg.route, backends, (statuses or plan_statuses)(), out,
+                           cfg.log_path)
         if not chain:
             print(f"[megazword] no installed AI for a {rating.level} task; "
                   f"check the route in {config.HOME / 'config.toml'}", file=sys.stderr)
@@ -585,7 +609,8 @@ def main(argv: list[str] | None = None,
             reviewers.update({name: b for name, b in backends.items()
                               if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))})
             reviewer = reviewers.get(cfg.agent["reviewer"])
-        order = cfg.agent.get("failover_order", config.DEFAULT_FREE_FAILOVER)
+        order = tencent_first(cfg.agent.get("failover_order", config.DEFAULT_FREE_FAILOVER),
+                              cfg.log_path)
         fallbacks = [backends[name] for name in order if name in backends
                      and name not in cfg.out_now()
                      and isinstance(backends[name], (OpenAICompatibleBackend, OllamaBackend))]
@@ -745,12 +770,16 @@ def auto_mark_out(name: str, error: str, cfg: config.Config) -> bool:
     try:
         config.set_out(config.HOME / "config.toml", name, hit.until)
     except (OSError, ValueError) as exc:
-        print(f"[megazword] {name} hit its usage limit but I couldn't save that: {exc}",
+        kind = ("rate limit" if "rate limit" in error.lower() or "rate limited" in error.lower()
+                else "usage limit")
+        print(f"[megazword] {name} hit its {kind} but I couldn't save that: {exc}",
               file=sys.stderr)
         return False
     cfg.out_until[name] = hit.until
     how = "" if hit.exact else " (reset time not given; guessing 1 hour)"
-    print(f"[megazword] {name} hit its usage limit; marked out until "
+    kind = ("rate limit" if "rate limit" in error.lower() or "rate limited" in error.lower()
+            else "usage limit")
+    print(f"[megazword] {name} hit its {kind}; marked out until "
           f"{hit.until.astimezone():%a %I:%M %p}{how}. Undo: megazword out {name} --clear",
           file=sys.stderr)
     return True
@@ -797,8 +826,8 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
         # Strongest first: the hard-task route, then anything else from the
         # original chain. The AI that answered last goes first so escalate()
         # can skip it.
-        names = list(dict.fromkeys([last["backend"], *cfg.route.get("hard", []),
-                                    *last["chain"]]))
+        names = tencent_first(list(dict.fromkeys([last["backend"], *cfg.route.get("hard", []),
+                                                  *last["chain"]])), cfg.log_path)
     chain = [backends[n] for n in names
              if n in backends and (n == last["backend"]
                                    or (n not in cfg.out_now() and backends[n].available()))]

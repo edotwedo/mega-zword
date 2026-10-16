@@ -13,7 +13,8 @@ from . import config
 from .backends import Backend
 
 CLI_SEATS = ("claude", "codex", "grok", "gemini")
-HTTP_SEATS = ("groq", "cloudflare", "zai", "gemini-api", "nvidia", "mistral", "openrouter")
+HTTP_SEATS = ("groq", "cloudflare", "zai", "gemini-api", "nvidia", "mistral",
+              "openrouter", "cerebras")
 MINIMUM_CLI = ("claude", "codex", "grok")
 
 

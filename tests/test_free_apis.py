@@ -27,6 +27,7 @@ def test_request_and_answer(api, monkeypatch):
         assert request.get_method() == "POST"
         assert request.get_header("Authorization") == "Bearer secret-test-credential"
         assert request.get_header("Content-type") == "application/json"
+        assert request.get_header("User-agent") == "megazword/0.1.0b1"
         assert timeout == 7
         assert json.loads(request.data) == {
             "model": "test-model", "messages": [{"role": "user", "content": "hello ☃"}],
@@ -38,6 +39,26 @@ def test_request_and_answer(api, monkeypatch):
     result = api.run("hello ☃")
     assert result.ok and result.text == "answer"
     assert result.backend == "test" and result.seconds >= 0
+
+
+def test_groq_gpt_oss_tool_requests_use_supported_reasoning_format(monkeypatch):
+    monkeypatch.setenv("TEST_API_KEY", "secret-test-credential")
+    groq = OpenAICompatibleBackend("groq", base_url="https://api.groq.com/openai/v1",
+                                   model="openai/gpt-oss-20b", key_env="TEST_API_KEY")
+
+    def fake(request, timeout):
+        body = json.loads(request.data)
+        assert body["tool_choice"] == "auto"
+        assert body["reasoning_format"] == "parsed"
+        assert body["tools"][0]["function"]["name"] == "finish"
+        return io.BytesIO(json.dumps({"choices": [{"message": {
+            "content": None, "tool_calls": [{"id": "t1", "type": "function",
+                "function": {"name": "finish", "arguments": '{"summary":"ok"}'}}]}}]}).encode())
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    message = groq.chat([{"role": "user", "content": "finish"}],
+                        [{"type": "function", "function": {"name": "finish"}}])
+    assert message["tool_calls"][0]["function"]["name"] == "finish"
 
 
 @pytest.mark.parametrize("value", [None, "", "a-key"])
@@ -92,6 +113,24 @@ def test_auth_errors_are_plain_and_never_leak_key(api, monkeypatch, code, word):
     assert failures.classify("groq", result.error).kind == "auth"
 
 
+def test_agent_harness_model_restriction_is_reported_as_access_not_bad_key(api, monkeypatch):
+    from megazword import failures
+    body = json.dumps({"error": {"message":
+        "This model is only available on agentic harnesses. See https://openrouter.ai/apps"}}).encode()
+
+    def fail(*args, **kwargs):
+        raise urllib.error.HTTPError("https://example.test/chat/completions", 403,
+                                     "Forbidden", {}, io.BytesIO(body))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    result = api.run("synthetic probe")
+    assert "only available on agentic harnesses" in result.error
+    assert "https://" not in result.error
+    failure = failures.classify("openrouter", result.error)
+    assert failure.kind == "access"
+    assert "restricted for this app" in failure.reason
+
+
 @pytest.mark.parametrize("body", [b"not json", b"{}", b'{"choices":[]}',
                                      b'{"choices":[{"message":{"content":null}}]}',
                                      b'{"choices":[{"message":{"content":" "}}]}'])
@@ -126,6 +165,59 @@ def test_retry_after_http_date():
     assert "in 3 minutes" in http_error_message(429, {"Retry-After": date})
 
 
+def test_cloudflare_daily_quota_uses_utc_midnight_reset(api, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from megazword import free_apis
+    from megazword.limits import detect
+
+    api.name = "cloudflare"
+    monkeypatch.setattr(free_apis, "_cloudflare_daily_reset_seconds", lambda: 3 * 60 * 60)
+    body = {"errors": [{"code": 4006, "message":
+                        "AiError: you have used up your daily free allocation of 10,000 neurons"}]}
+
+    def fail(request, **kwargs):
+        raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {},
+                                     io.BytesIO(json.dumps(body).encode()))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    result = api.run("hi")
+    assert not result.ok
+    assert "daily free allocation exhausted; resets at 00:00 UTC" in result.error
+    assert "try again in 180 minutes" in result.error
+    now = datetime.now(timezone.utc)
+    hit = detect(result.error, now)
+    assert hit and hit.exact and hit.until == now + timedelta(hours=3)
+
+
+def test_cloudflare_capacity_429_is_not_misread_as_daily_quota(api):
+    from megazword import free_apis
+    body = {"errors": [{"code": 3040, "message": "Capacity temporarily exceeded"}]}
+    assert not free_apis._cloudflare_daily_quota_exhausted(json.dumps(body).encode())
+
+
+def test_cloudflare_daily_reset_is_midnight_utc():
+    from datetime import datetime, timezone
+    from megazword.free_apis import _cloudflare_daily_reset_seconds
+    now = datetime(2026, 10, 14, 22, 30, tzinfo=timezone.utc)
+    assert _cloudflare_daily_reset_seconds(now) == 90 * 60
+
+
+def test_mistral_1300_rate_limit_is_identified_without_echoing_body(api, monkeypatch):
+    api.name = "mistral"
+    body = {"object": "error", "message": "Rate limit exceeded",
+            "type": "rate_limited", "code": 1300}
+
+    def fail(request, **kwargs):
+        raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {},
+                                     io.BytesIO(json.dumps(body).encode()))
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    result = api.run("hi")
+    assert not result.ok
+    assert "Mistral rate limit exceeded (code 1300)" in result.error
+    assert "Rate limit exceeded" not in result.error
+
+
 def test_cloudflare_validation_error_reason_is_safe(api, monkeypatch):
     api.name = "cloudflare"
     monkeypatch.setenv("OTHER_SECRET", "opaque-other-secret")
@@ -157,10 +249,12 @@ def test_presets_config_and_routes(monkeypatch):
     assert backends["groq"].base_url == "https://api.groq.com/openai/v1"
     assert backends["openrouter"].key_env == "OPENROUTER_API_KEY"
     assert backends["groq"].key_env == "GROQ_API_KEY"
-    assert config.DEFAULT_FREE["openrouter"].endswith(":free")
+    assert config.DEFAULT_FREE["openrouter"] == "openrouter/free"
+    assert config.DEFAULT_FREE["mistral"] == "ministral-3b-2512"
+    assert default_backends()["mistral"].model == "ministral-3b-2512"
     assert cfg.route == config.DEFAULT_ROUTE
     generated = config.render_default(list(backends))
-    assert "openrouter" not in generated and "groq" not in generated
+    assert "openrouter" in generated and "groq" in generated
     assert {"openrouter", "groq"} <= default_backends(edit=True).keys()
 
 
@@ -185,6 +279,7 @@ def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
     monkeypatch.setattr(urllib.request, "urlopen", finish_reply)
     assert cli.main(["run", "hello", "-m", name, "--edit"], cfg=cfg) == 0
     assert "tools" in calls[-1]
+    assert calls[-1]["tool_choice"] == "auto"
     assert len(calls) == 2
     assert cli.main(["backends"], cfg=cfg) == 0
     output = capsys.readouterr().out
@@ -192,23 +287,148 @@ def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
     assert "secret-test-credential" not in output
 
 
-NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "mistral")
+NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "nvidia-lightning",
+            "mistral", "tencent-glm-5.3-flash", "tencent-glm-5.3",
+            "tencent-kimi-k2.7-code", "tencent-kimi-k3")
 
 
-def test_b14_backends_exist_off_route_and_train_flags():
+def test_free_backends_are_registered_and_routed_before_paid_plans():
     backends = default_backends()
     for name in NEW_FREE:
         assert name in backends
         for level, names in config.DEFAULT_ROUTE.items():
-            # B15 (Phil): only Mistral is routed by default, first in `easy`.
-            assert name not in names or (name, level) == ("mistral", "easy")
+            assert name in names
         assert name in default_backends(edit=True)
+    assert "ollama" in backends
     assert not backends["zai"].trains_on_data
     assert backends["gemini-api"].trains_on_data
     assert backends["mistral"].trains_on_data
     assert not backends["cloudflare"].trains_on_data
     assert not backends["nvidia"].trains_on_data
-    assert not backends["openrouter"].trains_on_data
+    assert not backends["nvidia-lightning"].trains_on_data
+    assert backends["tencent"].model == "deepseek-v4-pro"
+    assert backends["tencent"].key_env == "TENCENT_TOKENHUB_API_KEY"
+    assert backends["tencent"].base_url == "https://tokenhub-intl.tencentcloudmaas.com/v1"
+    assert backends["nvidia-lightning"].model == "nvidia/nemotron-3.5-lightning-30b-a3b"
+    assert backends["nvidia-lightning"].key_env == backends["nvidia"].key_env
+    assert backends["nvidia-lightning"].base_url == backends["nvidia"].base_url
+    assert backends["openrouter"].trains_on_data
+    assert "cerebras" in backends
+    assert all("cerebras" not in names for names in config.DEFAULT_ROUTE.values())
+    assert "cerebras" not in config.DEFAULT_FREE_FAILOVER
+    assert {"groq-120b", "groq-qwen", "groq-allam"}.issubset(backends)
+    assert "gemini-api-31-lite" in backends
+    assert {"openrouter-dots", "openrouter-nemotron-nano",
+            "openrouter-nemotron-lightning", "openrouter-laguna-s",
+            "openrouter-laguna-xs"}.issubset(backends)
+    assert all(name in config.DEFAULT_FREE_FAILOVER
+               for name in ("groq-120b", "groq-qwen", "groq-allam"))
+
+
+def test_groq_model_aliases_use_verified_ids_and_shared_key(monkeypatch):
+    from megazword.free_apis import free_backends
+    backends = {b.name: b for b in free_backends(config.DEFAULT_FREE)}
+    expected = {"groq": "openai/gpt-oss-20b", "groq-120b": "openai/gpt-oss-120b",
+                "groq-qwen": "qwen/qwen3.8-27b", "groq-allam": "allam-2-7b"}
+    assert {name: backends[name].model for name in expected} == expected
+    assert all(backends[name].key_env == "GROQ_API_KEY" for name in expected)
+    assert all(backends[name].base_url == backends["groq"].base_url for name in expected)
+    monkeypatch.setenv("GROQ_API_KEY", "secret-test-credential")
+    assert all(backends[name].available() for name in expected)
+    assert backends["gemini-api-31-lite"].model == "gemini-3.1-flash-lite"
+    assert backends["gemini-api-31-lite"].key_env == backends["gemini-api"].key_env
+
+
+def test_verified_openrouter_model_identities_keep_one_key_and_exact_free_ids():
+    from megazword.free_apis import free_backends
+    models = {"openrouter-dots": "dots-studio/dots-3-note-preview:free",
+              "openrouter-nemotron-nano": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+              "openrouter-nemotron-lightning": "nvidia/nemotron-3.5-lightning:free",
+              "openrouter-laguna-s": "poolside/laguna-s-2.1:free",
+              "openrouter-laguna-xs": "poolside/laguna-xs-2.1:free"}
+    backends = {b.name: b for b in free_backends(config.DEFAULT_FREE)}
+    assert {name: backends[name].model for name in models} == models
+    assert all(backends[name].key_env == "OPENROUTER_API_KEY" for name in models)
+    assert all(backends[name].trains_on_data for name in models)
+    assert all(name in config.DEFAULT_FREE_FAILOVER for name in models)
+
+
+def test_nvidia_lightning_alias_uses_verified_free_endpoint_and_shared_pacing():
+    from megazword.free_apis import free_backends
+    backend = {b.name: b for b in free_backends(config.DEFAULT_FREE)}["nvidia-lightning"]
+    assert backend.model == "nvidia/nemotron-3.5-lightning-30b-a3b"
+    assert backend.key_env == "NVIDIA_API_KEY"
+    assert "nvidia-lightning" in config.DEFAULT_FREE_FAILOVER
+    assert all("nvidia-lightning" in route for route in config.DEFAULT_ROUTE.values())
+
+
+def test_nvidia_model_aliases_share_provider_pacing_file(tmp_path, monkeypatch):
+    from megazword import agent
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setattr(agent.time, "sleep", lambda _: None)
+    deadline = agent.time.monotonic() + 5
+    pace = {"nvidia": 0.001}
+    agent.pace_call("nvidia", pace, deadline)
+    agent.pace_call("nvidia-lightning", pace, deadline)
+    assert (tmp_path / "agent-pace" / "nvidia.json").exists()
+    assert not (tmp_path / "agent-pace" / "nvidia-lightning.json").exists()
+
+
+def test_successful_response_records_provider_request_quota(api, monkeypatch):
+    class Response(io.BytesIO):
+        headers = {"x-ratelimit-remaining-requests": "42",
+                   "x-ratelimit-limit-requests": "1000",
+                   "x-ratelimit-reset-requests": "30m"}
+        def __enter__(self): return self
+        def __exit__(self, *args): self.close()
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **kw: Response(
+        json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()))
+    assert api.run("hello").ok
+    assert (api.remaining_requests, api.limit_requests) == (42, 1000)
+
+
+def test_low_request_quota_is_persisted_until_header_reset(api, monkeypatch, tmp_path):
+    from megazword import free_apis
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    free_apis._record_request_quota("test", 49, 1000, "30m")
+    assert free_apis.request_quota_low("test")
+    assert not free_apis.request_quota_low("another-model")
+    free_apis._record_request_quota("test", 900, 1000, "1h")
+    assert not free_apis.request_quota_low("test")
+
+
+def test_all_default_routes_try_free_backends_before_paid_plans():
+    free = {"openrouter", "groq", "cloudflare", "zai", "gemini-api", "gemini",
+            "mistral", "nvidia", "tencent", "ollama"}
+    paid = {"claude", "codex", "grok"}
+    for route in config.DEFAULT_ROUTE.values():
+        free_positions = [i for i, name in enumerate(route) if name in free]
+        paid_positions = [i for i, name in enumerate(route) if name in paid]
+        assert free_positions and paid_positions
+        assert max(free_positions) < min(paid_positions)
+    assert config.DEFAULT_FREE_FAILOVER[:4] == [
+        "tencent-glm-5.3-flash", "tencent-glm-5.3",
+        "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+    ]
+    assert not ({"kimi", "qwen-coder", "deepseek"} & set(config.DEFAULT_FREE_FAILOVER))
+
+
+def test_gemini_cli_and_developer_api_are_distinct_backends():
+    from megazword.backends import GeminiBackend, default_backends
+    from megazword.free_apis import OpenAICompatibleBackend
+    backends = default_backends()
+    assert isinstance(backends["gemini"], GeminiBackend)
+    assert isinstance(backends["gemini-api"], OpenAICompatibleBackend)
+    assert backends["gemini"].name != backends["gemini-api"].name
+    assert all("gemini-api" in route and "gemini" in route
+               for route in config.DEFAULT_ROUTE.values())
+
+
+def test_openrouter_fallback_is_free_even_without_config_override():
+    from megazword.free_apis import free_backends
+    openrouter = next(b for b in free_backends({}) if b.name == "openrouter")
+    assert openrouter.model == "openrouter/free"
+    assert openrouter.trains_on_data
 
 
 def test_cloudflare_needs_account_id_and_puts_it_in_url(monkeypatch):
@@ -247,6 +467,60 @@ def test_new_free_forced_run(name, key_env, monkeypatch, capsys):
     assert "secret-test-credential" not in out
 
 
+def test_cerebras_free_model_defaults_and_override(monkeypatch):
+    from megazword.free_apis import OpenAICompatibleBackend, free_backends
+    models = dict(config.DEFAULT_FREE)
+    backends = {b.name: b for b in free_backends(models)}
+    cerebras = backends["cerebras"]
+    assert isinstance(cerebras, OpenAICompatibleBackend)
+    assert cerebras.base_url == "https://api.cerebras.ai/v1"
+    assert cerebras.model == "qwen-3.8-27b"
+    assert cerebras.key_env == "CEREBRAS_API_KEY"
+    models["cerebras"] = "gpt-oss-120b"
+    assert {b.name: b for b in free_backends(models)}["cerebras"].model == "gpt-oss-120b"
+
+
+def test_tencent_tokenhub_request_uses_deepseek_v4_pro_singapore_and_key(monkeypatch):
+    from megazword.free_apis import free_backends
+    monkeypatch.setenv("TENCENT_TOKENHUB_API_KEY", "secret-test-credential")
+    backend = {b.name: b for b in free_backends(config.DEFAULT_FREE)}["tencent"]
+    seen = []
+
+    def fake(request, timeout):
+        seen.append(request)
+        return reply("ok")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    result = backend.run("Reply with ok")
+    assert result.ok and result.text == "ok"
+    assert seen[0].full_url == (
+        "https://tokenhub-intl.tencentcloudmaas.com/v1/chat/completions")
+    assert seen[0].get_header("Authorization") == "Bearer secret-test-credential"
+    assert json.loads(seen[0].data)["model"] == "deepseek-v4-pro"
+
+
+def test_tencent_deepseek_remains_explicit_while_verified_models_are_routed():
+    backends = default_backends()
+    assert "tencent" in backends
+    assert all("tencent" not in route for route in config.DEFAULT_ROUTE.values())
+    assert "tencent" not in config.DEFAULT_FREE_FAILOVER
+    working = ("tencent-glm-5.3-flash", "tencent-glm-5.3",
+               "tencent-kimi-k2.7-code", "tencent-kimi-k3")
+    assert set(working).issubset(backends)
+    assert all(route[:4] == list(working) for route in config.DEFAULT_ROUTE.values())
+    assert all(name in config.DEFAULT_FREE_FAILOVER for name in working)
+    assert all(backends[name].key_env == "TENCENT_TOKENHUB_API_KEY"
+               for name in working)
+    assert all(backends[name].base_url == backends["tencent"].base_url
+               for name in working)
+    assert {name: backends[name].model for name in working} == {
+        "tencent-glm-5.3-flash": "glm-5.3-flash",
+        "tencent-glm-5.3": "glm-5.3",
+        "tencent-kimi-k2.7-code": "kimi-k2.7-code",
+        "tencent-kimi-k3": "kimi-k3",
+    }
+
+
 @pytest.mark.parametrize("model", ['""', '123'])
 def test_bad_model_config(tmp_path, model):
     path = tmp_path / "config.toml"
@@ -264,6 +538,11 @@ def test_provider_training_labels_match_developer_api_terms():
     assert backends["mistral"].trains_on_data
 
 
-def test_gemini_api_default_model_is_flash_latest():
-    assert config.DEFAULT_FREE["gemini-api"] == "gemini-flash-latest"
-    assert default_backends()["gemini-api"].model == "gemini-flash-latest"
+def test_gemini_api_default_model_is_flash_lite():
+    assert config.DEFAULT_FREE["gemini-api"] == "gemini-3.5-flash-lite"
+    assert default_backends()["gemini-api"].model == "gemini-3.5-flash-lite"
+
+
+def test_openrouter_default_uses_free_router():
+    assert config.DEFAULT_FREE["openrouter"] == "openrouter/free"
+    assert default_backends()["openrouter"].model == "openrouter/free"

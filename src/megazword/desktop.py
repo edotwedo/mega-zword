@@ -93,13 +93,14 @@ def shortcut_script(link: Path, target: str, args: str, icon: str | None, workdi
 def install_shortcut(run=None, env: dict | None = None, python: str | None = None) -> Path:
     """Create or refresh the Start menu shortcut. Windows only."""
     import subprocess
+    from .backends import no_window
     run = run or subprocess.run
     link = shortcut_path(env)
     link.parent.mkdir(parents=True, exist_ok=True)
     args = '-c "' + LAUNCH_CODE + '"'
     script = shortcut_script(link, launcher_python(python), args, icon_path(), str(Path.home()))
     result = run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
-                 capture_output=True, text=True, timeout=60)
+                 capture_output=True, text=True, timeout=60, **no_window())
     if result.returncode != 0:
         raise OSError((result.stderr or "could not write the shortcut").strip()[:300])
     return link

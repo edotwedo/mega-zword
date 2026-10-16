@@ -438,9 +438,12 @@ def test_answer_writers_in_separate_processes_preserve_records(tmp_path, monkeyp
     import os
     import subprocess
     import sys
+    from pathlib import Path
     from megazword import answers
     monkeypatch.setattr(config, "HOME", tmp_path)
     env = dict(os.environ, MEGAZWORD_HOME=str(tmp_path))
+    src = str(Path(__file__).resolve().parents[1] / "src")
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, [src, env.get("PYTHONPATH", "")]))
     code = ("import sys; from megazword import answers; "
             "[answers.add(sys.argv[1]+':'+str(i),'a','fake','proj','easy') for i in range(5)]")
     children = [subprocess.Popen([sys.executable, "-c", code, str(i)], env=env,
