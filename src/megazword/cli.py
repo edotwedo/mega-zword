@@ -19,7 +19,7 @@ from .routing import spread
 
 
 COMMAND_GROUPS = {
-    "Ask": ("run", "review", "chat", "retry", "room", "night", "job"),
+    "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job"),
     "See": ("start", "usage", "credits", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "free"),
     "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp"),
@@ -118,6 +118,8 @@ def build_parser() -> argparse.ArgumentParser:
                                   help="test only this identity; repeat to test several")
     from .review import add_parser as add_review_parser
     add_review_parser(sub)
+    from .heartbeat import add_parser as add_heartbeat_parser
+    add_heartbeat_parser(sub)
     cr = sub.add_parser("credits", help="free-credit ledger: grants left, runway, billing block")
     cr.add_argument("action", nargs="?", choices=("show", "set"), default="show")
     cr.add_argument("name", nargs="?", help="source name for set, e.g. tencent-kimi-k3")
@@ -385,6 +387,10 @@ def main(argv: list[str] | None = None,
         backends = default_backends(edit=getattr(args, "edit", False), free_models=cfg.free,
                                     lean=cfg.lean)
     rater = rater if rater is not None else (lambda p: rate(p, cfg.rater_model))
+
+    if args.command == "heartbeat":
+        from .heartbeat import command as heartbeat_command
+        return heartbeat_command(args, backends, cfg)
 
     if args.command == "review":
         from .review import command as review_command

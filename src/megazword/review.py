@@ -22,7 +22,7 @@ from pathlib import Path
 from . import config, log
 from .backends import Backend, Result
 
-REVIEWERS = 3
+REVIEWERS = 1          # routine change; the heartbeat uses 2 before merging (Phil, 2026-10-16)
 MAX_DIFF_CHARS = 24_000
 GREPTILE_MONTHLY = 50
 SEVERITY = {"high": 0, "medium": 1, "med": 1, "low": 2}
@@ -98,7 +98,8 @@ def pick_reviewers(backends: dict[str, Backend], count: int = REVIEWERS,
     for name in order:
         b = backends[name]
         family = name.split("-")[0]
-        if family in families or not free_backend(b) or not b.available():
+        # Tencent's one-time grants are kept for coding, never spent on reviews.
+        if family in families or family == "tencent" or not free_backend(b) or not b.available():
             continue
         chosen.append(b)
         families.add(family)
@@ -242,15 +243,32 @@ def _loose(text: str) -> list[Finding]:
 
 def run(repo: Path, backends: dict[str, Backend], cfg: config.Config, base: str | None = None,
         use_greptile: bool = False, count: int = REVIEWERS, write=print) -> int:
+    merged, raw, status = collect(repo, backends, cfg, base, use_greptile, count, write)
+    if merged is None:
+        return 1
+    write(report(merged, raw))
+    if status:
+        write(f"\n[megazword] {status}")
+    return 0 if raw or merged else 1
+
+
+def blocking(merged: list[Finding]) -> list[Finding]:
+    """High-severity findings that at least two reviewers reported independently."""
+    return [f for f in merged if f.severity == "high" and len(f.by) >= 2]
+
+
+def collect(repo: Path, backends: dict[str, Backend], cfg: config.Config, base: str | None = None,
+            use_greptile: bool = False, count: int = REVIEWERS, write=print):
+    """(merged findings, raw answers, status line); merged is None if nothing ran."""
     diff, label = change(repo, base)
     if not diff.strip():
         write("[megazword] nothing to review")
-        return 1
+        return None, {}, ""
     shown, note = clip(diff)
     reviewers = pick_reviewers(backends, count, cfg.log_path)
     if not reviewers and not use_greptile:
         write("[megazword] no free reviewers available (check keys with `megazword free test`)")
-        return 1
+        return None, {}, ""
     prompt = PROMPT.format(n=len(reviewers) + use_greptile, note=note, diff=shown)
     print(f"[megazword] reviewing {label} ({len(diff):,} chars) with "
           f"{', '.join(b.name for b in reviewers) or 'no free models'}"
@@ -275,10 +293,7 @@ def run(repo: Path, backends: dict[str, Backend], cfg: config.Config, base: str 
         else:
             write(f"[megazword] {r.backend} failed: {r.error[:160]}")
     findings += extra
-    write(report(merge(findings), raw))
-    if status:
-        write(f"\n[megazword] {status}")
-    return 0 if raw or extra else 1
+    return merge(findings), raw, status
 
 
 def add_parser(sub) -> None:
@@ -286,7 +301,7 @@ def add_parser(sub) -> None:
     p.add_argument("--base", help="compare against this ref (default: origin/main, or the last commit)")
     p.add_argument("--greptile", action="store_true",
                    help=f"also send it to Greptile via a temporary GitHub PR ({GREPTILE_MONTHLY} free/month)")
-    p.add_argument("-n", type=int, default=REVIEWERS, help="how many free reviewers (default 3)")
+    p.add_argument("-n", type=int, default=REVIEWERS, help="how many free reviewers (default 1)")
 
 
 def command(args, backends: dict[str, Backend], cfg: config.Config) -> int:
