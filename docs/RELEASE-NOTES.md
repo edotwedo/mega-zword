@@ -4,6 +4,8 @@
 
 - **Reload app** in the header reloads the whole page and reconnects after an
   update. The arrow button remains **Refresh usage meters**.
+- Enter sends in Home, Hive and chat tabs; Shift+Enter inserts a newline.
+  IME composition and held-key repeats do not submit messages. Ctrl+Enter still works.
 
 - The CLI now detects code-review requests itself, including requests sent by an
   older dashboard without review flags. Mega Zword reviews use installed source

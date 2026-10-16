@@ -349,7 +349,8 @@ current reply to finish; **Resume** continues toward the selected turn cap.
 
 **Chats** (sidebar, under Home and Hive): pick an AI (or auto) and press **+** for a
 new chat tab. Each tab keeps its AI, project and last few turns across restarts.
-Ctrl+Enter sends; **Chat options** contains Rename, New session and Delete chat.
+Enter sends; Shift+Enter inserts a new line (Ctrl+Enter also sends).
+**Chat options** contains Rename, New session and Delete chat.
 Links: `#hive` opens the Hive, `#tab-t1` opens tab t1. Tabs can't be reordered yet.
 
 ### Continuing chat-tab sessions

@@ -279,7 +279,7 @@ section { box-shadow:none; }
     <h2>~/workspace</h2>
     <div id="jobs" class="console-transcript" aria-label="Job output" tabindex="0"></div>
     <label class="prompt-label" for="prompt">&gt;_ <span class="sr-only">Task prompt</span></label>
-    <textarea id="prompt" aria-label="Task prompt" placeholder="Type a task… Ctrl+Enter to send"></textarea>
+    <textarea id="prompt" aria-label="Task prompt" placeholder="Type a task… Enter to send · Shift+Enter for a new line"></textarea>
     <div class="row console-toolbar">
       <label>AI <select id="model"><option value="">auto</option></select></label>
       <button class="go" id="send" aria-label="Send task" title="Send task">Send ↵</button>
@@ -369,7 +369,7 @@ section { box-shadow:none; }
     <label class="prompt-label" for="room-input">&gt;_ <span class="sr-only">Your message to the room</span></label>
     <label>Send to <select id="worker-target" aria-label="Message recipient"><option value="">Room replies (separate one-shot bots)</option></select></label>
     <div class="row room-compose">
-      <textarea id="room-input" aria-label="Your message to the room" placeholder="Say something to the room. Use @claude, @codex, @grok or @gemini to choose who replies."></textarea>
+      <textarea id="room-input" aria-label="Your message to the room" placeholder="Message the room… Enter to send · Shift+Enter for a new line"></textarea>
       <button id="room-send" type="button">Send</button>
       <button id="workers-announce" type="button">Announce to connected workers</button>
     </div>
@@ -397,7 +397,7 @@ section { box-shadow:none; }
     <div class="room-messages" id="chat-messages" role="region" aria-label="Chat messages" aria-live="polite" tabindex="0"></div>
     <label class="prompt-label" for="chat-input">&gt;_ <span class="sr-only">Your message</span></label>
     <div class="row room-compose">
-      <textarea id="chat-input" aria-label="Your message" placeholder="Message this tab's AI. Ctrl+Enter sends. Your conversation stays in this tab."></textarea>
+      <textarea id="chat-input" aria-label="Your message" placeholder="Message this tab's AI… Enter to send · Shift+Enter for a new line"></textarea>
       <button id="chat-send" type="button" class="go">Send</button>
     </div>
     <div class="row"><label><input type="checkbox" id="chat-context"> include project memory</label>
@@ -884,7 +884,8 @@ document.addEventListener("keydown", async e => {
   if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && e.altKey) {
     e.preventDefault(); $("prompt").focus();
   } else if (e.key === "Escape") {
-    const b = $("jobs").querySelector("button.cancel:not([disabled])");  // newest job is first
+    const buttons = $("jobs").querySelectorAll("button.cancel:not([disabled])");
+    const b = buttons[buttons.length - 1];
     if (!b) return;
     b.disabled = true;
     try { await post("/api/cancel", {job: b.dataset.job}); toast("cancelled the newest job"); }
@@ -987,7 +988,13 @@ $("jobs").addEventListener("click", async e => {
 $("send").onclick = send;
 $("compare").onchange = renderComparePicks;
 $("edit").onchange = () => { $("coding-folder").hidden = !$("edit").checked; };
-$("prompt").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send(); });
+function composerKeys(e, submit) {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+    e.preventDefault();
+    if (!e.repeat) submit();
+  }
+}
+$("prompt").addEventListener("keydown", e => composerKeys(e, send));
 $("retry").onclick = async () => { try { const {job} = await post("/api/retry", {model: $("model").value, project}); watch(job); }
   catch (e) { toast(e.message); } };
 $("addnote").onclick = async () => {
@@ -1162,7 +1169,7 @@ $("room-send").onclick = async () => {
   catch (e) { toast(e.message); }
   $("room-send").disabled = false;
 };
-$("room-input").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("room-send").click(); });
+$("room-input").addEventListener("keydown", e => composerKeys(e, () => $("room-send").click()));
 $("room-start").onclick = () => {
   const turns = Number($("room-turn-cap").value);
   if (!Number.isInteger(turns) || turns < 1 || turns > 50) { toast("Turns must be 1-50."); return; }
@@ -1190,7 +1197,7 @@ $("chat-new-session").onclick = async () => {
   } catch (e) { toast(e.message); }
   finally { chatBusy.delete(id); await reloadChatTabs(); }
 };
-$("chat-input").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) sendChat(); });
+$("chat-input").addEventListener("keydown", e => composerKeys(e, sendChat));
 $("chat-rename-save").onclick = async () => {
   const title = $("chat-rename").value.trim(); if (!title || !currentView.startsWith("tab:")) return;
   try { await post("/api/tabs/rename", {id: currentView.slice(4), title}); $("chat-rename").blur(); await reloadChatTabs(); setView(currentView); }
