@@ -14,26 +14,49 @@ TENCENT_BACKENDS = (
     "tencent-deepseek-v4-flash-vision-exp",
 )
 
+# Paid subscription CLIs keep their configured order after every free source.
+PAID_BACKENDS = ("claude", "codex", "grok", "gemini")
 
-def tencent_first(names: list[str], log_path: Path | None = None) -> list[str]:
-    """Lead with Tencent's free-trial models, favoring the least-used one.
+# One-time grants that never refill. Outside hard work each request counts four
+# times, so they get roughly a quarter share next to free tiers that reset.
+FINITE_BACKENDS = TENCENT_BACKENDS
+FINITE_SHARE = 0.25
 
-    Mega Zword's local run log only estimates token use. Tencent remains the
-    source of truth for each service's actual free-quota balance.
+SPREAD_WINDOW = timedelta(hours=24)
+
+
+def spread(names: list[str], level: str = "medium",
+           log_path: Path | None = None) -> list[str]:
+    """Order free sources so the least-used one in the last 24 hours goes first.
+
+    Phil (2026-10-16): use a tiny bit of every free source instead of draining
+    one before moving to the next. Hard work leads with the finite Tencent grants
+    (the strongest free coders), spread among themselves. Ties keep the
+    configured order. Mega Zword's run log only estimates use; each provider's
+    console stays the source of truth for balances.
     """
-    group = [name for name in names if name in TENCENT_BACKENDS]
-    if not group:
-        return list(names)
+    names = list(dict.fromkeys(names))
+    free = [name for name in names if name not in PAID_BACKENDS]
+    paid = [name for name in names if name in PAID_BACKENDS]
+    if len(free) < 2:
+        return [*free, *paid]
 
     if log_path is None:
         from .config import HOME
         log_path = HOME / "log.jsonl"
     from .runlog import summarize
 
-    usage = summarize(log_path, timedelta(days=365)) if len(group) > 1 else {}
-    position = {name: index for index, name in enumerate(group)}
-    group.sort(key=lambda name: (
-        usage.get(name).est_tokens if usage.get(name) else 0,
-        position[name],
-    ))
-    return [*group, *(name for name in names if name not in TENCENT_BACKENDS)]
+    usage = summarize(log_path, SPREAD_WINDOW)
+    position = {name: index for index, name in enumerate(free)}
+
+    def load(name: str) -> float:
+        runs = usage[name].runs if name in usage else 0
+        if name in FINITE_BACKENDS and level != "hard":
+            return runs / FINITE_SHARE
+        return float(runs)
+
+    def key(name: str):
+        lead = 0 if level == "hard" and name in FINITE_BACKENDS else 1
+        return (lead, load(name), position[name])
+
+    return [*sorted(free, key=key), *paid]

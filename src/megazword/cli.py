@@ -15,7 +15,7 @@ from .backends import Backend, apply_levels, default_backends, grok_label
 from .briefing import track_run
 from .escalate import escalate, looks_failed
 from .rater import Rating, rate
-from .routing import tencent_first
+from .routing import spread
 
 
 COMMAND_GROUPS = {
@@ -286,10 +286,9 @@ def candidates(rating: Rating, route: dict[str, list[str]],
     if rating.level == "easy":
         # B15 (Phil): AIs that train on prompts go first for small repetitive jobs.
         chain.sort(key=lambda b: not getattr(b, "trains_on_data", False))
-    # Phil asked that the verified Tencent trial pool lead while its free grants
-    # last. Spread primary requests across those independent services by logged
-    # estimated tokens, then use the normal free-first route as fallback.
-    names = tencent_first([b.name for b in chain], log_path)
+    # Phil (2026-10-16): a little from every free source. The least-used free
+    # source in the last 24 hours goes first; paid CLIs stay last.
+    names = spread([b.name for b in chain], rating.level, log_path)
     by_name = {b.name: b for b in chain}
     return [by_name[name] for name in names]
 
@@ -638,8 +637,8 @@ def main(argv: list[str] | None = None,
             reviewers.update({name: b for name, b in backends.items()
                               if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))})
             reviewer = reviewers.get(cfg.agent["reviewer"])
-        order = tencent_first(cfg.agent.get("failover_order", config.DEFAULT_FREE_FAILOVER),
-                              cfg.log_path)
+        order = spread(cfg.agent.get("failover_order", config.DEFAULT_FREE_FAILOVER),
+                       "medium", cfg.log_path)
         fallbacks = [backends[name] for name in order if name in backends
                      and name not in cfg.out_now()
                      and permitted(backends[name])
@@ -891,8 +890,9 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
         # Strongest first: the hard-task route, then anything else from the
         # original chain. The AI that answered last goes first so escalate()
         # can skip it.
-        names = tencent_first(list(dict.fromkeys([last["backend"], *cfg.route.get("hard", []),
-                                                  *last["chain"]])), cfg.log_path)
+        names = [last["backend"], *spread([n for n in dict.fromkeys(
+            [*cfg.route.get("hard", []), *last["chain"]]) if n != last["backend"]],
+            "hard", cfg.log_path)]
     chain = [backends[n] for n in names
              if n in backends and (n == last["backend"]
                                    or (n not in cfg.out_now() and backends[n].available()))]

@@ -3,6 +3,8 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-16
+- **Mega Zword's two jobs (Phil).** (1) Get free AI credits by any legal means and keep a cushion: more sources, including obscure and foreign providers and the providers behind OpenRouter added directly. (2) Finish big coding projects with many models working together, not one model after another until each runs out.
+- **A tiny bit from every free source (Phil).** Routing spreads requests across all free sources, least-used in the last 24 hours first. Tencent's one-time grants (34 available at $1 each to unlock, 6 unlocked) get a quarter share except on hard work, where they lead. Replaces the earlier 2026-10-16 "Tencent first" order.
 - Phil (Cedar-27 chat, follow-up): keep Sentinel monitoring running provided it does not consume AI usage; all other automatic jobs remain off. Reviewed the exact scheduled collector source: Windows event-log reads and HTTP site checks/notifications, no AI model requests. Re-enabled only `MegaZword-Sentinel` on its existing five-minute schedule. This is the sole exception to the automatic-activity stop below.
 - Phil (Cedar-27 chat): turn off automatic activity after repeated return-to-camera interruptions. Disabled all five installed MegaZword scheduled tasks, removed the Hive owner-camera Startup shortcut from Startup (retained locally under `.megazword/disabled-autostart`), and stopped both owner-camera watcher processes. Keep existing chats open. Earlier scheduled/automatic-work directions do not authorize re-enabling these helpers; wait for Phil's explicit request.
 - Phil (Cedar-27 chat): audit uncommitted Mega Zword changes and either commit useful work or delete obsolete work. Preserve the explicitly excluded, untracked `CODEX_JOB.md`.

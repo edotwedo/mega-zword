@@ -1,38 +1,45 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from megazword.routing import tencent_first
+from megazword.routing import spread
 
 
-def test_tencent_models_lead_and_least_logged_tokens_go_first(tmp_path):
+def _log(tmp_path, runs, when=None):
     log = tmp_path / "log.jsonl"
-    now = datetime.now(timezone.utc).isoformat()
+    stamp = (when or datetime.now(timezone.utc)).isoformat()
     log.write_text("\n".join(json.dumps({
-        "backend": name, "time": now, "ok": True, "requests": 1,
-        "est_tokens": tokens,
-    }) for name, tokens in (
-        ("tencent-glm-5.3-flash", 100),
-        ("tencent-glm-5.3", 20),
-        ("tencent-kimi-k3", 50),
-    )), encoding="utf-8")
-    names = ["mistral", "tencent-glm-5.3-flash", "tencent-glm-5.3",
-             "tencent-kimi-k2.7-code", "tencent-kimi-k3",
-             "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
-             "codex"]
-
-    assert tencent_first(names, log) == [
-        "tencent-kimi-k2.7-code", "tencent-deepseek-v4-pro",
-        "tencent-deepseek-v4-flash-vision-exp", "tencent-glm-5.3", "tencent-kimi-k3",
-        "tencent-glm-5.3-flash", "mistral", "codex",
-    ]
+        "backend": name, "time": stamp, "ok": True, "requests": count,
+    }) for name, count in runs.items()), encoding="utf-8")
+    return log
 
 
-def test_tencent_first_keeps_default_order_when_usage_is_tied(tmp_path):
-    names = ["tencent-glm-5.3-flash", "openrouter", "tencent-kimi-k3",
-             "tencent-glm-5.3", "tencent-kimi-k2.7-code",
-             "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp"]
-    assert tencent_first(names, tmp_path / "missing.jsonl") == [
-        "tencent-glm-5.3-flash", "tencent-kimi-k3", "tencent-glm-5.3",
-        "tencent-kimi-k2.7-code", "tencent-deepseek-v4-pro",
-        "tencent-deepseek-v4-flash-vision-exp", "openrouter",
-    ]
+def test_least_used_free_source_goes_first_and_paid_stay_last(tmp_path):
+    log = _log(tmp_path, {"groq": 3, "mistral": 1, "cloudflare": 2})
+    names = ["groq", "codex", "mistral", "cloudflare", "zai", "claude"]
+    assert spread(names, "easy", log) == [
+        "zai", "mistral", "cloudflare", "groq", "codex", "claude"]
+
+
+def test_finite_tencent_grants_get_a_quarter_share_outside_hard_work(tmp_path):
+    # One Tencent request weighs like four free-tier requests.
+    log = _log(tmp_path, {"tencent-kimi-k3": 1, "groq": 3, "mistral": 5})
+    names = ["tencent-kimi-k3", "groq", "mistral"]
+    assert spread(names, "medium", log) == ["groq", "tencent-kimi-k3", "mistral"]
+
+
+def test_hard_work_leads_with_least_used_tencent_grant(tmp_path):
+    log = _log(tmp_path, {"tencent-glm-5.3": 2, "tencent-kimi-k3": 1})
+    names = ["groq", "tencent-glm-5.3", "tencent-kimi-k3", "claude"]
+    assert spread(names, "hard", log) == [
+        "tencent-kimi-k3", "tencent-glm-5.3", "groq", "claude"]
+
+
+def test_ties_and_missing_log_keep_configured_order(tmp_path):
+    names = ["mistral", "groq", "tencent-glm-5.3", "grok"]
+    assert spread(names, "easy", tmp_path / "missing.jsonl") == names
+
+
+def test_only_the_last_24_hours_count(tmp_path):
+    old = datetime.now(timezone.utc) - timedelta(hours=30)
+    log = _log(tmp_path, {"groq": 50}, when=old)
+    assert spread(["groq", "mistral"], "easy", log) == ["groq", "mistral"]

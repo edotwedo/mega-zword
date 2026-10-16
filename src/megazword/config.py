@@ -57,9 +57,10 @@ DEFAULT_GROK = {
 DEFAULT_ROUTE = {
     # Try configured zero-cost providers first at every difficulty. Missing
     # keys/servers are filtered; paid CLI plans remain quality fallbacks.
-    # Verified Tencent trial services lead while their per-model free grants last.
-    # Easy tasks previously favored train-on-data services; Phil's 2026-10-16
-    # instruction to use Tencent now takes precedence.
+    # These lists say which sources may serve each level. routing.spread()
+    # picks the order: least-used free source in the last 24 hours first,
+    # Tencent's one-time grants at a quarter share except on hard work
+    # (Phil, 2026-10-16: "a tiny bit from every free source").
     "easy": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
              "tencent-kimi-k2.7-code", "tencent-kimi-k3",
              "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",

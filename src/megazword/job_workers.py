@@ -26,7 +26,7 @@ from .free_apis import OpenAICompatibleBackend
 from .guard import scrub
 from .log import append
 from .agent_quality import check_tests, is_test_path
-from .routing import tencent_first
+from .routing import spread
 
 
 def _safe(text):
@@ -185,9 +185,9 @@ class Runner:
             paid, _ = night.eligible(self.backends, summaries)
             paid = [n for n in paid if isinstance(self.backends[n], CLIBackend)
                     and n not in self._reserved and n not in self.cfg.out_now()]
-            order = tencent_first(
+            order = spread(
                 self.cfg.agent.get("failover_order", config.DEFAULT_FREE_FAILOVER),
-                self.cfg.log_path)
+                piece.difficulty, self.cfg.log_path)
             names = list(dict.fromkeys([*order, "ollama"]))
             free = [self.backends[n] for n in names if n in self.backends
                     and _free(self.backends[n]) and n not in self.cfg.out_now()
