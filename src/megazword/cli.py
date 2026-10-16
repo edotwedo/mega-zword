@@ -285,7 +285,8 @@ LEVELS = ("easy", "medium", "hard")
 
 def candidates(rating: Rating, route: dict[str, list[str]],
                backends: dict[str, Backend], statuses: dict | None = None,
-               out: set[str] = frozenset(), log_path: Path | None = None) -> list[Backend]:
+               out: set[str] = frozenset(), log_path: Path | None = None,
+               coding: bool = False) -> list[Backend]:
     """Installed AIs to try, in order: this difficulty's route (ranked by
     pacing when statuses are given), then stronger routes as fallbacks.
     AIs in `out` (marked out of usage in config) are skipped."""
@@ -303,7 +304,10 @@ def candidates(rating: Rating, route: dict[str, list[str]],
         chain.sort(key=lambda b: not getattr(b, "trains_on_data", False))
     # Phil (2026-10-16): a little from every free source. The least-used free
     # source in the last 24 hours goes first; paid CLIs stay last.
-    names = spread([b.name for b in chain], rating.level, log_path)
+    # Code changes are never "easy" enough to lead with the smallest models (a 3B model
+    # wrecked review.py on 2026-10-16), so order them as medium work.
+    level = "medium" if coding and rating.level == "easy" else rating.level
+    names = spread([b.name for b in chain], level, log_path)
     by_name = {b.name: b for b in chain}
     return [by_name[name] for name in names]
 
@@ -632,7 +636,7 @@ def main(argv: list[str] | None = None,
         apply_levels(backends, rating.level, cfg.grok, cfg.levels)
         out = cfg.out_now()
         chain = candidates(rating, cfg.route, backends, (statuses or plan_statuses)(), out,
-                           cfg.log_path)
+                           cfg.log_path, coding=args.edit)
         chain = [b for b in chain if permitted(b)]
         if not chain:
             print(f"[megazword] no installed AI for a {rating.level} task; "

@@ -43,10 +43,17 @@ def test_unused_tencent_waits_behind_unused_free_tiers_outside_hard_work(tmp_pat
     names = ["tencent-glm-5.3", "mistral", "groq"]
     missing = tmp_path / "missing.jsonl"
     assert spread(names, "easy", missing) == ["mistral", "groq", "tencent-glm-5.3"]
-    assert spread(names, "hard", missing) == names
+    assert spread(names, "hard", missing) == ["tencent-glm-5.3", "groq", "mistral"]
 
 
 def test_only_the_last_24_hours_count(tmp_path):
     old = datetime.now(timezone.utc) - timedelta(hours=30)
     log = _log(tmp_path, {"groq": 50}, when=old)
     assert spread(["groq", "mistral"], "easy", log) == ["groq", "mistral"]
+
+
+def test_small_models_share_easy_work_but_wait_behind_stronger_ones_otherwise(tmp_path):
+    missing = tmp_path / "missing.jsonl"
+    names = ["mistral", "groq", "nvidia", "zai"]
+    assert spread(names, "easy", missing) == names
+    assert spread(names, "medium", missing) == ["groq", "zai", "mistral", "nvidia"]

@@ -24,6 +24,11 @@ FINITE_SHARE = 0.25
 
 SPREAD_WINDOW = timedelta(hours=24)
 
+# Small models (3B-8B) share easy work; for medium and hard work they only go
+# after every stronger free source.
+WEAK_BACKENDS = ("mistral", "groq-allam", "nvidia", "ollama",
+                 "openrouter-nemotron-nano", "openrouter-laguna-xs")
+
 
 def spread(names: list[str], level: str = "medium",
            log_path: Path | None = None) -> list[str]:
@@ -65,6 +70,7 @@ def spread(names: list[str], level: str = "medium",
         finite = name in FINITE_BACKENDS
         lead = 0 if level == "hard" and finite else 1
         # On a tie outside hard work, free tiers that reset go before grants.
-        return (lead, load(name), finite and level != "hard", position[name])
+        weak = name in WEAK_BACKENDS and level != "easy"
+        return (lead, weak, load(name), finite and level != "hard", position[name])
 
     return [*sorted(free, key=key), *paid]
