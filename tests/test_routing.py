@@ -39,6 +39,13 @@ def test_ties_and_missing_log_keep_configured_order(tmp_path):
     assert spread(names, "easy", tmp_path / "missing.jsonl") == names
 
 
+def test_unused_tencent_waits_behind_unused_free_tiers_outside_hard_work(tmp_path):
+    names = ["tencent-glm-5.3", "mistral", "groq"]
+    missing = tmp_path / "missing.jsonl"
+    assert spread(names, "easy", missing) == ["mistral", "groq", "tencent-glm-5.3"]
+    assert spread(names, "hard", missing) == names
+
+
 def test_only_the_last_24_hours_count(tmp_path):
     old = datetime.now(timezone.utc) - timedelta(hours=30)
     log = _log(tmp_path, {"groq": 50}, when=old)

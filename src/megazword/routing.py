@@ -56,7 +56,9 @@ def spread(names: list[str], level: str = "medium",
         return float(runs)
 
     def key(name: str):
-        lead = 0 if level == "hard" and name in FINITE_BACKENDS else 1
-        return (lead, load(name), position[name])
+        finite = name in FINITE_BACKENDS
+        lead = 0 if level == "hard" and finite else 1
+        # On a tie outside hard work, free tiers that reset go before grants.
+        return (lead, load(name), finite and level != "hard", position[name])
 
     return [*sorted(free, key=key), *paid]
