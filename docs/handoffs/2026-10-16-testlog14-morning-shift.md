@@ -60,6 +60,8 @@ while he is at work on Friday, 2026-10-16, from 5:00 to 11:00 AM Pacific.
 - One additional read-only DeepSeek review attempt produced no output after
   roughly 3.5 minutes and was canceled; implementation was source-grounded by
   Testlog-14. No paid model was used.
+- Recovery was pushed to local Gitea `origin/main` as
+  `c33100d1a7c6e0856a0e97c98105b53377e537b7`.
 
 ## Schedule and safeguards
 
