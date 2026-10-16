@@ -161,7 +161,8 @@ def test_gemini_prefers_antigravity_cli(monkeypatch):
     backend = backends.default_backends(free_models=config.Config().free)["gemini"]
     result = backend.run("hello")
     # No --disable-slash-commands: it turns agy's read-only plan mode off.
-    assert calls == [["fake-agy.exe", "--mode", "plan", "--output-format", "text", "-p", "hello"]]
+    assert calls == [["fake-agy.exe", "--mode", "plan", "--output-format", "text",
+                      "--model", backends.AGY_DEFAULT_MODEL, "-p", "hello"]]
     assert result.ok and result.text == "hi" and result.backend == "gemini"
     assert "gemini" not in backends.default_backends(edit=True, free_models={})
     long = backend.run("x" * (backends.AGY_MAX_PROMPT + 1))

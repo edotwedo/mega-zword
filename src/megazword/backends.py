@@ -327,6 +327,7 @@ CODEX_LEAN = ["-c", "mcp_servers={}"]
 # ("--mode plan has no effect"), so it is not used.
 AGY_ARGS = ["--mode", "plan", "--output-format", "text", "-p", "{prompt}"]
 OLD_GEMINI_ARGS = ["--approval-mode", "plan", "--output-format", "text"]
+AGY_DEFAULT_MODEL = "gemini-3.8-flash-high"  # from `agy models`, 2026-10-16
 AGY_MAX_PROMPT = 30_000  # the prompt is a command-line argument; Windows caps those near 32k
 
 
@@ -344,7 +345,10 @@ class GeminiBackend(CLIBackend):
 
     def _pick(self) -> None:
         if shutil.which("agy"):
-            self.exe, self.args = "agy", [*AGY_ARGS[:-2], *self.level_args, *AGY_ARGS[-2:]]
+            # agy's own default can be a Claude/GPT model with a separate quota that runs
+            # out first; without a level choice, use Google's own model (2026-10-16).
+            level = self.level_args or ["--model", AGY_DEFAULT_MODEL]
+            self.exe, self.args = "agy", [*AGY_ARGS[:-2], *level, *AGY_ARGS[-2:]]
         else:
             self.exe, self.args = "gemini", list(OLD_GEMINI_ARGS)
 
