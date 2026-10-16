@@ -37,9 +37,10 @@ def test_vault_backend_and_all_output_scrubbing(store, monkeypatch):
     def response(request, timeout):
         assert request.get_header("Authorization") == "Bearer unusual-vault-value"
         assert "a" * 32 in request.full_url
+        assert "unusual-vault-value" not in request.data.decode()
         return io.BytesIO(json.dumps({"choices": [{"message": {"content": "unusual-vault-value"}}]}).encode())
     monkeypatch.setattr(free_apis.urllib.request, "urlopen", response)
-    assert backend.chat([{"role": "user", "content": "hello"}])["content"] == "[REDACTED]"
+    assert backend.chat([{"role": "user", "content": "unusual-vault-value"}])["content"] == "[REDACTED]"
     monkeypatch.setenv("GROQ_API_KEY", "env-fake")
     for scrubber in (guard.scrub, export.redact, free_test._safe_reason, run_control.safe, job_workers._safe):
         result = scrubber("unusual-vault-value env-fake")
@@ -137,3 +138,14 @@ def test_missing_keys_never_call_network(monkeypatch, capsys):
 
 def test_redirects_are_never_followed():
     assert keys._NoRedirect().redirect_request(None, None, 302, "", {}, "https://other.test") is None
+
+
+def test_all_backend_prompts_and_errors_scrub_vault_values(store):
+    from megazword.backends import Backend
+    store["GROQ_API_KEY"] = "fake-private-value"
+    class Fake(Backend):
+        def _run(self, prompt):
+            assert "fake-private-value" not in prompt
+            raise RuntimeError("fake-private-value")
+    result = Fake("fake", trains_on_data=False).run("fake-private-value")
+    assert not result.ok and "fake-private-value" not in result.error
