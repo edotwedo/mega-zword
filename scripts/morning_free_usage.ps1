@@ -124,10 +124,28 @@ function Run-Process([string]$File, [string]$Arguments, [string]$Cwd, [int]$Time
     return [pscustomobject]@{ ExitCode = $code; Stdout = $output; Stderr = $errorText }
 }
 
+function Invoke-Git([string[]]$GitArgs) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell 5.1 promotes native stderr to PowerShell errors.
+        # Git uses stderr for normal progress/notices such as "From <remote>".
+        $ErrorActionPreference = 'Continue'
+        $output = @(& git -C $root @GitArgs 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    return [pscustomobject]@{ ExitCode = $exitCode; Output = ($output | Out-String).Trim() }
+}
+
+function Git-Run([string[]]$GitArgs) {
+    $result = Invoke-Git $GitArgs
+    if ($result.ExitCode -ne 0) { throw "git $($GitArgs -join ' ') failed (exit $($result.ExitCode)): $($result.Output)" }
+    return $result.Output
+}
+
 function Git-Out([string[]]$GitArgs) {
-    $result = & git -C $root @GitArgs 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "git $($GitArgs -join ' ') failed: $($result | Out-String)" }
-    return ($result | Out-String).Trim()
+    return Git-Run $GitArgs
 }
 
 function Update-Active([string]$Detail) {
@@ -141,14 +159,10 @@ function Update-Active([string]$Detail) {
 
 function Publish-Active([string]$Detail, [int]$Slot) {
     Update-Active $Detail
-    & git -C $root add -- docs/STATUS.md | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Could not stage the scheduled-slot claim.' }
-    & git -C $root diff --cached --check | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Scheduled-slot claim diff check failed.' }
-    & git -C $root commit -m "Claim Testlog-14 morning slot $($Slot + 1)" | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Could not commit the scheduled-slot claim.' }
-    & git -C $root push origin HEAD:main | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Could not publish the scheduled-slot claim to local Gitea.' }
+    Git-Run @('add', '--', 'docs/STATUS.md') | Out-Null
+    Git-Run @('diff', '--cached', '--check') | Out-Null
+    Git-Run @('commit', '-m', "Claim Testlog-14 morning slot $($Slot + 1)") | Out-Null
+    Git-Run @('push', 'origin', 'HEAD:main') | Out-Null
 }
 
 function Release-Active([string]$Detail) {
@@ -162,22 +176,18 @@ function Release-Active([string]$Detail) {
 
 function Publish-Failure([string]$Detail) {
     Release-Active "Morning automation stopped; inspect local status/logs before resuming. $Detail"
-    & git -C $root reset --mixed HEAD | Out-Null
-    if ($LASTEXITCODE -ne 0) { return }
-    & git -C $root add -- docs/STATUS.md | Out-Null
-    if ($LASTEXITCODE -ne 0) { return }
-    & git -C $root diff --cached --check | Out-Null
-    if ($LASTEXITCODE -ne 0) { return }
-    $staged = (& git -C $root diff --cached -U0) -join "`n"
+    try { Git-Run @('reset', '--mixed', 'HEAD') | Out-Null } catch { return }
+    try { Git-Run @('add', '--', 'docs/STATUS.md') | Out-Null } catch { return }
+    try { Git-Run @('diff', '--cached', '--check') | Out-Null } catch { return }
+    try { $staged = Git-Run @('diff', '--cached', '-U0') } catch { return }
     if ($staged -match '(?im)^\+[^\r\n]*(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|AKID[A-Za-z0-9]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY)') { return }
-    & git -C $root commit -m 'Record blocked morning free-model step' | Out-Null
-    if ($LASTEXITCODE -ne 0) { return }
-    & git -C $root push origin HEAD:main | Out-Null
+    try { Git-Run @('commit', '-m', 'Record blocked morning free-model step') | Out-Null } catch { return }
+    try { Git-Run @('push', 'origin', 'HEAD:main') | Out-Null } catch { return }
 }
 
 function Check-PathsAndCommit([int]$Slot) {
-    $changed = @(& git -C $root status --short --untracked-files=all)
-    if ($LASTEXITCODE -ne 0) { throw 'Could not inspect git status.' }
+    $changedText = Git-Run @('status', '--short', '--untracked-files=all')
+    $changed = if ($changedText) { @($changedText -split '\r?\n') } else { @() }
     $paths = @()
     foreach ($line in $changed) {
         if ($line.Length -lt 4) { continue }
@@ -191,27 +201,23 @@ function Check-PathsAndCommit([int]$Slot) {
     if (-not $paths.Count) { return 'No source changes to commit.' }
 
     foreach ($path in ($paths | Select-Object -Unique)) {
-        & git -C $root add -- $path | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Could not stage $path" }
+        Git-Run @('add', '--', $path) | Out-Null
     }
-    $diff = (& git -C $root diff --cached -U0) -join "`n"
+    $diff = Git-Run @('diff', '--cached', '-U0')
     if ($diff -match '(?im)^\+[^\r\n]*(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|AKID[A-Za-z0-9]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY)') {
         throw 'Secret-pattern guard refused the staged change.'
     }
-    & git -C $root diff --cached --check
-    if ($LASTEXITCODE -ne 0) { throw 'Staged diff check failed.' }
+    Git-Run @('diff', '--cached', '--check') | Out-Null
     $message = "Morning free-model step $($Slot + 1): $($labels[$Slot].Split('.')[0])"
-    & git -C $root commit -m $message | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Commit failed.' }
-    & git -C $root push origin HEAD:main
-    if ($LASTEXITCODE -ne 0) { throw 'Local Gitea push failed; commit remains on this seat branch.' }
+    Git-Run @('commit', '-m', $message) | Out-Null
+    try { Git-Run @('push', 'origin', 'HEAD:main') | Out-Null } catch { throw "Local Gitea push failed; commit remains on this seat branch. $($_.Exception.Message)" }
     return "Committed and pushed validated step $($Slot + 1) to local Gitea origin/main."
 }
 
 if ($DryRun) {
     if (-not (Test-Path -LiteralPath $python)) { throw "Python runtime missing: $python" }
     if (-not (Test-Path -LiteralPath $testPython)) { throw "Test runtime missing: $testPython" }
-    $origin = (& git -C $root remote get-url origin).Trim()
+    $origin = Git-Out @('remote', 'get-url', 'origin')
     if ($origin -notmatch '^https?://127\.0\.0\.1:3000/') { throw "origin is not local Gitea: $origin" }
     Save-State 'dry-run-ok' 'Six hourly free-only steps, hard stop 11:00 PT, hidden process, local Gitea only; no model calls.'
     exit 0
@@ -238,8 +244,9 @@ if (Test-Path $statusPath) {
 try {
     $origin = Git-Out @('remote', 'get-url', 'origin')
     if ($origin -notmatch '^https?://127\.0\.0\.1:3000/') { throw "origin is not local Gitea: $origin" }
-    & git -C $root diff --cached --quiet
-    if ($LASTEXITCODE -ne 0) { throw 'Staged changes already exist; refusing to include them in scheduled commits.' }
+    $cachedDiff = Invoke-Git @('diff', '--cached', '--quiet')
+    if ($cachedDiff.ExitCode -eq 1) { throw 'Staged changes already exist; refusing to include them in scheduled commits.' }
+    if ($cachedDiff.ExitCode -ne 0) { throw "Could not inspect staged changes (git exit $($cachedDiff.ExitCode)): $($cachedDiff.Output)" }
     Git-Out @('fetch', 'origin') | Out-Null
     $mainStatus = Git-Out @('show', 'origin/main:docs/STATUS.md')
     $active = [regex]::Match($mainStatus, '(?m)^\*\*Active:\s*([^*]+)\*\*').Groups[1].Value.Trim()
@@ -267,7 +274,8 @@ try {
     if (Test-Path -LiteralPath $stopPath) { Save-State 'stopped' 'STOP marker received; no later slots will run.' $script:slot $result.ExitCode; Publish-Failure 'Phil stopped the morning automation; inspect local logs before resuming.'; exit 0 }
     if ($result.ExitCode -ne 0) { throw "Mega Zword run failed with exit $($result.ExitCode); see $slotLog" }
 
-    $sourceChanges = @(& git -C $root status --short --untracked-files=all | Where-Object { $_ -match '^(\s?[MARCDU?]{1,2}\s+)(src/megazword/|tests/)' })
+    $statusText = Git-Run @('status', '--short', '--untracked-files=all')
+    $sourceChanges = @($statusText -split '\r?\n' | Where-Object { $_ -match '^(\s?[MARCDU?]{1,2}\s+)(src/megazword/|tests/)' })
     if ($sourceChanges.Count) {
         Save-State 'testing' "Running full test suite after slot $($script:slot + 1)." $script:slot
         $testInfo = Run-Process $testPython '-m pytest -q --tb=short' $root 900 '' -SanitizeEnv
