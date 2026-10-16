@@ -237,6 +237,27 @@ def test_retry_before_any_run(capsys, cfg):
     assert main(["retry"], {}, cfg) == 2
 
 
+def test_project_retry_cannot_replay_another_projects_prompt(capsys, cfg):
+    backends = {'cheap': FakeBackend('cheap'), 'strong': FakeBackend('strong')}
+    assert main(['run', 'PRIVATE_OTHER_PROJECT_MARKER', '-p', 'other', '-m', 'cheap'], backends, cfg) == 0
+    capsys.readouterr()
+    assert main(['retry', '-p', 'current'], backends, cfg) == 2
+    output = capsys.readouterr()
+    assert 'PRIVATE_OTHER_PROJECT_MARKER' not in output.out + output.err
+    assert 'nothing to retry in this project' in output.err
+
+
+def test_project_retry_uses_its_saved_record_after_another_job(capsys, cfg):
+    backends = {'cheap': FakeBackend('cheap'), 'strong': FakeBackend('strong')}
+    assert main(['run', 'CURRENT_PROJECT_MARKER', '-p', 'current', '-m', 'cheap'], backends, cfg) == 0
+    assert main(['run', 'PRIVATE_OTHER_PROJECT_MARKER', '-p', 'other', '-m', 'cheap'], backends, cfg) == 0
+    capsys.readouterr()
+    assert main(['retry', '-p', 'current', '-m', 'strong'], backends, cfg) == 0
+    output = capsys.readouterr().out
+    assert 'CURRENT_PROJECT_MARKER' in output
+    assert 'PRIVATE_OTHER_PROJECT_MARKER' not in output
+
+
 def test_marked_out_ai_is_skipped(capsys, cfg):
     from datetime import datetime, timedelta, timezone
     cfg.route = {"easy": ["cheap", "strong"], "medium": ["strong"], "hard": ["strong"]}

@@ -3,6 +3,7 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-15
+- Phil (Testlog-14 chat): simplify the app's typing and response area to a Matrix-style console. Use a dark background, green monospace text, a plain transcript above the prompt, and expandable options. Unrelated personal history must not enter job context; audit project and conversation boundaries before packaging.
 - Phil (Testlog-14 chat): actual workers must appear in Hive and be reachable there. Provider one-shot chat participants are not a worker roster. Choose a verified active session for handoffs; do not send Phil hunting for a name found only in STATUS. Provide targeted worker messages and announcements with honest queued/delivered status.
 - Phil (Testlog-14 chat): restore ALL saved CLI tabs together in a fresh Terminal window on a separate dedicated Windows desktop at login. Do not disrupt open sessions to demonstrate it now. Implement using noninteractive tests; defer actual restart/restore testing until around 90% Codex usage and Phil's readiness. Do not reboot automatically at that threshold.
 - Phil (Testlog-14 chat): for interactive setup, prompt him and let him drive; no UI takeover unless he asks.

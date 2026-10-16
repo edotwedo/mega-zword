@@ -200,6 +200,49 @@ main[hidden], #hive[hidden] { display:none; }
   color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); }
 #brief-dialog::backdrop { background:#0009; }
 #brief-text { margin-top:16px; }
+/* Console workspace: one transcript, then one prompt. */
+:root {
+  --bg:#050906; --panel:#080e0a; --inset:#050906; --field:#080e0a;
+  --text:#c1e6cb; --dim:#8eae99; --accent:#80eaa1; --ok:#80eaa1;
+  --line:#587b62; --button:#101e15; --radius:3px;
+}
+body { background:var(--bg); font-family:var(--mono); }
+.sidebar, header { background:var(--panel); backdrop-filter:none; }
+section { box-shadow:none; }
+.console { background:var(--bg); border:0; padding:0; }
+.console h2 { color:var(--accent); font:600 13px var(--mono); text-transform:none; letter-spacing:0; }
+.console-transcript, .console .room-messages {
+  height:clamp(260px, 48vh, 680px); max-height:none; min-height:0;
+  overflow:auto; scrollbar-color:#355c41 var(--bg); scrollbar-gutter:stable;
+  border:0; border-bottom:1px solid var(--line); border-radius:0;
+  padding:12px 0; margin:0 0 14px; overflow-wrap:anywhere;
+}
+#jobs:empty::before { content:"Ready. What are we working on?"; color:var(--dim); }
+.console .job { background:transparent; border:0; border-bottom:1px solid var(--line);
+  padding:18px 0; margin:0; border-radius:0; }
+.console .job .ans { background:transparent; border:0; padding:4px 0; border-radius:0; }
+.console pre, .console .room-message { font:14px/1.7 var(--mono); }
+.console .ans pre { padding:30px 0 0; }
+.console .room-message { border:0; padding:12px 0; white-space:pre-wrap; }
+.console .room-message b { color:var(--accent); }
+.console textarea { min-height:76px; max-height:240px; border:0; border-left:2px solid var(--accent);
+  border-radius:0; background:var(--field); padding:12px 14px; font:14px/1.6 var(--mono); }
+.console .prompt-label { margin-bottom:8px; }
+.console-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.console-toolbar .go { margin-left:auto; }
+.console-options { color:var(--dim); font-size:12px; margin:8px 0; }
+.console-options > summary { cursor:pointer; padding:6px 0; width:fit-content; }
+.console-options[open] { border-bottom:1px solid var(--line); padding-bottom:12px; }
+.console-options select { max-width:100%; }
+.workspace-details { grid-column:1 / -1; min-width:0; }
+.workspace-details > summary { color:var(--dim); cursor:pointer; padding:12px 0; font-size:12px; }
+.workspace-details > .workspace-panels { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+@media (max-width:760px) {
+  .workspace-details > .workspace-panels { grid-template-columns:minmax(0,1fr); }
+  .console-transcript, .console .room-messages { height:46vh; }
+  .console-toolbar { gap:8px; }
+  .console-toolbar select { max-width:calc(100vw - 170px); }
+}
 </style>
 </head>
 <body>
@@ -209,7 +252,7 @@ main[hidden], #hive[hidden] { display:none; }
 </div>
 <div class="shell">
 <aside class="sidebar" aria-label="Workspace sidebar">
-  <div class="sidebar-head"><a class="brand" href="#home" aria-label="Mega Zword Home"><span class="brand-mark">MZ</span><span class="brand-name">MEGA ZWORD</span></a></div>
+  <div class="sidebar-head"><a class="brand" href="#home" aria-label="Mega Zword Home"><span class="brand-mark">[MZ]</span><span class="brand-name">MEGA ZWORD</span></a></div>
   <div><p class="side-label">Workspace</p><nav class="tab-strip" aria-label="Workspace tabs">
     <button class="nav-tab" id="tab-home" type="button" aria-pressed="true" data-view="home"><span class="nav-icon" aria-hidden="true">⌂</span>Home</button>
     <button class="nav-tab" id="tab-hive" type="button" aria-pressed="false" data-view="hive"><span class="nav-icon" aria-hidden="true">◇</span>Hive</button>
@@ -231,24 +274,28 @@ main[hidden], #hive[hidden] { display:none; }
   <button id="refresh" aria-label="Refresh usage meters" title="Re-read the usage meters now">↻</button>
 </header>
 <main id="home-view">
-  <section class="wide">
-    <h2><span class="ascii-mark" aria-hidden="true">[MZ]</span> Run a task</h2>
+  <section class="wide console">
+    <h2>~/workspace</h2>
+    <div id="jobs" class="console-transcript" aria-label="Job output" tabindex="0"></div>
     <label class="prompt-label" for="prompt">&gt;_ <span class="sr-only">Task prompt</span></label>
-    <textarea id="prompt" aria-label="Task prompt" placeholder="Ask anything. Ctrl+Enter sends. Auto picks the cheapest AI. Alt+/ focuses here; Esc cancels the newest job."></textarea>
-    <div class="row">
-      <label>AI <select id="model"><option value="">auto (route + pacing)</option></select></label>
+    <textarea id="prompt" aria-label="Task prompt" placeholder="Type a task… Ctrl+Enter to send"></textarea>
+    <div class="row console-toolbar">
+      <label>AI <select id="model"><option value="">auto</option></select></label>
+      <button class="go" id="send" aria-label="Send task" title="Send task">Send ↵</button>
+      <button id="retry" aria-label="Retry with a stronger AI" title="Last answer not good enough: give it to a stronger AI">Retry</button>
+    </div>
+    <details class="console-options"><summary>Task options</summary><div class="row">
       <label><input type="checkbox" id="context"> include project memory</label>
       <label title="Choose a free API bot; edits happen in the dashboard's working folder"><input type="checkbox" id="edit"> code with a free bot</label>
       <label title="Same prompt on 2-3 AIs at once, answers side by side"><input type="checkbox" id="compare"> compare</label>
       <span id="cmppicks" hidden></span>
-      <button class="go" id="send" aria-label="Send task" title="Send task">↗</button>
-      <button id="retry" aria-label="Retry with a stronger AI" title="Last answer not good enough: give it to a stronger AI">↻</button>
     </div>
-    <div id="jobs" aria-label="Job output" style="margin-top:10px"></div>
     <div id="coding-folder" class="note" hidden></div>
+    </details>
     <div id="job-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   </section>
 
+  <details class="workspace-details"><summary>Workspace details · usage, routing, memory &amp; settings</summary><div class="workspace-panels">
   <section>
     <h2>Sentinel</h2>
     <div id="sentinel"></div>
@@ -305,15 +352,18 @@ main[hidden], #hive[hidden] { display:none; }
     <div class="scroll" tabindex="0" role="region" aria-label="Recent runs table"><table id="runs"></table></div>
     <div class="note">Est. tokens = (prompt + answer characters) / 4, rounded down. Old runs count as 0. This is not a billing or quota meter.</div>
   </section>
+  </div></details>
 </main>
 <div id="hive" class="hive-view" role="region" aria-labelledby="hive-title" hidden>
-  <section class="wide">
+  <section class="wide console">
     <h2 id="hive-title">Hive room</h2>
+    <details class="console-options"><summary>Workers &amp; room details</summary>
     <div id="hive-floor" class="note" role="status" style="margin:0 0 8px"></div>
     <div id="hive-workers" aria-label="Worker sessions"></div>
     <p class="note">Connected sessions are checked locally. Saved reports alone do not prove a worker is online. Terminal messages wait for an idle turn and an empty input line.</p>
     <p class="room-status" id="room-status" role="status" aria-live="polite">Room is idle.</p>
     <div class="row" id="room-summary" aria-label="Room status"></div>
+    </details>
     <div class="room-messages" id="room-messages" role="region" aria-label="Hive room messages" tabindex="0"></div>
     <label class="prompt-label" for="room-input">&gt;_ <span class="sr-only">Your message to the room</span></label>
     <label>Send to <select id="worker-target" aria-label="Message recipient"><option value="">Room replies (separate one-shot bots)</option></select></label>
@@ -322,18 +372,19 @@ main[hidden], #hive[hidden] { display:none; }
       <button id="room-send" type="button">Send</button>
       <button id="workers-announce" type="button">Announce to connected workers</button>
     </div>
-    <div class="row">
+    <details class="console-options"><summary>Reply controls</summary><div class="row">
       <label>Turns <input id="room-turn-cap" type="number" min="1" max="50" value="12" aria-label="Room turn limit"></label>
       <button id="room-start" type="button" class="go" hidden>Resume replies</button>
       <button id="room-pause" type="button">Pause</button>
       <button id="room-stop" type="button">Stop</button>
       <span class="note">Pause takes effect after the current bot reply.</span>
-    </div>
+    </div></details>
   </section>
 </div>
 <div id="chat" class="hive-view" role="region" aria-labelledby="chat-title" hidden>
-  <section class="wide">
+  <section class="wide console">
     <h2 id="chat-title">Chat</h2>
+    <details class="console-options"><summary>Chat options</summary>
     <div class="row">
       <span class="note" id="chat-info"></span>
       <input id="chat-rename" aria-label="Chat tab name" maxlength="80" style="flex:1 1 160px;min-width:0">
@@ -341,6 +392,7 @@ main[hidden], #hive[hidden] { display:none; }
       <button id="chat-new-session" type="button">New session</button>
       <button id="chat-close" type="button">Delete chat</button>
     </div>
+    </details>
     <div class="room-messages" id="chat-messages" role="region" aria-label="Chat messages" aria-live="polite" tabindex="0"></div>
     <label class="prompt-label" for="chat-input">&gt;_ <span class="sr-only">Your message</span></label>
     <div class="row room-compose">
@@ -682,9 +734,12 @@ function renderMem(s) {
 }
 
 function renderJob(j) {
+  if (j.project && state && j.project !== state.project) return;
+  const transcript = $("jobs");
+  const follow = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 60;
   let el = document.getElementById("job-" + j.id);
   if (!el) { el = document.createElement("div"); el.className = "job"; el.id = "job-" + j.id;
-    $("jobs").prepend(el); }
+    $("jobs").append(el); }
   const secs = Math.max(0, Math.round((Date.now() - new Date(j.started)) / 1000));
   const ae = document.activeElement;
   const activity = j.activity;
@@ -729,6 +784,7 @@ function renderJob(j) {
     (t || $("prompt")).focus();
     if (restore.instruction && t) t.setSelectionRange(...selection);
   }
+  if (follow) transcript.scrollTop = transcript.scrollHeight;
 }
 
 function announceJob(j) {
@@ -867,6 +923,7 @@ async function load(refresh) {
     if (!r.ok) {  // e.g. the chosen project folder was deleted: go back to the default
       toast(got.error || "could not load"); project = ""; return load(refresh);
     }
+    if (state && state.project !== got.project) $("jobs").replaceChildren();
     state = got;
     $("build-info").textContent = state.build ? `Build ${state.build}` : "Older server";
     renderProjects(state);
@@ -880,7 +937,7 @@ async function load(refresh) {
   } catch { $("meta").textContent = "dashboard server stopped"; return; }
   const sel = $("model"), cur = sel.value;
   if (document.activeElement !== sel) {
-    sel.innerHTML = '<option value="">auto (route + pacing)</option>' + Object.entries(state.backends)
+    sel.innerHTML = '<option value="">auto</option>' + Object.entries(state.backends)
       .map(([n, ok]) => `<option value="${esc(n)}" ${ok ? "" : "disabled"}>${esc(n)}${ok ? "" : " (not installed)"}${state.out[n] ? " (marked out)" : ""}</option>`).join("");
     sel.value = cur;
   }
@@ -888,7 +945,7 @@ async function load(refresh) {
   $("coding-folder").textContent = `Coding edits happen in ${state.working_folder || "the dashboard working folder"}. Use a dedicated worktree.`;
   $("coding-folder").hidden = !$("edit").checked;
   renderSettings(state.settings); renderPlans(state); renderSentinel(state); renderRoute(state); renderFloor(state); renderChart(state); renderTrend(state); renderRuns(state); renderMem(state); renderAnswers(state); renderComparePicks(); renderAdvice(state);
-  for (const j of state.jobs) if (!document.getElementById("job-" + j.id)) {
+  for (const j of [...state.jobs].reverse()) if (!document.getElementById("job-" + j.id)) {
     renderJob(j); if (!j.done && !watching.has(j.id)) watch(j.id); }
 }
 

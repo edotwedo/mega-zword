@@ -168,6 +168,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     retry = sub.add_parser("retry", help="last answer not good enough: ask a stronger AI")
     retry.add_argument("-m", "--model", help="force which AI tries next")
+    retry.add_argument("-p", "--project", help="retry only this project's last answer")
     sub.add_parser("chat", help="start an interactive conversation")
 
     room = sub.add_parser("room", help="Hive bot room: group chat between Phil and the bots")
@@ -664,7 +665,9 @@ def main(argv: list[str] | None = None,
 # The CLIs load their users' global startup rules (e.g. "read the team board
 # first"). For a routed one-shot that wastes time and usage, so say so up front.
 ONE_SHOT_NOTE = ("[Sent by Mega Zword as a one-shot task. Answer it directly. Skip "
-                 "session startup, coordination and check-in routines.]\n\n")
+                 "session startup, coordination and check-in routines. Stay on the current "
+                 "task and its supplied project context; do not retrieve or include unrelated "
+                 "personal history or other projects' notes.]\n\n")
 
 
 @track_run
@@ -812,7 +815,11 @@ def auto_mark_out(name: str, error: str, cfg: config.Config) -> bool:
     return True
 
 
-def last_run_path():
+def last_run_path(project: str | None = None):
+    if project is not None:
+        from .memory import check_project
+        check_project(config.HOME, project, {project})
+        return config.HOME / 'projects' / project / 'last_run.json'
     return config.HOME / "last_run.json"
 
 
@@ -821,10 +828,12 @@ def save_last_run(sent, prompt, chain, backend, answer, project, level,
     import json
     from .filelock import write_atomic
     # Atomic: a parallel job finishing at the same time can't leave half a file.
-    write_atomic(last_run_path(), json.dumps({"sent": sent, "prompt": prompt, "chain": chain,
+    payload = json.dumps({"sent": sent, "prompt": prompt, "chain": chain,
                                               "backend": backend, "answer": answer,
                                               "project": project, "rating": level,
-                                              "tab_id": tab_id, 'policy':policy or {}}))
+                                              "tab_id": tab_id, 'policy':policy or {}})
+    write_atomic(last_run_path(project), payload)
+    write_atomic(last_run_path(), payload)
     from . import answers
     answers.add(prompt, answer, backend, project, level, tab_id=tab_id)
 
@@ -832,11 +841,17 @@ def save_last_run(sent, prompt, chain, backend, answer, project, level,
 def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
                on_answer: Callable[[str], None] | None = None) -> int:
     import json
-    path = last_run_path()
+    project = getattr(args, 'project', None)
+    path = last_run_path(project)
+    if project and not path.exists():
+        path = last_run_path()  # Migrate old records only when the project matches.
     if not path.exists():
         print("[megazword] nothing to retry yet; run something first", file=sys.stderr)
         return 2
     last = json.loads(path.read_text(encoding="utf-8"))
+    if project and last.get('project') != project:
+        print('[megazword] nothing to retry in this project; run a task here first', file=sys.stderr)
+        return 2
     from .request_mode import free_only, free_backend, code_review
     policy = last.get('policy') or {}
     reviewing = policy.get('review') or (not policy.get('edit') and code_review(last['prompt']))

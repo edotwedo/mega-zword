@@ -96,6 +96,7 @@ class Usage:
 class Job:
     def __init__(self, job_id: str, label: str, cmd: list[str], stdin: str):
         self.id, self.label = job_id, label
+        self.project = cmd[cmd.index('-p') + 1] if '-p' in cmd else None
         self.mode = 'review' if '--review' in cmd else 'edit' if '-e' in cmd else 'chat'
         self.started = datetime.now(timezone.utc).isoformat()
         self.out: list[str] = []
@@ -155,6 +156,7 @@ class Job:
     def view(self) -> dict:
         return {"id": self.id, "label": self.label, "started": self.started,
                 "mode": self.mode,
+                "project": getattr(self, 'project', None),
                 "out": "".join(self.out), "err": "".join(self.err),
                 "done": self.code is not None, "code": self.code,
                 "activity": self.control.view() if self.control else None}
@@ -183,6 +185,7 @@ class App:
         self.launcher = launcher
         self.token = secrets.token_urlsafe(24)
         self.jobs: dict[str, Job] = {}
+        self._job_projects: dict[str, str] = {}
         self._jobs_lock = threading.Lock()
         self._n = 0
         self._room_thread: threading.Thread | None = None
@@ -222,7 +225,8 @@ class App:
                 if r.get("project", self.project) == project][-60:]
         memory = Memory(config.HOME, project, self.cfg.memory_lines)
         with self._jobs_lock:
-            jobs = list(self.jobs.values())
+            jobs = [job for job_id, job in self.jobs.items()
+                    if self._job_projects.get(job_id, self.project) == project]
         return {
             "now": now.isoformat(),
             "build": os.environ.get("MEGAZWORD_BUILD", "development"),
@@ -245,7 +249,7 @@ class App:
                          runlog.summarize(self.cfg.log_path, timedelta(hours=24), now).items()},
             "memory": [asdict(e) for e in reversed(memory.recent(40))],
             "answers": answers.recent(20, project),
-            "jobs": [j.view() for j in reversed(jobs)][:10],
+            "jobs": [{**j.view(), 'project': project} for j in reversed(jobs)][:10],
             "tabs": tabs.list_tabs(),
             "sentinel": sentinel.summary(),
             "floor": self.floor_state(now),
@@ -295,9 +299,11 @@ class App:
                 if finished is None:
                     raise ValueError("too many running jobs; wait or cancel one")
                 del self.jobs[finished]
+                self._job_projects.pop(finished, None)
             self._n += 1
             job_id = f"j{self._n}"
             self.jobs[job_id] = self.launcher(job_id, label, megazword_cmd(*args), stdin)
+            self._job_projects[job_id] = args[args.index('-p') + 1] if '-p' in args else self.project
         return {"job": job_id}
 
     def run(self, body: dict) -> dict:
@@ -337,8 +343,7 @@ class App:
         return self._start(prompt[:80], args, prompt)
 
     def retry(self, body: dict) -> dict:
-        self.project_for(body.get("project"))  # validate; retry reuses the last run's project
-        args = ["retry"]
+        args = ["retry", '-p', self.project_for(body.get("project"))]
         model = body.get("model") or ""
         if model:
             if not isinstance(model, str) or model not in self.backends:

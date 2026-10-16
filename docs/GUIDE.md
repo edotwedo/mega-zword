@@ -339,15 +339,17 @@ detached server started by plain `megazword`.
 ### Home and Hive
 
 Use the sidebar's **Home** and **Hive** buttons to switch views. Home contains
-the task box, meters and history. Hive shows the shared room conversation,
-primary project, last speaker and turns remaining. Enter a message and choose
-**Send**, then **Start** to run a bounded room session. **Pause** waits for the
+one console transcript above the prompt. **Task options** opens memory, editing
+and comparison controls; **Workspace details** opens meters, history and settings.
+Hive shows the shared room conversation. **Workers & room details** opens its
+roster and status. Enter a message and choose **Send** to start replies.
+**Reply controls** contains the turn cap, Pause and Stop. **Pause** waits for the
 current reply to finish; **Resume** continues toward the selected turn cap.
 **Stop** ends the session. The room is coordination chat, not an editing worker.
 
 **Chats** (sidebar, under Home and Hive): pick an AI (or auto) and press **+** for a
 new chat tab. Each tab keeps its AI, project and last few turns across restarts.
-Ctrl+Enter sends; **Rename** changes the name; **Close tab** needs two clicks.
+Ctrl+Enter sends; **Chat options** contains Rename, New session and Delete chat.
 Links: `#hive` opens the Hive, `#tab-t1` opens tab t1. Tabs can't be reordered yet.
 
 ### Continuing chat-tab sessions
@@ -368,7 +370,7 @@ history; they do not use this CLI-session feature. Grok's installed CLI supports
 
 ### Home controls
 
-The project selector switches the memory, notes, runs and answers shown. The
+The project selector switches the memory, notes, runs, answers and job output shown. The
 page refreshes its state periodically; **Refresh meters** rereads the usage
 sources immediately.
 
@@ -376,7 +378,9 @@ sources immediately.
   pacing; the AI menu forces an installed tool. Check project memory to add
   notes and decisions to the prompt. Compare runs it on two or three chosen
   AIs. A running job shows elapsed time; Cancel stops that job. Answers appear
-  when the tool finishes. **Not good enough** retries the last saved answer.
+  when the tool finishes. **Retry** uses the selected project's last saved answer.
+  It cannot silently replay another project's task. The CLI equivalent is
+  `megazword retry -p PROJECT`; plain CLI `retry` still means the global last run.
 - **Plans & pace:** the bar shows reported usage. The vertical tick shows how
   much of a known reset window has elapsed. If usage is ahead of the tick, the
   plan is being used faster than time passes. Labels identify stale or

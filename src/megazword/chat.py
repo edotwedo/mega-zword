@@ -160,12 +160,13 @@ def run(backends: dict[str, Backend], cfg: config.Config,
                 elif command == "/retry":
                     class Args:
                         model = None
+                        project = memory.project
                     answer: list[str] = []
                     code = cli.retry_last(Args(), dict(backends), cfg,
                                           on_answer=lambda text: (answer.append(text), write(text)))
                     try:
                         import json
-                        last = json.loads(cli.last_run_path().read_text(encoding="utf-8"))
+                        last = json.loads(cli.last_run_path(memory.project).read_text(encoding="utf-8"))
                         if code == 0:
                             turns.append((last["prompt"], last["answer"]))
                     except (OSError, ValueError, KeyError):

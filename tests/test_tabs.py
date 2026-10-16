@@ -44,6 +44,26 @@ def rate(level="easy"):
     return lambda prompt: Rating(level, "test", "fake")
 
 
+def test_backend_receives_only_its_tab_and_opted_in_project_memory():
+    from megazword.memory import Memory
+    models = backends()
+    Memory(config.HOME, 'current').add('note', 'CURRENT_PROJECT_CONTEXT_MARKER')
+    Memory(config.HOME, 'other').add('note', 'PRIVATE_OTHER_PROJECT_MARKER')
+    own = tabs.create('cheap', 'current', backends=models)
+    other = tabs.create('cheap', 'other', backends=models)
+    tabs.send(other['id'], 'PRIVATE_OTHER_CONVERSATION_MARKER', models, cfg(), rate(), dict)
+    tabs.send(own['id'], 'current task', models, cfg(), rate(), dict)
+    sent = models['cheap'].calls[-1]
+    assert 'CURRENT_PROJECT_CONTEXT_MARKER' not in sent
+    assert 'PRIVATE_OTHER_PROJECT_MARKER' not in sent
+    assert 'PRIVATE_OTHER_CONVERSATION_MARKER' not in sent
+    tabs.send(own['id'], 'continue current task', models, cfg(), rate(), dict, context=True)
+    sent = models['cheap'].calls[-1]
+    assert 'CURRENT_PROJECT_CONTEXT_MARKER' in sent
+    assert 'PRIVATE_OTHER_PROJECT_MARKER' not in sent
+    assert 'PRIVATE_OTHER_CONVERSATION_MARKER' not in sent
+
+
 def test_create_list_rename_close_persist():
     first = tabs.create("claude", "alpha", title="Work", backends=backends())
     assert first["id"] == "t1" and first["ai"] == "claude" and first["title"] == "Work"

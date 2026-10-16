@@ -1,5 +1,19 @@
 # Release notes
 
+## Mega Zword: Console Workspace (2026-10-15)
+
+- Home, Hive and chat tabs use a plain green-on-black monospace console.
+  Home puts the transcript above the prompt in chronological order. Options,
+  chat management, workers and workspace panels expand when needed.
+- Home job output and Retry follow the selected project. Each project keeps
+  its own last-run record; legacy records are reused only for a matching project.
+  `megazword retry -p PROJECT` exposes the same boundary. Interactive CLI chat
+  Retry also specifies its project. Normal CLI `retry` retains global-last behavior.
+- One-shot instructions explicitly exclude unrelated personal history and other
+  projects' notes. Regression checks verify actual backend prompts keep tab
+  history separate and include only opted-in memory from the tab's project.
+  This is context isolation, not a guarantee against arbitrary model mistakes.
+
 ## Mega Zword: Source-Grounded Self-Review (2026-10-15)
 
 - Code inspection requests in the dashboard now use the existing tool loop in

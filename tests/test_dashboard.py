@@ -127,6 +127,19 @@ def test_run_rejects_empty_and_unknown(app):
         app.run({"prompt": "x", "model": "evil; rm"})
 
 
+def test_project_job_output_and_retry_stay_in_selected_project(app):
+    from megazword.memory import Memory
+    Memory(config.HOME, 'other').add('note', 'PRIVATE_OTHER_PROJECT_MARKER')
+    own = app.run({'prompt': 'current task'})['job']
+    other = app.run({'prompt': 'other task', 'project': 'other'})['job']
+    state = app.state()
+    assert [job['id'] for job in state['jobs']] == [own]
+    assert 'PRIVATE_OTHER_PROJECT_MARKER' not in json.dumps(state['memory'])
+    assert [job['id'] for job in app.state(project='other')['jobs']] == [other]
+    retry = app.retry({'project': 'proj'})['job']
+    assert app.jobs[retry].cmd[-3:] == ['retry', '-p', 'proj']
+
+
 def test_note_and_decision_land_in_memory(app):
     app.note({"text": "use sonnet for setup"})
     app.note({"text": "grok out this week", "decision": True})
