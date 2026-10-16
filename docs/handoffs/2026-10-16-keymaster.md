@@ -1,6 +1,6 @@
 # Keymaster, small version (ROADMAP item 2)
 
-**Status:** taken by Alder-16 (Codex), 2026-10-16. Written by Juniper-16 (Claude Code), 2026-10-16.
+**Status:** done by Alder-16 (Codex), 2026-10-16; source e285f0a, added prompt regression ca787e7. Written by Juniper-16 (Claude Code), 2026-10-16.
 **Claim it:** pick a designation, put it on the Active line of docs/STATUS.md, commit and push, work in your own worktree (`git worktree add %USERPROFILE%\mz-seats\<name> -B seat/<name> origin/main`). Pushes go to local Gitea `origin` only.
 
 ## Why
@@ -43,3 +43,50 @@ publish a `megazword brief report` card.
 - Don't send keys to any model, log, Q comment or GitHub.
 - Don't edit `routing.py`, `ledger.py`, `review.py`, `night.py` (Juniper-16 is working on
   the heartbeat in night.py and a new heartbeat module).
+
+
+## Report — Alder-16, 2026-10-16
+
+Implemented Keymaster in `keys.py` with a small `credential_store.py` ctypes
+wrapper. Environment-first lookup now reaches free backends and doctor. Vault
+values are covered by prompt, response, error and export scrubbing. Metadata
+checks are deduplicated per provider, reject redirects, and make no inference
+calls. OpenRouter uses authenticated `/key`; Gemini and Cloudflare use their
+native metadata endpoints. Unsupported metadata endpoints yield `no answer`;
+`ok` is not a free-quota or inference-access guarantee.
+
+Move copies user-environment values (including registry values not inherited by
+an older shell), verifies each write, and leaves environment values untouched.
+Process/user conflicts are skipped. Optional cleanup uses exact PowerShell
+SetEnvironmentVariable lines rather than unreliable `setx NAME ""` deletion.
+Phil runs the real migration himself. No real credential writes were performed.
+
+Free coding: Tencent GLM-5.3 Flash timed out; Groq Qwen hit the 10-step cap with
+an unusable draft. Groq GPT-OSS 120B through Mega Zword produced the accepted
+wrapper draft; Alder corrected platform detection, pointer assignment, input
+validation and cleanup/error handling, then integrated and tested it. Gemini
+API reviewed all source changes with no findings; Groq's review returned an
+invalid response. Review's 24k cap excluded the two new test files.
+
+Validation: full suite 1,353 passed in 209.44s; final Keymaster prompt regression
+suite 17 passed; ctypes fake tests cover read/write/delete, missing/errors,
+UTF-8 byte limits, zeroing, and prototypes. No test writes to Credential Manager
+or makes provider calls. `git diff --check` passed. Testlog's concurrent runner
+fix was retained by clean rebase; no edits to routing/ledger/review/night.
+
+Installed wheel into canonical app venv and system Python311. Both installed
+CLI entrypoints recognize `keys --help`; all 63 package/UI files match source
+content (normalizing line endings; keys.py changed LF/CRLF on rebase). Existing
+app processes were not restarted. Build required standard isolated setuptools
+build because both installed build environments have older setuptools.
+
+Next for Phil: `megazword keys` checks providers; `megazword keys move` performs
+the one-time migration. Restart existing shells/apps after optional environment
+cleanup. Existing GUI processes need reopening to load updated package code.
+Routine source stays on local Gitea; no GitHub source mirror.
+
+Implementation references: [Microsoft CREDENTIALW](https://learn.microsoft.com/en-us/windows/win32/api/wincred/ns-wincred-credentialw),
+[CredReadW](https://learn.microsoft.com/windows/win32/api/wincred/nf-wincred-credreadw),
+[OpenRouter key check](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key),
+[Gemini models](https://ai.google.dev/api/models),
+[Cloudflare model search](https://developers.cloudflare.com/api/resources/ai/subresources/models/methods/list/).
