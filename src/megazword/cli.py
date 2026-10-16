@@ -159,7 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
     from .job import add_parser as add_job_parser
     add_job_parser(sub)
 
-    out = sub.add_parser("out", help="mark an AI out of usage (auto-pick skips it)")
+    out = sub.add_parser("out", help="keep auto-picks and background jobs off an AI")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
     group = out.add_mutually_exclusive_group()
     group.add_argument("--until", help="when it's back: 7d, 5h, 2026-10-17 or 2026-10-17T23:30")
@@ -798,6 +798,9 @@ def out_command(args, cfg: config.Config) -> int:
             print("[megazword] no AI is marked out")
         for name in sorted(marks):
             print(f"{name:7} out until {cfg.out_until[name].astimezone():%a %b %d %I:%M %p}")
+        if marks:
+            print("Mega Zword won't pick these on its own or give them background work. "
+                  "Chatting with them directly still works.")
         return 0
     if not args.until and not args.clear:
         print("[megazword] say when it's back (--until 7d) or --clear", file=sys.stderr)
@@ -813,7 +816,9 @@ def out_command(args, cfg: config.Config) -> int:
         print(f"[megazword] {' '.join(str(exc).split())}", file=sys.stderr)
         return 2
     if until:
-        print(f"[megazword] {args.ai} marked out until {until.astimezone():%a %b %d %I:%M %p}")
+        print(f"[megazword] {args.ai} marked out until {until.astimezone():%a %b %d %I:%M %p}: "
+              "Mega Zword won't pick it on its own or give it background work. "
+              f"Chatting with it directly still works. Undo: megazword out {args.ai} --clear")
     else:
         print(f"[megazword] {args.ai} is back in the rotation")
     return 0
