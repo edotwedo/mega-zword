@@ -13,7 +13,7 @@ cushion; (2) finish big coding projects with many models working together.
 - [x] Credit ledger + billing block (`megazword credits`); agent sends 33% less per run. 2026-10-16, Juniper-16, ce0b490
 
 ## Next, in order
-1. [ ] **Review command** (`megazword review`). Free models review every change on Gitea (3 at once, results merged). Big changes also go to Greptile (and Open Code Review once verified and installed) through a temporary draft PR on GitHub; comments come back merged; PR closed. Ledger tracks each monthly allowance.
+1. [~] **Review command** (free-model half done 2026-10-16, Juniper-16: `megazword review [--base REF] [-n 3]`; Greptile half coded with `--greptile`, needs one live run once Claude may push review branches to GitHub) (`megazword review`). Free models review every change on Gitea (3 at once, results merged). Big changes also go to Greptile (and Open Code Review once verified and installed) through a temporary draft PR on GitHub; comments come back merged; PR closed. Ledger tracks each monthly allowance.
    Done when: `megazword review` works with fake reviewers in tests and one real Greptile review has come back. Phil: sign up for Greptile, install its GitHub app on mega-zword only.
 2. [ ] **Keymaster, small version** (`megazword keys`). Moves API keys from plain environment variables into Windows Credential Manager; hands each key only to its own provider call; `megazword keys` shows which keys work (one free check each). No AI ever sees a key value.
    Done when: keys load from Credential Manager, the check table works, tests use fakes. Phil: run the one-time move command.

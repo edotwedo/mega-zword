@@ -1,0 +1,99 @@
+"""Fake reviewers and a fake GitHub only: no network, no real models."""
+import json
+import subprocess
+from types import SimpleNamespace
+
+from megazword import config, review
+from megazword.backends import Result
+
+
+def test_parse_reads_findings_and_normalises_severity():
+    text = ("- [HIGH] src/a.py:12 - divides by zero when list is empty\n"
+            "* [med] b.py:3 — leaks the key into the log\nnot a finding")
+    found = review.parse(text, "groq")
+    assert [(f.severity, f.path, f.line) for f in found] == [("high", "src/a.py", 12), ("medium", "b.py", 3)]
+
+
+def test_merge_ranks_independent_agreement_first():
+    findings = (review.parse("- [low] a.py:10 - x", "groq")
+                + review.parse("- [high] b.py:5 - y", "zai")
+                + review.parse("- [medium] src/a.py:12 - same bug", "cloudflare"))
+    merged = review.merge(findings)
+    assert merged[0].path.endswith("a.py") and sorted(merged[0].by) == ["cloudflare", "groq"]
+    assert merged[0].severity == "medium"
+    assert merged[1].path == "b.py"
+
+
+def test_one_reviewer_repeating_itself_does_not_count_as_agreement():
+    merged = review.merge(review.parse("- [low] a.py:1 - x\n- [low] a.py:2 - x again", "groq"))
+    assert all(len(m.by) == 1 for m in merged)
+
+
+def test_clip_keeps_whole_files_and_names_the_rest():
+    diff = "diff --git a/a.py b/a.py\n" + "+x\n" * 10 + "diff --git a/big.py b/big.py\n" + "+y\n" * 100
+    shown, note = review.clip(diff, limit=60)
+    assert "a/a.py" in shown and "big.py" not in shown and "big.py" in note
+
+
+class Fake:
+    def __init__(self, name, answer):
+        self.name, self.answer, self.timeout = name, answer, 60
+
+    def available(self):
+        return True
+
+    def run(self, prompt):
+        assert "```diff" in prompt
+        return Result(self.name, self.answer, True, 0.1)
+
+
+def test_run_merges_free_reviewers(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for cmd in (["init", "-q"], ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", str(repo), *cmd], check=True)
+    (repo / "a.py").write_text("x = 1\n")
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "c"], check=True)
+    fakes = [Fake("groq", "- [high] a.py:1 - wrong value"), Fake("zai", "- [high] a.py:1 - x is wrong"),
+             Fake("mistral", "no bugs found")]
+    monkeypatch.setattr(review, "pick_reviewers", lambda *a, **k: fakes)
+    cfg = SimpleNamespace(log_path=tmp_path / "log.jsonl", log_lines=100, timeouts={})
+    out = []
+    assert review.run(repo, {}, cfg, write=out.append) == 0
+    text = "\n".join(out)
+    assert "a.py:1 (2 reviewers agree)" in text and "No bugs found by: mistral" in text
+    logged = [json.loads(l) for l in (tmp_path / "log.jsonl").read_text().splitlines()]
+    assert {r["backend"] for r in logged} == {"groq", "zai", "mistral"}
+
+
+def test_greptile_respects_monthly_allowance(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    (tmp_path / "reviews.jsonl").write_text("\n".join(
+        json.dumps({"time": now, "reviewer": "greptile", "credits": 1}) for _ in range(50)))
+    findings, status = review.greptile(tmp_path, "x")
+    assert findings == [] and "50/50" in status
+
+
+def test_greptile_opens_collects_and_closes_pr(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    calls = []
+    monkeypatch.setattr(review, "git", lambda repo, *a, **k: SimpleNamespace(
+        returncode=0, stdout="abc1234\n", stderr=""))
+
+    def gh(*args, **kwargs):
+        calls.append(args)
+        if args[:2] == ("pr", "create"):
+            return SimpleNamespace(returncode=0, stdout="https://github.com/edotwedo/mega-zword/pull/7\n", stderr="")
+        if args[0] == "api" and args[1].endswith("/pulls/7/comments"):
+            body = [{"user": {"login": "greptile-apps[bot]"}, "path": "src/a.py", "line": 4,
+                     "body": "Null check missing"}]
+            return SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
+        return SimpleNamespace(returncode=0, stdout="[]", stderr="")
+    monkeypatch.setattr(review, "_gh", gh)
+    findings, status = review.greptile(tmp_path, "x", sleep=lambda s: None)
+    assert findings[0].path == "src/a.py" and findings[0].line == 4 and findings[0].by == ["greptile"]
+    assert ("pr", "close", "7", "--repo", "edotwedo/mega-zword", "--delete-branch") in calls
+    assert review.greptile_used_this_month(tmp_path / "reviews.jsonl") == 1
