@@ -16,6 +16,7 @@ Each beat (Phil, 2026-10-16: "an enforced roadmap"):
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -92,13 +93,24 @@ def home() -> Path:
 
 
 def _locked() -> bool:
+    """Take the beat lock atomically; True if another live beat holds it."""
     lock = home() / "lock"
-    if lock.exists():
-        age = datetime.now().timestamp() - lock.stat().st_mtime
-        if age < LOCK_HOURS * 3600:
-            return True
-    lock.write_text(str(datetime.now()), encoding="utf-8")
-    return False
+    for _ in range(2):
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                age = datetime.now().timestamp() - lock.stat().st_mtime
+            except FileNotFoundError:
+                continue
+            if age < LOCK_HOURS * 3600:
+                return True
+            lock.unlink(missing_ok=True)  # stale: a beat that died long ago
+            continue
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            out.write(str(datetime.now()))
+        return False
+    return True
 
 
 def _record(**row) -> None:
@@ -121,18 +133,23 @@ def merge(clone: Path, branch: str, backends, cfg, review_fn=None) -> str:
     night._check(night.git(["worktree", "add", "--quiet", "--detach", str(work), f"origin/{branch}"], clone),
                  "git worktree add")
     try:
-        # Two reviewers, so one model's false alarm can't block a merge on its own.
+        # Only the exact commit Night Shift tested may reach main: it must sit
+        # directly on today's main (fast-forward), or the combination is untested.
+        ahead = night.git(["merge-base", "--is-ancestor", "origin/main", f"origin/{branch}"], work)
+        if ahead.returncode != 0:
+            return "not merged: main moved while the job ran; the next beat starts fresh"
+        diff, _ = review.change(work, "origin/main")
+        if review.clip(diff)[1]:
+            return "not merged: change too big to review in one pass; needs a person"
+        # Two usable reviews, so one model's false alarm can't block a merge and
+        # a provider outage can't let an unreviewed change through.
         merged, raw, _ = (review_fn or review.collect)(work, backends, cfg, base="origin/main", count=2)
-        stops = review.blocking(merged or [])
+        if merged is None or len(raw) < 2:
+            return f"not merged: needs 2 completed reviews, got {len(raw)}"
+        stops = review.blocking(merged)
         if stops:
             return "not merged: reviewers agree on " + "; ".join(
                 f"{f.path}:{f.line} {f.text[:80]}" for f in stops[:3])
-        night._check(night.git(["checkout", "--quiet", "--detach", "origin/main"], work), "checkout main")
-        res = night.git(["-c", "core.hooksPath=", "merge", "--no-ff", "--no-edit", "-m",
-                         f"heartbeat: merge {branch}", f"origin/{branch}"], work)
-        if res.returncode != 0:
-            night.git(["merge", "--abort"], work)
-            return "not merged: conflicts with main"
         problem = night.secret_problem(work, since="origin/main")
         if problem:
             return "not merged: " + problem

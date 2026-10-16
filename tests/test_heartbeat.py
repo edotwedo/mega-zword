@@ -117,14 +117,43 @@ def test_merge_blocks_on_agreed_high_finding_and_merges_otherwise(tmp_path):
     for args in (["config", "user.email", "t@t"], ["config", "user.name", "t"]):
         _git(clone, *args)
 
+    two = {"groq": "", "zai": ""}
     bad = [review.Finding("high", "a.py", 1, "wrong", ["groq", "zai"])]
-    text = heartbeat.merge(clone, "night/t-1", {}, None, review_fn=lambda *a, **k: (bad, {"groq": ""}, ""))
+    text = heartbeat.merge(clone, "night/t-1", {}, None, review_fn=lambda *a, **k: (bad, two, ""))
     assert text.startswith("not merged: reviewers agree")
+    # One answer (the other reviewer failed) or none at all must not count as approval.
+    text = heartbeat.merge(clone, "night/t-1", {}, None, review_fn=lambda *a, **k: ([], {"groq": ""}, ""))
+    assert text == "not merged: needs 2 completed reviews, got 1"
+    text = heartbeat.merge(clone, "night/t-1", {}, None, review_fn=lambda *a, **k: (None, {}, ""))
+    assert text.startswith("not merged: needs 2")
     ok = [review.Finding("high", "a.py", 1, "maybe", ["groq"])]
-    text = heartbeat.merge(clone, "night/t-1", {}, None, review_fn=lambda *a, **k: (ok, {"groq": ""}, ""))
+    text = heartbeat.merge(clone, "night/t-1", {}, None, review_fn=lambda *a, **k: (ok, two, ""))
     assert text.startswith("merged into main")
     shown = subprocess.run(["git", "-C", str(bare), "show", "main:a.py"], capture_output=True, text=True)
     assert shown.stdout == "x = 2\n"
+
+    # main moves after a job starts: the tested commit is no longer what would ship.
+    (seed / "a.py").write_text("x = 3\n")
+    _git(seed, "commit", "-qam", "job")
+    _git(seed, "push", "-q", "origin", "HEAD:refs/heads/night/t-2")
+    _git(seed, "reset", "-q", "--hard", "HEAD~1")
+    (seed / "b.py").write_text("y = 1\n")
+    _git(seed, "add", ".")
+    _git(seed, "commit", "-qm", "someone else")
+    _git(seed, "pull", "-q", "--no-rebase", "origin", "main")
+    _git(seed, "push", "-q", "origin", "HEAD:main")
+    text = heartbeat.merge(clone, "night/t-2", {}, None, review_fn=lambda *a, **k: ([], two, ""))
+    assert text.startswith("not merged: main moved")
+
+
+def test_lock_is_atomic_and_stale_locks_expire(monkeypatch, tmp_path):
+    assert heartbeat._locked() is False
+    assert heartbeat._locked() is True
+    lock = tmp_path / "heartbeat" / "lock"
+    old = lock.stat().st_mtime - heartbeat.LOCK_HOURS * 3600 - 60
+    import os
+    os.utime(lock, (old, old))
+    assert heartbeat._locked() is False
 
 
 def test_install_needs_valid_times_and_yes(capsys):
