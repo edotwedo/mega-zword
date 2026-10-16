@@ -38,13 +38,19 @@ def spread(names: list[str], level: str = "medium",
     names = list(dict.fromkeys(names))
     free = [name for name in names if name not in PAID_BACKENDS]
     paid = [name for name in names if name in PAID_BACKENDS]
-    if len(free) < 2:
-        return [*free, *paid]
+    if not free:
+        return paid
 
     if log_path is None:
         from .config import HOME
         log_path = HOME / "log.jsonl"
     from .runlog import summarize
+
+    # Hard block (ledger): never route to a source that could bill, or to a
+    # grant that is used up or expired.
+    from .ledger import blocked
+    stop = blocked(free, home=log_path.parent, log_path=log_path)
+    free = [name for name in free if name not in stop]
 
     usage = summarize(log_path, SPREAD_WINDOW)
     position = {name: index for index, name in enumerate(free)}

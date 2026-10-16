@@ -363,7 +363,9 @@ def test_http_native_response_preserved(tmp_path, monkeypatch):
     model = OpenAICompatibleBackend("groq", base_url="https://example.test/v1",
                                     key_env="TEST_KEY", model="fake")
     def urlopen(req, timeout):
-        assert json.loads(req.data)["tools"] == agent.TOOLS
+        # A job with no web hint omits the fetch tool.
+        assert json.loads(req.data)["tools"] == [
+            t for t in agent.TOOLS if t["function"]["name"] != "fetch_public_url"]
         return io.BytesIO(json.dumps({"choices": [{"message": {
             "role": "assistant", "content": None, **call("finish", summary="native done")}}]}).encode())
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)

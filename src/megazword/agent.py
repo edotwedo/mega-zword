@@ -90,6 +90,10 @@ INSTRUCTIONS = (
     '{"tool":"read_file","arguments":{"path":"file.py"}}. '
     "The available tool schemas are: " + json.dumps(TOOLS)
 )
+SCHEMA_TEXT = "The available tool schemas are: " + json.dumps(TOOLS)
+FETCH_SENTENCE = ("fetch_public_url can read bounded text from public HTTPS pages only; "
+                  "it cannot access private or authenticated pages. ")
+WEB_HINT = re.compile(r"https?://|\b(?:url|link|web|website|online|docs?|documentation|page|fetch|internet)\b", re.I)
 READ_TOOLS = [t for t in TOOLS if t['function']['name'] in ('list_files', 'read_file', 'finish')]
 REVIEW_INSTRUCTIONS = (
     "You are reviewing the actual Mega Zword work folder through read-only tools. "
@@ -105,6 +109,7 @@ REVIEW_INSTRUCTIONS = (
     '{"tool":"read_file","arguments":{"path":"routing.py"}}. '
     "Available tools: " + json.dumps(READ_TOOLS)
 )
+READ_SCHEMA_TEXT = "Available tools: " + json.dumps(READ_TOOLS)
 
 
 def _scrub_values(value):
@@ -115,6 +120,11 @@ def _scrub_values(value):
     if isinstance(value, dict):
         return {k: _scrub_values(v) for k, v in value.items()}
     return value
+
+
+# Resending old tool output is the main credit cost of long runs.
+KEEP_FULL = 1
+STALE_LIMIT = 400
 
 
 @dataclass
@@ -141,6 +151,7 @@ class AgentBackend(Backend):
     answer_chars: int = 0
     control: object | None = None
     _retry_directions: list = field(default_factory=list)
+    _tools: list = field(default_factory=lambda: list(TOOLS))
 
     def _event(self, phase, **details):
         if self.control:
@@ -272,6 +283,8 @@ class AgentBackend(Backend):
                 text = scrub(output.read().decode("utf-8", errors="replace"))
                 return f"exit code {proc.returncode}\n" + text[-tail_chars:]
         if name == "fetch_public_url":
+            if not any(t["function"]["name"] == name for t in self._tools):
+                raise ValueError("fetch_public_url is not available for this job")
             from .public_fetch import fetch_public_url
             return fetch_public_url(args["url"])
         path = self._path(args["path"])
@@ -398,7 +411,7 @@ class AgentBackend(Backend):
                     return {"content": generate(json.dumps(sent), self._ollama_model,
                             self.model_backend.url, json_format=True, messages=sent,
                             timeout=min(self.call_timeout, self.wall_timeout, remaining, self.model_backend.timeout))}
-                return self.model_backend.chat(sent, tools=None if text_mode else (READ_TOOLS if self.read_only else TOOLS),
+                return self.model_backend.chat(sent, tools=None if text_mode else (READ_TOOLS if self.read_only else self._tools),
                                                timeout=min(self.call_timeout, self.wall_timeout, remaining, self.model_backend.timeout))
             except (APIHTTPError, urllib.error.HTTPError) as exc:
                 if (isinstance(self.model_backend, OllamaBackend) and exc.code == 404
@@ -502,12 +515,21 @@ class AgentBackend(Backend):
         self._ollama_fallback = False
         previous_call, repeats = None, 0
         last_text = ""
-        messages = [{"role": "system", "content": REVIEW_INSTRUCTIONS if self.read_only else INSTRUCTIONS},
+        # Only send tools the job needs: each schema is resent on every step.
+        web = bool(WEB_HINT.search(prompt))
+        self._tools = TOOLS if web else [t for t in TOOLS if t["function"]["name"] != "fetch_public_url"]
+        instructions = INSTRUCTIONS if web else INSTRUCTIONS.replace(FETCH_SENTENCE, "").replace(
+            SCHEMA_TEXT, "The available tool schemas are: " + json.dumps(self._tools))
+        messages = [{"role": "system", "content": REVIEW_INSTRUCTIONS if self.read_only else instructions},
                     {"role": "user", "content": prompt}]
         text_mode = self.text_protocol or isinstance(self.model_backend, OllamaBackend)
         compacted = False
         for step in range(self.max_steps):
             messages.extend(self._checkpoint())
+            if not self.read_only:
+                # Every step resends the history, so stale bulk costs credits again
+                # each time. Reviews keep full reads for their line citations.
+                self._trim_stale(messages)
             if len(json.dumps(messages)) > 24000:
                 # Completed tool exchanges need not be resent indefinitely. Keep
                 # task and user interventions intact, then recent observations.
@@ -525,7 +547,12 @@ class AgentBackend(Backend):
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
             sent = _scrub_values(messages) if self.trains_on_data else messages
             sent = list(sent)
-            sent[0] = {**sent[0], "content": sent[0]["content"] + (
+            system = sent[0]["content"]
+            if not text_mode:
+                # Native calls already carry the schemas in `tools`; don't pay twice.
+                system = system.replace("The available tool schemas are: " + json.dumps(self._tools), "")
+                system = system.replace(SCHEMA_TEXT, "").replace(READ_SCHEMA_TEXT, "")
+            sent[0] = {**sent[0], "content": system + (
                 f"\nExecution budget: {self.max_steps - step} tool steps remaining. "
                 + ("Read relevant source, cite evidence, then finish. No writes or commands."
                    if self.read_only else "Batch related file reads, make requested edits, run focused tests once, then finish."))}
@@ -662,6 +689,41 @@ class AgentBackend(Backend):
                 # Text-only providers need ordinary user/assistant messages.
                 messages = self._text_history(messages)
         raise RuntimeError(f"agent step cap reached ({self.max_steps}); edits remain in the work folder")
+
+    @staticmethod
+    def _trim_stale(messages, keep=KEEP_FULL, limit=STALE_LIMIT):
+        """Shrink tool outputs and written file bodies older than the last few.
+
+        The newest `keep` results stay whole. Older ones become a short stub that
+        tells the model to call the tool again if it still needs the content.
+        Message order and tool_call ids are unchanged, so native protocols stay valid.
+        """
+        results = [i for i, m in enumerate(messages) if m.get("role") == "tool"]
+        for i in results[:-keep] if keep else results:
+            content = messages[i].get("content") or ""
+            if len(content) > limit and not content.startswith("[trimmed"):
+                messages[i] = {**messages[i], "content":
+                               f"[trimmed: earlier tool output, {len(content)} chars; "
+                               f"call the tool again if you still need it]\n{content[:limit // 2]}"}
+        asked = [i for i, m in enumerate(messages)
+                 if m.get("role") == "assistant" and m.get("tool_calls")]
+        for i in asked[:-keep] if keep else asked:
+            calls, changed = [], False
+            for c in messages[i]["tool_calls"]:
+                try:
+                    args = json.loads(c["function"]["arguments"])
+                except (KeyError, TypeError, ValueError):
+                    calls.append(c)
+                    continue
+                if isinstance(args, dict):
+                    for key in ("text", "old", "new"):
+                        value = args.get(key)
+                        if isinstance(value, str) and len(value) > limit:
+                            args[key] = f"[trimmed: {len(value)} chars]"
+                            changed = True
+                calls.append({**c, "function": {**c["function"], "arguments": json.dumps(args)}})
+            if changed:
+                messages[i] = {**messages[i], "tool_calls": calls}
 
     @staticmethod
     def _text_history(messages):

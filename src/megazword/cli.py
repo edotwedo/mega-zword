@@ -20,7 +20,7 @@ from .routing import spread
 
 COMMAND_GROUPS = {
     "Ask": ("run", "chat", "retry", "room", "night", "job"),
-    "See": ("start", "usage", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
+    "See": ("start", "usage", "credits", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "free"),
     "Set up": ("init", "doctor", "out", "backends", "app", "mcp"),
     "Memory": ("note", "decide", "import-hive"),
@@ -113,6 +113,14 @@ def build_parser() -> argparse.ArgumentParser:
     free_test_parser.add_argument("--provider", action="append", choices=FREE_TEST_PROVIDERS,
                                   dest="providers", metavar="NAME",
                                   help="test only this identity; repeat to test several")
+    cr = sub.add_parser("credits", help="free-credit ledger: grants left, runway, billing block")
+    cr.add_argument("action", nargs="?", choices=("show", "set"), default="show")
+    cr.add_argument("name", nargs="?", help="source name for set, e.g. tencent-kimi-k3")
+    cr.add_argument("--used", type=int, help="tokens used, from the provider's console")
+    cr.add_argument("--grant", type=int, help="total grant in tokens")
+    cr.add_argument("--expires", help="grant end date, YYYY-MM-DD")
+    cr.add_argument("--can-bill", choices=("yes", "no"),
+                    help="yes blocks routing until billing is turned off")
     sub.add_parser("plan", help="rank the AIs for new work by live spare usage")
     sub.add_parser("start", help="text start screen (plain `megazword` opens the app window)")
     sub.add_parser("projects", help="list projects with memory entries and last activity")
@@ -425,6 +433,13 @@ def main(argv: list[str] | None = None,
         from . import advise
         print(advise.text(advise.advise(cfg)))
         return 0
+
+    if args.command == "credits":
+        from . import ledger
+        if args.action == "set" and not args.name:
+            print("credits set needs a source name, e.g. tencent-kimi-k3", file=sys.stderr)
+            return 2
+        return ledger.command(args, log_path=cfg.log_path)
 
     if args.command == "stats":
         from .stats import daily, table
