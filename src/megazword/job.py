@@ -182,11 +182,23 @@ def add_parser(sub) -> None:
     jsub = job.add_subparsers(dest="job_cmd", required=True)
     plan = jsub.add_parser("plan", help="ask one AI to split a job into pieces")
     plan.add_argument("text", help="the job to split")
+    combine = jsub.add_parser("combine", help="merge a job's passed pieces on job/ID, test and review it")
+    combine.add_argument("id", help="job ID from `megazword job plan`")
+    combine.add_argument("--no-push", action="store_true", help="keep job/ID local")
 
 
 def command(args, backends: dict[str, Backend], cfg: config.Config,
             write: Callable[[str], None] = print) -> int:
     if args.job_cmd == "plan":
         return plan_job(args.text, backends, write=write)
+    if args.job_cmd == "combine":
+        from . import team
+        try:
+            combined = team.combine(args.id, backends, cfg, push=not args.no_push)
+        except FileNotFoundError as exc:
+            write(f"job combine: {exc}")
+            return 1
+        write(team.format_combined(combined))
+        return 0 if combined["status"].startswith("ready") else 1
     write("Usage: megazword job plan \"...\"")
     return 2

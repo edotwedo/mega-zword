@@ -45,7 +45,7 @@ branch to approve. A scoreboard shows who is good at what and what it cost.
    free attempts, each from a different family (by name prefix: groq-*, openrouter-*,
    tencent-*, zai-*, nvidia-*, gemini-api*, cheap-*), before the paid retry. Keep the first
    attempt that passes its test. Record every attempt in `result.tried`.
-5. [ ] (Juniper-16) `megazword job combine ID`: in the job's clone, branch `job/ID` from
+5. [x] (2026-10-17, Juniper-16; src/megazword/team.py, tests/test_team.py) `megazword job combine ID`: in the job's clone, branch `job/ID` from
    the base, merge every passed piece branch, run the full test command, then send the
    combined diff to `review.collect` with 2 reviewers from families that didn't write any
    piece. Save `combined` (branch, tests, review findings) in job.json and push `job/ID`
@@ -63,3 +63,4 @@ A job planned with `megazword job plan` runs, combines into one reviewed `job/ID
 and `megazword job scores` shows who did what; step 8 then finishes ROADMAP item 5.
 
 ## Heartbeat log
+- 2026-10-17: step 5 done by Juniper-16 (team.combine, `megazword job combine ID [--no-push]`). Plain push only: if job/ID already exists on origin it is left alone and reported. Reviewers exclude every family that wrote a piece.
