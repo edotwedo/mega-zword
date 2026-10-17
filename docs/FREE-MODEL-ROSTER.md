@@ -144,10 +144,13 @@ methods are Phil's call.
 | GitHub Models | Retired July 30, 2026 | Official GitHub docs | Gone. Remove from future lists. |
 | LLM7.io | Free token (signup): 100,000 tokens/day, 60 requests/min, 250/hour; turbo models include DeepSeek V4 Flash, GLM-5.3 Flash, Codestral | Official limits page (docs.llm7.io/limits). Keyless calls also worked on Oct 17, but the docs don't describe keyless use, so it isn't relied on. | Phil: free signup worth doing (email only per third parties). Then add with the token. |
 | Pollinations | Anonymous tier serves only gpt-oss-20b, hosted on OVH | Its own models endpoint | Nothing new beyond our direct OVH access. |
+| Cohere (trial key) | 1,000 calls/month free; Chat about 10-20/min; not for production or commercial use | Cohere's Going Live docs; third parties agree on 1,000/month | Fits personal dev use. Phil: free signup at dashboard.cohere.com. Its code model is already reachable keyless through Kilo (`kilo-cohere`). |
+| Public AI (publicai.co) | Nonprofit inference utility (Apertus, SEA-LION), OpenAI-compatible; funded by donated GPU time | Its own utility page + Hugging Face provider docs; limits not published | Phil: check platform.publicai.co for a free key. Small models; low priority. |
+| StepFun | About ¥10 signup credit, 5 requests/min | Third-party only (yangmao.ai) | Small one-time credit; skip unless signup is trivial. |
 
-Not checked yet: StepFun. `megazword scout` leads still to check: AtlasCloud, Phala,
-Poolside, Liquid, Thinking Machines (they host OpenRouter free models), publicai,
-gigachat.
+Scout leads still to check: AtlasCloud, Phala, Poolside, Liquid, Thinking Machines
+(they host OpenRouter free models; Kilo's keyless list also carries Liquid, Poolside and
+Thinking Machines models), gigachat.
 
 ## Origin and evaluation policy
 
