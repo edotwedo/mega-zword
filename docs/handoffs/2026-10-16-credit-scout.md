@@ -34,11 +34,11 @@ price lists, are where direct free tiers and signup grants hide.
    provider matches a Mega Zword backend family (names in `free_apis.FREE_KEYS`, e.g.
    groq, cerebras, mistral, nvidia, cloudflare, tencent, zai). Save to
    `~/.megazword/scout/leads.json` (use `config.HOME`); keep a `first_seen` date per provider.
-4. [ ] `megazword scout` command: fetch both sources (endpoints for at most 25 free
+4. [x] (2026-10-16, Juniper-16) `megazword scout` command: fetch both sources (endpoints for at most 25 free
    OpenRouter models from `openrouter_catalog.free_tool_models`), update leads.json and
    print NEW providers first, then known ones. One help line, under "See" in COMMAND_GROUPS.
    Tests use monkeypatched fetchers.
-5. [ ] docs/GUIDE.md: a short "Finding more free AI" section: what `megazword scout`
+5. [x] (2026-10-16, Juniper-16) docs/GUIDE.md: a short "Finding more free AI" section: what `megazword scout`
    shows, and that every lead must be checked by a person (terms, real free amount,
    whether it can bill) before a key is added. Then `megazword credits set NAME --can-bill no`
    only after that check.
@@ -58,3 +58,5 @@ fakes, GUIDE has the section, and ROADMAP item 4 is ticked.
 - 2026-10-16: step 1 done (scout.providers_from_endpoints, fetch_endpoints, 4 tests). openrouter, groq and zai hit the 60-step cap first; nvidia finished with one broken mock. Next: step 2, zero_price_litellm.
 - 2026-10-16: step 2 done (zero_price_litellm). The free model shipped it without tests and counted missing prices as free; fixed. Heartbeat now refuses code without tests. Next: step 3, leads().
 - 2026-10-16: step 3 done (leads, update_leads, known_families) by Juniper-16. Beat 5 ran 12 models, including 4 Tencent grants, and all hit the 60-step cap or made no changes. Next: step 4, the `megazword scout` command.
+- 2026-10-16: step 4 done (`megazword scout`, scout.gather/command, 4 tests). First live run: 36 providers, 26 without a key yet. Worth a person's look: AtlasCloud, Phala, Poolside, Liquid, Thinking Machines (OpenRouter free-model hosts), sarvam, volcengine, publicai, gigachat (LiteLLM $0 entries; many cloud entries like bedrock/azure are $0 only because you bring your own deployment). Next: step 5, GUIDE section.
+- 2026-10-16: step 5 done (GUIDE "Finding more free AI"). All five code steps done. Left on ROADMAP #4: the research half below (Juniper-16 claimed it) and auto-testing new free models.

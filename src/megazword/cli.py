@@ -20,7 +20,7 @@ from .routing import spread
 
 COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job"),
-    "See": ("start", "usage", "credits", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
+    "See": ("start", "usage", "credits", "scout", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "free"),
     "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp"),
     "Memory": ("note", "decide", "import-hive"),
@@ -128,6 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
     cr.add_argument("--expires", help="grant end date, YYYY-MM-DD")
     cr.add_argument("--can-bill", choices=("yes", "no"),
                     help="yes blocks routing until billing is turned off")
+    sub.add_parser("scout", help="find AI providers we don't use yet")
     sub.add_parser("plan", help="rank the AIs for new work by live spare usage")
     sub.add_parser("start", help="text start screen (plain `megazword` opens the app window)")
     sub.add_parser("projects", help="list projects with memory entries and last activity")
@@ -455,6 +456,10 @@ def main(argv: list[str] | None = None,
         from . import advise
         print(advise.text(advise.advise(cfg)))
         return 0
+
+    if args.command == "scout":
+        from . import scout
+        return scout.command()
 
     if args.command == "credits":
         from . import ledger

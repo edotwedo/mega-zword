@@ -776,6 +776,27 @@ the request count, backend switch history, requests by backend and estimated tok
 Stats count those model requests and use
 the coding run's final outcome for their success rate.
 
+### Finding more free AI
+
+`megazword scout` looks for AI providers Mega Zword doesn't use yet. It needs no
+keys. It reads two public lists: the companies that host OpenRouter's free models
+(up to 25 models), and the models LiteLLM's price file lists at $0.
+
+It prints new providers first, then ones it has seen before, with the list each
+came from, the date first seen, and "(have a key)" when Mega Zword already has a
+key for that company. Results are saved in `~/.megazword/scout/leads.json`.
+
+A lead isn't a free tier yet. Many $0 entries are cloud services where you bring
+your own paid deployment (bedrock, azure, sagemaker). Before adding a key, a person
+checks the provider's terms, how much is really free, and whether it can bill.
+After that check, record it so routing can use it:
+
+```
+megazword credits set NAME --can-bill no
+```
+
+Anything set to `--can-bill yes` is never routed.
+
 ## Keymaster: keep provider keys in Windows Credential Manager
 
 `megazword keys` shows each key's name, source (`env`, `vault`, or `missing`),
