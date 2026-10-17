@@ -404,7 +404,11 @@ def main(argv: list[str] | None = None,
         print(render(cfg))
         return 0
     if backends is None:
-        backends = default_backends(edit=getattr(args, "edit", False), free_models=cfg.free,
+        # A heartbeat run commits code, so its CLIs need edit mode like Night Shift's;
+        # read-only Claude and Codex "made no changes" on every beat (2026-10-17).
+        edit = getattr(args, "edit", False) or (
+            args.command == "heartbeat" and getattr(args, "action", "") == "run")
+        backends = default_backends(edit=edit, free_models=cfg.free,
                                     lean=cfg.lean)
     rater = rater if rater is not None else (lambda p: rate(p, cfg.rater_model))
 

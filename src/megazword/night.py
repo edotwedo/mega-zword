@@ -37,6 +37,7 @@ JOB_MINUTES = 30    # AI time cap per job
 TEST_MINUTES = 20   # test run cap per job
 MAX_JOBS = 5
 MAX_FREE_TRIES = 4  # free coders per job; a step that stumps four rarely suits a fifth
+MAX_CHEAP_TRIES = 1  # paid cheap-tier models per job
 LOCK_STALE_HOURS = 12
 
 LINE = re.compile(r"^\s*-\s*\[(?P<mark>[ xX!])\]\s*(?P<body>.+?)\s*$")
@@ -464,6 +465,9 @@ class Night:
         free_turns = 0
         cheap = [n for n in names if n.startswith("cheap-")]
         names = [n for n in names if n not in cheap]
+        # One paid model per job: two cheap runs that hit the step cap cost $0.17
+        # of the $1 month in one beat (2026-10-17). The route lists the best first.
+        cheap = cheap[:MAX_CHEAP_TRIES]
         free_count = sum(1 for n in names if is_free_backend(self.backends[n]))
         # Same fair share as chat and coding (Phil: a tiny bit from every free
         # source): least used first, small and slow models last, Tencent grants

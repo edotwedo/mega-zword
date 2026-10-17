@@ -471,3 +471,14 @@ def test_tests_run_with_console_python_even_under_pythonw(tmp_path, monkeypatch)
     assert cmd[0] == str(folder / "python.exe")
     monkeypatch.setattr(night.sys, "executable", str(folder / "python.exe"))
     assert night.console_python() == str(folder / "python.exe")
+
+
+def test_night_tries_only_one_cheap_model(origin):
+    free = {f"free{i}": IdleHTTP(f"free{i}") for i in range(night.MAX_FREE_TRIES)}
+    pro, flash = IdleHTTP("cheap-deepseek-pro"), IdleHTTP("cheap-deepseek-flash")
+    codex = FakeAI("codex", action=typo_fix)
+    n = night.Night({**free, "cheap-deepseek-pro": pro, "cheap-deepseek-flash": flash, "codex": codex},
+                    usage=meters(codex=10), date="2026-10-13")
+    night.run_night(n, queue=str(origin), max_jobs=1, write=lambda s: None)
+    assert pro.seen and not flash.seen  # the first cheap model only, then paid
+    assert codex.calls

@@ -480,10 +480,11 @@ it's merged into main unless both agree on a serious problem.
   (a Windows task with no window). Remove: `megazword heartbeat remove`. Pause
   everything: `megazword night stop`; turn back on with `megazword night resume`.
 - Run one beat now: `megazword heartbeat run`. See the last beats and anything
-  shelved: `megazword heartbeat status`.
+  shelved: `megazword heartbeat status`. Everything a beat did, model by model:
+  `~\.megazword\heartbeateat.log`.
 - Who works a step: free models first, at most 4 tries, least used first, small
-  and slow models last; then the cheap paid tier (below); then Claude only with
-  more than 15% left.
+  and slow models last; then one cheap paid model (below); then Claude or Codex
+  only with more than 15% left.
 - A step that fails 2 beats in a row is **shelved**: the heartbeat writes a note
   to `~\.megazword\heartbeat\notes-for-phil.md`, puts it on its card in **Catch me
   up**, and picks the next open item. Fix or clarify the step, then

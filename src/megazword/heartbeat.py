@@ -404,6 +404,8 @@ def status(write=print) -> int:
         write(f"shelved: #{num} {row.get('title', '')} since {row.get('at', '')}")
     if shelved:
         write(f"notes for Phil: {notes_path()}")
+    if log_path().exists():
+        write(f"beat log: {log_path()}")
     write("last beats:" if rows else "no beats yet")
     for line in rows:
         try:
@@ -425,9 +427,24 @@ def add_parser(sub) -> None:
     p.add_argument("--yes", action="store_true", help="really create the scheduled task")
 
 
+def log_path() -> Path:
+    return home() / "beat.log"
+
+
+def logged(text: str) -> None:
+    """Print and keep: the scheduled task runs windowless, so nothing sees stdout."""
+    print(text)
+    try:
+        home().mkdir(parents=True, exist_ok=True)
+        with log_path().open("a", encoding="utf-8") as out:
+            out.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} {text}\n")
+    except OSError:
+        pass  # the log is bookkeeping; never fail a beat over it
+
+
 def command(args, backends, cfg: config.Config) -> int:
     if args.action == "run":
-        beat(backends, cfg)
+        beat(backends, cfg, write=logged)
         return 0
     if args.action == "install":
         return install(args.start, args.every, args.until, args.yes)

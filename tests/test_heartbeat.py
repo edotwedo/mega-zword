@@ -294,3 +294,22 @@ def test_no_room_beats_and_merges_do_not_count_as_failures(monkeypatch):
     for _ in range(3):
         assert not heartbeat.beat({}, config.Config(), runner=Runner(),
                                   write=lambda s: None).startswith("stopped")
+
+
+def test_run_logs_to_a_file_because_the_task_is_windowless(monkeypatch, capsys):
+    monkeypatch.setattr(heartbeat, "beat", lambda backends, cfg, write: write("[heartbeat] hello"))
+    assert heartbeat.command(SimpleNamespace(action="run"), {}, None) == 0
+    assert "hello" in capsys.readouterr().out
+    assert heartbeat.log_path().read_text(encoding="utf-8").strip().endswith("[heartbeat] hello")
+    heartbeat.status(write=lambda s: print(s))
+    assert f"beat log: {heartbeat.log_path()}" in capsys.readouterr().out
+
+
+def test_heartbeat_run_builds_ais_that_can_edit(monkeypatch):
+    from megazword import backends as backends_mod, cli
+    seen = []
+    monkeypatch.setattr(cli, "default_backends", lambda edit=False, **kw: seen.append(edit) or {})
+    monkeypatch.setattr(heartbeat, "command", lambda args, backends, cfg: 0)
+    assert cli.main(["heartbeat", "run"]) == 0
+    assert cli.main(["heartbeat", "status"]) == 0
+    assert seen == [True, False]
