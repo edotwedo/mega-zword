@@ -117,7 +117,8 @@ def checks(home: Path | None = None) -> list[Check]:
                        ", ".join(picks) if picks else "CLI defaults",
                        f"unknown effort: {', '.join(odd)}" if odd else ""))
     from .config import DEFAULT_FREE
-    known = {"claude", "codex", "grok", "gemini", *DEFAULT_FREE}
+    from .free_apis import cheap_backends
+    known = {"claude", "codex", "grok", "gemini", *DEFAULT_FREE, *(b.name for b in cheap_backends({}))}
     unknown = sorted({name for route in cfg.route.values() for name in route
                       if name not in known})
     found.append(Check("WARN" if unknown else "OK", "routes",

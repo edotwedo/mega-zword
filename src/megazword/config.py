@@ -71,13 +71,15 @@ DEFAULT_ROUTE = {
                "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
                "openrouter", "groq",
                "cloudflare", "zai", "zai-47", "ovh", "gemini-api",
-               "mistral", "nvidia", "nvidia-lightning", "ollama", "gemini", "codex", "grok", "claude"],
+               "mistral", "nvidia", "nvidia-lightning", "ollama", "cheap-deepseek-flash",
+               "gemini", "codex", "grok", "claude"],
     "hard": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
              "tencent-kimi-k2.7-code", "tencent-kimi-k3",
              "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
              "openrouter", "groq",
              "cloudflare", "zai", "zai-47", "ovh", "gemini-api",
-             "mistral", "nvidia", "nvidia-lightning", "ollama", "gemini", "claude", "codex", "grok"],
+             "mistral", "nvidia", "nvidia-lightning", "ollama", "cheap-deepseek-pro",
+             "cheap-deepseek-flash", "gemini", "claude", "codex", "grok"],
 }
 
 DEFAULT_FREE = {
@@ -130,7 +132,9 @@ DEFAULT_FREE_FAILOVER = ["tencent-glm-5.3-flash", "tencent-glm-5.3",
                          "gemini-api-31-lite",
                          "mistral", "nvidia", "nvidia-lightning", "ollama", "openrouter-dots",
                          "openrouter-nemotron-nano", "openrouter-nemotron-lightning",
-                         "openrouter-laguna-s", "openrouter-laguna-xs"]
+                         "openrouter-laguna-s", "openrouter-laguna-xs",
+                         # Cheap paid, capped by budget.MONTHLY_USD; last resort.
+                         "cheap-deepseek-flash", "cheap-deepseek-pro"]
 
 # API keys Mega Zword reads. On Windows a key set with
 # SetEnvironmentVariable(..., "User") is missing from shells and subprocesses

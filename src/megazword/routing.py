@@ -16,6 +16,9 @@ TENCENT_BACKENDS = (
 
 # Paid subscription CLIs keep their configured order after every free source.
 PAID_BACKENDS = ("claude", "codex", "grok", "gemini")
+# Cheap paid OpenRouter models under budget.MONTHLY_USD: after every free
+# source, before the paid CLIs. Pro first on hard work, Flash first otherwise.
+CHEAP_PREFIX = "cheap-"
 
 # One-time grants that never refill. Outside hard work each request counts four
 # times, so they get roughly a quarter share next to free tiers that reset.
@@ -41,8 +44,10 @@ def spread(names: list[str], level: str = "medium",
     console stays the source of truth for balances.
     """
     names = list(dict.fromkeys(names))
-    free = [name for name in names if name not in PAID_BACKENDS]
-    paid = [name for name in names if name in PAID_BACKENDS]
+    cheap = sorted((n for n in names if n.startswith(CHEAP_PREFIX)),
+                   key=lambda n: ("pro" not in n) if level == "hard" else ("pro" in n))
+    free = [name for name in names if name not in PAID_BACKENDS and name not in cheap]
+    paid = [*cheap, *(name for name in names if name in PAID_BACKENDS)]
     if not free:
         return paid
 

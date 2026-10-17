@@ -133,6 +133,8 @@ def table(home: Path | None = None, log_path: Path | None = None) -> str:
     total = sum(r["left"] or 0 for r in rows if not r["blocked"])
     lines.append(f"\nUsable grant tokens left: {_fmt(total)} (estimate). "
                  "Record real figures from each console with `megazword credits set`.")
+    from . import budget
+    lines.append(budget.line())
     return "\n".join(lines)
 
 

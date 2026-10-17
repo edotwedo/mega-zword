@@ -424,19 +424,24 @@ class Night:
             return out
         tried_free: set[str] = set()
         free_turns = 0
+        cheap = [n for n in names if n.startswith("cheap-")]
+        names = [n for n in names if n not in cheap]
+        free_count = sum(1 for n in names if is_free_backend(self.backends[n]))
+        names = [*names[:free_count], *cheap, *names[free_count:]]
         for name in names:
             if name in tried_free:
                 continue
             source = self.backends[name]
-            if is_free_backend(source):
+            if is_free_backend(source) and name not in cheap:
                 if free_turns >= MAX_FREE_TRIES:
                     continue
                 free_turns += 1
             out.tried.append(name)
             if is_free_backend(source):
                 from .agent import wrap
-                fallbacks = [self.backends[n] for n in names
-                             if n != name and n not in tried_free and is_free_backend(self.backends[n])]
+                fallbacks = [] if name in cheap else [
+                    self.backends[n] for n in names if n != name and n not in tried_free
+                    and n not in cheap and is_free_backend(self.backends[n])]
                 settings = dict(self.cfg.agent)
                 settings.update(root=work, wall_timeout=int(self.job_seconds), reviewer="",
                                 allow_test_edits=bool(re.search(

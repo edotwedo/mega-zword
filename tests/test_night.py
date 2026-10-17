@@ -213,6 +213,17 @@ def test_night_stops_free_tries_at_cap_then_uses_paid(origin):
     assert codex.calls
     assert show(origin, "night/2026-10-13-1", "README.md") == "receive\n"
 
+
+def test_night_tries_cheap_after_free_cap_before_paid(origin):
+    free = {f"free{i}": IdleHTTP(f"free{i}") for i in range(night.MAX_FREE_TRIES + 1)}
+    cheap = FreeHTTP("cheap-deepseek-flash")
+    codex = FakeAI("codex", action=typo_fix)
+    n = night.Night({"cheap-deepseek-flash": cheap, **free, "codex": codex},
+                    usage=meters(codex=10), date="2026-10-13")
+    night.run_night(n, queue=str(origin), max_jobs=1, write=lambda s: None)
+    assert sum(bool(ai.seen) for ai in free.values()) == night.MAX_FREE_TRIES
+    assert cheap.seen and not codex.calls  # cheap fixed it, so Codex was never called
+
 def test_night_status_shows_stop_lock_jobs_and_summary(capsys):
     night.home().mkdir(parents=True, exist_ok=True)
     night.stop_path().write_text("stopped\n", encoding="utf-8")

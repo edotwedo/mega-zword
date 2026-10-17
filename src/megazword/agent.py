@@ -37,6 +37,8 @@ def pace_call(name, pace, deadline):
         name = "gemini-api"  # Same project key; preserve safe shared pacing.
     elif name.startswith("nvidia-"):
         name = "nvidia"  # One Developer key; don't fan out concurrent requests.
+    elif name.startswith("cheap-"):
+        name = "openrouter"  # Same OpenRouter key as the free models.
     elif name.startswith("zai-"):
         name = "zai"  # One Z.ai key; the free models allow one request at a time.
     elif name.startswith("tencent-"):

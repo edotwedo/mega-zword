@@ -428,12 +428,13 @@ def default_backends(edit: bool = False,
         # been verified, especially on Windows. auto_edit is not containment.
         backends.append(GeminiBackend("gemini"))
     from .config import Config, load
-    from .free_apis import free_backends
+    from .free_apis import cheap_backends, free_backends
     if free_models is None:
         try:
             free_models = load().free
         except (ValueError, TypeError, OSError):
             free_models = Config().free
     backends.extend(free_backends(free_models))
+    backends.extend(cheap_backends(free_models))
     backends.append(OllamaBackend("ollama", model=free_models.get("ollama", "qwen2.5-coder:7b")))
     return {b.name: b for b in backends}

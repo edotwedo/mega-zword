@@ -265,6 +265,7 @@ class OpenAICompatibleBackend(Backend):
     extra_headers: dict[str, str] = field(default_factory=dict)
     # Anonymous free tier: never send a key (a keyed call would be billed).
     keyless: bool = False
+    extra_body: dict = field(default_factory=dict)
     remaining_requests: int | None = field(default=None, init=False)
     limit_requests: int | None = field(default=None, init=False)
 
@@ -318,7 +319,8 @@ class OpenAICompatibleBackend(Backend):
             headers = {**({"Authorization": f"Bearer {key}"} if key else {}),
                        "Content-Type": "application/json",
                        "User-Agent": f"megazword/{__version__}", **self.extra_headers}
-            body = {"model": self.model, "messages": redact_payload(messages), "stream": False}
+            body = {"model": self.model, "messages": redact_payload(messages), "stream": False,
+                    **self.extra_body}
             if self.name == "cloudflare":
                 body.pop("stream")  # The default is a non-streaming response.
             if tools is not None:
@@ -419,6 +421,34 @@ def http_error_message(code: int, headers=None) -> str:
 
 
 # Free API backends available to automatic routes when credentials are present.
+@dataclass
+class CheapBackend(OpenAICompatibleBackend):
+    """A very cheap paid OpenRouter model, held to budget.MONTHLY_USD (Phil, 2026-10-17)."""
+
+    def available(self) -> bool:
+        from . import budget
+        return self._env_ok() and not budget.known_exhausted()
+
+    def chat(self, messages, tools=None, timeout=None):
+        from . import budget
+        ok, why = budget.room()
+        if not ok:
+            raise RuntimeError(why)
+        return super().chat(messages, tools, timeout)
+
+
+def cheap_backends(models: dict[str, str]) -> list[Backend]:
+    # max_price is OpenRouter's own ceiling ($ per 1M tokens): it never routes the
+    # call to a pricier provider of the same model.
+    return [CheapBackend(name, base_url="https://openrouter.ai/api/v1",
+                         model=models.get(name, model), key_env="OPENROUTER_API_KEY",
+                         trains_on_data=True,
+                         extra_body={"provider": {"max_price": {"prompt": prompt, "completion": completion}}})
+            for name, model, prompt, completion in (
+                ("cheap-deepseek-flash", "deepseek/deepseek-v4-flash", 0.15, 0.30),
+                ("cheap-deepseek-pro", "deepseek/deepseek-v4-pro", 0.30, 0.60))]
+
+
 # Free sources that need no key or signup.
 KEYLESS = ("ovh",)
 
