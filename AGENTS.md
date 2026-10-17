@@ -17,6 +17,11 @@ repo is the only handoff. Nothing lives only in a chat.
   Phil normally drives interactive setup from short prompts; take over the UI
   only when he asks. The terminal reboot/restore test is explicitly deferred
   until Phil is ready near 90% Codex usage; never reboot at a meter threshold.
+- **Designation in your console tab (Phil, 2026-10-17).** As soon as you pick your
+  designation, put it in the title of the terminal tab you run in. Try
+  `python -c "open('CONOUT$','w').write(chr(27)+']0;YOUR-NAME'+chr(7))"`; if the tab
+  doesn't change, ask Phil to rename it (right-click the tab, Rename Tab). Keep the
+  same designation for the whole session.
 - **Usage first, every time (Phil).** Before you start, claim or hand out any work: run `megazword usage`
   (on Phil's PC) or read the usage board in Q
   (https://github.com/edotwedo/workshop/pull/33#issuecomment-6115098816; over 30 minutes old means the
