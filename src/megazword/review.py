@@ -23,6 +23,7 @@ from . import config, log
 from .backends import Backend, Result
 
 REVIEWERS = 1          # routine change; the heartbeat uses 2 before merging (Phil, 2026-10-16)
+SPARES = 2             # backups from other families when a reviewer fails
 MAX_DIFF_CHARS = 24_000
 GREPTILE_MONTHLY = 50
 SEVERITY = {"high": 0, "medium": 1, "med": 1, "low": 2}
@@ -89,9 +90,12 @@ def clip(diff: str, limit: int = MAX_DIFF_CHARS) -> tuple[str, str]:
 
 def pick_reviewers(backends: dict[str, Backend], count: int = REVIEWERS,
                    log_path: Path | None = None) -> list[Backend]:
-    """Least-used free sources first, at most one per provider family."""
+    """Least-used free sources first, at most one per provider family.
+
+    Tiny models (routing.WEAK_BACKENDS) are left out: they fail on long diffs.
+    """
     from .request_mode import free_backend
-    from .routing import spread
+    from .routing import WEAK_BACKENDS, spread
     names = [n for n in config.DEFAULT_FREE_FAILOVER if n in backends]
     order = spread(names, "medium", log_path)
     chosen, families = [], set()
@@ -99,7 +103,8 @@ def pick_reviewers(backends: dict[str, Backend], count: int = REVIEWERS,
         b = backends[name]
         family = name.split("-")[0]
         # Tencent's one-time grants are kept for coding, never spent on reviews.
-        if family in families or family == "tencent" or not free_backend(b) or not b.available():
+        if (family in families or family == "tencent" or name in WEAK_BACKENDS
+                or not free_backend(b) or not b.available()):
             continue
         chosen.append(b)
         families.add(family)
@@ -215,6 +220,25 @@ def greptile(repo: Path, label: str, wait_minutes: float = 15, poll: float = 30,
     return findings, f"greptile: {len(texts)} comment(s) from {url} (closed)"
 
 
+BADGE = re.compile(r"!\[P(?P<p>[0-9]) Badge\]\([^)]*\)")
+BADGE_SEVERITY = {"0": "high", "1": "high", "2": "medium", "3": "low"}
+
+
+def _badge(body: str) -> tuple[str, str]:
+    """Greptile/Codex inline comments start with a P1/P2/P3 badge and a bold title.
+
+    Returns (severity, "Title: first sentence") with the HTML stripped.
+    """
+    m = BADGE.search(body)
+    severity = BADGE_SEVERITY.get(m["p"], "medium") if m else "medium"
+    text = re.sub(r"<[^>]+>", "", BADGE.sub("", body)).strip()
+    title, _, rest = text.partition("\n")
+    title = title.strip().strip("*").strip()
+    rest = " ".join(rest.split())
+    sentence = re.split(r"(?<=[.!?])\s", rest, maxsplit=1)[0] if rest else ""
+    return severity, (f"{title}: {sentence}" if title and sentence else title or sentence)[:300]
+
+
 def _greptile_comments(number: str) -> list[str]:
     texts = []
     for path in (f"repos/edotwedo/mega-zword/pulls/{number}/comments",
@@ -230,7 +254,11 @@ def _greptile_comments(number: str) -> list[str]:
             body = row.get("body") or ""
             if "greptile" in login and body.strip():
                 where = f"{row['path']}:{row.get('line') or row.get('original_line') or 0}" if row.get("path") else ""
-                texts.append(f"- [medium] {where} - {body}" if where else body)
+                if where:
+                    severity, text = _badge(body)
+                    texts.append(f"- [{severity}] {where} - {text}")
+                else:
+                    texts.append(body)
     return texts
 
 
@@ -265,7 +293,9 @@ def collect(repo: Path, backends: dict[str, Backend], cfg: config.Config, base: 
         write("[megazword] nothing to review")
         return None, {}, ""
     shown, note = clip(diff)
-    reviewers = pick_reviewers(backends, count, cfg.log_path)
+    # Pick spares too: a reviewer that fails is replaced by one from another family.
+    picked = pick_reviewers(backends, count + SPARES, cfg.log_path)
+    reviewers, spares = picked[:count], picked[count:]
     if not reviewers and not use_greptile:
         write("[megazword] no free reviewers available (check keys with `megazword free test`)")
         return None, {}, ""
@@ -273,12 +303,17 @@ def collect(repo: Path, backends: dict[str, Backend], cfg: config.Config, base: 
     print(f"[megazword] reviewing {label} ({len(diff):,} chars) with "
           f"{', '.join(b.name for b in reviewers) or 'no free models'}"
           f"{' + greptile' if use_greptile else ''}", file=sys.stderr)
-    for b in reviewers:
+    for b in picked:
         b.timeout = cfg.timeouts.get(b.name, b.timeout)
     with ThreadPoolExecutor(max_workers=max(1, len(reviewers) + 1)) as pool:
         futures = [pool.submit(b.run, prompt) for b in reviewers]
         side = pool.submit(greptile, repo, label) if use_greptile else None
         results: list[Result] = [f.result() for f in futures]
+        missing = sum(1 for r in results if not r.ok)
+        if missing and spares:
+            backup = spares[:missing]
+            write(f"[megazword] {missing} reviewer(s) failed; asking {', '.join(b.name for b in backup)}")
+            results += [f.result() for f in [pool.submit(b.run, prompt) for b in backup]]
         extra, status = side.result() if side else ([], "")
     findings, raw = [], {}
     for r in results:

@@ -60,7 +60,7 @@ def test_run_merges_free_reviewers(tmp_path, monkeypatch):
     monkeypatch.setattr(review, "pick_reviewers", lambda *a, **k: fakes)
     cfg = SimpleNamespace(log_path=tmp_path / "log.jsonl", log_lines=100, timeouts={})
     out = []
-    assert review.run(repo, {}, cfg, write=out.append) == 0
+    assert review.run(repo, {}, cfg, count=3, write=out.append) == 0
     text = "\n".join(out)
     assert "a.py:1 (2 reviewers agree)" in text and "No bugs found by: mistral" in text
     logged = [json.loads(l) for l in (tmp_path / "log.jsonl").read_text().splitlines()]
@@ -97,3 +97,50 @@ def test_greptile_opens_collects_and_closes_pr(tmp_path, monkeypatch):
     assert findings[0].path == "src/a.py" and findings[0].line == 4 and findings[0].by == ["greptile"]
     assert ("pr", "close", "7", "--repo", "edotwedo/mega-zword", "--delete-branch") in calls
     assert review.greptile_used_this_month(tmp_path / "reviews.jsonl") == 1
+
+
+class Broken(Fake):
+    def run(self, prompt):
+        return Result(self.name, "", False, 0.1, "API returned an invalid or empty chat response")
+
+
+def test_failed_reviewer_is_replaced_by_a_spare(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for cmd in (["init", "-q"], ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", str(repo), *cmd], check=True)
+    (repo / "a.py").write_text("x = 1\n")
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "c"], check=True)
+    picked = [Fake("groq", "no bugs found"), Broken("zai", ""), Fake("nvidia-lightning", "no bugs found"),
+              Fake("ovh", "never asked")]
+    monkeypatch.setattr(review, "pick_reviewers", lambda backends, count, log_path=None: picked[:count])
+    cfg = SimpleNamespace(log_path=tmp_path / "log.jsonl", log_lines=100, timeouts={})
+    out = []
+    merged, raw, _ = review.collect(repo, {}, cfg, count=2, write=out.append)
+    assert set(raw) == {"groq", "nvidia-lightning"}  # two completed reviews despite zai failing
+    assert any("asking nvidia-lightning" in line for line in out)
+
+
+def test_tiny_models_never_review():
+    from megazword import routing
+    from megazword.free_apis import OpenAICompatibleBackend
+
+    class Up(OpenAICompatibleBackend):
+        def available(self):
+            return True
+    names = ["groq-allam", "mistral", "groq", "zai"]
+    backends = {n: Up(n, base_url="https://example.test/v1", model="m", key_env="X") for n in names}
+    chosen = [b.name for b in review.pick_reviewers(backends, 4)]
+    assert chosen and not set(chosen) & set(routing.WEAK_BACKENDS)
+
+
+def test_greptile_badges_become_severity_and_title():
+    body = ("**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  "
+            "Require successful verdicts before merging**\n\nWhen no reviewers are available, "
+            "every call fails. Thus unreviewed code merges.")
+    assert review._badge(body) == ("high", "Require successful verdicts before merging: "
+                                           "When no reviewers are available, every call fails.")
+    low = "**![P3 Badge](x) Tidy a name**\n\nRename it."
+    assert review._badge(low) == ("low", "Tidy a name: Rename it.")
+    assert review._badge("plain text, no badge") == ("medium", "plain text, no badge")
