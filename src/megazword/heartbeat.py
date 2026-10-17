@@ -169,7 +169,9 @@ def _locked() -> bool:
                 continue
             except ValueError:
                 pid = 0
-            if age < LOCK_HOURS * 3600 and _alive(pid):
+            # A live beat keeps its lock however long it runs (seven AIs at 30 minutes
+            # each can pass 3 hours); the age only matters when no PID was written.
+            if _alive(pid) if pid else age < LOCK_HOURS * 3600:
                 return True
             lock.unlink(missing_ok=True)  # stale: its beat died or is long gone
             continue

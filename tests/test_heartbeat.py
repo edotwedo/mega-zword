@@ -154,6 +154,9 @@ def test_lock_is_atomic_and_stale_locks_expire(monkeypatch, tmp_path):
     old = lock.stat().st_mtime - heartbeat.LOCK_HOURS * 3600 - 60
     import os
     os.utime(lock, (old, old))
+    assert heartbeat._locked() is True  # its beat is still alive: a long run keeps the lock
+    lock.write_text("", encoding="utf-8")  # no PID recorded: only the age decides
+    os.utime(lock, (old, old))
     assert heartbeat._locked() is False
 
 
