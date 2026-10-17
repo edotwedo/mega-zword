@@ -427,7 +427,15 @@ class Night:
         cheap = [n for n in names if n.startswith("cheap-")]
         names = [n for n in names if n not in cheap]
         free_count = sum(1 for n in names if is_free_backend(self.backends[n]))
-        names = [*names[:free_count], *cheap, *names[free_count:]]
+        # Same fair share as chat and coding (Phil: a tiny bit from every free
+        # source): least used first, small and slow models last, Tencent grants
+        # at a quarter share. Without it the first four sources got every job.
+        from .rater import rule_rate
+        from .routing import spread
+        level = rule_rate(job.task).level
+        level = "medium" if level == "easy" else level
+        free = spread(names[:free_count], level, self.cfg.log_path, coding=True)
+        names = [*free, *cheap, *names[free_count:]]
         for name in names:
             if name in tried_free:
                 continue

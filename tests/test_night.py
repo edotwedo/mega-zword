@@ -429,3 +429,15 @@ def test_default_branch_prefers_main_over_a_stale_remote_head(tmp_path):
     clone = tmp_path / "c"
     subprocess.run(["git", "clone", "-q", str(bare), str(clone)], check=True, capture_output=True)
     assert night.default_branch(clone) == "origin/main"
+
+
+def test_night_gives_the_job_to_the_least_used_free_source(origin, tmp_path):
+    from megazword import config, log
+    cfg = config.Config()
+    cfg.log_path = tmp_path / "fair.jsonl"
+    for _ in range(3):
+        log.append(cfg.log_path, backend="groq", ok=True)  # groq is busy today; zai is idle
+    groq, zai = FreeHTTP("groq"), FreeHTTP("zai")
+    n = night.Night({"groq": groq, "zai": zai}, usage=lambda: [], date="2026-10-13", cfg=cfg)
+    night.run_night(n, queue=str(origin), max_jobs=1, write=lambda s: None)
+    assert zai.seen and not groq.seen
