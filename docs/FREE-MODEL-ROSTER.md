@@ -24,6 +24,8 @@ models are tried before the other free providers and plan-based CLI fallbacks.
 | Gemini API `gemini-api` | `gemini-3.5-flash-lite` | Answered; 5 output tokens | Free tier; RPM/TPM/RPD are project- and model-specific in AI Studio. This is separate from Gemini CLI. |
 | Gemini API `gemini-api-31-lite` | `gemini-3.1-flash-lite` | Answered; 5 output tokens | Independent per-model quota under the same Google AI project key; shared conservative request pace. |
 | Z.AI `zai` | `glm-4.5-flash` | Earlier coding probe passed; live health probe on Oct 15 answered in 12.3 seconds. | Z.AI's exact key/model allowance was not published in the checked docs; use the account console and response headers. Chinese-origin GLM retained. |
+| Z.AI `zai-47` | `glm-4.7-flash` | Oct 16: answered a native `finish` tool call in 14.0s with the existing key. | Z.ai's official pricing page lists GLM-4.7-Flash, GLM-4.5-Flash and GLM-4.6V-Flash as Free; third-party guides report one request at a time on free models, so `zai` and `zai-47` share one pace lock. |
+| OVHcloud `ovh` (keyless) | `Qwen3.5-397B-A17B` | Oct 16: no key, no account; native `finish` tool call in 1.3s, 338 tokens. | Anonymous tier: 2 requests/min per IP and per model (official docs; response headers agree). Mega Zword never sends a key to it, because keyed calls are billed. Prompts are scrubbed since data terms weren't checked. |
 | Mistral `mistral` | `ministral-3b-2512` | Earlier free-mode coding check passed; live health probe on Oct 15 answered in 0.7 seconds. | Free mode includes monthly API usage; per-model request-per-second and token-per-minute limits are shown in the account's Limits page. They vary by organization/model, so there is no honest universal number to put here. |
 | Tencent TokenHub `tencent-glm-5.3-flash` | `glm-5.3-flash` | Oct 16: HTTP 200; completed a normal coding task and returned Mega Zword's native `finish` tool call in 45.9s. | Claimed 1M free-trial tokens; 99.7% remained after the test. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
 | Tencent TokenHub `tencent-glm-5.3` | `glm-5.3` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 45.7s on retry. The initial 75s probe limit was too short. | Claimed 1M free-trial tokens; 99.4% remained after tests. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
@@ -114,6 +116,34 @@ headers.
 Other listed Groq models include Whisper transcription and Orpheus speech
 generation. They may be useful for voice features, but are not coding workers;
 prompt-guard/safeguard models are classifiers, not general coding agents.
+
+## Regional and other providers checked 2026-10-16 (Juniper-16)
+
+Credit-scout research (ROADMAP #4). "Official" means the provider's own docs or
+pricing page; "third-party" means aggregator sites, which often disagree. Nothing
+here is signed up or keyed yet except Z.ai. Signups, phone checks and payment
+methods are Phil's call.
+
+| Provider | Free offer | Evidence | Verdict |
+| --- | --- | --- | --- |
+| Z.ai GLM-4.7-Flash | Free model, existing key | Official pricing page + live probe | **Added** as `zai-47`. |
+| OVHcloud AI Endpoints | Anonymous use: 2 requests/min per IP and per model; keyed use is 400/min but billed | Official capabilities page; third-party agrees; live keyless call returned `x-ratelimit-limit-minute: 2`. | **Added** as keyless `ovh` (Qwen3.5-397B-A17B), paced 31 s per call. Other free-listed models there: gpt-oss-120b, Qwen3.8-27B, Llama 3.3 70B, Mistral Small 3.2 (each has its own 2/min). |
+| ModelScope API-Inference | 2,000 calls/day total, reset 00:00 UTC+8; reportedly 500/day per model | Cherry Studio docs + free-llm.com (both third-party; official page didn't render). Needs an Alibaba Cloud account with real-name/phone verification. | Big daily pool, but verification may block a non-China user. Phil to check signup. |
+| Scaleway Generative APIs | 1,000,000 free tokens for new customers, pooled across models, then billed | Official FAQ + official signup page | One-time grant; worth it only with a hard spend cap. Phil's call (needs a payment method). |
+| Volcano Engine Ark / BytePlus ModelArk | 500k free tokens per model; "Free Tokens Only Mode" suspends instead of billing | BytePlus official docs + older aibase article | Good shape (like Alibaba's Free Quota Only). BytePlus is the international version; Phil to check signup. |
+| Nebius Token Factory | Builder Program: $25 at signup + $25 after ~30 days, expire in 90 days; screened, work/school email preferred | Official builder terms; third-party says the normal trial is about $1 | Apply to the Builder Program if Phil wants; credits, not a lasting tier. |
+| SiliconFlow | Some free small models (Qwen3-8B etc.), list rotates; reportedly 100 requests/day plus small trial credit; excluded in EU/UK/CH | Third-party only, sources disagree | Unverified. Check the console before counting it. |
+| Upstage Solar | Reportedly $10 signup credit; usage continues and bills the card after credits run out | Upstage blog (AI-written) + official FAQ on billing | Risky: billing continues automatically. Skip unless a hard cap exists. |
+| Chutes | Was community-free; moved to capped subscriptions in early 2026 | Two third-party sources agree on subscriptions | Not a free source now. |
+| MiniMax | Trial credits at signup only; no lasting free API tier | Third-party only | Skip. |
+| Baidu Qianfan | Old free ERNIE Speed/Lite replaced by paid Pro versions; may need a mainland phone number | Third-party only | Skip. |
+| Sarvam | ₹100 signup credit (cut from ₹1,000 in May 2026); sarvam-m retired | Official docs and changelog | Too small to matter. |
+| SEA-LION | No official API free tier found; model is on Cloudflare Workers AI (`@cf/aisingapore/gemma-sea-lion-v4-27b-it`) | Third-party listing | Reachable through our Cloudflare key; no new source. |
+| GitHub Models | Retired July 30, 2026 | Official GitHub docs | Gone. Remove from future lists. |
+
+Not checked yet: StepFun. `megazword scout` leads still to check: AtlasCloud, Phala,
+Poolside, Liquid, Thinking Machines (they host OpenRouter free models), publicai,
+gigachat.
 
 ## Origin and evaluation policy
 

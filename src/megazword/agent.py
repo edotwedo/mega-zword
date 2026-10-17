@@ -23,7 +23,8 @@ from .agent_quality import check_tests, is_test_path
 
 DEFAULT_PACE = {"gemini-api": 6, "mistral": 2, "groq": 2, "cloudflare": 1,
                 "openrouter": 3, "nvidia": 2, "zai": 2, "cerebras": 2,
-                "tencent": 2, "ollama": 0}
+                "tencent": 2, "ollama": 0,
+                "ovh": 31}  # anonymous OVH allows 2 requests a minute
 
 
 def pace_call(name, pace, deadline):
@@ -36,6 +37,8 @@ def pace_call(name, pace, deadline):
         name = "gemini-api"  # Same project key; preserve safe shared pacing.
     elif name.startswith("nvidia-"):
         name = "nvidia"  # One Developer key; don't fan out concurrent requests.
+    elif name.startswith("zai-"):
+        name = "zai"  # One Z.ai key; the free models allow one request at a time.
     elif name.startswith("tencent-"):
         name = "tencent"  # One TokenHub key; pace all free-trial services together.
     gap = pace.get(name, DEFAULT_PACE.get(name, 0))

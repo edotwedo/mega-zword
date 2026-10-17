@@ -10,7 +10,7 @@ from urllib.request import Request, urlopen
 from typing import List, Dict, Any
 
 from . import config
-from .free_apis import FREE_KEYS
+from .free_apis import FREE_KEYS, KEYLESS
 
 TIMEOUT_SECONDS = 15
 LITELLM_URL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
@@ -91,7 +91,7 @@ def _norm(name: str) -> str:
 
 def known_families() -> set:
     """Providers Mega Zword already has a key for, from the key names (GROQ_API_KEY -> groq)."""
-    found = set()
+    found = set(KEYLESS)
     for _, key in FREE_KEYS:
         family = key.split("_")[0].lower()
         found.update(ALIASES.get(family, (family,)))

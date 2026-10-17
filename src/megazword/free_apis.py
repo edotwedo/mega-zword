@@ -263,6 +263,8 @@ class OpenAICompatibleBackend(Backend):
     key_env: str = ""
     extra_env: tuple[str, ...] = ()
     extra_headers: dict[str, str] = field(default_factory=dict)
+    # Anonymous free tier: never send a key (a keyed call would be billed).
+    keyless: bool = False
     remaining_requests: int | None = field(default=None, init=False)
     limit_requests: int | None = field(default=None, init=False)
 
@@ -272,7 +274,8 @@ class OpenAICompatibleBackend(Backend):
                 or request_quota_low(self.name))
 
     def _env_ok(self) -> bool:
-        return bool(get_key(self.key_env)) and all(get_key(n) for n in self.extra_env)
+        return ((self.keyless or bool(get_key(self.key_env)))
+                and all(get_key(n) for n in self.extra_env))
 
     def available(self) -> bool:
         return self._env_ok()
@@ -307,12 +310,12 @@ class OpenAICompatibleBackend(Backend):
     def chat(self, messages: list[dict], tools: list[dict] | None = None,
              timeout: float | None = None) -> dict:
         """One OpenAI chat turn, preserving native tool calls."""
-        key = get_key(self.key_env)
-        if not key or not self._env_ok():
+        key = None if self.keyless else get_key(self.key_env)
+        if not self._env_ok():
             raise RuntimeError("API key not set")
         try:
             from . import __version__
-            headers = {"Authorization": f"Bearer {key}",
+            headers = {**({"Authorization": f"Bearer {key}"} if key else {}),
                        "Content-Type": "application/json",
                        "User-Agent": f"megazword/{__version__}", **self.extra_headers}
             body = {"model": self.model, "messages": redact_payload(messages), "stream": False}
@@ -416,6 +419,9 @@ def http_error_message(code: int, headers=None) -> str:
 
 
 # Free API backends available to automatic routes when credentials are present.
+# Free sources that need no key or signup.
+KEYLESS = ("ovh",)
+
 FREE_KEYS = (
     ("kimi", "OPENROUTER_API_KEY"),
     ("deepseek", "OPENROUTER_API_KEY"),
@@ -432,6 +438,7 @@ FREE_KEYS = (
     ("groq-allam", "GROQ_API_KEY"),
     ("cloudflare", "CLOUDFLARE_API_TOKEN"),
     ("zai", "ZAI_API_KEY"),
+    ("zai-47", "ZAI_API_KEY"),
     ("gemini-api", "GOOGLE_AI_API_KEY"),
     ("gemini-api-31-lite", "GOOGLE_AI_API_KEY"),
     ("cerebras", "CEREBRAS_API_KEY"),
@@ -529,10 +536,16 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
               ("groq-120b", "https://api.groq.com/openai/v1", "openai/gpt-oss-120b", "GROQ_API_KEY", False),
               ("groq-qwen", "https://api.groq.com/openai/v1", "qwen/qwen3.8-27b", "GROQ_API_KEY", False),
               ("groq-allam", "https://api.groq.com/openai/v1", "allam-2-7b", "GROQ_API_KEY", False),
+              ("zai-47", "https://api.z.ai/api/paas/v4", "glm-4.7-flash", "ZAI_API_KEY", False),
               ("gemini-api-31-lite", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-3.1-flash-lite", "GOOGLE_AI_API_KEY", True),
               ("openrouter-dots", "https://openrouter.ai/api/v1", "dots-studio/dots-3-note-preview:free", "OPENROUTER_API_KEY", True),
               ("openrouter-nemotron-nano", "https://openrouter.ai/api/v1", "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", "OPENROUTER_API_KEY", True),
               ("openrouter-nemotron-lightning", "https://openrouter.ai/api/v1", "nvidia/nemotron-3.5-lightning:free", "OPENROUTER_API_KEY", True),
               ("openrouter-laguna-s", "https://openrouter.ai/api/v1", "poolside/laguna-s-2.1:free", "OPENROUTER_API_KEY", True),
               ("openrouter-laguna-xs", "https://openrouter.ai/api/v1", "poolside/laguna-xs-2.1:free", "OPENROUTER_API_KEY", True))],
+        # OVHcloud AI Endpoints, anonymous: 2 requests/min per IP and per model,
+        # no account (verified 2026-10-16). Unknown data terms, so scrub like OpenRouter.
+        OpenAICompatibleBackend("ovh", base_url="https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+                                model=m.get("ovh", "Qwen3.5-397B-A17B"), keyless=True,
+                                trains_on_data=True),
     ]

@@ -72,7 +72,8 @@ def test_init_keeps_gemini_identities_separate(monkeypatch, capsys, tmp_path, in
     monkeypatch.setattr(ollama, "reachable", lambda *args, **kwargs: False)
     assert cli.main(["init"], cfg=config.Config()) == 0
     output = capsys.readouterr().out
-    assert f"installed AIs: {'gemini' if installed else 'none'}" in output
+    # ovh needs no key, so it is always available.
+    assert f"installed AIs: {'gemini, ' if installed else ''}ovh" in output
     assert all("gemini" in route and "gemini-api" in route
                for route in config.Config().route.values())
     generated = config.load(config.HOME / "config.toml").route

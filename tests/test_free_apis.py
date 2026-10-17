@@ -355,7 +355,7 @@ def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
     assert "secret-test-credential" not in output
 
 
-NEW_FREE = ("cloudflare", "zai", "gemini-api", "nvidia", "nvidia-lightning",
+NEW_FREE = ("cloudflare", "zai", "zai-47", "gemini-api", "nvidia", "nvidia-lightning",
             "mistral", "tencent-glm-5.3-flash", "tencent-glm-5.3",
             "tencent-kimi-k2.7-code", "tencent-kimi-k3",
             "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp")
@@ -381,6 +381,10 @@ def test_free_backends_are_registered_and_routed_before_paid_plans():
     assert backends["nvidia-lightning"].model == "nvidia/nemotron-3.5-lightning-30b-a3b"
     assert backends["nvidia-lightning"].key_env == backends["nvidia"].key_env
     assert backends["nvidia-lightning"].base_url == backends["nvidia"].base_url
+    assert backends["zai-47"].model == "glm-4.7-flash"
+    assert backends["zai-47"].key_env == backends["zai"].key_env
+    assert backends["zai-47"].base_url == backends["zai"].base_url
+    assert not backends["zai-47"].trains_on_data
     assert backends["openrouter"].trains_on_data
     assert "cerebras" in backends
     assert all("cerebras" not in names for names in config.DEFAULT_ROUTE.values())
@@ -623,3 +627,33 @@ def test_gemini_api_default_model_is_flash_lite():
 def test_openrouter_default_uses_free_router():
     assert config.DEFAULT_FREE["openrouter"] == "openrouter/free"
     assert default_backends()["openrouter"].model == "openrouter/free"
+
+
+def test_ovh_is_keyless_and_never_sends_a_key(monkeypatch):
+    from megazword.free_apis import KEYLESS, free_backends
+    monkeypatch.setenv("OVH_AI_ENDPOINTS_ACCESS_TOKEN", "secret-test-credential")
+    backend = {b.name: b for b in free_backends(config.DEFAULT_FREE)}["ovh"]
+    assert "ovh" in KEYLESS and backend.available() and backend.trains_on_data
+    seen = []
+
+    def fake(request, timeout):
+        seen.append(request)
+        return reply("ok")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    assert backend.run("Reply with ok").text == "ok"
+    assert seen[0].full_url == "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions"
+    assert seen[0].get_header("Authorization") is None
+    assert json.loads(seen[0].data)["model"] == "Qwen3.5-397B-A17B"
+    assert all("ovh" in names for names in config.DEFAULT_ROUTE.values())
+    assert "ovh" in config.DEFAULT_FREE_FAILOVER
+
+
+def test_keyed_backend_without_key_still_refuses(monkeypatch):
+    monkeypatch.delenv("MISSING_TEST_KEY", raising=False)
+    backend = OpenAICompatibleBackend("t", base_url="https://example.test/v1", model="m",
+                                      key_env="MISSING_TEST_KEY")
+    monkeypatch.setattr("megazword.free_apis.get_key", lambda name: None)
+    assert not backend.available()
+    with pytest.raises(RuntimeError, match="API key not set"):
+        backend.chat([{"role": "user", "content": "hi"}])

@@ -49,6 +49,9 @@ def test_tencent_model_aliases_share_provider_pacing(tmp_path, monkeypatch):
     agent.pace_call("tencent-deepseek-v4-flash-vision-exp", {"tencent": 2}, 200)
     assert sleeps == [2, 2, 2]
     assert float((config.HOME / "agent-pace/tencent.json").read_text()) == 106
+    agent.pace_call("zai", {"zai": 2}, 200)
+    agent.pace_call("zai-47", {"zai": 2}, 200)
+    assert sleeps[-1] == 2  # both Z.ai models share one pace lock
 
 
 def test_pacing_wall_cap_prevents_request(tmp_path, monkeypatch):
@@ -121,7 +124,7 @@ def test_default_provider_gaps():
                         isinstance(t, ast.Name) and t.id == "DEFAULT_PACE" for t in n.targets))
     assert defaults == {"gemini-api": 6, "mistral": 2, "groq": 2, "cloudflare": 1,
                         "openrouter": 3, "nvidia": 2, "zai": 2,
-                        "cerebras": 2, "tencent": 2, "ollama": 0}
+                        "cerebras": 2, "tencent": 2, "ollama": 0, "ovh": 31}
 
 
 def test_cli_reviewer_uses_api_fake(tmp_path, monkeypatch, capsys):
