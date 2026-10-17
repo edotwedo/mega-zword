@@ -42,6 +42,9 @@ price lists, are where direct free tiers and signup grants hide.
    shows, and that every lead must be checked by a person (terms, real free amount,
    whether it can bill) before a key is added. Then `megazword credits set NAME --can-bill no`
    only after that check.
+6. [ ] `megazword scout --test`: for each backend name in `free_test.PROVIDERS` that is
+   available, send one tool-call probe (the `finish` tool, like `free_test`), at most one
+   request per backend, and print name, seconds and ok/failed. Tests use fake backends.
 
 ## Research half (needs web search, so for Juniper-16 / Grok, not free coders)
 Regional providers to check against two sources each, results in
@@ -60,3 +63,4 @@ fakes, GUIDE has the section, and ROADMAP item 4 is ticked.
 - 2026-10-16: step 3 done (leads, update_leads, known_families) by Juniper-16. Beat 5 ran 12 models, including 4 Tencent grants, and all hit the 60-step cap or made no changes. Next: step 4, the `megazword scout` command.
 - 2026-10-16: step 4 done (`megazword scout`, scout.gather/command, 4 tests). First live run: 36 providers, 26 without a key yet. Worth a person's look: AtlasCloud, Phala, Poolside, Liquid, Thinking Machines (OpenRouter free-model hosts), sarvam, volcengine, publicai, gigachat (LiteLLM $0 entries; many cloud entries like bedrock/azure are $0 only because you bring your own deployment). Next: step 5, GUIDE section.
 - 2026-10-16: step 5 done (GUIDE "Finding more free AI"). All five code steps done. Left on ROADMAP #4: the research half below (Juniper-16 claimed it) and auto-testing new free models.
+- 2026-10-16: research half done by Juniper-16 (table in docs/FREE-MODEL-ROSTER.md). Added `zai-47` and keyless `ovh`. Left: step 6, StepFun, and the scout leads listed there. Claim released.
