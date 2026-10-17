@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import json
-from urllib.error import HTTPError, URLError
+import re
+from datetime import date
+from pathlib import Path
 from urllib.request import Request, urlopen
 from typing import List, Dict, Any
+
+from . import config
+from .free_apis import FREE_KEYS
 
 TIMEOUT_SECONDS = 15
 
@@ -66,3 +71,72 @@ def zero_price_litellm(payload: Dict[str, Any]) -> List[Dict[str, str]]:
                 })
     return sorted(results, key=lambda x: (x["provider"], x["model"]))
 
+
+
+# Provider names that don't match their key name.
+ALIASES = {"google": ("google", "gemini", "vertex"), "tencent": ("tencent", "hunyuan")}
+
+
+def _norm(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+def known_families() -> set:
+    """Providers Mega Zword already has a key for, from the key names (GROQ_API_KEY -> groq)."""
+    found = set()
+    for _, key in FREE_KEYS:
+        family = key.split("_")[0].lower()
+        found.update(ALIASES.get(family, (family,)))
+    return found
+
+
+def leads(sources: Dict[str, List[str]], previous: List[Dict[str, Any]] | None = None,
+          today: str | None = None, known: set | None = None) -> List[Dict[str, Any]]:
+    """Merge provider names from each source into one list of leads.
+
+    sources maps a source name ("openrouter", "litellm") to provider names. A
+    provider seen before keeps its first_seen date. New providers sort first.
+    """
+    today = today or date.today().isoformat()
+    known = known_families() if known is None else known
+    old = {_norm(row["provider"]): row for row in previous or []}
+    rows: Dict[str, Dict[str, Any]] = {}
+    for source, names in sources.items():
+        for name in names:
+            key = _norm(name)
+            if not key:
+                continue
+            row = rows.setdefault(key, {
+                "provider": old.get(key, {}).get("provider", name.strip()),
+                "seen_in": [],
+                "already_have": any(key.startswith(family) for family in known),
+                "first_seen": old.get(key, {}).get("first_seen", today),
+            })
+            if source not in row["seen_in"]:
+                row["seen_in"].append(source)
+    for row in rows.values():
+        row["seen_in"].sort()
+        row["new"] = _norm(row["provider"]) not in old
+    return sorted(rows.values(), key=lambda r: (not r["new"], r["already_have"], r["provider"].lower()))
+
+
+def leads_path() -> Path:
+    return config.HOME / "scout" / "leads.json"
+
+
+def update_leads(sources: Dict[str, List[str]], path: Path | None = None,
+                 today: str | None = None) -> List[Dict[str, Any]]:
+    """Merge sources into the saved leads file and return the merged rows."""
+    path = path or leads_path()
+    try:
+        previous = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        previous = []
+    rows = leads(sources, previous if isinstance(previous, list) else [], today)
+    # Keep providers this run didn't see, so first_seen survives a source being down.
+    seen = {_norm(r["provider"]) for r in rows}
+    kept = [dict(r, new=False) for r in previous if isinstance(r, dict)
+            and r.get("provider") and _norm(r["provider"]) not in seen]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(rows + kept, indent=2), encoding="utf-8")
+    return rows + kept

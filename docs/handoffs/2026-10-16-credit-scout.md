@@ -29,7 +29,7 @@ price lists, are where direct free tiers and signup grants hide.
    a dict of model -> {"litellm_provider", "input_cost_per_token", "output_cost_per_token", ...})
    and return `{"provider", "model"}` for entries whose input and output costs are both 0.
    Skip the `sample_spec` key and entries without costs. Tests with a 4-entry fixture.
-3. [ ] `leads(sources) -> list[dict]`: merge provider names from steps 1 and 2 into one
+3. [x] (2026-10-16, Juniper-16 after every free model hit the step cap) `leads(sources) -> list[dict]`: merge provider names from steps 1 and 2 into one
    list of `{"provider", "seen_in", "already_have"}`. `already_have` is true when the
    provider matches a Mega Zword backend family (names in `free_apis.FREE_KEYS`, e.g.
    groq, cerebras, mistral, nvidia, cloudflare, tencent, zai). Save to
@@ -57,3 +57,4 @@ fakes, GUIDE has the section, and ROADMAP item 4 is ticked.
 ## Heartbeat log
 - 2026-10-16: step 1 done (scout.providers_from_endpoints, fetch_endpoints, 4 tests). openrouter, groq and zai hit the 60-step cap first; nvidia finished with one broken mock. Next: step 2, zero_price_litellm.
 - 2026-10-16: step 2 done (zero_price_litellm). The free model shipped it without tests and counted missing prices as free; fixed. Heartbeat now refuses code without tests. Next: step 3, leads().
+- 2026-10-16: step 3 done (leads, update_leads, known_families) by Juniper-16. Beat 5 ran 12 models, including 4 Tencent grants, and all hit the 60-step cap or made no changes. Next: step 4, the `megazword scout` command.
