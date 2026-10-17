@@ -41,7 +41,7 @@ branch to approve. A scoreboard shows who is good at what and what it cost.
    plans). Save `brief` in job.json. In `Runner.run_piece`, when the plan has a brief, the
    worker prompt starts with "Shared brief for every worker on this job: ...". Tests: both
    plan shapes parse; the prompt includes the brief.
-4. [ ] (Juniper-16) Several attempts on hard pieces: a hard piece that fails gets up to 3
+4. [x] (2026-10-17, Juniper-16; job_workers.free_attempts, HARD_ATTEMPTS) Several attempts on hard pieces: a hard piece that fails gets up to 3
    free attempts, each from a different family (by name prefix: groq-*, openrouter-*,
    tencent-*, zai-*, nvidia-*, gemini-api*, cheap-*), before the paid retry. Keep the first
    attempt that passes its test. Record every attempt in `result.tried`.
@@ -64,3 +64,4 @@ and `megazword job scores` shows who did what; step 8 then finishes ROADMAP item
 
 ## Heartbeat log
 - 2026-10-17: step 5 done by Juniper-16 (team.combine, `megazword job combine ID [--no-push]`). Plain push only: if job/ID already exists on origin it is left alone and reported. Reviewers exclude every family that wrote a piece.
+- 2026-10-17: step 4 done by Juniper-16. A hard piece gets up to 3 free attempts, each starting with a new family; easy/medium keep one attempt with in-loop failover. Next for the heartbeat: steps 1-3, 6, 7.

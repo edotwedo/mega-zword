@@ -165,6 +165,27 @@ def validate_pieces(plan: dict) -> list[Piece]:
     return pieces
 
 
+HARD_ATTEMPTS = 3  # free tries, each from a different family, before a hard piece's paid retry
+
+
+def family(name: str) -> str:
+    """Provider family by name prefix: groq-120b -> groq, tencent-kimi-k3 -> tencent."""
+    return name.split("-")[0]
+
+
+def free_attempts(free: list[Backend], difficulty: str) -> list[list[Backend]]:
+    """One attempt with every free worker (in-loop failover), or, for a hard
+    piece, up to HARD_ATTEMPTS attempts that each start with a new family."""
+    if not free:
+        return []
+    if difficulty != "hard":
+        return [free]
+    groups: dict[str, list[Backend]] = {}
+    for b in free:
+        groups.setdefault(family(b.name), []).append(b)
+    return list(groups.values())[:HARD_ATTEMPTS]
+
+
 def _free(backend: Backend) -> bool:
     return isinstance(backend, (OpenAICompatibleBackend, OllamaBackend))
 
@@ -233,11 +254,12 @@ class Runner:
                       f"Allowed files (exact paths): {', '.join(piece.files)}\n"
                       "Edit only those files. Do not run git, commit, push or change unrelated files. "
                       "Mega Zword owns git and runs the tests. Keep the change small. Finish with a short summary.")
-            # Any piece may get one paid retry after its free loop fails.
-            attempts = [(free, None)] if free else []
+            # Any piece may get one paid retry after its free loop fails. A hard
+            # piece first gets up to HARD_ATTEMPTS free tries from different families.
+            attempts = [(group, None) for group in free_attempts(free, piece.difficulty)]
             if paid:
                 attempts.append(([], paid[0]))
-            for options, name in attempts:
+            for number, (options, name) in enumerate(attempts):
                 if name:
                     with self._route_lock:
                         # Recheck usage after a free attempt; never use a stale
@@ -308,7 +330,7 @@ class Runner:
                     result.tests = "passed" if checked.returncode == 0 else "failed"
                     if checked.returncode:
                         result.reason = "tests failed: " + _safe((checked.stdout or checked.stderr))[-1000:]
-                        if options and paid:
+                        if options and number + 1 < len(attempts):
                             night._check(night.git(["reset", "--hard", "--quiet", original], work), "reset failed tests")
                             night._check(night.git(["clean", "-fdq"], work), "clean test output")
                             continue

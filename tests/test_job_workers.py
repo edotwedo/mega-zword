@@ -301,3 +301,41 @@ def test_runner_test_permission_comes_from_title_not_boilerplate(tmp_path):
     assert not (tmp_path / "tests" / "test_a.py").exists()
     intended = runner._worker(tmp_path, jobs.Piece("add tests", ("tests/test_a.py",), "easy"), [free], None)
     assert intended.allow_test_edits is True
+
+
+@dataclass
+class Idle(Free):
+    """Finishes without editing anything."""
+
+    def chat(self, messages, tools=None, timeout=None):
+        self.seen.append(messages)
+        return tool("finish", summary="nothing to do")
+
+
+def test_hard_piece_gets_three_free_families_before_giving_up(origin):
+    order = ["groq", "zai", "ovh", "nvidia"]
+    settings = config.Config(agent={"pace": {n: 0 for n in order}, "failover_order": order})
+    backends = {"groq": Idle("groq"), "zai": Idle("zai"), "ovh": Free("ovh"), "nvidia": Free("nvidia")}
+    report = jobs.run_pieces({"pieces": [piece(level="hard")]}, origin, cfg=settings,
+                             backends=backends, usage=usage, job_id="hard")
+    result = report["results"][0]
+    assert result["status"] == "passed" and result["ai"] == "ovh"
+    assert {"groq", "zai", "ovh"} <= set(result["tried"]) and not backends["nvidia"].seen
+
+
+def test_easy_piece_gets_a_single_free_attempt(origin):
+    order = ["groq", "zai", "ovh"]
+    settings = config.Config(agent={"pace": {n: 0 for n in order}, "failover_order": order})
+    backends = {"groq": Idle("groq"), "zai": Free("zai"), "ovh": Free("ovh")}
+    report = jobs.run_pieces({"pieces": [piece(level="easy")]}, origin, cfg=settings,
+                             backends=backends, usage=usage, job_id="easy-one")
+    assert report["results"][0]["status"] == "failed" and not backends["zai"].seen
+
+
+def test_free_attempts_groups_by_family():
+    names = ["groq", "groq-120b", "zai", "zai-47", "ovh", "tencent-glm-5.3"]
+    free = [Free(n) for n in names]
+    groups = jobs.free_attempts(free, "hard")
+    assert [[b.name for b in g] for g in groups] == [["groq", "groq-120b"], ["zai", "zai-47"], ["ovh"]]
+    assert [len(g) for g in jobs.free_attempts(free, "medium")] == [6]
+    assert jobs.free_attempts([], "hard") == []
