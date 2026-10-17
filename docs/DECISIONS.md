@@ -3,6 +3,7 @@
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-17
+- Phil wants new Codex terminal instances to assign themselves a unique session designation and put it in the tab automatically, without a manual rename. New PowerShell startups use a metadata-first launcher; resuming preserves the designation. This changes naming only, not model/permission/auth settings.
 - Phil explicitly requested unattended work scheduled for 10:10 AM Pacific while at work. Authorized one one-time Mega Zword roadmap shift on 2026-10-17, bounded to 12:10 PM, using free coding models and Claude, with tests/reviews/local Gitea saves. This is a scoped exception to the earlier automatic-work stop; it does not enable recurring tasks. Phil says window visibility is irrelevant while he is away.
 - **Cheap paid tier, $1 a month (Phil).** "If you can get a million tokens for 4 cents, see what you can get for a dollar." Allowed: very cheap paid models on OpenRouter, paid from the $10 already on the account (no new card or signup). DeepSeek V4 Flash (~10M tokens/$) for medium and hard work, DeepSeek V4 Pro (~4.4M tokens/$) for hard work. They run only after every free source, before the paid CLIs. Cap: $1/month, read live from OpenRouter before every call, fail closed; OpenRouter max_price stops pricier providers. This is a narrow exception to "never route to anything that can bill"; everything else stays blocked.
 

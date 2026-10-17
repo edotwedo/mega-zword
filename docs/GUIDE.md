@@ -818,3 +818,19 @@ status, sends authentication only to the provider, and includes vault values in
 secret scrubbing. Never paste real keys into chats or commit them. Credential
 Manager protects stored values; programs running as your Windows user can still
 access them. This is not isolation from other programs on your account.
+
+
+## Automatic names for new Codex terminal sessions
+
+On this PC, a new PowerShell or Windows PowerShell window loads the named Codex
+launcher. Run `codex` normally: it creates an empty saved session, assigns a unique
+designation, and opens that session with its designation as the tab title. Naming
+uses local metadata operations and no model turn. Explicit resumes keep registered
+names. New-session identity is supplied through MEGAZWORD_SEAT/MEGAZWORD_SESSION.
+
+The launcher is installed under `%LOCALAPPDATA%/MegaZword/CodexNames/`; source is
+`scripts/codex_named_launcher.py`. Command-line `exec`, review, login and tooling
+subcommands pass through, as do explicit remote/worktree starts. Direct npm/native
+exe invocation, Command Prompt, Bash and the desktop app bypass the PowerShell
+function. Existing shells load it when reopened. Existing chats are not restarted.
+See `docs/handoffs/2026-10-17-codex-named-startup.md` for validation and undo.
