@@ -55,8 +55,9 @@ def zero_price_litellm(payload: Dict[str, Any]) -> List[Dict[str, str]]:
             continue
         if model_name == "sample_spec":
             continue
-        costs = model_info.get("input_cost_per_token", 0), model_info.get("output_cost_per_token", 0)
-        if costs == (0, 0):
+        # A missing price is unknown, not free.
+        costs = model_info.get("input_cost_per_token"), model_info.get("output_cost_per_token")
+        if None not in costs and costs == (0, 0):
             provider = model_info.get("litellm_provider")
             if isinstance(provider, str) and provider.strip():
                 results.append({

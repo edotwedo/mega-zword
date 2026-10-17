@@ -145,6 +145,8 @@ def merge(clone: Path, branch: str, backends, cfg, review_fn=None) -> str:
         names = night.git(["diff", "--name-only", f"origin/main...origin/{branch}"], work).stdout.split()
         if names and all(n.startswith(LOG_ONLY) for n in names):
             return "not merged: only notes changed, no real progress"
+        if any(n.startswith("src/") for n in names) and not any(n.startswith("tests/") for n in names):
+            return "not merged: code changed without tests"
         diff, _ = review.change(work, "origin/main")
         if review.clip(diff)[1]:
             return "not merged: change too big to review in one pass; needs a person"

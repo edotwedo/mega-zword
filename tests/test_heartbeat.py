@@ -196,3 +196,25 @@ def test_notes_only_change_is_not_merged(tmp_path):
     text = heartbeat.merge(clone, "night/n-1", {}, None,
                            review_fn=lambda *a, **k: pytest.fail("no review for notes-only"))
     assert text == "not merged: only notes changed, no real progress"
+
+
+def test_code_without_tests_is_not_merged(tmp_path):
+    bare = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(bare)], check=True)
+    seed = tmp_path / "seed"
+    subprocess.run(["git", "clone", "-q", str(bare), str(seed)], check=True, capture_output=True)
+    for args in (["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+        _git(seed, *args)
+    (seed / "README").write_text("x\n")
+    _git(seed, "add", ".")
+    _git(seed, "commit", "-qm", "base")
+    _git(seed, "push", "-q", "origin", "HEAD:main")
+    (seed / "src").mkdir()
+    (seed / "src" / "a.py").write_text("def f(): return 1\n")
+    _git(seed, "add", ".")
+    _git(seed, "commit", "-qm", "code only")
+    _git(seed, "push", "-q", "origin", "HEAD:refs/heads/night/c-1")
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", str(bare), str(clone)], check=True, capture_output=True)
+    text = heartbeat.merge(clone, "night/c-1", {}, None, review_fn=lambda *a, **k: pytest.fail("no review"))
+    assert text == "not merged: code changed without tests"

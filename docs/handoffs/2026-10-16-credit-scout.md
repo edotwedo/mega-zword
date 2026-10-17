@@ -24,7 +24,7 @@ price lists, are where direct free tiers and signup grants hide.
    (`{"data": {"endpoints": [{"provider_name": ..., "pricing": {...}}, ...]}}`) into sorted,
    unique provider names; plus `fetch_endpoints(model_id)`. Tests: normal payload,
    duplicates, missing fields, empty list.
-2. [ ] `zero_price_litellm(payload) -> list[dict]`: parse LiteLLM's public price file
+2. [x] (2026-10-16, free model via heartbeat cdf905b; missing-cost bug and tests by Juniper-16) `zero_price_litellm(payload) -> list[dict]`: parse LiteLLM's public price file
    (`https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json`,
    a dict of model -> {"litellm_provider", "input_cost_per_token", "output_cost_per_token", ...})
    and return `{"provider", "model"}` for entries whose input and output costs are both 0.
@@ -56,3 +56,4 @@ fakes, GUIDE has the section, and ROADMAP item 4 is ticked.
 
 ## Heartbeat log
 - 2026-10-16: step 1 done (scout.providers_from_endpoints, fetch_endpoints, 4 tests). openrouter, groq and zai hit the 60-step cap first; nvidia finished with one broken mock. Next: step 2, zero_price_litellm.
+- 2026-10-16: step 2 done (zero_price_litellm). The free model shipped it without tests and counted missing prices as free; fixed. Heartbeat now refuses code without tests. Next: step 3, leads().

@@ -76,3 +76,18 @@ def test_fetch_endpoints_monkeypatched():
             }
         }
 
+
+
+def test_zero_price_litellm_keeps_only_listed_zero_costs():
+    payload = {
+        "sample_spec": {"litellm_provider": "x", "input_cost_per_token": 0, "output_cost_per_token": 0},
+        "free/model": {"litellm_provider": "groq", "input_cost_per_token": 0, "output_cost_per_token": 0.0},
+        "paid/model": {"litellm_provider": "groq", "input_cost_per_token": 1e-6, "output_cost_per_token": 0},
+        "unknown/model": {"litellm_provider": "mystery"},
+        "a/free": {"litellm_provider": "cerebras", "input_cost_per_token": 0, "output_cost_per_token": 0},
+        "broken": "not a dict",
+    }
+    assert scout.zero_price_litellm(payload) == [
+        {"provider": "cerebras", "model": "a/free"},
+        {"provider": "groq", "model": "free/model"},
+    ]
