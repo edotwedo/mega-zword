@@ -136,7 +136,7 @@ methods are Phil's call.
 | Upstage Solar | Reportedly $10 signup credit; usage continues and bills the card after credits run out | Upstage blog (AI-written) + official FAQ on billing | Risky: billing continues automatically. Skip unless a hard cap exists. |
 | Chutes | Was community-free; moved to capped subscriptions in early 2026 | Two third-party sources agree on subscriptions | Not a free source now. |
 | MiniMax | Trial credits at signup only; no lasting free API tier | Third-party only | Skip. |
-| Baidu Qianfan | Old free ERNIE Speed/Lite replaced by paid Pro versions; may need a mainland phone number | Third-party only | Skip. |
+| Baidu Qianfan | Sources conflict: some say ERNIE Speed/Lite/Tiny are still free with a monthly quota (one says 100K tokens per model); others say they were replaced by Pro versions at about $0.03-0.04 per 1M input tokens. May need a mainland phone number. | Third-party only; official page unreachable | Maybe. Phil to try signup with a US number. Paid Pro models would need a payment method, which the billing block refuses unless Phil allows capped cheap sources. |
 | Sarvam | ₹100 signup credit (cut from ₹1,000 in May 2026); sarvam-m retired | Official docs and changelog | Too small to matter. |
 | SEA-LION | No official API free tier found; model is on Cloudflare Workers AI (`@cf/aisingapore/gemma-sea-lion-v4-27b-it`) | Third-party listing | Reachable through our Cloudflare key; no new source. |
 | GitHub Models | Retired July 30, 2026 | Official GitHub docs | Gone. Remove from future lists. |
