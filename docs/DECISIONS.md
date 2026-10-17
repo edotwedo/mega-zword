@@ -2,6 +2,9 @@
 
 Newest first. Don't reopen these without Phil.
 
+## 2026-10-17
+- Phil explicitly requested unattended work scheduled for 10:10 AM Pacific while at work. Authorized one one-time Mega Zword roadmap shift on 2026-10-17, bounded to 12:10 PM, using free coding models and Claude, with tests/reviews/local Gitea saves. This is a scoped exception to the earlier automatic-work stop; it does not enable recurring tasks. Phil says window visibility is irrelevant while he is away.
+
 ## 2026-10-16
 - **Greptile free reviews (Phil).** Use Greptile's free Starter tier (50 reviews/month, no usage or credits) as an outside reviewer for diversity. Plan: Phil signs up and installs the GitHub app on edotwedo/mega-zword only; `megazword review` pushes a branch to GitHub as a draft PR (review-only exception to the local-Gitea rule), collects Greptile's comments, closes the PR; the ledger tracks 50/month; big changes only, small ones get free-model review.
 - **Mega Zword's two jobs (Phil).** (1) Get free AI credits by any legal means and keep a cushion: more sources, including obscure and foreign providers and the providers behind OpenRouter added directly. (2) Finish big coding projects with many models working together, not one model after another until each runs out.
