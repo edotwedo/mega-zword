@@ -181,6 +181,7 @@ def test_step_cap(tmp_path):
     loop, _ = coding(tmp_path, [call("list_files", glob="*")] * 3, max_steps=2)
     result = loop.run("keep going")
     assert not result.ok and "step cap" in result.error and loop.request_count == 2
+    assert result.error.endswith("tool calls: list_files 2")
 
 
 def test_agent_prompt_tracks_remaining_tool_steps_without_rewriting_history(tmp_path):

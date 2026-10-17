@@ -193,6 +193,26 @@ def test_night_uses_free_http_when_paid_has_no_room(origin):
     assert groq.seen
 
 
+
+@dataclass
+class IdleHTTP(FreeHTTP):
+    """Free API that finishes without editing anything."""
+
+    def chat(self, messages, tools=None, timeout=None):
+        self.seen.append(messages)
+        args = json.dumps({"summary": "nothing"})
+        return {"tool_calls": [{"id": "t", "function": {"name": "finish", "arguments": args}}]}
+
+
+def test_night_stops_free_tries_at_cap_then_uses_paid(origin):
+    free = {f"free{i}": IdleHTTP(f"free{i}") for i in range(night.MAX_FREE_TRIES + 2)}
+    codex = FakeAI("codex", action=typo_fix)
+    n = night.Night({**free, "codex": codex}, usage=meters(codex=10), date="2026-10-13")
+    night.run_night(n, queue=str(origin), max_jobs=1, write=lambda s: None)
+    assert sum(bool(ai.seen) for ai in free.values()) == night.MAX_FREE_TRIES
+    assert codex.calls
+    assert show(origin, "night/2026-10-13-1", "README.md") == "receive\n"
+
 def test_night_status_shows_stop_lock_jobs_and_summary(capsys):
     night.home().mkdir(parents=True, exist_ok=True)
     night.stop_path().write_text("stopped\n", encoding="utf-8")

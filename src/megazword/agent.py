@@ -514,6 +514,7 @@ class AgentBackend(Backend):
         self._ollama_model = getattr(self.model_backend, "model", "")
         self._ollama_fallback = False
         previous_call, repeats = None, 0
+        used = {}  # tool name -> calls, so a capped run says where its steps went
         last_text = ""
         # Only send tools the job needs: each schema is resent on every step.
         web = bool(WEB_HINT.search(prompt))
@@ -645,6 +646,7 @@ class AgentBackend(Backend):
                     name = call["function"]["name"]
                     args = json.loads(call["function"]["arguments"])
                     self._event("tool", tool=name, file=args.get("path", "") if isinstance(args, dict) else "")
+                    used[name] = used.get(name, 0) + 1
                     signature = (name, json.dumps(args, sort_keys=True))
                     repeats = repeats + 1 if signature == previous_call else 1
                     previous_call = signature
@@ -688,7 +690,9 @@ class AgentBackend(Backend):
                 # Flatten native history when a model cannot form valid calls.
                 # Text-only providers need ordinary user/assistant messages.
                 messages = self._text_history(messages)
-        raise RuntimeError(f"agent step cap reached ({self.max_steps}); edits remain in the work folder")
+        spent = ", ".join(f"{n} {c}" for n, c in sorted(used.items(), key=lambda kv: -kv[1]))
+        raise RuntimeError(f"agent step cap reached ({self.max_steps}); edits remain in the work folder"
+                           + (f"; tool calls: {spent}" if spent else ""))
 
     @staticmethod
     def _trim_stale(messages, keep=KEEP_FULL, limit=STALE_LIMIT):

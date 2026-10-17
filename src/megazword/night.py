@@ -36,6 +36,7 @@ FLOOR = 15          # percent left; below this an AI gets no night work
 JOB_MINUTES = 30    # AI time cap per job
 TEST_MINUTES = 20   # test run cap per job
 MAX_JOBS = 5
+MAX_FREE_TRIES = 4  # free coders per job; a step that stumps four rarely suits a fifth
 LOCK_STALE_HOURS = 12
 
 LINE = re.compile(r"^\s*-\s*\[(?P<mark>[ xX!])\]\s*(?P<body>.+?)\s*$")
@@ -422,11 +423,16 @@ class Night:
             out.status, out.reason = "skipped", baseline_problem
             return out
         tried_free: set[str] = set()
+        free_turns = 0
         for name in names:
             if name in tried_free:
                 continue
-            out.tried.append(name)
             source = self.backends[name]
+            if is_free_backend(source):
+                if free_turns >= MAX_FREE_TRIES:
+                    continue
+                free_turns += 1
+            out.tried.append(name)
             if is_free_backend(source):
                 from .agent import wrap
                 fallbacks = [self.backends[n] for n in names
