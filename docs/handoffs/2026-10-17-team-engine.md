@@ -1,0 +1,65 @@
+# Team engine (ROADMAP item 5)
+
+**Status:** open. Written by Juniper-16 (Claude Code), 2026-10-17. Worked one step per
+heartbeat beat by free models; Juniper-16 takes the steps marked (Juniper-16) and fixes
+what the free models get wrong. Claim a step by writing `(taken: NAME, date)` after it.
+
+## Goal
+Phil gives one bigger coding job. Mega Zword splits it, several models work on the pieces
+at the same time, tests decide, a different family reviews, and Phil gets one combined
+branch to approve. A scoreboard shows who is good at what and what it cost.
+
+## What already exists (don't rebuild it)
+- `megazword job plan "TEXT"` (src/megazword/job.py): one AI splits the job into pieces
+  (title, files, difficulty, test) and saves `~/.megazword/jobs/<ID>/job.json`.
+- `job_workers.run_pieces(plan, repo, workers=N)` (src/megazword/job_workers.py): clones
+  the repo, gives each piece its own worktree and branch `job/<ID>-<n>`, free models first
+  then one paid retry, refuses edits outside the piece's files, runs the piece's test,
+  commits, and writes results into the same job.json. It never merges or pushes.
+- `review.collect(...)` (src/megazword/review.py): free reviewers from different families.
+
+## Rules for every step
+- One step per change. Code in src/megazword/job.py, job_workers.py, or a new
+  src/megazword/team.py; tests in tests/test_team.py (new) or tests/test_job*.py.
+- Tests use fakes and tmp_path; no network, no real AI, no real Gitea.
+- Pure functions for formatting and scoring (take dicts, return text or dicts).
+- Never push to main from a job; job branches only.
+- Don't edit routing.py, ledger.py, budget.py, heartbeat.py or night.py.
+
+## Steps (do the first one not yet done; tick it here with date and commit)
+1. [ ] `megazword job run ID [--workers N] [--repo URL]`: load
+   `~/.megazword/jobs/ID/job.json`, call `job_workers.run_pieces(plan, repo, job_id=ID,
+   workers=N)`, then print one line per piece: number, title, status, AI, reason. Default
+   repo: the local Gitea mega-zword URL (`heartbeat.GITEA`). Missing job: a clear message
+   and exit code 1. Tests monkeypatch `run_pieces`.
+2. [ ] `megazword job status ID`: a pure `format_status(report) -> str` showing the overall
+   `runner_status`, then per piece: number, title, status, tests, AI that delivered, AIs
+   tried, branch, reason. Works on a plan that hasn't run yet ("not started"). Tests with
+   small dict fixtures.
+3. [ ] Shared brief: `planner_prompt` asks for
+   `{"brief": "...", "pieces": [...]}`; `parse_pieces` keeps accepting a bare list (old
+   plans). Save `brief` in job.json. In `Runner.run_piece`, when the plan has a brief, the
+   worker prompt starts with "Shared brief for every worker on this job: ...". Tests: both
+   plan shapes parse; the prompt includes the brief.
+4. [ ] (Juniper-16) Several attempts on hard pieces: a hard piece that fails gets up to 3
+   free attempts, each from a different family (by name prefix: groq-*, openrouter-*,
+   tencent-*, zai-*, nvidia-*, gemini-api*, cheap-*), before the paid retry. Keep the first
+   attempt that passes its test. Record every attempt in `result.tried`.
+5. [ ] (Juniper-16) `megazword job combine ID`: in the job's clone, branch `job/ID` from
+   the base, merge every passed piece branch, run the full test command, then send the
+   combined diff to `review.collect` with 2 reviewers from families that didn't write any
+   piece. Save `combined` (branch, tests, review findings) in job.json and push `job/ID`
+   to origin. Never main. A merge conflict or failing tests stops and is recorded.
+6. [ ] Scoreboard: pure `scoreboard(reports) -> list[dict]` over every
+   `~/.megazword/jobs/*/job.json`: per AI, pieces delivered, pieces failed, pass rate,
+   estimated tokens; plus `megazword job scores` printing it best first. Tests with
+   fixtures.
+7. [ ] docs/GUIDE.md section "Team jobs": plan, run, status, combine, scores, in plain
+   words, with one example. Check every command against `megazword job --help`.
+8. [phil] First real job on another project (e.g. Up Dawg), chosen by Phil.
+
+## Done when
+A job planned with `megazword job plan` runs, combines into one reviewed `job/ID` branch,
+and `megazword job scores` shows who did what; step 8 then finishes ROADMAP item 5.
+
+## Heartbeat log

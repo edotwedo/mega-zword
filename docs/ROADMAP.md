@@ -24,7 +24,7 @@ cushion; (2) finish big coding projects with many models working together.
 4. [ ] **Credit scout.** (steps: docs/handoffs/2026-10-16-credit-scout.md) Pull the providers behind OpenRouter, the LiteLLM price list and models.dev; research regional providers (Alibaba Model Studio first); check each offer against 2 sources; auto-test new free models for tool calls and a small coding task; report what's new.
    Done when: `megazword scout` prints a verified list of new leads and tested models. Phil: signups.
    State 2026-10-17: steps 1-5 and the research half done (Juniper-16); zai-47, ovh and the $1/month cheap tier added. Next: step 6, `megazword scout --test` (Alder-16's 10:10 shift starts there).
-5. [ ] **Team engine.** Planner writes a shared brief; parallel builders each take one piece; tests decide; several attempts on hard pieces; cross-family review; scoreboard of who is good at what.
+5. [ ] **Team engine.** (steps: docs/handoffs/2026-10-17-team-engine.md) Planner writes a shared brief; parallel builders each take one piece; tests decide; several attempts on hard pieces; cross-family review; scoreboard of who is good at what.
    Each piece has an explicit worker, owner and status; parallel builders are bounded; the scoreboard counts work that passed tests and review, and its real usage/cost (from Sauna-17's proposal, Q 6234967960).
    Done when: one real piece of another project (e.g. Up Dawg) is finished mostly on free credits.
 
