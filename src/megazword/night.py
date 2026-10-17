@@ -392,6 +392,27 @@ class Night:
         self._baselines[key] = reason
         return reason
 
+    def _log_run(self, worker, result, prompt: str) -> None:
+        """Record each model run in the normal run log. Fair share and the grant
+        ledger both read it; Night Shift and heartbeat runs were missing from it,
+        so grants looked fuller than they were (two Tencent grants answered 402
+        while the ledger still showed 0.56-0.79M left, 2026-10-17)."""
+        from .log import append
+        used = getattr(worker, "backends_used", None) or [worker.name]
+        prompt_chars = getattr(worker, "prompt_chars", len(prompt))
+        answer_chars = getattr(worker, "answer_chars", len(result.text or ""))
+        try:
+            append(self.cfg.log_path, backend=worker.name, project="night", forced=False,
+                   ok=result.ok, seconds=round(result.seconds, 2),
+                   rejected=None if result.ok else f"failed: {result.error}"[:200],
+                   prompt_chars=prompt_chars, answer_chars=answer_chars,
+                   requests=max(1, getattr(worker, "request_count", 1)),
+                   backends_used=used, final_backend=used[-1],
+                   requests_by_backend=getattr(worker, "requests_by_backend", None) or {worker.name: 1},
+                   est_tokens=(prompt_chars + answer_chars) // 4)
+        except OSError:
+            pass  # the log is bookkeeping; never fail a job over it
+
     def run_job(self, job: Job) -> Outcome:
         out = Outcome(job, "failed")
         summaries = self.usage()  # usage before every job (Phil's rule)
@@ -464,6 +485,7 @@ class Night:
                 self.log(f"{branch}: {name} working on: {job.task}")
                 result = worker.run(prompt)
                 tried_free.update(getattr(worker, "backends_used", None) or [name])
+                self._log_run(worker, result, prompt)
             else:
                 # Free calls can take long enough for a paid quota snapshot to
                 # become stale. Recheck immediately before a paid fallback.
@@ -481,6 +503,7 @@ class Night:
                 self.log(f"{branch}: {name} working on: {job.task}")
                 out.status = "failed"
                 result = backend.run(prompt)
+                self._log_run(backend, result, prompt)
             git(["add", "-A"], work)
             changed = git(["diff", "--cached", "--quiet"], work).returncode != 0
             if changed and result.ok:

@@ -442,3 +442,16 @@ def test_night_gives_the_job_to_the_least_used_free_source(origin, tmp_path):
     n = night.Night({"groq": groq, "zai": zai}, usage=lambda: [], date="2026-10-13", cfg=cfg)
     night.run_night(n, queue=str(origin), max_jobs=1, write=lambda s: None)
     assert zai.seen and not groq.seen
+
+
+def test_night_runs_are_written_to_the_run_log(origin, tmp_path):
+    from megazword import config
+    from megazword.runlog import summarize
+    from datetime import timedelta
+    cfg = config.Config()
+    cfg.log_path = tmp_path / "night-log.jsonl"
+    groq = FreeHTTP("groq")
+    n = night.Night({"groq": groq}, usage=lambda: [], date="2026-10-13", cfg=cfg)
+    night.run_night(n, queue=str(origin), max_jobs=1, write=lambda s: None)
+    runs = summarize(cfg.log_path, timedelta(days=1))
+    assert runs["groq"].runs >= 1 and runs["groq"].est_tokens > 0

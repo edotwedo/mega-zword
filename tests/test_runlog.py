@@ -67,3 +67,16 @@ def test_stats_survive_bad_numbers(tmp_path):
                    '"seconds": "abc", "est_tokens": Infinity}\n', encoding="utf-8")
     [s] = daily(log, 1, date(2026, 10, 12))
     assert (s.runs, s.seconds, s.est_tokens) == (1, 0, 0)
+
+
+def test_failover_run_is_split_by_requests_per_backend(tmp_path):
+    from datetime import timedelta
+    from megazword import log
+    from megazword.runlog import summarize
+    path = tmp_path / "log.jsonl"
+    log.append(path, backend="tencent-kimi-k3", ok=True, requests=4, est_tokens=4000,
+               requests_by_backend={"tencent-kimi-k3": 1, "groq": 3}, final_backend="groq")
+    runs = summarize(path, timedelta(days=1))
+    assert (runs["tencent-kimi-k3"].runs, runs["tencent-kimi-k3"].est_tokens) == (1, 1000)
+    assert (runs["groq"].runs, runs["groq"].est_tokens, runs["groq"].ok) == (3, 3000, 3)
+    assert runs["tencent-kimi-k3"].ok == 0 and runs["tencent-kimi-k3"].failed == 1

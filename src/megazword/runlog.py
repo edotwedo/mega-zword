@@ -64,16 +64,28 @@ def summarize(path: Path, window: timedelta, now: datetime | None = None,
         if stamp is None or stamp < cutoff or stamp > now:
             continue
         backend = str(record["backend"])
-        item = summaries.setdefault(backend, RunSummary(backend))
         requests = max(1, int(_number(record.get("requests", 1))))
-        item.runs += requests
-        item.ok += requests * bool(record.get("ok"))
-        item.rejected += requests * bool(record.get("rejected"))
-        item.failed += requests * (not record.get("ok") and not record.get("rejected"))
-        item.seconds += _number(record.get("seconds"))
-        item.prompt_chars += int(_number(record.get("prompt_chars")))
-        item.answer_chars += int(_number(record.get("answer_chars")))
-        item.est_tokens += int(_number(record.get("est_tokens")))
+        # A coding run that failed over is split by the requests each backend
+        # served, so fair share and the grant ledger see who actually did the work.
+        by = record.get("requests_by_backend")
+        shares = ({str(k): int(_number(v)) for k, v in by.items() if int(_number(v)) > 0}
+                  if isinstance(by, dict) else {})
+        if len(shares) < 2:
+            shares = {backend: requests}
+        total = sum(shares.values())
+        for name, count in shares.items():
+            part = count / total
+            item = summaries.setdefault(name, RunSummary(name))
+            item.runs += count
+            # The outcome belongs to the run's final backend; the others failed over.
+            ok = bool(record.get("ok")) and (len(shares) == 1 or name == record.get("final_backend"))
+            item.ok += count * ok
+            item.rejected += count * bool(record.get("rejected"))
+            item.failed += count * (not ok and not record.get("rejected"))
+            item.seconds += _number(record.get("seconds")) * part
+            item.prompt_chars += int(_number(record.get("prompt_chars")) * part)
+            item.answer_chars += int(_number(record.get("answer_chars")) * part)
+            item.est_tokens += int(_number(record.get("est_tokens")) * part)
     return summaries
 
 
