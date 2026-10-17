@@ -144,3 +144,23 @@ def test_greptile_badges_become_severity_and_title():
     low = "**![P3 Badge](x) Tidy a name**\n\nRename it."
     assert review._badge(low) == ("low", "Tidy a name: Rename it.")
     assert review._badge("plain text, no badge") == ("medium", "plain text, no badge")
+
+
+def test_greptile_waits_for_line_comments_to_settle(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setattr(review, "git", lambda repo, *a, **k: SimpleNamespace(
+        returncode=0, stdout="abc1234\n", stderr=""))
+    monkeypatch.setattr(review, "_gh", lambda *a, **k: SimpleNamespace(
+        returncode=0, stdout="https://github.com/edotwedo/mega-zword/pull/8\n" if a[:2] == ("pr", "create") else "",
+        stderr=""))
+    rounds = [[], ["- [low] a.py:1 - summary"],
+              ["- [low] a.py:1 - summary", "- [high] a.py:5 - bug", "- [medium] b.py:2 - risk"]]
+    polls = []
+
+    def comments(number):
+        polls.append(number)
+        return rounds[min(len(polls) - 1, len(rounds) - 1)]
+    monkeypatch.setattr(review, "_greptile_comments", comments)
+    findings, status = review.greptile(tmp_path, "x", sleep=lambda s: None)
+    assert len(findings) == 3 and "3 comment(s)" in status
+    assert len(polls) == 4  # nothing, summary, all three, all three again: settled

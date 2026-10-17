@@ -205,10 +205,14 @@ def greptile(repo: Path, label: str, wait_minutes: float = 15, poll: float = 30,
     texts: list[str] = []
     deadline = time.monotonic() + wait_minutes * 60
     try:
+        # Greptile posts its summary first and the line comments a minute or two
+        # later: stop once the count is the same on two polls in a row.
+        seen = -1
         while True:
             texts = _greptile_comments(number)
-            if texts or time.monotonic() >= deadline:
+            if (texts and len(texts) == seen) or time.monotonic() >= deadline:
                 break
+            seen = len(texts) if texts else -1
             sleep(poll)
     finally:
         _gh("pr", "close", number, "--repo", "edotwedo/mega-zword", "--delete-branch")
