@@ -67,3 +67,14 @@ def test_slow_keyless_sources_code_last_but_still_answer_first(tmp_path):
     names = ["groq", "ovh", "kilo"]
     assert spread(names, "medium", log)[0] in ("ovh", "kilo")  # least used leads a chat answer
     assert spread(names, "medium", log, coding=True)[0] == "groq"  # but not a coding loop
+
+
+def test_plain_tencent_alias_counts_as_a_one_time_grant(tmp_path):
+    log = tmp_path / "log.jsonl"
+    log.write_text("", encoding="utf-8")
+    from megazword import log as runlog
+    runlog.append(log, backend="tencent", ok=True)  # counts 4x outside hard work
+    for _ in range(2):
+        runlog.append(log, backend="groq", ok=True)
+    assert spread(["tencent", "groq"], "medium", log) == ["groq", "tencent"]
+    assert spread(["groq", "tencent"], "hard", log)[0] == "tencent"

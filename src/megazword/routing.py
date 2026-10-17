@@ -22,7 +22,8 @@ CHEAP_PREFIX = "cheap-"
 
 # One-time grants that never refill. Outside hard work each request counts four
 # times, so they get roughly a quarter share next to free tiers that reset.
-FINITE_BACKENDS = TENCENT_BACKENDS
+# "tencent" is the older alias of tencent-deepseek-v4-pro: same one-time grant.
+FINITE_BACKENDS = (*TENCENT_BACKENDS, "tencent")
 FINITE_SHARE = 0.25
 
 SPREAD_WINDOW = timedelta(hours=24)
