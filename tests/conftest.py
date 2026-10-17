@@ -7,6 +7,23 @@ import pytest
 from megazword import config
 
 
+def pytest_configure(config):
+    """Give every test run its own temp folder (2026-10-17). Pytest's shared
+    pytest-of-USER folder keeps only the newest few runs and deletes the rest, so
+    a second run on this PC (another seat, the heartbeat, Night Shift) deleted
+    folders a running suite still used: 39 errors in a heartbeat baseline."""
+    if not config.option.basetemp:
+        config.option.basetemp = tempfile.mkdtemp(prefix="mz-pytest-")
+        config._mz_own_basetemp = config.option.basetemp
+
+
+def pytest_unconfigure(config):
+    own = getattr(config, "_mz_own_basetemp", None)
+    if own:
+        import shutil
+        shutil.rmtree(own, ignore_errors=True)
+
+
 @pytest.fixture(autouse=True)
 def isolated_home(tmp_path, monkeypatch):
     """Never let tests touch the real ~/.megazword."""

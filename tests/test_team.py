@@ -71,10 +71,16 @@ def test_combine_merges_passed_pieces_tests_reviews_and_pushes_job_branch(job):
     saved = json.loads((job["folder"] / "job.json").read_text(encoding="utf-8"))
     assert saved["combined"]["status"] == "ready"
     assert "job/J1: ready" in team.format_combined(combined)
-    # A second combine never force-pushes over the branch already there.
+    # A second combine with different content never force-pushes over the branch already there.
+    clone = job["clone"]
+    git(clone, "checkout", "-q", "job/J1-1")
+    (clone / "a.txt").write_text("a by groq, fixed\n")
+    git(clone, "commit", "-qam", "piece 1 again")
+    git(clone, "checkout", "-q", "main")
     again = team.combine("J1", backends, None, review_fn=two_reviews(),
                          test_fn=lambda work: ("passed", ""))
     assert again["status"] == "ready, not pushed" and "already exists" in again["detail"]
+    assert show(job["bare"], "job/J1", "a.txt") == "a by groq\n"  # the pushed branch is untouched
 
 
 def test_conflicting_pieces_stop_before_tests(job):
