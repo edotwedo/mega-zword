@@ -83,6 +83,8 @@ DEFAULT_ROUTE = {
 }
 
 DEFAULT_FREE = {
+    # Retired from OpenRouter's catalog (2026-10-17); kept as names so a config
+    # can point them at a live model. free_apis skips these default ids.
     "kimi": "moonshotai/kimi-k2.6:free",
     "deepseek": "deepseek/deepseek-chat-v3.1:free",
     "qwen-coder": "qwen/qwen3-coder:free",
@@ -135,7 +137,7 @@ DEFAULT_FREE_FAILOVER = ["tencent-glm-5.3-flash", "tencent-glm-5.3",
                          "tencent-deepseek-v4-pro",
                          "tencent-deepseek-v4-flash-vision-exp",
                          "openrouter", "groq", "groq-120b", "groq-qwen",
-                         "groq-allam", "cloudflare", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "gemini-api",
+                         "cloudflare", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "gemini-api",
                          "gemini-api-31-lite",
                          "mistral", "nvidia", "nvidia-lightning", "ollama", "openrouter-dots",
                          "openrouter-nemotron-nano", "openrouter-nemotron-lightning",

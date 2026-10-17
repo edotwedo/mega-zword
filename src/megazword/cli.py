@@ -128,7 +128,11 @@ def build_parser() -> argparse.ArgumentParser:
     cr.add_argument("--expires", help="grant end date, YYYY-MM-DD")
     cr.add_argument("--can-bill", choices=("yes", "no"),
                     help="yes blocks routing until billing is turned off")
-    sub.add_parser("scout", help="find AI providers we don't use yet")
+    scout_parser = sub.add_parser("scout", help="find AI providers we don't use yet")
+    scout_parser.add_argument("--test", action="store_true",
+                              help="send one tool-call probe to each free API instead")
+    scout_parser.add_argument("--provider", action="append", dest="providers",
+                              help="probe only this backend (repeatable; allows Tencent grants)")
     sub.add_parser("plan", help="rank the AIs for new work by live spare usage")
     sub.add_parser("start", help="text start screen (plain `megazword` opens the app window)")
     sub.add_parser("projects", help="list projects with memory entries and last activity")
@@ -478,6 +482,8 @@ def main(argv: list[str] | None = None,
 
     if args.command == "scout":
         from . import scout
+        if args.test:
+            return scout.test_command(backends, args.providers, cfg.out_now())
         return scout.command()
 
     if args.command == "credits":

@@ -684,8 +684,10 @@ then **Create Key**. Keep the key private. Save it in PowerShell:
 setx OPENROUTER_API_KEY "paste-your-key-here"
 ```
 
-Open a new terminal. One key enables `kimi`, `deepseek`, `qwen-coder` and
-`openrouter`. The current free catalog is routed by `openrouter`:
+Open a new terminal. The key enables `openrouter` and the fixed `openrouter-*`
+models. `kimi`, `deepseek` and `qwen-coder` only work if you point them at a live
+free model in config.toml: their old default models left OpenRouter on 2026-10-17.
+The current free catalog is routed by `openrouter`:
 
 ```powershell
 megazword run -m openrouter "Explain this function"
@@ -859,6 +861,13 @@ megazword credits set NAME --can-bill no
 ```
 
 Anything set to `--can-bill yes` is never routed.
+
+To see which free APIs can code right now, `megazword scout --test` sends each one
+a single tool call (the agent's `finish` tool) and prints ok, failed or skipped with
+the seconds and reason. Coding needs tool calls, so a model that only answers in
+text fails. It skips the one-time Tencent grants (name one with
+`--provider tencent-kimi-k3` to probe it), sources marked out, and OpenRouter
+models that aren't listed free right now, so it never spends money.
 
 ## Keymaster: keep provider keys in Windows Credential Manager
 

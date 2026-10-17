@@ -491,6 +491,11 @@ FREE_KEYS = (
 )
 
 
+RETIRED_OPENROUTER = {"kimi": "moonshotai/kimi-k2.6:free",
+                      "deepseek": "deepseek/deepseek-chat-v3.1:free",
+                      "qwen-coder": "qwen/qwen3-coder:free"}
+
+
 def free_backends(models: dict[str, str]) -> list[Backend]:
     m = {**{k: v for k, v in models.items()}}
     return [
@@ -558,13 +563,12 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
         )],
         # OpenRouter chooses the serving provider. Its training policy can
         # vary by endpoint (and configured model); unknown means scrub prompts.
+        # These three default models left OpenRouter's catalog (scout --test,
+        # 2026-10-17), so they exist only when config.toml names another model.
         *[OpenAICompatibleBackend(name, base_url="https://openrouter.ai/api/v1",
-                                  model=m.get(name, default),
+                                  model=m[name],
                                   key_env="OPENROUTER_API_KEY", trains_on_data=True)
-          for name, default in (
-              ("kimi", "moonshotai/kimi-k2.6:free"),
-              ("deepseek", "deepseek/deepseek-chat-v3.1:free"),
-              ("qwen-coder", "qwen/qwen3-coder:free"))],
+          for name, dead in RETIRED_OPENROUTER.items() if m.get(name, dead) != dead],
         *[OpenAICompatibleBackend(name, base_url=base,
                                   model=m.get(name, model), key_env=key,
                                   trains_on_data=trains)

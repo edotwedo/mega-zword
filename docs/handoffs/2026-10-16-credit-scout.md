@@ -42,7 +42,7 @@ price lists, are where direct free tiers and signup grants hide.
    shows, and that every lead must be checked by a person (terms, real free amount,
    whether it can bill) before a key is added. Then `megazword credits set NAME --can-bill no`
    only after that check.
-6. [ ] `megazword scout --test`: for each backend name in `free_test.PROVIDERS` that is
+6. [x] (2026-10-17, Juniper-16) `megazword scout --test`: for each backend name in `free_test.PROVIDERS` that is
    available, send one tool-call probe (the `finish` tool, like `free_test`), at most one
    request per backend, and print name, seconds and ok/failed. Tests use fake backends.
 
@@ -64,3 +64,4 @@ fakes, GUIDE has the section, and ROADMAP item 4 is ticked.
 - 2026-10-16: step 4 done (`megazword scout`, scout.gather/command, 4 tests). First live run: 36 providers, 26 without a key yet. Worth a person's look: AtlasCloud, Phala, Poolside, Liquid, Thinking Machines (OpenRouter free-model hosts), sarvam, volcengine, publicai, gigachat (LiteLLM $0 entries; many cloud entries like bedrock/azure are $0 only because you bring your own deployment). Next: step 5, GUIDE section.
 - 2026-10-16: step 5 done (GUIDE "Finding more free AI"). All five code steps done. Left on ROADMAP #4: the research half below (Juniper-16 claimed it) and auto-testing new free models.
 - 2026-10-16: research half done by Juniper-16 (table in docs/FREE-MODEL-ROSTER.md). Added `zai-47` and keyless `ovh`. Left: step 6, StepFun, and the scout leads listed there. Claim released.
+- 2026-10-17: step 6 done by Juniper-16 (`scout --test`, scout.probe/test_command, free_test.openrouter_free_models shared). Every beat failed it: Claude and Codex were read-only in heartbeat runs (fixed ec3f516). First live probe: 22 ok; groq-allam has no tool calls (off the coding failover); kimi, deepseek and qwen-coder default models left OpenRouter (no longer built unless config names another model); cloudflare's daily allowance was spent; openrouter-nemotron-nano returned an empty reply; openrouter-laguna-xs rate limited. ROADMAP #4 ticked. Left as a Later idea: a small coding task per new model.

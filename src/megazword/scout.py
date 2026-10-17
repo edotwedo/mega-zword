@@ -183,6 +183,70 @@ def gather(catalog=None, endpoints=None, litellm=None, limit: int = MAX_MODELS):
     return sources, problems
 
 
+PROBE_SECONDS = 30
+PROBE = [{"role": "user", "content": "Call the finish tool with summary set to ok. Do not reply in text."}]
+
+
+def probe(backends: dict, names: list[str] | None = None, out_now: set[str] | None = None,
+          clock=None) -> list[tuple[str, str, float, str]]:
+    """One native tool call (the agent's finish tool) per available free API.
+
+    Coding needs tool calls, not just text, so this is the check that matters for a
+    new free model. At most one request per backend, paced like the agent. Skips
+    one-time grants (Tencent) unless named, out-marked sources, CLIs, and OpenRouter
+    models not listed free right now. Rows: (name, ok/failed/skipped, seconds, why).
+    """
+    import time
+    from .agent import TOOLS, pace_call
+    from .free_test import OPENROUTER_PROVIDERS, PROVIDERS, _safe_reason, openrouter_free_models
+    from .routing import FINITE_BACKENDS
+
+    clock = clock or time.monotonic
+    chosen = names is not None
+    names = list(dict.fromkeys(names if chosen else PROVIDERS))
+    finish = [t for t in TOOLS if t["function"]["name"] == "finish"]
+    allowed, catalog_error = openrouter_free_models(backends, names)
+    rows = []
+    for name in names:
+        backend = backends.get(name)
+        if name in (out_now or set()):
+            rows.append((name, "skipped", 0.0, "marked out"))
+            continue
+        if backend is None or not callable(getattr(backend, "chat", None)) or not backend.available():
+            if chosen:
+                rows.append((name, "skipped", 0.0, "not configured, or not a tool-call API"))
+            continue
+        if name in FINITE_BACKENDS and not chosen:
+            rows.append((name, "skipped", 0.0, "one-time grant; name it with --provider to probe"))
+            continue
+        if name in OPENROUTER_PROVIDERS and (catalog_error or getattr(backend, "model", "") not in (allowed or set())):
+            rows.append((name, "skipped", 0.0, catalog_error or "not listed free and tool-capable right now"))
+            continue
+        start = clock()
+        try:
+            pace_call(name, {}, start + 2 * PROBE_SECONDS)
+            start = clock()
+            reply = backend.chat(PROBE, tools=finish, timeout=PROBE_SECONDS)
+            calls = [c.get("function", {}).get("name") for c in reply.get("tool_calls") or []]
+            ok, why = ("ok", "") if "finish" in calls else ("failed", "answered without the finish tool call")
+        except Exception as exc:  # any provider error is a failed probe, never a crash
+            ok, why = "failed", _safe_reason(str(exc))
+        rows.append((name, ok, clock() - start, why))
+    return rows
+
+
+def test_command(backends: dict, names: list[str] | None = None, out_now: set[str] | None = None,
+                 out=print) -> int:
+    """`megazword scout --test`: print the probe table. 1 if a probe failed."""
+    rows = probe(backends, names, out_now)
+    out(f"{'provider':<30} {'result':<8} {'seconds':>7}  reason")
+    for name, ok, seconds, why in rows:
+        out(f"{name:<30} {ok:<8} {seconds:>7.1f}  {why}")
+    if not rows:
+        out("No free APIs to probe.")
+    return 1 if any(ok == "failed" for _, ok, _, _ in rows) else 0
+
+
 def command(path: Path | None = None, out=print, **fetchers) -> int:
     """`megazword scout`: update leads.json and print new providers first."""
     sources, problems = gather(**fetchers)

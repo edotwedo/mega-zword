@@ -209,3 +209,59 @@ def test_scout_is_a_cli_command(monkeypatch, tmp_path):
     called = []
     monkeypatch.setattr(scout, "command", lambda: called.append(1) or 0)
     assert main(["scout"]) == 0 and called
+
+
+class FakeAPI:
+    def __init__(self, reply=None, error=None, model="m", up=True):
+        self.reply, self.error, self.model, self.up, self.calls = reply, error, model, up, []
+
+    def available(self):
+        return self.up
+
+    def chat(self, messages, tools=None, timeout=None):
+        self.calls.append((messages, tools, timeout))
+        if self.error:
+            raise RuntimeError(self.error)
+        return self.reply
+
+
+FINISH = {"tool_calls": [{"id": "1", "function": {"name": "finish", "arguments": '{"summary": "ok"}'}}]}
+
+
+def test_probe_sends_one_finish_tool_call_per_free_api(monkeypatch, tmp_path):
+    from megazword import agent, config, free_test
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setattr(agent, "pace_call", lambda name, pace, deadline: None)
+    monkeypatch.setattr(free_test.openrouter_catalog, "fetch_catalog", lambda: {})
+    monkeypatch.setattr(free_test.openrouter_catalog, "free_tool_models", lambda c: [{"id": "free/model"}])
+    good, text, broken = FakeAPI(FINISH), FakeAPI({"content": "ok"}), FakeAPI(error="HTTP 500 boom")
+    grant, paid = FakeAPI(FINISH), FakeAPI(FINISH, model="paid/model")
+    router, down, out = FakeAPI(FINISH, model="free/model"), FakeAPI(FINISH, up=False), FakeAPI(FINISH)
+    backends = {"groq": good, "mistral": text, "cloudflare": broken, "tencent-glm-5.3": grant,
+                "kimi": paid, "openrouter": router, "zai": down, "ovh": out}
+    rows = {name: (ok, why) for name, ok, _, why in scout.probe(backends, out_now={"ovh"})}
+    assert rows["groq"] == ("ok", "") and rows["openrouter"] == ("ok", "")
+    assert rows["mistral"][0] == "failed" and "finish" in rows["mistral"][1]
+    assert rows["cloudflare"] == ("failed", "HTTP 500 boom")
+    assert rows["tencent-glm-5.3"][0] == "skipped" and not grant.calls  # one-time grant
+    assert rows["kimi"][0] == "skipped" and not paid.calls  # not free on OpenRouter right now
+    assert rows["ovh"] == ("skipped", "marked out") and not out.calls
+    assert "zai" not in rows and not down.calls
+    messages, tools, timeout = good.calls[0]
+    assert len(good.calls) == 1 and [t["function"]["name"] for t in tools] == ["finish"]
+    assert timeout == scout.PROBE_SECONDS
+    # Named explicitly, a grant is probed; the exit code reports any failure.
+    lines = []
+    assert scout.test_command(backends, ["tencent-glm-5.3"], out=lines.append) == 0
+    assert grant.calls and "tencent-glm-5.3" in lines[1] and " ok " in lines[1]
+    assert scout.test_command(backends, ["cloudflare"], out=lines.append) == 1
+
+
+def test_scout_test_flag_runs_the_probe(monkeypatch):
+    from megazword import cli
+    seen = []
+    monkeypatch.setattr(scout, "test_command", lambda b, names, out_now: seen.append(names) or 0)
+    monkeypatch.setattr(scout, "command", lambda: seen.append("leads") or 0)
+    assert cli.main(["scout", "--test", "--provider", "groq"], backends={}) == 0
+    assert cli.main(["scout"], backends={}) == 0
+    assert seen == [["groq"], "leads"]

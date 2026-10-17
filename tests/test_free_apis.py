@@ -394,8 +394,10 @@ def test_free_backends_are_registered_and_routed_before_paid_plans():
     assert {"openrouter-dots", "openrouter-nemotron-nano",
             "openrouter-nemotron-lightning", "openrouter-laguna-s",
             "openrouter-laguna-xs"}.issubset(backends)
-    assert all(name in config.DEFAULT_FREE_FAILOVER
-               for name in ("groq-120b", "groq-qwen", "groq-allam"))
+    assert all(name in config.DEFAULT_FREE_FAILOVER for name in ("groq-120b", "groq-qwen"))
+    assert "groq-allam" not in config.DEFAULT_FREE_FAILOVER  # its model has no tool calls
+    # Default ids gone from OpenRouter: not built unless config names another model.
+    assert not {"kimi", "deepseek", "qwen-coder"} & set(backends)
 
 
 def test_groq_model_aliases_use_verified_ids_and_shared_key(monkeypatch):

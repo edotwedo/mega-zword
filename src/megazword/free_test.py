@@ -42,6 +42,20 @@ def _safe_reason(reason: str) -> str:
     return reason[:160] or "request failed"
 
 
+def openrouter_free_models(providers: dict, names: list[str]) -> tuple[set[str] | None, str]:
+    """Model ids OpenRouter lists right now as free and tool-capable, fetched only
+    when an OpenRouter name is being probed. An error means: probe none of them."""
+    candidates = [providers.get(name) for name in names if name in OPENROUTER_PROVIDERS]
+    if not any(backend is not None and backend.available()
+               and callable(getattr(backend, "chat", None)) for backend in candidates):
+        return None, ""
+    try:
+        return {item["id"] for item in
+                openrouter_catalog.free_tool_models(openrouter_catalog.fetch_catalog())}, ""
+    except (OSError, TimeoutError, ValueError):
+        return None, "current free catalog unavailable; skipped to avoid an unverified charge"
+
+
 def command(backends: dict[str, Backend], free_models: dict[str, str],
             selected: list[str] | None = None, out: set[str] | None = None) -> int:
     """Probe selected free identities; out-marked providers are never called."""
@@ -52,19 +66,7 @@ def command(backends: dict[str, Backend], free_models: dict[str, str],
     rows: list[tuple[str, bool | None, float, str]] = []
     explicitly_selected_failure = False
 
-    candidates = [providers.get(name) for name in names if name in OPENROUTER_PROVIDERS]
-    candidates = [backend for backend in candidates if backend is not None
-                  and backend.available() and callable(getattr(backend, "chat", None))]
-    allowed_openrouter_models = None
-    catalog_error = ""
-    if candidates:
-        try:
-            allowed_openrouter_models = {
-                item["id"] for item in
-                openrouter_catalog.free_tool_models(openrouter_catalog.fetch_catalog())
-            }
-        except (OSError, TimeoutError, ValueError):
-            catalog_error = "current free catalog unavailable; skipped to avoid an unverified charge"
+    allowed_openrouter_models, catalog_error = openrouter_free_models(providers, names)
 
     for name in names:
         if name in out:

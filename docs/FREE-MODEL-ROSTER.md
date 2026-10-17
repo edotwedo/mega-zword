@@ -20,7 +20,7 @@ models are tried before the other free providers and plan-based CLI fallbacks.
 | Groq `groq` | `openai/gpt-oss-20b` | Answered; native tool use works | Groq Free: 30 RPM, 1,000 requests/day, 8K TPM, 200K TPD per model; response headers report remaining requests. |
 | Groq `groq-120b` | `openai/gpt-oss-120b` | Answered | Same published per-model limits; distinct model pool. |
 | Groq `groq-qwen` | `qwen/qwen3.8-27b` | Answered | Same published per-model limits; Chinese-origin Qwen retained. |
-| Groq `groq-allam` | `allam-2-7b` | Answered | Probe header showed 7,000 requests/day. |
+| Groq `groq-allam` | `allam-2-7b` | Answered text. Oct 17 `scout --test`: "tool calling is not supported with this model"; off the coding failover. | Probe header showed 7,000 requests/day. |
 | Gemini API `gemini-api` | `gemini-3.5-flash-lite` | Answered; 5 output tokens | Free tier; RPM/TPM/RPD are project- and model-specific in AI Studio. This is separate from Gemini CLI. |
 | Gemini API `gemini-api-31-lite` | `gemini-3.1-flash-lite` | Answered; 5 output tokens | Independent per-model quota under the same Google AI project key; shared conservative request pace. |
 | Z.AI `zai` | `glm-4.5-flash` | Earlier coding probe passed; live health probe on Oct 15 answered in 12.3 seconds. | Z.AI's exact key/model allowance was not published in the checked docs; use the account console and response headers. Chinese-origin GLM retained. |
