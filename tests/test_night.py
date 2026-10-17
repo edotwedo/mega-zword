@@ -325,7 +325,8 @@ def test_job_tests_get_no_keys_or_git_login(monkeypatch, tmp_path):
         monkeypatch.setenv(var, "x")
     env = night.test_env(tmp_path)
     assert not {"GH_TOKEN", "GITHUB_TOKEN", "XAI_API_KEY", "CLOUDFLARE_API_TOKEN", "MY_SECRET"} & set(env)
-    assert env["GIT_TERMINAL_PROMPT"] == "0" and env["GIT_CONFIG_KEY_0"] == "credential.helper"
+    assert env["GIT_TERMINAL_PROMPT"] == "0" and env["GIT_CONFIG_PARAMETERS"] == "'credential.helper='"
+    assert not any(k.startswith("GIT_CONFIG_") and k != "GIT_CONFIG_PARAMETERS" for k in env)
     assert env["MEGAZWORD_NO_USER_ENV"] == "1" and "PATH" in env
 
 

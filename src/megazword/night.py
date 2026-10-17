@@ -247,8 +247,13 @@ def test_env(work: Path) -> dict:
     env.update({"MEGAZWORD_NO_USER_ENV": "1", "MEGAZWORD_NO_APP": "1",
                 "MEGAZWORD_HOME": str(home() / "test-home"),
                 "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never",
-                "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "credential.helper",
-                "GIT_CONFIG_VALUE_0": ""})
+                # An empty credential.helper clears git's stored-login helpers. It goes in
+                # GIT_CONFIG_PARAMETERS, never as an empty variable: on Windows any code
+                # that rewrites os.environ (patch.dict in a test) deletes empty ones, and
+                # git then fails on a half-defined GIT_CONFIG_* set (2026-10-17 baselines).
+                "GIT_CONFIG_PARAMETERS": "'credential.helper='"})
+    for name in ("GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"):
+        env.pop(name, None)
     return env
 
 
