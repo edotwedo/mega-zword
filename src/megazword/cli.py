@@ -256,6 +256,8 @@ def show_usage() -> int:
                 reset = f", resets {w.resets_at.astimezone():%a %I:%M %p}" if w.resets_at else ""
                 parts.append(f"{w.name} {w.used_percent:.0f}%{reset}")
             print(f"{'':8}{' | '.join(parts)}")
+    from . import budget
+    print(budget.line())  # last saved reading; no network call here
     print("\nMega Zword runs (last 24h)")
     runs = summarize(config.HOME / "log.jsonl", timedelta(hours=24))
     print("AI      runs ok rej/bad sec chars est_tokens")

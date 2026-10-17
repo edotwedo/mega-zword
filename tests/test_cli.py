@@ -347,3 +347,11 @@ def test_usage_displays_token_totals_and_empty_backends(monkeypatch, capsys, cfg
             if (parts := line.split()) and parts[0] in ("claude", "codex", "grok")}
     assert rows["claude"][-1] == "17"
     assert rows["codex"][-1] == rows["grok"][-1] == "0"
+
+
+def test_usage_shows_cheap_budget_without_network(monkeypatch, capsys, cfg):
+    from megazword import budget, usage_sources
+    monkeypatch.setattr(usage_sources, "all_usage", lambda *args: [])
+    monkeypatch.setattr(budget, "_fetch_spend", lambda: (_ for _ in ()).throw(AssertionError("network")))
+    assert main(["usage"], {}, cfg) == 0
+    assert "Cheap paid (OpenRouter): cap $1.00/month" in capsys.readouterr().out
