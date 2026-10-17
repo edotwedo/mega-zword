@@ -41,3 +41,27 @@ def fetch_endpoints(model_id: str) -> Dict[str, Any]:
     with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
         return json.load(response)
 
+
+def zero_price_litellm(payload: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Parse LiteLLM's public price file and return zero-cost entries.
+    
+    Returns list of {"provider": str, "model": str} for entries where both
+    input_cost_per_token and output_cost_per_token are 0. Skips sample_spec
+    and entries without costs.
+    """
+    results = []
+    for model_name, model_info in payload.items():
+        if not isinstance(model_info, dict):
+            continue
+        if model_name == "sample_spec":
+            continue
+        costs = model_info.get("input_cost_per_token", 0), model_info.get("output_cost_per_token", 0)
+        if costs == (0, 0):
+            provider = model_info.get("litellm_provider")
+            if isinstance(provider, str) and provider.strip():
+                results.append({
+                    "provider": provider.strip(),
+                    "model": model_name
+                })
+    return sorted(results, key=lambda x: (x["provider"], x["model"]))
+
