@@ -235,6 +235,18 @@ def show_plan() -> int:
     return 0
 
 
+def free_spread_line(runs: dict) -> str:
+    """How many free sources did some work in the last 24 hours (Phil: a tiny bit
+    from every free source), and which ones sat idle."""
+    names = [n for n in config.DEFAULT_FREE_FAILOVER if not n.startswith("cheap-")]
+    idle = [n for n in names if n not in runs or not runs[n].runs]
+    line = f"Free sources used (24h): {len(names) - len(idle)} of {len(names)}"
+    if idle:
+        shown = ", ".join(idle[:8]) + (f" and {len(idle) - 8} more" if len(idle) > 8 else "")
+        line += f"; idle: {shown}"
+    return line
+
+
 def show_usage() -> int:
     from datetime import timedelta
     from .runlog import summarize
@@ -258,6 +270,7 @@ def show_usage() -> int:
             print(f"{'':8}{' | '.join(parts)}")
     from . import budget
     print(budget.line())  # last saved reading; no network call here
+    print(free_spread_line(summarize(config.HOME / "log.jsonl", timedelta(hours=24))))
     print("\nMega Zword runs (last 24h)")
     runs = summarize(config.HOME / "log.jsonl", timedelta(hours=24))
     print("AI      runs ok rej/bad sec chars est_tokens")

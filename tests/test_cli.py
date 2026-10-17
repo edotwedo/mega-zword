@@ -355,3 +355,14 @@ def test_usage_shows_cheap_budget_without_network(monkeypatch, capsys, cfg):
     monkeypatch.setattr(budget, "_fetch_spend", lambda: (_ for _ in ()).throw(AssertionError("network")))
     assert main(["usage"], {}, cfg) == 0
     assert "Cheap paid (OpenRouter): cap $1.00/month" in capsys.readouterr().out
+
+
+def test_free_spread_line_counts_used_and_idle_sources():
+    from types import SimpleNamespace
+    from megazword.cli import free_spread_line
+    total = len([n for n in config.DEFAULT_FREE_FAILOVER if not n.startswith("cheap-")])
+    line = free_spread_line({"groq": SimpleNamespace(runs=3), "zai": SimpleNamespace(runs=0)})
+    assert line.startswith(f"Free sources used (24h): 1 of {total}; idle: ")
+    assert "groq," not in line and line.endswith(f"and {total - 1 - 8} more")
+    every = {n: SimpleNamespace(runs=1) for n in config.DEFAULT_FREE_FAILOVER}
+    assert free_spread_line(every) == f"Free sources used (24h): {total} of {total}"
