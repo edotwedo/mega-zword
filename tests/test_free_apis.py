@@ -664,6 +664,9 @@ def test_each_ovh_model_is_its_own_keyless_pool():
     from megazword.free_apis import KEYLESS, free_backends
     backends = {b.name: b for b in free_backends(config.DEFAULT_FREE)}
     models = {n: backends[n].model for n in KEYLESS}
-    assert models == {"ovh": "Qwen3.5-397B-A17B", "ovh-120b": "gpt-oss-120b", "ovh-qwen": "Qwen3.8-27B"}
+    assert models == {"ovh": "Qwen3.5-397B-A17B", "ovh-120b": "gpt-oss-120b", "ovh-qwen": "Qwen3.8-27B",
+                      "kilo": "kilo-auto/free", "kilo-cohere": "cohere/north-mini-code:free",
+                      "kilo-nemotron": "nvidia/nemotron-3-super-120b-a12b:free"}
     assert all(backends[n].keyless and backends[n].available() for n in KEYLESS)
-    assert all(agent.DEFAULT_PACE[n] == 31 for n in KEYLESS)  # 2 requests/min per model
+    assert all(agent.DEFAULT_PACE[n] == 31 for n in KEYLESS if n.startswith("ovh"))  # 2/min per model
+    assert agent.DEFAULT_PACE["kilo"] == 18  # 200/hour per IP, shared by every kilo-* model

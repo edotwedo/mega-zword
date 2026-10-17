@@ -25,7 +25,8 @@ DEFAULT_PACE = {"gemini-api": 6, "mistral": 2, "groq": 2, "cloudflare": 1,
                 "openrouter": 3, "nvidia": 2, "zai": 2, "cerebras": 2,
                 "tencent": 2, "ollama": 0,
                 # Anonymous OVH allows 2 requests a minute per model.
-                "ovh": 31, "ovh-120b": 31, "ovh-qwen": 31}
+                "ovh": 31, "ovh-120b": 31, "ovh-qwen": 31,
+                "kilo": 18}  # Kilo: 200 requests/hour per IP, all models together
 
 
 def pace_call(name, pace, deadline):
@@ -40,6 +41,8 @@ def pace_call(name, pace, deadline):
         name = "nvidia"  # One Developer key; don't fan out concurrent requests.
     elif name.startswith("cheap-"):
         name = "openrouter"  # Same OpenRouter key as the free models.
+    elif name.startswith("kilo-"):
+        name = "kilo"  # One anonymous Kilo limit per IP across its free models.
     elif name.startswith("zai-"):
         name = "zai"  # One Z.ai key; the free models allow one request at a time.
     elif name.startswith("tencent-"):
