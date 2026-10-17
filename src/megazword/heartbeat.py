@@ -256,7 +256,17 @@ def _show(clone: Path, path: str) -> str:
     return res.stdout if res.returncode == 0 else ""
 
 
-def merge(clone: Path, branch: str, backends, cfg, review_fn=None) -> str:
+def _retest(work: Path) -> tuple[bool, str]:
+    """Full tests on the rebased step, the same command Night Shift uses."""
+    cmd, env = night.test_command(work, night.Job(0, " ", "", "rebased step", "tests pass"))
+    if not cmd:
+        return False, "no test command to check it"
+    res = night.run_cmd(cmd, work, night.TEST_MINUTES * 60, env)
+    tail = ((res.stdout or res.stderr or "").strip().splitlines() or [""])[-1]
+    return res.returncode == 0, tail[:200]
+
+
+def merge(clone: Path, branch: str, backends, cfg, review_fn=None, test_fn=None) -> str:
     """Review the night branch and merge it into main if nothing blocks it."""
     from . import review
     work = night.home() / "work" / ("merge_" + branch.replace("/", "_"))
@@ -268,9 +278,18 @@ def merge(clone: Path, branch: str, backends, cfg, review_fn=None) -> str:
         # Only the exact commit Night Shift tested may reach main: it must sit
         # directly on today's main (fast-forward), or the combination is untested.
         ahead = night.git(["merge-base", "--is-ancestor", "origin/main", f"origin/{branch}"], work)
+        rebased = ""
         if ahead.returncode != 0:
-            return "not merged: main moved while the job ran; the next beat starts fresh"
-        names = night.git(["diff", "--name-only", f"origin/main...origin/{branch}"], work).stdout.split()
+            # Other seats push to main while a beat runs. Put the step on top of the
+            # new main and test that exact result again instead of throwing it away.
+            if night.git(["rebase", "--quiet", "origin/main"], work).returncode != 0:
+                night.git(["rebase", "--abort"], work)
+                return "not merged: main moved and the step conflicts with it; the next beat starts fresh"
+            ok, detail = (test_fn or _retest)(work)
+            if not ok:
+                return f"not merged: main moved; tests fail on the new main ({detail})"
+            rebased = ", rebased onto the new main and retested"
+        names = night.git(["diff", "--name-only", "origin/main...HEAD"], work).stdout.split()
         if names and all(n.startswith(LOG_ONLY) for n in names):
             return "not merged: only notes changed, no real progress"
         if any(n.startswith("src/") for n in names) and not any(n.startswith("tests/") for n in names):
@@ -291,7 +310,7 @@ def merge(clone: Path, branch: str, backends, cfg, review_fn=None) -> str:
         if problem:
             return "not merged: " + problem
         night._check(night.git(["push", "--quiet", "origin", "HEAD:refs/heads/main"], work, 600), "git push main")
-        return f"merged into main ({len(raw)} reviewers, no agreed high findings)"
+        return f"merged into main ({len(raw)} reviewers, no agreed high findings{rebased})"
     finally:
         night.git(["worktree", "remove", "--force", str(work)], clone)
 

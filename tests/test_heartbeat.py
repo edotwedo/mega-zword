@@ -143,8 +143,30 @@ def test_merge_blocks_on_agreed_high_finding_and_merges_otherwise(tmp_path):
     _git(seed, "commit", "-qm", "someone else")
     _git(seed, "pull", "-q", "--no-rebase", "origin", "main")
     _git(seed, "push", "-q", "origin", "HEAD:main")
-    text = heartbeat.merge(clone, "night/t-2", {}, None, review_fn=lambda *a, **k: ([], two, ""))
-    assert text.startswith("not merged: main moved")
+    # main moved under the job: the step is rebased and retested, never shipped untested.
+    text = heartbeat.merge(clone, "night/t-2", {}, None, review_fn=lambda *a, **k: ([], two, ""),
+                           test_fn=lambda work: (False, "1 failed"))
+    assert text == "not merged: main moved; tests fail on the new main (1 failed)"
+    tested = []
+    text = heartbeat.merge(clone, "night/t-2", {}, None, review_fn=lambda *a, **k: ([], two, ""),
+                           test_fn=lambda work: tested.append(work) or (True, "ok"))
+    assert text.startswith("merged into main") and "rebased onto the new main" in text and tested
+    for name, value in (("a.py", "x = 3\n"), ("b.py", "y = 1\n")):
+        shown = subprocess.run(["git", "-C", str(bare), "show", f"main:{name}"], capture_output=True, text=True)
+        assert shown.stdout == value  # both the step and the other seat's work survive
+
+    # A step that conflicts with the new main is refused.
+    (seed / "a.py").write_text("x = 4\n")
+    _git(seed, "commit", "-qam", "job 3")
+    _git(seed, "push", "-q", "origin", "HEAD:refs/heads/night/t-3")
+    _git(seed, "reset", "-q", "--hard", "HEAD~1")
+    _git(seed, "pull", "-q", "--no-rebase", "origin", "main")
+    (seed / "a.py").write_text("x = 5\n")
+    _git(seed, "commit", "-qam", "someone else again")
+    _git(seed, "push", "-q", "origin", "HEAD:main")
+    text = heartbeat.merge(clone, "night/t-3", {}, None, review_fn=lambda *a, **k: ([], two, ""),
+                           test_fn=lambda work: pytest.fail("must not test a conflict"))
+    assert text.startswith("not merged: main moved and the step conflicts")
 
 
 def test_lock_is_atomic_and_stale_locks_expire(monkeypatch, tmp_path):
