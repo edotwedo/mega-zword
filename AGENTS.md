@@ -21,7 +21,9 @@ repo is the only handoff. Nothing lives only in a chat.
   designation, put it in the title of the terminal tab you run in. Try
   `python -c "open('CONOUT$','w').write(chr(27)+']0;YOUR-NAME'+chr(7))"`; if the tab
   doesn't change, ask Phil to rename it (right-click the tab, Rename Tab). Keep the
-  same designation for the whole session.
+  same designation for the whole session, including after a restart or summary.
+  Never rename yourself without asking Phil: STATUS, handoffs and scheduled tasks
+  refer to you by that name.
 - **Usage first, every time (Phil).** Before you start, claim or hand out any work: run `megazword usage`
   (on Phil's PC) or read the usage board in Q
   (https://github.com/edotwedo/workshop/pull/33#issuecomment-6115098816; over 30 minutes old means the
