@@ -455,3 +455,19 @@ def test_night_runs_are_written_to_the_run_log(origin, tmp_path):
     night.run_night(n, queue=str(origin), max_jobs=1, write=lambda s: None)
     runs = summarize(cfg.log_path, timedelta(days=1))
     assert runs["groq"].runs >= 1 and runs["groq"].est_tokens > 0
+
+
+def test_tests_run_with_console_python_even_under_pythonw(tmp_path, monkeypatch):
+    folder = tmp_path / "py"
+    folder.mkdir()
+    (folder / "python.exe").write_text("")
+    (folder / "pythonw.exe").write_text("")
+    monkeypatch.setattr(night.sys, "executable", str(folder / "pythonw.exe"))
+    assert night.console_python() == str(folder / "python.exe")
+    work = tmp_path / "repo"
+    (work / "tests").mkdir(parents=True)
+    (work / "pyproject.toml").write_text("")
+    cmd, _ = night.test_command(work, night.Job(0, " ", "", "t", "d"))
+    assert cmd[0] == str(folder / "python.exe")
+    monkeypatch.setattr(night.sys, "executable", str(folder / "python.exe"))
+    assert night.console_python() == str(folder / "python.exe")

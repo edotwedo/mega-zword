@@ -283,7 +283,9 @@ def test_step_failing_twice_is_shelved_with_a_note_and_next_task_picked(monkeypa
 def test_no_room_beats_and_merges_do_not_count_as_failures(monkeypatch):
     _fake_clone(monkeypatch)
     monkeypatch.setattr(night, "git", lambda args, cwd: SimpleNamespace(stdout="aaa\n", returncode=0))
-    outcomes = [night.Outcome(None, "skipped", reason="no AI has room: codex: out")] * 3
+    outcomes = [night.Outcome(None, "skipped", reason="no AI has room: codex: out"),
+                night.Outcome(None, "skipped", reason="baseline tests failed before model work: 9 failed"),
+                night.Outcome(None, "skipped", reason="no AI has room: codex: out")]
 
     class Runner:
         def run_job(self, job):

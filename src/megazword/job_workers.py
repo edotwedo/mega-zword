@@ -132,10 +132,10 @@ def _test(value) -> tuple[str, ...]:
         if args[1:3] != ["-m", "pytest"] and tuple(args[1:3]) != ("-m", "pytest"):
             raise ValueError("Python test commands must use -m pytest")
         _pytest_args(args[3:])
-        return (sys.executable, *args[1:])
+        return (night.console_python(), *args[1:])
     if exe in ("pytest", "pytest.exe"):
         _pytest_args(args[1:])
-        return (sys.executable, "-m", "pytest", *args[1:])
+        return (night.console_python(), "-m", "pytest", *args[1:])
     if exe in ("npm", "npm.cmd") and tuple(args[1:]) in (("test",), ("run", "typecheck")):
         return tuple(args)
     raise ValueError("supported tests: python -m pytest, pytest, npm test, npm run typecheck")

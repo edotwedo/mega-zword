@@ -211,7 +211,7 @@ def _failures(num: int, base: str) -> int:
     """Beats in a row, newest first, where step #num failed on this same main.
 
     A fix pushed to main changes `base` and so clears the count. Beats that
-    only found no AI with room cost nothing and don't count.
+    found no AI with room, or a broken baseline, cost no model use and don't count.
     """
     path = home() / "beats.jsonl"
     count = 0
@@ -226,7 +226,9 @@ def _failures(num: int, base: str) -> int:
         result = str(row.get("result", ""))
         if "merged into main" in result:
             break
-        if "no AI has room" not in result:
+        # No room, or a broken baseline (an environment problem, found before any
+        # model call), says nothing about the step itself.
+        if "no AI has room" not in result and "baseline tests failed" not in result:
             count += 1
     return count
 

@@ -257,6 +257,18 @@ def test_env(work: Path) -> dict:
     return env
 
 
+def console_python() -> str:
+    """The console python.exe beside a windowless pythonw.exe. The scheduled
+    heartbeat runs under pythonw, which has no stdout; tests started with it saw
+    no output from their Python children and failed (10:10 and 12:30 baselines,
+    2026-10-17)."""
+    exe = Path(sys.executable)
+    console = exe.with_name("python.exe")
+    if exe.name.lower() == "pythonw.exe" and console.exists():
+        return str(console)
+    return sys.executable
+
+
 def test_command(work: Path, job: Job) -> tuple[list[str] | None, dict | None]:
     """The job's own test command, else pytest for a Python repo. The checkout's
     src/ goes first on PYTHONPATH so tests import this branch, not Phil's install."""
@@ -268,7 +280,7 @@ def test_command(work: Path, job: Job) -> tuple[list[str] | None, dict | None]:
             return ["cmd", "/c", job.test], env
         return ["sh", "-c", job.test], env
     if (work / "pyproject.toml").exists() and (work / "tests").is_dir():
-        return [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider"], env
+        return [console_python(), "-m", "pytest", "-q", "-p", "no:cacheprovider"], env
     return None, None
 
 
