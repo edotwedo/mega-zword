@@ -24,10 +24,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config, night
+from .filelock import write_atomic
 
 GITEA = "http://127.0.0.1:3000/edotwedo/mega-zword.git"
 TASK_NAME = "MegaZword-Heartbeat"
 LOCK_HOURS = 3
+MAX_FAILS = 2  # same step failing this many beats in a row on the same main: shelve it
+SEAT = "heartbeat"  # its card in `megazword brief` / Catch me up
 ITEM = re.compile(r"^(?P<num>\d+)\.\s*\[(?P<mark>[ ~x!]|phil)\]\s*\*\*(?P<title>[^*]+)\*\*(?P<rest>.*)$")
 HANDOFF = re.compile(r"docs/handoffs/[\w.-]+\.md")
 
@@ -78,15 +81,22 @@ def claimed(item: Item, status: str) -> bool:
     return any(re.search(rf"ROADMAP #{item.num}\b", l) for l in active)
 
 
-def next_item(items: list[Item], status: str) -> tuple[Item | None, str]:
+def next_item(items: list[Item], status: str, shelved=()) -> tuple[Item | None, str]:
+    """First item that isn't done, waiting on Phil, failed, shelved or claimed.
+
+    Phil (2026-10-17): a stuck step is shelved with a note and the heartbeat
+    picks another task; it never stops dead.
+    """
+    skipped = []
     for item in items:
         if item.mark in ("x", "phil"):
             continue
-        if item.mark == "!":
-            return None, f"#{item.num} {item.title} failed last time; waiting for a person"
-        if claimed(item, status):
-            return None, f"#{item.num} {item.title} is claimed by a seat; waiting (no skipping ahead)"
+        if item.mark == "!" or item.num in shelved or claimed(item, status):
+            skipped.append(f"#{item.num}")
+            continue
         return item, ""
+    if skipped:
+        return None, f"nothing to pick: {', '.join(skipped)} shelved, failed or claimed"
     return None, "roadmap finished"
 
 
@@ -94,6 +104,55 @@ def home() -> Path:
     path = config.HOME / "heartbeat"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def shelf() -> dict:
+    try:
+        data = json.loads((home() / "shelf.json").read_text(encoding="utf-8"))
+        return {int(k): v for k, v in data.items()} if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_shelf(data: dict) -> None:
+    write_atomic(home() / "shelf.json", json.dumps({str(k): v for k, v in data.items()}, indent=2))
+
+
+def notes_path() -> Path:
+    return home() / "notes-for-phil.md"
+
+
+def shelve(item: Item, base: str, tries: list[str]) -> None:
+    """Set a stuck step aside and leave Phil a note for when he's back."""
+    data = shelf()
+    data[item.num] = {"title": item.title, "at": datetime.now().isoformat(timespec="minutes"),
+                      "base": base[:12]}
+    _save_shelf(data)
+    lines = [f"\n## Shelved #{item.num} {item.title} ({data[item.num]['at']})",
+             f"It failed {MAX_FAILS} beats in a row on main {base[:12]}, so the heartbeat moved on.",
+             "What happened:", *(f"- {t}" for t in tries),
+             f"To put it back: fix or clarify the step, then `megazword heartbeat unshelve {item.num}`.\n"]
+    with notes_path().open("a", encoding="utf-8") as out:
+        out.write("\n".join(lines))
+
+
+def unshelve(num: int, write=print) -> int:
+    data = shelf()
+    if data.pop(num, None) is None:
+        write(f"[heartbeat] #{num} is not on the shelf")
+        return 1
+    _save_shelf(data)
+    write(f"[heartbeat] #{num} is back in the work order")
+    return 0
+
+
+def _card(state: str, doing: str, done: str, blocked: str = "", next_step: str = "") -> None:
+    from . import briefing
+    try:
+        briefing.publish({"seat": SEAT, "project": "mega-zword", "state": state, "doing": doing,
+                          "done": done, "blocked": blocked, "next": next_step})
+    except (OSError, ValueError):
+        pass  # the card is a convenience; never fail a beat over it
 
 
 def _locked() -> bool:
@@ -144,6 +203,50 @@ def _record(**row) -> None:
     row = {"time": datetime.now(timezone.utc).isoformat(timespec="seconds"), **row}
     with (home() / "beats.jsonl").open("a", encoding="utf-8") as out:
         out.write(json.dumps(row) + "\n")
+
+
+def _failures(num: int, base: str) -> int:
+    """Beats in a row, newest first, where step #num failed on this same main.
+
+    A fix pushed to main changes `base` and so clears the count. Beats that
+    only found no AI with room cost nothing and don't count.
+    """
+    path = home() / "beats.jsonl"
+    count = 0
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    for line in reversed(lines):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if row.get("item") != num or row.get("base") != base:
+            break
+        result = str(row.get("result", ""))
+        if "merged into main" in result:
+            break
+        if "no AI has room" not in result:
+            count += 1
+    return count
+
+
+def _tries(num: int, base: str) -> list[str]:
+    path = home() / "beats.jsonl"
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines() if path.exists() else []:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if row.get("item") == num and row.get("base") == base:
+            rows.append(f"{row.get('time', '')[:16]} {row.get('result', '')}"[:400])
+    return rows[-MAX_FAILS:]
+
+
+def _shelf_line(shelved: dict) -> str:
+    if not shelved:
+        return ""
+    names = ", ".join(f"#{n} {v.get('title', '')}" for n, v in sorted(shelved.items()))
+    return f"Shelved for Phil: {names}. Notes: {notes_path()}"
 
 
 def _show(clone: Path, path: str) -> str:
@@ -199,9 +302,12 @@ def beat(backends, cfg: config.Config, runner=None, merger=merge, write=print) -
     try:
         clone = night.cache_clone(GITEA)
         roadmap, status = _show(clone, "docs/ROADMAP.md"), _show(clone, "docs/STATUS.md")
-        item, why = next_item(parse(roadmap), status)
+        shelved = shelf()
+        item, why = next_item(parse(roadmap), status, shelved)
         if item is None:
+            _card("waiting", "", why, _shelf_line(shelved))
             return _done(write, why)
+        base = night.git(["rev-parse", "origin/main"], clone).stdout.strip()
         refs = HANDOFF.findall(item.body)
         handoff = "".join(f"\nHandoff {ref}:\n{_show(clone, ref)}\n" for ref in refs[:1])
         log_file = refs[0] if refs else f"docs/handoffs/roadmap-{item.num}.md"
@@ -215,8 +321,15 @@ def beat(backends, cfg: config.Config, runner=None, merger=merge, write=print) -
             result += f" ({out.reason[:200]})"
         if out.status == "done" and out.tests == "passed" and out.branch:
             result += "; " + merger(clone, out.branch, backends, cfg)
-        _record(item=item.num, status=out.status, ai=out.ai, branch=out.branch,
+        _record(item=item.num, base=base, status=out.status, ai=out.ai, branch=out.branch,
                 tests=out.tests, result=result)
+        merged = "merged into main" in result
+        if not merged and _failures(item.num, base) >= MAX_FAILS:
+            shelve(item, base, _tries(item.num, base))
+            shelved = shelf()
+            result += f"; shelved #{item.num}, note in {notes_path()}"
+        _card("blocked" if shelved else "working", f"roadmap #{item.num} {item.title}",
+              result[:600], _shelf_line(shelved), "next beat picks the next open step")
         return _done(write, result)
     finally:
         (home() / "lock").unlink(missing_ok=True)
@@ -263,6 +376,11 @@ def status(write=print) -> int:
     path = home() / "beats.jsonl"
     rows = path.read_text(encoding="utf-8").splitlines()[-5:] if path.exists() else []
     write(f"STOP file: {'set' if night.stop_path().exists() else 'not set'}")
+    shelved = shelf()
+    for num, row in sorted(shelved.items()):
+        write(f"shelved: #{num} {row.get('title', '')} since {row.get('at', '')}")
+    if shelved:
+        write(f"notes for Phil: {notes_path()}")
     write("last beats:" if rows else "no beats yet")
     for line in rows:
         try:
@@ -275,7 +393,9 @@ def status(write=print) -> int:
 
 def add_parser(sub) -> None:
     p = sub.add_parser("heartbeat", help="work the roadmap on a schedule")
-    p.add_argument("action", nargs="?", choices=("status", "run", "install", "remove"), default="status")
+    p.add_argument("action", nargs="?", choices=("status", "run", "install", "remove", "unshelve"),
+                   default="status")
+    p.add_argument("item", nargs="?", type=int, help="roadmap item number (unshelve)")
     p.add_argument("--start", default="09:00", help="first beat of the day (install)")
     p.add_argument("--until", default="23:00", help="last beat of the day (install)")
     p.add_argument("--every", type=int, default=2, help="hours between beats (install)")
@@ -288,6 +408,11 @@ def command(args, backends, cfg: config.Config) -> int:
         return 0
     if args.action == "install":
         return install(args.start, args.every, args.until, args.yes)
+    if args.action == "unshelve":
+        if args.item is None:
+            print("[heartbeat] unshelve needs a roadmap item number, e.g. `megazword heartbeat unshelve 4`")
+            return 2
+        return unshelve(args.item)
     if args.action == "remove":
         res = night._schtasks(["/Delete", "/TN", TASK_NAME, "/F"])
         print("[heartbeat] removed" if res.returncode == 0 else "[heartbeat] no task to remove")

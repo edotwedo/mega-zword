@@ -34,19 +34,20 @@ def test_parse_reads_items_marks_and_done_when():
     assert items[1].done_when == "keys load from the vault and tests pass."
 
 
-def test_next_item_skips_phil_items_and_waits_on_claims():
+def test_next_item_skips_phil_and_claimed_items():
     items = heartbeat.parse(ROADMAP)
     item, _ = heartbeat.next_item(items, "# Status\n**Active: none.**")
     assert item.num == 2
     claimed = "# Status\n**Active: Lark-17 (Codex) 3 PM. ROADMAP #2 Keymaster.**"
-    item, why = heartbeat.next_item(items, claimed)
-    assert item is None and "#2" in why and "no skipping" in why
+    item, _ = heartbeat.next_item(items, claimed)
+    assert item.num == 3  # someone has #2; the heartbeat picks another task
 
 
-def test_failed_item_stops_the_heartbeat():
+def test_failed_or_shelved_items_are_skipped_not_a_dead_stop():
     items = heartbeat.parse(ROADMAP.replace("2. [ ]", "2. [!]"))
-    item, why = heartbeat.next_item(items, "")
-    assert item is None and "failed" in why
+    assert heartbeat.next_item(items, "")[0].num == 3
+    item, why = heartbeat.next_item(heartbeat.parse(ROADMAP), "", shelved={2: {}, 3: {}})
+    assert item is None and "#2, #3" in why
 
 
 def _fake_clone(monkeypatch, roadmap=ROADMAP, status="**Active: none.**"):
@@ -225,3 +226,44 @@ def test_lock_left_by_a_dead_beat_is_taken_over(tmp_path):
     (tmp_path / "heartbeat" / "lock").write_text("999999 2026-10-16 17:12")  # no such process
     assert heartbeat._locked() is False
     assert heartbeat._alive(__import__("os").getpid()) is True
+
+
+def test_step_failing_twice_is_shelved_with_a_note_and_next_task_picked(monkeypatch):
+    from megazword import briefing
+    _fake_clone(monkeypatch)
+    monkeypatch.setattr(night, "git", lambda args, cwd: SimpleNamespace(stdout="aaa\n", returncode=0))
+    jobs = []
+
+    class Runner:
+        def run_job(self, job):
+            jobs.append(job.task)
+            return night.Outcome(job, "failed", reason="agent step cap reached (60)")
+
+    def beat():
+        return heartbeat.beat({}, config.Config(), runner=Runner(),
+                              merger=lambda *a: pytest.fail("must not merge"), write=lambda s: None)
+
+    assert "shelved" not in beat()
+    assert "shelved #2" in beat()
+    assert heartbeat.shelf()[2]["title"] == "Keymaster"
+    note = heartbeat.notes_path().read_text(encoding="utf-8")
+    assert "## Shelved #2 Keymaster" in note and "step cap" in note and "unshelve 2" in note
+    card = briefing.snapshot()
+    assert "Shelved for Phil: #2 Keymaster" in str(card)
+    beat()
+    assert "ROADMAP item 3: Heartbeat" in jobs[-1]  # moved on to the next task
+    assert heartbeat.unshelve(2, write=lambda s: None) == 0 and 2 not in heartbeat.shelf()
+
+
+def test_no_room_beats_and_merges_do_not_count_as_failures(monkeypatch):
+    _fake_clone(monkeypatch)
+    monkeypatch.setattr(night, "git", lambda args, cwd: SimpleNamespace(stdout="aaa\n", returncode=0))
+    outcomes = [night.Outcome(None, "skipped", reason="no AI has room: codex: out")] * 3
+
+    class Runner:
+        def run_job(self, job):
+            return outcomes.pop()
+
+    for _ in range(3):
+        assert not heartbeat.beat({}, config.Config(), runner=Runner(),
+                                  write=lambda s: None).startswith("stopped")

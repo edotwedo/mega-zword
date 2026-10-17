@@ -3,7 +3,7 @@
 The enforced order of work (Phil, 2026-10-16). Work the first unfinished item.
 Don't start a later item while an earlier one is open, unless it is blocked on
 Phil; then mark it `[phil]` and move to the next. Each item has a "done when".
-Mark items `[x]` with date, who and commit when finished. To claim an item, write `ROADMAP #N` on your Active line in docs/STATUS.md; the heartbeat waits on claimed items and never skips ahead. Marks: `[ ]` open, `[~]` in progress, `[phil]` waiting on Phil (skipped), `[!]` failed (heartbeat stops), `[x]` done.
+Mark items `[x]` with date, who and commit when finished. To claim an item, write `ROADMAP #N` on your Active line in docs/STATUS.md; the heartbeat leaves claimed items to their seat and takes the next open one. If a step fails 2 beats in a row, the heartbeat shelves it, writes Phil a note (`~/.megazword/heartbeat/notes-for-phil.md`, also on its Catch me up card) and picks another task (Phil, 2026-10-17); `megazword heartbeat unshelve N` puts it back. Marks: `[ ]` open, `[~]` in progress, `[phil]` waiting on Phil (skipped), `[!]` failed (skipped), `[x]` done.
 
 Mega Zword's two jobs: (1) get free AI credits by any legal means and keep a
 cushion; (2) finish big coding projects with many models working together.
