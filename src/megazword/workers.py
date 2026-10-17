@@ -64,7 +64,7 @@ def roster():
         key = f"{tab['client']}-{session}"
         reachable = _live(runtime) and runtime.get('inbox_version') == 1
         card = next((c for c in cards.values() if c.get('session') == session), {})
-        found[key] = {'id': key, 'seat': card.get('seat') or f"{tab['client']} · {session[:8]}",
+        found[key] = {'id': key, 'seat': card.get('seat') or tab.get('designation') or f"{tab['client']} · {session[:8]}",
                       'session': session, 'client': tab['client'], 'connected': True,
                       'reachable': bool(reachable), 'transport': 'terminal',
                       'state': card.get('state', 'unknown'), 'doing': card.get('doing', '')}

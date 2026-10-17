@@ -23,6 +23,14 @@ def test_saved_working_report_does_not_fake_a_connected_worker():
         workers.send('bramble-16', 'Who are you?')
 
 
+def test_launcher_designation_labels_native_worker_without_faking_reachability(monkeypatch):
+    monkeypatch.setattr(ws, 'discover', lambda _: [
+        {'client': 'codex', 'session': 'named-session', 'designation': 'Briar-17'}])
+    worker, = workers.roster()
+    assert worker['seat'] == 'Briar-17'
+    assert worker['connected'] and not worker['reachable']
+
+
 def test_two_codex_workers_do_not_overwrite_each_other():
     one = workers.connect('codex', 'session-one')
     two = workers.connect('codex', 'session-two')

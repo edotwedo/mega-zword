@@ -6,6 +6,39 @@ from types import SimpleNamespace
 import pytest
 
 from megazword import workspace as w
+
+
+def test_named_native_cli_is_discovered_despite_appserver_source(tmp_path, monkeypatch):
+    codex = tmp_path / '.codex'
+    codex.mkdir()
+    with sqlite3.connect(codex / 'state_5.sqlite') as db:
+        db.execute('CREATE TABLE threads(id,cwd,model,rollout_path,source,created_at)')
+        db.executemany('INSERT INTO threads VALUES (?,?,?,?,?,?)', [
+            ('named-live', str(tmp_path), 'model', 'log', 'vscode', 1),
+            ('named-closed', str(tmp_path), 'model', 'log', 'vscode', 2),
+            ('desktop-unregistered', str(tmp_path), 'model', 'log', 'vscode', 3),
+            ('regular-cli', str(tmp_path), 'model', 'log', 'cli', 4)])
+    registry = tmp_path / 'AppData/Local/MegaZword/CodexNames/designations.sqlite'
+    registry.parent.mkdir(parents=True)
+    with sqlite3.connect(registry) as db:
+        db.execute('CREATE TABLE names(thread_id,name)')
+        db.executemany('INSERT INTO names VALUES (?,?)', [('named-live', 'Briar-17'), ('named-closed', 'Clover-17')])
+    monkeypatch.setattr(w, 'session_locked', lambda sid, user_home: sid != 'named-closed')
+    rows = w.discover(tmp_path)
+    assert [r['session'] for r in rows] == ['named-live', 'regular-cli']
+    assert rows[0]['title'] == rows[0]['designation'] == 'Briar-17'
+    snapshot = w.merge_snapshot({}, rows)
+    assert snapshot['tabs'][0]['title'] == 'Briar-17'
+
+
+def test_missing_name_registry_does_not_promote_desktop_sessions(tmp_path, monkeypatch):
+    codex = tmp_path / '.codex'
+    codex.mkdir()
+    with sqlite3.connect(codex / 'state_5.sqlite') as db:
+        db.execute('CREATE TABLE threads(id,cwd,model,rollout_path,source,created_at)')
+        db.execute('INSERT INTO threads VALUES (?,?,?,?,?,?)', ('desktop', str(tmp_path), 'model', 'log', 'vscode', 1))
+    monkeypatch.setattr(w, 'session_locked', lambda *args: pytest.fail('unregistered desktop row must not be tested as native CLI'))
+    assert w.discover(tmp_path) == []
 from megazword.workspace_terminal import ReturnQueue, escape_input
 from megazword.face_identity import matches
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import ctypes
 from datetime import datetime
 import json
@@ -99,14 +100,30 @@ def discover(user_home=None):
     """Read native registries, not chat contents. Only CLI Codex writers qualify."""
     user_home = user_home or Path.home()
     found = []
+    # The named launcher creates metadata before opening the native CLI.
+    # Codex stores those rows as vscode, so source alone cannot identify them.
+    # Only launcher-registered IDs with an actual live writer qualify below.
+    names = {}
+    registry = user_home / 'AppData/Local/MegaZword/CodexNames/designations.sqlite'
+    if registry.exists():
+        try:
+            with closing(sqlite3.connect(registry.as_uri() + '?mode=ro', uri=True, timeout=2)) as c:
+                names = dict(c.execute('SELECT thread_id,name FROM names'))
+        except sqlite3.Error:
+            pass
     db = user_home / '.codex/state_5.sqlite'
     if db.exists():
         with sqlite3.connect(db.as_uri() + '?mode=ro', uri=True, timeout=2) as c:
-            for sid, cwd, model, rollout in c.execute(
-                    "SELECT id,cwd,model,rollout_path FROM threads WHERE source='cli' ORDER BY created_at"):
+            for sid, cwd, model, rollout, source in c.execute(
+                    "SELECT id,cwd,model,rollout_path,source FROM threads ORDER BY created_at"):
+                if source != 'cli' and sid not in names:
+                    continue
                 if session_locked(sid, user_home):
-                    found.append(dict(client='codex', session=sid, cwd=cwd.removeprefix('\\\\?\\'),
-                                      model=model, log=rollout, active=True))
+                    row = dict(client='codex', session=sid, cwd=cwd.removeprefix('\\\\?\\'),
+                               model=model, log=rollout, active=True)
+                    if sid in names:
+                        row.update(title=names[sid], designation=names[sid])
+                    found.append(row)
     for item in load(user_home / '.grok/active_sessions.json', []):
         started = registered_start(item)
         if alive(item.get('pid'), started=started, name='grok.exe'):
@@ -136,7 +153,7 @@ def merge_snapshot(previous, current):
             by_id[key].update(item)
         else:
             row = dict(item)
-            row['title'] = f"{item['client']} - {Path(item['cwd']).name}"
+            row.setdefault('title', f"{item['client']} - {Path(item['cwd']).name}")
             row['color'] = COLORS.get(item['client'], '#777777')
             rows.append(row)
             by_id[key] = row
