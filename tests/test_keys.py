@@ -149,3 +149,16 @@ def test_all_backend_prompts_and_errors_scrub_vault_values(store):
             raise RuntimeError("fake-private-value")
     result = Fake("fake", trains_on_data=False).run("fake-private-value")
     assert not result.ok and "fake-private-value" not in result.error
+
+
+def test_payload_redaction_reads_the_vault_once_and_scrubs_every_string(monkeypatch):
+    reads = []
+
+    def read(name):
+        reads.append(name)
+        return "vault-secret-value" if name == "GROQ_API_KEY" else None
+    monkeypatch.setattr(vault, "read", read)
+    payload = [{"role": "user", "content": f"line {i} vault-secret-value"} for i in range(20)]
+    out = keys.redact_payload(payload)
+    assert all("vault-secret-value" not in m["content"] and "[REDACTED]" in m["content"] for m in out)
+    assert len(reads) == len(keys.key_names())  # one pass over the vault, not one per string

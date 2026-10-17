@@ -25,8 +25,8 @@ def get_key(env_name: str) -> str | None:
         return None
 
 
-def redact_known(text: str, mask: str = "[REDACTED]") -> str:
-    """Also scrub vault copies shadowed by environment overrides."""
+def _secret_values() -> list[str]:
+    """Every credential value from the environment and the vault, longest first."""
     values = {value for name, value in os.environ.items()
               if value and re.search(r"KEY|TOKEN|SECRET|PASSWORD|ACCOUNT_ID", name, re.I)}
     for name in key_names():
@@ -36,19 +36,29 @@ def redact_known(text: str, mask: str = "[REDACTED]") -> str:
             continue
         if value:
             values.add(value)
-    for value in sorted(values, key=len, reverse=True):
+    return sorted(values, key=len, reverse=True)
+
+
+def redact_known(text: str, mask: str = "[REDACTED]", values: list[str] | None = None) -> str:
+    """Also scrub vault copies shadowed by environment overrides."""
+    for value in _secret_values() if values is None else values:
         text = text.replace(value, mask)
     return text
 
 
-def redact_payload(value):
-    """Preserve message structure while scrubbing strings before JSON encoding."""
+def redact_payload(value, _values: list[str] | None = None):
+    """Preserve message structure while scrubbing strings before JSON encoding.
+
+    The vault is read once per payload, not once per string (Greptile, PR #59):
+    a chat turn has many strings and each vault read is a Credential Manager call.
+    """
+    values = _secret_values() if _values is None else _values
     if isinstance(value, str):
-        return redact_known(value)
+        return redact_known(value, values=values)
     if isinstance(value, list):
-        return [redact_payload(item) for item in value]
+        return [redact_payload(item, values) for item in value]
     if isinstance(value, dict):
-        return {key: redact_payload(item) for key, item in value.items()}
+        return {key: redact_payload(item, values) for key, item in value.items()}
     return value
 
 
