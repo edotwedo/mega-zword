@@ -328,6 +328,9 @@ def collect(repo: Path, backends: dict[str, Backend], cfg: config.Config, base: 
         write("[megazword] nothing to review")
         return None, {}, ""
     shown, note = clip(diff)
+    if use_greptile and base and base not in ("origin/main", "main"):
+        # Greptile's temporary PR always targets main, so it sees more than the free reviewers.
+        write(f"[megazword] note: Greptile reviews against main, the free reviewers against {base}")
     # Pick spares too: a reviewer that fails is replaced by one from another family.
     picked = pick_reviewers(backends, count + SPARES, cfg.log_path)
     reviewers, spares = picked[:count], picked[count:]

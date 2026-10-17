@@ -185,3 +185,13 @@ def test_greptile_credit_is_reserved_and_refunded_when_no_pr(tmp_path, monkeypat
     assert findings == [] and "PR not created: no access" in status
     assert ("push", "github", "--delete", "review/abc1234") in deleted
     assert review.greptile_used_this_month(tmp_path / "reviews.jsonl") == 0  # reserved, then refunded
+
+
+def test_greptile_with_another_base_warns(tmp_path, monkeypatch):
+    monkeypatch.setattr(review, "change", lambda repo, base=None: ("diff --git a/a b/a\n+x\n", "label"))
+    monkeypatch.setattr(review, "pick_reviewers", lambda *a, **k: [])
+    monkeypatch.setattr(review, "greptile", lambda repo, label: ([], "greptile: done"))
+    cfg = SimpleNamespace(log_path=tmp_path / "log.jsonl", log_lines=100, timeouts={})
+    out = []
+    review.collect(tmp_path, {}, cfg, base="v1.0", use_greptile=True, write=out.append)
+    assert any("Greptile reviews against main" in line for line in out)
