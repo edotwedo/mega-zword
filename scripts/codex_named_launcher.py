@@ -36,6 +36,8 @@ def invocation(args):
     """Return new/resume/pass and target cwd without interpreting prompt text."""
     if any(a in ("-h", "--help", "-V", "--version") for a in args):
         return "pass", Path.cwd()
+    if any(a == "--worktree" or a == "--remote" or a.startswith("--remote=") for a in args):
+        return "pass", Path.cwd()  # Preserve native remote/worktree creation semantics.
     cwd, i = Path.cwd(), 0
     while i < len(args):
         arg = args[i]
@@ -93,8 +95,12 @@ class RPC:
         self.messages = queue.Queue()
         self.next_id = 0
         threading.Thread(target=self._read, daemon=True).start()
-        self.call("initialize", {"clientInfo": {"name": "hive-session-namer", "title": "Hive named Codex launcher", "version": "1.0"}})
-        self.send({"method": "initialized", "params": {}})
+        try:
+            self.call("initialize", {"clientInfo": {"name": "hive-session-namer", "title": "Hive named Codex launcher", "version": "1.0"}})
+            self.send({"method": "initialized", "params": {}})
+        except Exception:
+            self.close()
+            raise
 
     def _read(self):
         for line in self.process.stdout:
@@ -124,11 +130,15 @@ class RPC:
         raise RuntimeError("Codex metadata operation timed out: " + method)
 
     def close(self):
-        self.process.terminate()
+        self.process.stdin.close()
         try:
             self.process.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            self.process.kill()
+            if os.name == "nt":
+                subprocess.run(["taskkill.exe", "/PID", str(self.process.pid), "/T", "/F"],
+                               capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                self.process.kill()
             self.process.wait(timeout=5)
 
 
