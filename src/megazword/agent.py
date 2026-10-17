@@ -24,7 +24,8 @@ from .agent_quality import check_tests, is_test_path
 DEFAULT_PACE = {"gemini-api": 6, "mistral": 2, "groq": 2, "cloudflare": 1,
                 "openrouter": 3, "nvidia": 2, "zai": 2, "cerebras": 2,
                 "tencent": 2, "ollama": 0,
-                "ovh": 31}  # anonymous OVH allows 2 requests a minute
+                # Anonymous OVH allows 2 requests a minute per model.
+                "ovh": 31, "ovh-120b": 31, "ovh-qwen": 31}
 
 
 def pace_call(name, pace, deadline):

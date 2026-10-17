@@ -19,7 +19,7 @@ PROVIDERS = (
     "mistral", "cloudflare", "openrouter", "kimi",
     "deepseek", "qwen-coder", "openrouter-dots", "openrouter-nemotron-nano",
     "openrouter-nemotron-lightning", "openrouter-laguna-s", "openrouter-laguna-xs",
-    "nvidia", "nvidia-lightning", "zai", "zai-47", "ovh",
+    "nvidia", "nvidia-lightning", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen",
     "tencent-glm-5.3-flash", "tencent-glm-5.3",
     "tencent-kimi-k2.7-code", "tencent-kimi-k3",
     "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",

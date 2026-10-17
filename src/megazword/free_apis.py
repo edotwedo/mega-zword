@@ -450,7 +450,7 @@ def cheap_backends(models: dict[str, str]) -> list[Backend]:
 
 
 # Free sources that need no key or signup.
-KEYLESS = ("ovh",)
+KEYLESS = ("ovh", "ovh-120b", "ovh-qwen")
 
 FREE_KEYS = (
     ("kimi", "OPENROUTER_API_KEY"),
@@ -575,7 +575,8 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
               ("openrouter-laguna-xs", "https://openrouter.ai/api/v1", "poolside/laguna-xs-2.1:free", "OPENROUTER_API_KEY", True))],
         # OVHcloud AI Endpoints, anonymous: 2 requests/min per IP and per model,
         # no account (verified 2026-10-16). Unknown data terms, so scrub like OpenRouter.
-        OpenAICompatibleBackend("ovh", base_url="https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
-                                model=m.get("ovh", "Qwen3.5-397B-A17B"), keyless=True,
-                                trains_on_data=True),
+        *[OpenAICompatibleBackend(name, base_url="https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+                                  model=m.get(name, model), keyless=True, trains_on_data=True)
+          for name, model in (("ovh", "Qwen3.5-397B-A17B"), ("ovh-120b", "gpt-oss-120b"),
+                              ("ovh-qwen", "Qwen3.8-27B"))],
     ]

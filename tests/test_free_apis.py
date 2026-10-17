@@ -657,3 +657,13 @@ def test_keyed_backend_without_key_still_refuses(monkeypatch):
     assert not backend.available()
     with pytest.raises(RuntimeError, match="API key not set"):
         backend.chat([{"role": "user", "content": "hi"}])
+
+
+def test_each_ovh_model_is_its_own_keyless_pool():
+    from megazword import agent
+    from megazword.free_apis import KEYLESS, free_backends
+    backends = {b.name: b for b in free_backends(config.DEFAULT_FREE)}
+    models = {n: backends[n].model for n in KEYLESS}
+    assert models == {"ovh": "Qwen3.5-397B-A17B", "ovh-120b": "gpt-oss-120b", "ovh-qwen": "Qwen3.8-27B"}
+    assert all(backends[n].keyless and backends[n].available() for n in KEYLESS)
+    assert all(agent.DEFAULT_PACE[n] == 31 for n in KEYLESS)  # 2 requests/min per model
