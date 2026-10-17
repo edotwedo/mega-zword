@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config, log
+from .filelock import locked
 from .backends import Backend, Result
 
 REVIEWERS = 1          # routine change; the heartbeat uses 2 before merging (Phil, 2026-10-16)
@@ -119,12 +120,30 @@ def parse(text: str, by: str) -> list[Finding]:
             for m in FINDING.finditer(text or "")]
 
 
+WORD = re.compile(r"[a-z_][a-z0-9_]{3,}")
+COMMON = {"this", "that", "with", "when", "from", "should", "could", "would", "will", "line",
+          "code", "here", "there", "which", "into", "than", "then", "also", "only", "does"}
+
+
+def _words(text: str) -> set[str]:
+    return set(WORD.findall(text.lower())) - COMMON
+
+
+def _same_problem(a: Finding, b: Finding, near: int) -> bool:
+    """Same file, and the same line or a nearby line that names the same thing.
+    Two different bugs a few lines apart are not agreement (Greptile, PR #59)."""
+    if not (a.path.endswith(b.path) or b.path.endswith(a.path)):
+        return False
+    if a.line == b.line:
+        return True
+    return abs(a.line - b.line) <= near and bool(_words(a.text) & _words(b.text))
+
+
 def merge(findings: list[Finding], near: int = 3) -> list[Finding]:
-    """Same file and a line within `near` = same finding, reported by several."""
+    """The same problem reported by several reviewers becomes one finding."""
     merged: list[Finding] = []
     for f in findings:
-        same = next((m for m in merged if m.path.endswith(f.path) or f.path.endswith(m.path)
-                     if abs(m.line - f.line) <= near), None)
+        same = next((m for m in merged if _same_problem(m, f, near)), None)
         if same and not set(f.by) & set(same.by):
             same.by += f.by
             if SEVERITY.get(f.severity, 2) < SEVERITY.get(same.severity, 2):
@@ -183,25 +202,37 @@ def greptile(repo: Path, label: str, wait_minutes: float = 15, poll: float = 30,
              sleep=time.sleep) -> tuple[list[Finding], str]:
     """Push HEAD to a review branch on GitHub, open a PR, collect Greptile's
     comments, close the PR and delete the branch. Returns findings and a status line."""
-    used = greptile_used_this_month()
-    if used >= GREPTILE_MONTHLY:
-        return [], f"greptile skipped: {used}/{GREPTILE_MONTHLY} credits used this month"
     sha = git(repo, "rev-parse", "--short", "HEAD").stdout.strip()
+
+    def note(credits: int, **row) -> None:
+        with reviews_path().open("a", encoding="utf-8") as out:
+            out.write(json.dumps({"time": datetime.now(timezone.utc).isoformat(), "reviewer": "greptile",
+                                  "credits": credits, "sha": sha, **row}) + "\n")
+
+    # Check and reserve in one step, so two reviews at once can't both take the last credit.
+    with locked(reviews_path()):
+        used = greptile_used_this_month()
+        if used >= GREPTILE_MONTHLY:
+            return [], f"greptile skipped: {used}/{GREPTILE_MONTHLY} credits used this month"
+        note(1, status="reserved")
     branch = f"review/{sha}"
     pushed = git(repo, "push", "github", f"HEAD:refs/heads/{branch}", timeout=300)
     if pushed.returncode != 0:
+        note(-1, status="refund: push failed")
         return [], f"greptile skipped: push to GitHub failed: {pushed.stderr.strip()[:200]}"
-    made = _gh("pr", "create", "--repo", "edotwedo/mega-zword", "--base", "main", "--head", branch,
-               "--title", f"[review] {label} {sha}",
-               "--body", "Temporary review PR opened by `megazword review`; closed automatically.")
-    url = made.stdout.strip().splitlines()[-1] if made.returncode == 0 and made.stdout.strip() else ""
+    try:
+        made = _gh("pr", "create", "--repo", "edotwedo/mega-zword", "--base", "main", "--head", branch,
+                   "--title", f"[review] {label} {sha}",
+                   "--body", "Temporary review PR opened by `megazword review`; closed automatically.")
+        url = made.stdout.strip().splitlines()[-1] if made.returncode == 0 and made.stdout.strip() else ""
+        problem = made.stderr.strip()[:200]
+    except (OSError, subprocess.SubprocessError) as exc:
+        url, problem = "", str(exc)[:200]
     if not url:
-        git(repo, "push", "github", "--delete", branch)
-        return [], f"greptile skipped: PR not created: {made.stderr.strip()[:200]}"
+        git(repo, "push", "github", "--delete", branch)  # never leave the branch on GitHub
+        note(-1, status="refund: PR not created")
+        return [], f"greptile skipped: PR not created: {problem}"
     number = url.rstrip("/").rsplit("/", 1)[-1]
-    with reviews_path().open("a", encoding="utf-8") as out:
-        out.write(json.dumps({"time": datetime.now(timezone.utc).isoformat(), "reviewer": "greptile",
-                              "credits": 1, "pr": url, "sha": sha}) + "\n")
     texts: list[str] = []
     deadline = time.monotonic() + wait_minutes * 60
     try:

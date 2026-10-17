@@ -15,9 +15,9 @@ def test_parse_reads_findings_and_normalises_severity():
 
 
 def test_merge_ranks_independent_agreement_first():
-    findings = (review.parse("- [low] a.py:10 - x", "groq")
+    findings = (review.parse("- [low] a.py:10 - off by one in total", "groq")
                 + review.parse("- [high] b.py:5 - y", "zai")
-                + review.parse("- [medium] src/a.py:12 - same bug", "cloudflare"))
+                + review.parse("- [medium] src/a.py:12 - total is off by one", "cloudflare"))
     merged = review.merge(findings)
     assert merged[0].path.endswith("a.py") and sorted(merged[0].by) == ["cloudflare", "groq"]
     assert merged[0].severity == "medium"
@@ -164,3 +164,24 @@ def test_greptile_waits_for_line_comments_to_settle(tmp_path, monkeypatch):
     findings, status = review.greptile(tmp_path, "x", sleep=lambda s: None)
     assert len(findings) == 3 and "3 comment(s)" in status
     assert len(polls) == 4  # nothing, summary, all three, all three again: settled
+
+
+def test_different_problems_on_nearby_lines_are_not_agreement():
+    findings = (review.parse("- [high] a.py:10 - missing null check on user", "groq")
+                + review.parse("- [high] a.py:12 - timeout never cancelled", "zai")
+                + review.parse("- [high] a.py:12 - the timeout leaks", "ovh"))
+    merged = review.merge(findings)
+    assert [sorted(f.by) for f in merged] == [["ovh", "zai"], ["groq"]]
+    assert [f.line for f in review.blocking(merged)] == [12]
+
+
+def test_greptile_credit_is_reserved_and_refunded_when_no_pr(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    deleted = []
+    monkeypatch.setattr(review, "git", lambda repo, *a, **k: deleted.append(a) or SimpleNamespace(
+        returncode=0, stdout="abc1234\n", stderr=""))
+    monkeypatch.setattr(review, "_gh", lambda *a, **k: SimpleNamespace(returncode=1, stdout="", stderr="no access"))
+    findings, status = review.greptile(tmp_path, "x", sleep=lambda s: None)
+    assert findings == [] and "PR not created: no access" in status
+    assert ("push", "github", "--delete", "review/abc1234") in deleted
+    assert review.greptile_used_this_month(tmp_path / "reviews.jsonl") == 0  # reserved, then refunded
