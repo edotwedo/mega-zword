@@ -208,7 +208,7 @@ class Runner:
                     and n not in self._reserved and n not in self.cfg.out_now()]
             order = spread(
                 self.cfg.agent.get("failover_order", config.DEFAULT_FREE_FAILOVER),
-                piece.difficulty, self.cfg.log_path)
+                piece.difficulty, self.cfg.log_path, coding=True)
             names = list(dict.fromkeys([*order, "ollama"]))
             free = [self.backends[n] for n in names if n in self.backends
                     and _free(self.backends[n]) and n not in self.cfg.out_now()

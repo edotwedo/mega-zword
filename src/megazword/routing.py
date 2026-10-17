@@ -34,7 +34,7 @@ WEAK_BACKENDS = ("mistral", "groq-allam", "nvidia", "ollama",
 
 
 def spread(names: list[str], level: str = "medium",
-           log_path: Path | None = None) -> list[str]:
+           log_path: Path | None = None, coding: bool = False) -> list[str]:
     """Order free sources so the least-used one in the last 24 hours goes first.
 
     Phil (2026-10-16): use a tiny bit of every free source instead of draining
@@ -63,6 +63,7 @@ def spread(names: list[str], level: str = "medium",
     free = [name for name in free if name not in stop]
 
     usage = summarize(log_path, SPREAD_WINDOW)
+    from .free_apis import KEYLESS
     position = {name: index for index, name in enumerate(free)}
 
     def load(name: str) -> float:
@@ -76,6 +77,9 @@ def spread(names: list[str], level: str = "medium",
         lead = 0 if level == "hard" and finite else 1
         # On a tie outside hard work, free tiers that reset go before grants.
         weak = name in WEAK_BACKENDS and level != "easy"
-        return (lead, weak, load(name), finite and level != "hard", position[name])
+        # Keyless sources wait 18-31 s between calls: fine for one answer, but a
+        # 50-step coding loop on them can outrun a 30-minute job. They code last.
+        slow = coding and name in KEYLESS
+        return (lead, weak, slow, load(name), finite and level != "hard", position[name])
 
     return [*sorted(free, key=key), *paid]

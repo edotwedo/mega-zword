@@ -323,7 +323,7 @@ def candidates(rating: Rating, route: dict[str, list[str]],
     # Code changes are never "easy" enough to lead with the smallest models (a 3B model
     # wrecked review.py on 2026-10-16), so order them as medium work.
     level = "medium" if coding and rating.level == "easy" else rating.level
-    names = spread([b.name for b in chain], level, log_path)
+    names = spread([b.name for b in chain], level, log_path, coding=coding)
     by_name = {b.name: b for b in chain}
     return [by_name[name] for name in names]
 
@@ -695,7 +695,7 @@ def main(argv: list[str] | None = None,
                               if isinstance(b, (OpenAICompatibleBackend, OllamaBackend))})
             reviewer = reviewers.get(cfg.agent["reviewer"])
         order = spread(cfg.agent.get("failover_order", config.DEFAULT_FREE_FAILOVER),
-                       "medium", cfg.log_path)
+                       "medium", cfg.log_path, coding=True)
         fallbacks = [backends[name] for name in order if name in backends
                      and name not in cfg.out_now()
                      and permitted(backends[name])
