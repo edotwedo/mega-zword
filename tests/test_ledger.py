@@ -57,6 +57,7 @@ def test_stale_tool_output_is_trimmed_and_cuts_resent_text(tmp_path, monkeypatch
               *[call("read_file", path="a.py") for _ in range(4)],
               call("run_tests"), call("finish", summary="done")]
     kwargs = dict(test_command=(sys.executable, "-c", "print('ok')"))
+    monkeypatch.setattr(agent, "SMALL_HISTORY", {})  # compare trimming alone, not condensing
 
     trimmed, model = coding(tmp_path / "t", list(script), **kwargs)
     (tmp_path / "t").mkdir()
@@ -66,7 +67,7 @@ def test_stale_tool_output_is_trimmed_and_cuts_resent_text(tmp_path, monkeypatch
     assert tool_outputs[0] == "wrote a.py" and tool_outputs[1].startswith("[trimmed")
     assert "[trimmed" in json.dumps([m for m in last if m.get("tool_calls")][0])
 
-    monkeypatch.setattr(agent.AgentBackend, "_trim_stale", staticmethod(lambda m: None))
+    monkeypatch.setattr(agent.AgentBackend, "_trim_stale", staticmethod(lambda m, **k: None))
     full, _ = coding(tmp_path / "f", list(script), **kwargs)
     (tmp_path / "f").mkdir()
     assert full.run("edit a").ok
@@ -84,3 +85,30 @@ def test_native_calls_skip_duplicate_schemas_and_unneeded_web_tool(tmp_path):
     loop, model = coding(tmp_path, [call("finish", summary="ok")])
     loop.run("read https://example.com/docs and summarize")
     assert "fetch_public_url" in json.dumps(model.seen[0][1])
+
+
+def test_newest_read_of_each_file_stays_whole_until_the_file_is_written():
+    def asked(i, name, **args):
+        return {"role": "assistant", "content": None,
+                "tool_calls": [{"id": f"c{i}", "function": {"name": name, "arguments": json.dumps(args)}}]}
+
+    def told(i, text):
+        return {"role": "tool", "tool_call_id": f"c{i}", "content": text}
+    big = "line\n" * 300
+    messages = [{"role": "system", "content": "s"}, {"role": "user", "content": "task"},
+                asked(1, "read_file", path="a.py"), told(1, "A" + big),
+                asked(2, "read_file", path="b.py"), told(2, "B" + big),
+                asked(3, "read_file", path="c.py"), told(3, "C" + big),
+                asked(4, "run_tests"), told(4, "T" + big),
+                asked(5, "write_file", path="b.py", text="new"), told(5, "wrote b.py"),
+                asked(6, "list_files"), told(6, "L" + big),
+                asked(7, "run_tests"), told(7, "R" + big)]
+    agent.AgentBackend._trim_stale(messages)
+    out = {m["tool_call_id"]: m["content"] for m in messages if m["role"] == "tool"}
+    assert out["c1"].startswith("A") and out["c3"].startswith("C")   # reads still needed
+    assert out["c2"].startswith("[trimmed")   # b.py was rewritten after this read
+    assert out["c4"].startswith("[trimmed")   # old test output
+    assert out["c6"].startswith("L") and out["c7"].startswith("R")   # newest two
+    agent.AgentBackend._trim_stale(messages, keep=2, keep_reads=False)  # over budget: reads go too
+    out = {m["tool_call_id"]: m["content"] for m in messages if m["role"] == "tool"}
+    assert out["c1"].startswith("[trimmed") and out["c7"].startswith("R")

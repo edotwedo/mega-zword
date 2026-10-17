@@ -132,7 +132,13 @@ def _scrub_values(value):
 
 
 # Resending old tool output is the main credit cost of long runs.
-KEEP_FULL = 1
+KEEP_FULL = 2
+# History resent each step, in characters. Big enough to hold a few 12k-char file
+# reads; a smaller one condensed every step and models re-read files until the
+# 60-step cap (2026-10-17 trace: read_file 61 of 62 calls). Free tiers with low
+# tokens-per-minute caps keep the old size.
+HISTORY_CHARS = 90_000
+SMALL_HISTORY = {"groq": 24_000, "cloudflare": 24_000, "mistral": 24_000, "ollama": 24_000}
 STALE_LIMIT = 400
 
 
@@ -540,7 +546,10 @@ class AgentBackend(Backend):
                 # Every step resends the history, so stale bulk costs credits again
                 # each time. Reviews keep full reads for their line citations.
                 self._trim_stale(messages)
-            if len(json.dumps(messages)) > 24000:
+            budget = SMALL_HISTORY.get(self.model_backend.name.split("-")[0], HISTORY_CHARS)
+            if len(json.dumps(messages)) > budget and not self.read_only:
+                self._trim_stale(messages, keep=2, keep_reads=False)  # cheaper than losing it all
+            if len(json.dumps(messages)) > budget:
                 # Completed tool exchanges need not be resent indefinitely. Keep
                 # task and user interventions intact, then recent observations.
                 flattened = self._text_history(messages)
@@ -704,15 +713,38 @@ class AgentBackend(Backend):
                            + (f"; tool calls: {spent}" if spent else ""))
 
     @staticmethod
-    def _trim_stale(messages, keep=KEEP_FULL, limit=STALE_LIMIT):
+    def _trim_stale(messages, keep=KEEP_FULL, limit=STALE_LIMIT, keep_reads=True):
         """Shrink tool outputs and written file bodies older than the last few.
 
-        The newest `keep` results stay whole. Older ones become a short stub that
-        tells the model to call the tool again if it still needs the content.
-        Message order and tool_call ids are unchanged, so native protocols stay valid.
+        The newest `keep` results stay whole, and so does the newest read of each
+        file until that file is written again (keep_reads): stubbing a read the
+        model still needs only makes it read the file again. Older ones become a
+        short stub. Message order and tool_call ids are unchanged, so native
+        protocols stay valid.
         """
+        calls = {}
+        for m in messages:
+            for c in m.get("tool_calls") or [] if m.get("role") == "assistant" else []:
+                try:
+                    args = json.loads(c["function"]["arguments"])
+                except (KeyError, TypeError, ValueError):
+                    args = {}
+                calls[c.get("id")] = (c.get("function", {}).get("name"), args if isinstance(args, dict) else {})
         results = [i for i, m in enumerate(messages) if m.get("role") == "tool"]
+        live, written = set(), set()
+        for i in reversed(results):
+            name, args = calls.get(messages[i].get("tool_call_id"), (None, {}))
+            path = str(args.get("path", ""))
+            if name in ("write_file", "replace_in_file"):
+                written.add(path)
+            elif keep_reads and name == "read_file" and path not in written:
+                key = (path, args.get("start"), args.get("end"))
+                if key not in {k for k, _ in live}:
+                    live.add((key, i))
+        live_rows = {i for _, i in live}
         for i in results[:-keep] if keep else results:
+            if i in live_rows:
+                continue
             content = messages[i].get("content") or ""
             if len(content) > limit and not content.startswith("[trimmed"):
                 messages[i] = {**messages[i], "content":
