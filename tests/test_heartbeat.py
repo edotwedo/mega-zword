@@ -89,7 +89,7 @@ def test_stop_file_and_lock_skip_the_beat(monkeypatch, tmp_path):
     assert "STOP" in heartbeat.beat({}, config.Config(), write=lambda s: None)
     (tmp_path / "STOP").unlink()
     (tmp_path / "heartbeat").mkdir(exist_ok=True)
-    (tmp_path / "heartbeat" / "lock").write_text("busy")
+    (tmp_path / "heartbeat" / "lock").write_text(str(__import__("os").getpid()))  # a live beat
     assert "another beat" in heartbeat.beat({}, config.Config(), write=lambda s: None)
 
 
@@ -218,3 +218,10 @@ def test_code_without_tests_is_not_merged(tmp_path):
     subprocess.run(["git", "clone", "-q", str(bare), str(clone)], check=True, capture_output=True)
     text = heartbeat.merge(clone, "night/c-1", {}, None, review_fn=lambda *a, **k: pytest.fail("no review"))
     assert text == "not merged: code changed without tests"
+
+
+def test_lock_left_by_a_dead_beat_is_taken_over(tmp_path):
+    (tmp_path / "heartbeat").mkdir(exist_ok=True)
+    (tmp_path / "heartbeat" / "lock").write_text("999999 2026-10-16 17:12")  # no such process
+    assert heartbeat._locked() is False
+    assert heartbeat._alive(__import__("os").getpid()) is True

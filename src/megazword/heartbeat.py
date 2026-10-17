@@ -105,14 +105,37 @@ def _locked() -> bool:
         except FileExistsError:
             try:
                 age = datetime.now().timestamp() - lock.stat().st_mtime
+                pid = int((lock.read_text(encoding="utf-8").split() or ["0"])[0])
             except FileNotFoundError:
                 continue
-            if age < LOCK_HOURS * 3600:
+            except ValueError:
+                pid = 0
+            if age < LOCK_HOURS * 3600 and _alive(pid):
                 return True
-            lock.unlink(missing_ok=True)  # stale: a beat that died long ago
+            lock.unlink(missing_ok=True)  # stale: its beat died or is long gone
             continue
         with os.fdopen(fd, "w", encoding="utf-8") as out:
-            out.write(str(datetime.now()))
+            out.write(f"{os.getpid()} {datetime.now()}")
+        return False
+    return True
+
+
+def _alive(pid: int) -> bool:
+    """Is that process still running? Never signals it (os.kill would end it on Windows)."""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except OSError:
         return False
     return True
 
