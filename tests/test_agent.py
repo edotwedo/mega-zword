@@ -74,7 +74,7 @@ def test_read_only_review_reads_source_and_refuses_writes_and_tests(tmp_path):
     result = loop.run('Review the code without edits')
     assert result.ok and 'source.py:2' in result.text
     assert (tmp_path / 'source.py').read_text() == 'def route():\n    return "free"\n'
-    assert {t['function']['name'] for t in model.seen[0][1]} == {'list_files','read_file','finish'}
+    assert {t['function']['name'] for t in model.seen[0][1]} == {'list_files','search_files','read_file','finish'}
     history = str(model.seen[-1][0])
     assert 'Read source files before finishing' in history
     assert 'read-only review: writes and commands are unavailable' in history
@@ -704,3 +704,20 @@ def test_cloudflare_invalid_request_recovery_is_bounded(tmp_path):
     result = loop.run("job")
     assert not result.ok and "context too long" in result.error
     assert loop.request_count == 2
+
+
+def test_search_files_finds_lines_and_skips_private_files(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("x = 1\ndef scout_parser():\n    pass\n", encoding="utf-8")
+    (tmp_path / "src" / "b.py").write_text("scout = 2\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("scout=SECRET\n", encoding="utf-8")
+    (tmp_path / "blob.bin").write_bytes(b"\xff\xfe scout \x00")
+    loop, model = coding(tmp_path, [call("search_files", pattern="scout", glob="src/*.py"),
+                                    call("search_files", pattern="def scout_(", glob="*"),
+                                    call("search_files", pattern="scout"),
+                                    call("finish", summary="found it")])
+    assert loop.run("find the scout parser").ok
+    results = [m["content"] for m in model.seen[-1][0] if m["role"] == "tool"]
+    assert results[0].splitlines() == ["src/a.py:2: def scout_parser():", "src/b.py:1: scout = 2"]
+    assert results[1] == "no matches"  # invalid regex is searched literally
+    assert "SECRET" not in results[2] and ".env" not in results[2] and "blob.bin" not in results[2]

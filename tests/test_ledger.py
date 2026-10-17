@@ -112,3 +112,32 @@ def test_newest_read_of_each_file_stays_whole_until_the_file_is_written():
     agent.AgentBackend._trim_stale(messages, keep=2, keep_reads=False)  # over budget: reads go too
     out = {m["tool_call_id"]: m["content"] for m in messages if m["role"] == "tool"}
     assert out["c1"].startswith("[trimmed") and out["c7"].startswith("R")
+
+
+def test_http_402_marks_the_grant_used_up_and_routing_skips_it(tmp_path, monkeypatch):
+    import io
+    import pytest
+    import urllib.error
+    import urllib.request
+    from megazword import config, ledger, routing
+    from megazword.free_apis import OpenAICompatibleBackend, APIHTTPError
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setenv("TENCENT_TOKENHUB_API_KEY", "secret-test-credential")
+
+    def refuse(request, timeout):
+        raise urllib.error.HTTPError(request.full_url, 402, "Payment Required", {}, io.BytesIO(b"{}"))
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    backend = OpenAICompatibleBackend("tencent-glm-5.3", base_url="https://example.test/v1", model="glm-5.3",
+                                      key_env="TENCENT_TOKENHUB_API_KEY")
+    with pytest.raises(APIHTTPError) as caught:
+        backend.chat([{"role": "user", "content": "hi"}])
+    assert caught.value.code == 402 and "used up" in str(caught.value)
+    assert ledger.blocked(["tencent-glm-5.3", "tencent-kimi-k3"], home=tmp_path,
+                          log_path=tmp_path / "log.jsonl") == {"tencent-glm-5.3": "grant used up"}
+    assert "HTTP 402" in ledger.table(tmp_path, tmp_path / "log.jsonl")
+    log = tmp_path / "log.jsonl"
+    log.write_text("", encoding="utf-8")
+    assert "tencent-glm-5.3" not in routing.spread(["tencent-glm-5.3", "groq"], "hard", log)
+    assert ledger.mark_used_up("tencent", "402", home=tmp_path)  # alias of deepseek-v4-pro
+    assert "tencent-deepseek-v4-pro" in ledger.blocked(["tencent-deepseek-v4-pro"], home=tmp_path, log_path=log)
+    assert not ledger.mark_used_up("groq", "402", home=tmp_path)

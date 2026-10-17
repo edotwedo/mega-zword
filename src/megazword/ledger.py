@@ -51,6 +51,28 @@ def save(entries: dict[str, dict], home: Path | None = None) -> None:
     tmp.replace(target)
 
 
+ALIASES = {"tencent": "tencent-deepseek-v4-pro"}  # same grant, older backend name
+
+
+def mark_used_up(name: str, why: str, home: Path | None = None) -> bool:
+    """A provider refused for lack of free quota (HTTP 402): stop routing to it.
+
+    Records the whole grant as used, with the reason, so `megazword credits` shows
+    it and routing skips it. `credits set NAME --used N` with the console figure
+    puts it back. Returns False for sources the ledger doesn't track.
+    """
+    name = ALIASES.get(name, name)
+    entries = load(home)
+    if name not in entries:
+        return False
+    entry = entries[name]
+    entry["used_reported"] = entry.get("grant_tokens") or 1
+    entry["reported_at"] = datetime.now(timezone.utc).isoformat()
+    entry["note"] = f"{why} ({datetime.now():%Y-%m-%d %H:%M})"
+    save(entries, home)
+    return True
+
+
 def _logged_tokens(name: str, since: datetime | None, log_path: Path,
                    now: datetime) -> int:
     from .runlog import summarize
@@ -126,6 +148,8 @@ def table(home: Path | None = None, log_path: Path | None = None) -> str:
     for r in rows:
         runway = "-" if r["days_left"] is None else f"{r['days_left']:.0f}d"
         note = r["blocked"] or ""
+        if note and entries[r["name"]].get("note"):
+            note += ": " + entries[r["name"]]["note"]
         if not note and r["days_left"] is not None and r["days_left"] <= WARN_DAYS[0]:
             note = "LOW: under a week left at current pace"
         lines.append(f"{r['name']:38} {_fmt(r['left']):>6} / {_fmt(r['grant']):<7} "

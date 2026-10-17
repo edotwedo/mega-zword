@@ -370,6 +370,12 @@ class OpenAICompatibleBackend(Backend):
                     reason = "Mistral rate limit exceeded (code 1300)"
                 raise APIHTTPError(exc.code, headers, reason) from None
             reason = _safe_reason(exc) if exc.code in (400, 403, 422) else ""
+            if exc.code == 402:
+                # Payment required: this free grant is spent (billing stays off, so
+                # nothing was charged). Mark it so routing stops trying it.
+                from . import ledger
+                if ledger.mark_used_up(self.name, "provider answered HTTP 402: no free quota left"):
+                    reason = "free grant used up (HTTP 402); marked in `megazword credits`"
             if tools is not None and exc.code in (400, 422):
                 raise ToolsUnsupported("API rejected native tools" + (": " + reason if reason else "")) from None
             # Auth and rate-limit bodies stay private. Only sanitized validation
