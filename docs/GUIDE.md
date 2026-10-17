@@ -468,6 +468,68 @@ Night Shift does real work while you sleep. It reads `docs/QUEUE.md` on GitHub
 - The log is `~\.megazword\night\night.log`; each night's summary is
   `~\.megazword\night\summary-<date>.md`.
 
+## Roadmap heartbeat
+
+The heartbeat keeps Mega Zword's own roadmap moving while you're away. Each run
+("beat") reads `docs/ROADMAP.md` on local Gitea, takes the first open item, and
+hands one small step of it to Night Shift's machinery (own folder, tests first,
+free models first). If the step's tests pass, two free reviewers check it, and
+it's merged into main unless both agree on a serious problem.
+
+- Schedule: `megazword heartbeat install --start 12:30 --until 23:00 --every 2 --yes`
+  (a Windows task with no window). Remove: `megazword heartbeat remove`. Pause
+  everything: `megazword night stop`; turn back on with `megazword night resume`.
+- Run one beat now: `megazword heartbeat run`. See the last beats and anything
+  shelved: `megazword heartbeat status`.
+- Who works a step: free models first, at most 4 tries, least used first, small
+  and slow models last; then the cheap paid tier (below); then Claude only with
+  more than 15% left.
+- A step that fails 2 beats in a row is **shelved**: the heartbeat writes a note
+  to `~\.megazword\heartbeat\notes-for-phil.md`, puts it on its card in **Catch me
+  up**, and picks the next open item. Fix or clarify the step, then
+  `megazword heartbeat unshelve 4` puts item 4 back.
+- Items marked `[phil]`, `[x]` or `[!]`, and items a seat claimed (`ROADMAP #N` on
+  its STATUS Active line), are skipped.
+- If someone pushes to main during a beat, the step is put on top of the new main
+  and the full tests run again before review. A conflict or failing tests refuse it.
+
+## Code review
+
+`megazword review` sends your change (this branch against `origin/main`, or the
+last commit) to free reviewers from different companies and merges what they find.
+Findings two reviewers report about the same thing are marked "N reviewers agree".
+
+- `-n 2` asks two reviewers (default one). A reviewer that fails is replaced by a
+  spare from another company. Tiny models and Tencent's grants never review.
+- `--base REF` compares against another branch or commit.
+- `--greptile` also asks Greptile (50 free reviews a month) through a temporary
+  GitHub pull request that's closed when its comments are in.
+
+## Free sources, the credit ledger and the $1 tier
+
+- `megazword credits` shows each one-time grant (Tencent): tokens left, burn per
+  day and days left, plus this month's cheap paid spend. Record real console
+  figures with `megazword credits set tencent-kimi-k3 --used 180000`.
+- `megazword usage` ends with how many free sources did some work in the last 24
+  hours and which sat idle.
+- Keyless sources need no account: OVH (`ovh`, `ovh-120b`, `ovh-qwen`, 2 requests a
+  minute each) and Kilo's gateway (`kilo`, `kilo-cohere`, `kilo-nemotron`, 200 an
+  hour together). They answer chat normally but code last because they're slow.
+- Cheap paid tier: `cheap-deepseek-flash` and `cheap-deepseek-pro` on OpenRouter,
+  paid from the account balance, capped at **$1 a month**. Mega Zword reads the
+  month's spend from OpenRouter before every call and stops at the cap; if it
+  can't read it, it doesn't call. They run only after every free source. To change
+  the cap, put `{"monthly_usd": 2}` in `~\.megazword\budget.json`.
+
+## Team jobs
+
+- `megazword job plan "the job"` asks one AI to split a job into pieces and saves
+  `~\.megazword\jobs\<ID>\job.json`.
+- `megazword job combine <ID>` merges every piece that passed onto `job/<ID>`, runs
+  the full tests, and has reviewers from companies that wrote none of the pieces
+  check it. Only `job/<ID>` is pushed, never main; you approve it. `--no-push`
+  keeps it local.
+
 ## Other commands
 
 - `megazword init [--force]` creates a config using installed tools; `--force`
