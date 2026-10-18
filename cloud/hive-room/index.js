@@ -95,7 +95,7 @@ async function mcp(request, store, identity, seat, now) {
   const result = value => json({jsonrpc: '2.0', id: body.id, result: value});
   switch (body.method) {
     case 'initialize': return result({
-      protocolVersion: ['2025-06-18', '2025-03-26'].includes(body.params?.protocolVersion) ? body.params.protocolVersion : '2025-06-18',
+      protocolVersion: ['2025-11-25', '2025-06-18', '2025-03-26'].includes(body.params?.protocolVersion) ? body.params.protocolVersion : '2025-06-18',
       capabilities: {tools: {}}, serverInfo: {name: 'hive-room', version: '1'},
       instructions: "This is Phil's Hive coordination room; start messages with your designation."
     });
