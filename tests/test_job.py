@@ -87,3 +87,22 @@ def test_cli_job_plan_uses_fake(isolated_home, capsys):
     assert main(["job", "plan", "split this"], backends=backends, cfg=cfg) == 0
     out = capsys.readouterr().out
     assert "2 pieces" in out and "lock tests" in out
+
+
+def test_parse_plan_reads_brief_and_old_bare_lists():
+    rows = '[{"title": "a", "files": ["a.py"], "difficulty": "easy", "test": ""}]'
+    brief, pieces = job.parse_plan('```json\n{"brief": "  Goal:   add a.  ", "pieces": ' + rows + "}\n```")
+    assert brief == "Goal: add a." and [p.title for p in pieces] == ["a"]
+    assert job.parse_plan(rows)[0] == "" and len(job.parse_pieces(rows)) == 1
+    assert len(job.parse_plan('{"brief": "' + "x" * 5000 + '", "pieces": ' + rows + "}")[0]) == job.BRIEF_CHARS
+    with pytest.raises(ValueError):
+        job.parse_plan('{"brief": "no pieces"}')
+
+
+def test_plan_saves_brief(isolated_home, capsys):
+    reply = '{"brief": "Shared goal.", "pieces": ' + TWO + "}"
+    backends = {"grok": FakeAI("grok", reply=reply)}
+    assert job.plan_job("x", backends, home=isolated_home, job_id="t2") == 0
+    payload = json.loads((isolated_home / "jobs" / "t2" / "job.json").read_text(encoding="utf-8"))
+    assert payload["brief"] == "Shared goal." and len(payload["pieces"]) == 2
+    assert '"brief"' in backends["grok"].last

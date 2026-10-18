@@ -197,6 +197,7 @@ class Runner:
         self.seconds, self.test_seconds = job_minutes * 60, test_minutes * 60
         self._route_lock = threading.Lock()
         self._reserved: set[str] = set()
+        self.brief = ""  # the planner's shared brief, if the plan has one
 
     def _reserve(self, piece: Piece):
         # Live meter reads and reservations happen serially. A paid CLI gets at
@@ -250,7 +251,8 @@ class Runner:
                 return result
             night._check(night.git(["worktree", "add", "--quiet", "-b", branch, str(work), base], clone), "worktree")
             original = night._check(night.git(["rev-parse", "HEAD"], work), "HEAD").strip()
-            prompt = (f"Work on this independent piece only: {piece.title}\n"
+            shared = f"Shared brief for every worker on this job: {self.brief}\n" if self.brief else ""
+            prompt = (f"{shared}Work on this independent piece only: {piece.title}\n"
                       f"Allowed files (exact paths): {', '.join(piece.files)}\n"
                       "Edit only those files. Do not run git, commit, push or change unrelated files. "
                       "Mega Zword owns git and runs the tests. Keep the change small. Finish with a short summary.")
@@ -412,6 +414,7 @@ def run_pieces(plan: dict, repo: str | Path, *, job_id: str | None = None,
             write_atomic(report_path, json.dumps(report, indent=2))
         save()
         runner = Runner(cfg, backends, usage, job_minutes, test_minutes)
+        runner.brief = str(plan.get("brief") or "")
         with ThreadPoolExecutor(max_workers=min(workers, len(pieces))) as pool:
             futures = [pool.submit(runner.run_piece, clone, folder, job_id, i, piece, base)
                        for i, piece in enumerate(pieces, 1)]

@@ -339,3 +339,16 @@ def test_free_attempts_groups_by_family():
     assert [[b.name for b in g] for g in groups] == [["groq", "groq-120b"], ["zai", "zai-47"], ["ovh"]]
     assert [len(g) for g in jobs.free_attempts(free, "medium")] == [6]
     assert jobs.free_attempts([], "hard") == []
+
+
+def test_shared_brief_starts_every_worker_prompt(origin):
+    free = Free("groq")
+    report = jobs.run_pieces({"brief": "Add a widget; both pieces call it make_widget.",
+                              "pieces": [piece()]}, origin, cfg=cfg(),
+                             backends={"groq": free}, usage=usage, job_id="briefed")
+    assert report["runner_status"] == "complete" and report["brief"].startswith("Add a widget")
+    first = free.seen[0][1]["content"]
+    assert first.startswith("Shared brief for every worker on this job: Add a widget; both pieces")
+    unbriefed = Free("groq")
+    run(origin, [piece()], {"groq": unbriefed}, job_id="plain")
+    assert unbriefed.seen[0][1]["content"].startswith("Work on this independent piece only")

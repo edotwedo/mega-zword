@@ -79,15 +79,34 @@ def _clean_path(raw: str) -> str | None:
     return text
 
 
-def parse_pieces(text: str) -> list[Piece]:
+BRIEF_CHARS = 1500  # the brief is resent with every worker's prompt
+
+
+def parse_plan(text: str) -> tuple[str, list[Piece]]:
+    """Planner reply -> (shared brief, pieces). Accepts {"brief", "pieces"} or a bare
+    list (plans from before 2026-10-18), so the brief may be empty."""
     blob = text.strip()
     fenced = _FENCE.search(blob)
     if fenced:
         blob = fenced.group(1).strip()
-    start, end = blob.find("["), blob.rfind("]")
+    obj, start = blob.find("{"), blob.find("[")
+    if obj >= 0 and (start < 0 or obj < start):
+        data = json.loads(blob[obj:blob.rfind("}") + 1])
+        if not isinstance(data, dict):
+            raise ValueError("planner reply was not a JSON plan")
+        brief = " ".join(str(data.get("brief") or "").split())[:BRIEF_CHARS]
+        return brief, _pieces(data.get("pieces"))
+    end = blob.rfind("]")
     if start < 0 or end <= start:
         raise ValueError("planner reply was not a JSON list of pieces")
-    data = json.loads(blob[start:end + 1])
+    return "", _pieces(json.loads(blob[start:end + 1]))
+
+
+def parse_pieces(text: str) -> list[Piece]:
+    return parse_plan(text)[1]
+
+
+def _pieces(data) -> list[Piece]:
     if not isinstance(data, list) or not data:
         raise ValueError("planner reply was not a JSON list of pieces")
     pieces: list[Piece] = []
@@ -122,10 +141,12 @@ def pick_planner(backends: dict[str, Backend]) -> Backend:
 
 def planner_prompt(text: str) -> str:
     return (
-        "Split this coding job into independent pieces. Reply with JSON only: a list of "
-        "objects with keys title (string), files (list of repo-relative paths this piece "
-        "may edit), difficulty (easy, medium, or hard), test (command to run for this "
-        "piece). Merge work that must touch the same file into one piece. No markdown.\n\n"
+        "Split this coding job into independent pieces. Reply with JSON only: "
+        '{"brief": "...", "pieces": [...]}. brief: under 100 words every worker needs '
+        "(goal, shared names, interfaces between pieces). pieces: objects with keys title "
+        "(string), files (list of repo-relative paths this piece may edit), difficulty "
+        "(easy, medium, or hard), test (command to run for this piece). Merge work that "
+        "must touch the same file into one piece. No markdown.\n\n"
         f"Job:\n{text.strip()}"
     )
 
@@ -160,7 +181,7 @@ def plan_job(text: str, backends: dict[str, Backend], home: Path | None = None,
         write(f"job plan: {planner.name} failed: {result.error}")
         return 1
     try:
-        pieces = parse_pieces(result.text)
+        brief, pieces = parse_plan(result.text)
     except (ValueError, json.JSONDecodeError) as exc:
         write(f"job plan: bad plan from {planner.name}: {exc}")
         return 1
@@ -171,6 +192,8 @@ def plan_job(text: str, backends: dict[str, Backend], home: Path | None = None,
         "planner": planner.name,
         "pieces": [asdict(p) for p in pieces],
     }
+    if brief:
+        payload["brief"] = brief
     path = save_job(job_id, payload, home)
     write(format_plan(job_id, pieces))
     write(f"saved {path}")
