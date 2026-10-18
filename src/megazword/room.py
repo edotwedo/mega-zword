@@ -492,7 +492,9 @@ class RemoteRoom:
         self.queue = room_dir(home) / f"{room}.{binding}.queue.json"
 
     def request(self, method: str, suffix: str = "", item: dict | None = None) -> dict:
-        headers = {"Authorization": "Bearer " + self.token, "Content-Type": "application/json"}
+        # Cloudflare answers Python's default User-Agent with 403 (error 1010), so name ourselves.
+        headers = {"Authorization": "Bearer " + self.token, "Content-Type": "application/json",
+                   "User-Agent": "megazword-room/1"}
         data = None
         if item is not None:
             headers["Idempotency-Key"] = item["id"]

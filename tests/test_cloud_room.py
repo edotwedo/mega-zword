@@ -128,6 +128,7 @@ def test_transport_uses_keymaster_header_timeout_and_retry_key(tmp_path, monkeyp
     client.request("POST", item={"id": "retry-id", "text": "hi"})
     assert seen["headers"]["Authorization"] == "Bearer " + fake
     assert seen["headers"]["Idempotency-key"] == "retry-id"
+    assert not seen["headers"]["User-agent"].startswith("Python-urllib")  # Cloudflare 1010
     assert seen["timeout"] == 10 and seen["body"] == {"text": "hi"}
     assert not list(tmp_path.rglob("*.json"))
 
