@@ -117,3 +117,30 @@ def test_command_run_reports_incomplete_runs(isolated_home, monkeypatch, capsys)
     cfg = config.Config(log_path=isolated_home / "log.jsonl")
     assert main(["job", "run", "t2", "--repo", "http://example/r.git"], backends={}, cfg=cfg) == 1
     assert "1. simple piece  failed  -  (tests failed)" in capsys.readouterr().out
+
+
+def test_format_status_plan_not_started():
+    text = job.format_status(TEST_PLAN)
+    assert text.splitlines() == ["job test-job-001: not started", "1. simple piece  not started"]
+
+
+def test_format_status_shows_each_piece():
+    report = dict(TEST_PLAN, runner_status="failed", pieces=TEST_PLAN["pieces"] * 2, results=[
+        {"index": 1, "title": "simple piece", "status": "passed", "ai": "groq", "tests": "3 passed",
+         "tried": ["cerebras", "groq"], "branch": "job/test-job-001/1", "reason": ""},
+        {"index": 2, "title": "simple piece", "status": "failed", "ai": "", "tried": ["nvidia"],
+         "reason": "tests failed"}])
+    text = job.format_status(report)
+    assert text.startswith("job test-job-001: failed\n1. simple piece  passed\n")
+    assert "   tests: 3 passed\n   delivered by: groq\n   tried: cerebras, groq\n   branch: job/test-job-001/1" in text
+    assert text.endswith("2. simple piece  failed\n   tried: nvidia\n   reason: tests failed")
+    assert "delivered by: \n" not in text
+
+
+def test_command_status(isolated_home, capsys):
+    _write_job(isolated_home, "t3", TEST_PLAN)
+    cfg = config.Config(log_path=isolated_home / "log.jsonl")
+    assert main(["job", "status", "t3"], backends={}, cfg=cfg) == 0
+    assert "1. simple piece  not started" in capsys.readouterr().out
+    assert main(["job", "status", "nope"], backends={}, cfg=cfg) == 1
+    assert "no job nope" in capsys.readouterr().out

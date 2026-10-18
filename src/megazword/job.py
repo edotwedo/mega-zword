@@ -186,6 +186,8 @@ def add_parser(sub) -> None:
     run.add_argument("id", help="job ID from `megazword job plan`")
     run.add_argument("--workers", "-w", type=int, default=2, help="number of parallel workers (1-8)")
     run.add_argument("--repo", help="repo URL to clone (default: local Gitea mega-zword URL)")
+    status = jsub.add_parser("status", help="show a job's pieces: status, tests, AIs, branch")
+    status.add_argument("id", help="job ID from `megazword job plan`")
     combine = jsub.add_parser("combine", help="merge a job's passed pieces on job/ID, test and review it")
     combine.add_argument("id", help="job ID from `megazword job plan`")
     combine.add_argument("--no-push", action="store_true", help="keep job/ID local")
@@ -224,8 +226,43 @@ def run_job(job_id: str, workers: int, repo: str | None, cfg: config.Config,
     return 0 if report.get("runner_status") == "complete" else 1
 
 
+def format_status(report: dict) -> str:
+    """One job's state: overall runner_status, then one block per piece. A plan that
+    hasn't run has no runner_status and no results, so every piece is "not started"."""
+    results = {row.get("index"): row for row in report.get("results") or []}
+    pieces = report.get("pieces") or []
+    lines = [f"job {report.get('id', '?')}: {report.get('runner_status') or 'not started'}"]
+    for index, piece in enumerate(pieces, 1):
+        row = results.get(index, {})
+        lines.append(f"{index}. {piece.get('title', '')}  {row.get('status') or 'not started'}")
+        if not row:
+            continue
+        details = [("tests", row.get("tests")), ("delivered by", row.get("ai")),
+                   ("tried", ", ".join(row.get("tried") or [])), ("branch", row.get("branch")),
+                   ("reason", row.get("reason"))]
+        lines += [f"   {label}: {value}" for label, value in details if value]
+    return "\n".join(lines)
+
+
+def status_job(job_id: str, write: Callable[[str], None] = print) -> int:
+    """`megazword job status ID`: read the saved job; never runs anything."""
+    path = jobs_home() / job_id / "job.json"
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        write(f"job status: no job {job_id} (make one with `megazword job plan`)")
+        return 1
+    except (OSError, ValueError) as exc:
+        write(f"job status: can't read {path}: {exc}")
+        return 1
+    write(format_status(report))
+    return 0
+
+
 def command(args, backends: dict[str, Backend], cfg: config.Config,
             write: Callable[[str], None] = print) -> int:
+    if args.job_cmd == "status":
+        return status_job(args.id, write=write)
     if args.job_cmd == "plan":
         return plan_job(args.text, backends, write=write)
     if args.job_cmd == "run":
