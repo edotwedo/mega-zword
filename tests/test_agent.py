@@ -721,3 +721,50 @@ def test_search_files_finds_lines_and_skips_private_files(tmp_path):
     assert results[0].splitlines() == ["src/a.py:2: def scout_parser():", "src/b.py:1: scout = 2"]
     assert results[1] == "no matches"  # invalid regex is searched literally
     assert "SECRET" not in results[2] and ".env" not in results[2] and "blob.bin" not in results[2]
+
+
+def test_run_tests_runs_only_tests_for_what_was_edited(tmp_path):
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_a.py").write_text("")
+    (tmp_path / "tests" / "test_c.py").write_text("")
+    # Exits 1 so the run continues and the model's next turn shows the output.
+    echo = (sys.executable, "-c", "import sys; print('args', sys.argv[1:]); sys.exit(1)  # pytest stand-in")
+    loop, model = coding(tmp_path, [
+        call("run_tests"),
+        call("write_file", path="src/pkg/a.py", text="x = 1\n"),
+        call("write_file", path="src/pkg/b.py", text="y = 1\n"),  # no tests/test_b.py: nothing added
+        call("run_tests"), call("finish", summary="done")],
+        test_command=echo)
+    loop.run("job")
+    before, after = model.seen[1][0][-1]["content"], model.seen[4][0][-1]["content"]
+    assert "args []" in before and "ran:" not in before  # nothing edited yet: as configured
+    assert "args ['tests/test_a.py']" in after
+    assert "ran: tests/test_a.py (the full suite runs after you finish)" in after
+
+
+def test_run_tests_leaves_explicit_or_non_pytest_commands_alone(tmp_path):
+    loop, _ = coding(tmp_path, [])
+    (tmp_path / "tests").mkdir()
+    for name in ("test_a.py", "test_b.py", "conftest.py"):
+        (tmp_path / "tests" / name).write_text("")
+    loop._originals = {tmp_path / "a.py": None, tmp_path / "tests" / "test_b.py": None,
+                       tmp_path / "tests" / "conftest.py": None, tmp_path / "tests" / "test_gone.py": None}
+    assert loop._test_targets(["python", "-m", "pytest", "-q"]) == ["tests/test_a.py", "tests/test_b.py"]
+    assert loop._test_targets(["python", "-m", "pytest", "tests/test_x.py"]) == []
+    assert loop._test_targets(["npm", "test"]) == []
+
+
+def test_model_that_never_forms_a_tool_call_is_dropped_early(tmp_path):
+    chatter = [{"content": "I will now look at the files."}] * 10
+    loop, model = coding(tmp_path, chatter, max_steps=60)
+    result = loop.run("job")
+    assert not result.ok and "4 replies in a row without a usable tool call" in result.error
+    assert len(model.seen) == agent.MAX_INVALID  # not all 60 steps
+    bad_args = {"tool_calls": [{"id": "c", "type": "function",
+                                "function": {"name": "read_file", "arguments": "{not json"}}]}
+    loop, model = coding(tmp_path, [bad_args] * 10, max_steps=60)
+    assert "without a usable tool call" in loop.run("job").error and len(model.seen) == agent.MAX_INVALID
+    # A good call in between resets the count.
+    mixed = [chatter[0]] * 3 + [call("list_files", glob="*")] + [chatter[0]] * 3 + [call("finish", summary="ok")]
+    loop, _ = coding(tmp_path, mixed, max_steps=60)
+    assert loop.run("job").ok

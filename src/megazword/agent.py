@@ -144,6 +144,9 @@ HISTORY_CHARS = 90_000
 SMALL_HISTORY = {"groq": 24_000, "cloudflare": 24_000, "mistral": 24_000, "ollama": 24_000}
 STALE_LIMIT = 400
 SEARCH_HITS = 60  # matching lines returned by one search_files call
+# Replies in a row with no usable tool call before giving up on a model. Cloudflare
+# spent all 60 steps this way in 103 s on 2026-10-17.
+MAX_INVALID = 4
 
 
 @dataclass
@@ -312,6 +315,8 @@ class AgentBackend(Backend):
             env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
             env.pop("MEGAZWORD_RUN_CONTROL", None)
             command = list(self.test_command)
+            targets = self._test_targets(command)
+            command += targets
             if re.fullmatch(r"python(?:\d+(?:\.\d+)*)?(?:\.exe)?", Path(command[0]).name, re.I):
                 if "-I" not in command[1:]:
                     command.insert(1, "-I")
@@ -332,7 +337,8 @@ class AgentBackend(Backend):
                 self._tests_passed = proc.returncode == 0
                 self._event("tests finished", tests="passed" if self._tests_passed else "failed")
                 text = scrub(output.read().decode("utf-8", errors="replace"))
-                return f"exit code {proc.returncode}\n" + text[-tail_chars:]
+                ran = f"ran: {' '.join(targets)} (the full suite runs after you finish)\n" if targets else ""
+                return f"exit code {proc.returncode}\n{ran}" + text[-tail_chars:]
         if name == "fetch_public_url":
             if not any(t["function"]["name"] == name for t in self._tools):
                 raise ValueError("fetch_public_url is not available for this job")
@@ -372,6 +378,29 @@ class AgentBackend(Backend):
         self._edited = True
         self._tests_passed = False
         return "wrote " + args["path"]
+
+    def _test_targets(self, command: list[str]) -> list[str]:
+        """Test files for what this run edited: changed tests, plus tests/test_<name>.py
+        for each changed source file. The full suite takes minutes (longer than
+        test_timeout), so run_tests on it always timed out and models could never
+        see a pass (2026-10-17: 20 run_tests calls in one 60-step run). Empty means
+        run the command as configured."""
+        if "pytest" not in " ".join(command) or any(a.endswith(".py") for a in command[1:]):
+            return []
+        found = []
+        for path in self._originals:
+            try:
+                rel = Path(path).resolve().relative_to(Path(self.root).resolve()).as_posix()
+            except ValueError:
+                continue
+            if rel.startswith("tests/") and Path(rel).name.startswith("test_") and rel.endswith(".py"):
+                if Path(path).exists():
+                    found.append(rel)
+            elif rel.endswith(".py") and not rel.startswith("tests/"):
+                test = f"tests/test_{Path(rel).stem}.py"
+                if (self.root / test).exists():
+                    found.append(test)
+        return sorted(set(found))
 
     def _quality_errors(self):
         errors = []
@@ -576,6 +605,16 @@ class AgentBackend(Backend):
                     {"role": "user", "content": prompt}]
         text_mode = self.text_protocol or isinstance(self.model_backend, OllamaBackend)
         compacted = False
+        invalid = 0
+
+        def refuse(text):
+            nonlocal invalid
+            invalid += 1
+            if invalid >= MAX_INVALID:
+                raise RuntimeError(f"{self.model_backend.name} sent {invalid} replies in a row "
+                                   "without a usable tool call")
+            messages.append({"role": "user", "content": text})
+
         for step in range(self.max_steps):
             messages.extend(self._checkpoint())
             if not self.read_only:
@@ -659,7 +698,7 @@ class AgentBackend(Backend):
                                or not isinstance(call["function"].get("name"), str)
                                or not isinstance(call["function"].get("arguments"), str)
                                for call in reply["tool_calls"])))):
-                messages.append({"role": "user", "content": "Invalid reply. Use string content and at most eight tool calls."})
+                refuse("Invalid reply. Use string content and at most eight tool calls.")
                 continue
             calls = reply.get("tool_calls")
             if not calls:
@@ -674,7 +713,7 @@ class AgentBackend(Backend):
                     calls = [{"id": "text", "function": {"name": obj["tool"],
                               "arguments": json.dumps(obj["arguments"])}}]
                 except (ValueError, KeyError, TypeError, IndexError):
-                    messages.append({"role": "user", "content": "Invalid reply. Send one JSON tool object with tool and arguments."})
+                    refuse("Invalid reply. Send one JSON tool object with tool and arguments.")
                     continue
             elif text_mode:
                 # A model may use native tools after switching protocols.
@@ -701,6 +740,7 @@ class AgentBackend(Backend):
                     args = json.loads(call["function"]["arguments"])
                     self._event("tool", tool=name, file=args.get("path", "") if isinstance(args, dict) else "")
                     used[name] = used.get(name, 0) + 1
+                    invalid = 0  # a call it could form; a refused tool is still progress
                     signature = (name, json.dumps(args, sort_keys=True))
                     repeats = repeats + 1 if signature == previous_call else 1
                     previous_call = signature
@@ -737,6 +777,10 @@ class AgentBackend(Backend):
                                 {"role": "tool", "tool_call_id": call.get("id", "") if isinstance(call, dict) else "", "content": result})
                 if bad_protocol:
                     text_mode = True
+                    invalid += 1
+                    if invalid >= MAX_INVALID:
+                        raise RuntimeError(f"{self.model_backend.name} sent {invalid} replies in a row "
+                                           "without a usable tool call")
             if nudge_finish:
                 messages.append({"role": "user", "content":
                                  "You repeated the same tool call three times. Finish now with an honest summary."})
