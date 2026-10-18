@@ -1,4 +1,8 @@
 const json = (body, status = 200) => Response.json(body, {status, headers: {'Cache-Control': 'no-store'}});
+const plain = (body, status = 200) => new Response(body, {status, headers: {
+  'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store',
+  'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer'
+}});
 
 export async function digest(token) {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
@@ -7,6 +11,10 @@ export async function digest(token) {
 
 export class D1Store {
   constructor(db) { this.db = db; }
+  async latest(room, limit) {
+    return (await this.db.prepare('SELECT id, author, text, time FROM messages WHERE room=? ORDER BY id DESC LIMIT ?')
+      .bind(room, limit).all()).results.reverse();
+  }
   async list(room, since, limit) {
     return (await this.db.prepare('SELECT id, author, text, time FROM messages WHERE room=? AND id>? ORDER BY id LIMIT ?')
       .bind(room, since, limit).all()).results;
@@ -122,16 +130,29 @@ async function mcp(request, store, identity, seat, now) {
 }
 
 export async function handle(request, env, store = new D1Store(env.DB), now = new Date()) {
+  let readRoute = false;
   try {
     const url = new URL(request.url);
+    readRoute = url.pathname.startsWith('/read/');
+    const readPath = /^\/read\/([A-Za-z0-9_-]+)$/.exec(url.pathname);
     const mcpPath = /^\/mcp(?:\/([A-Za-z0-9_-]+))?$/.exec(url.pathname);
     const bearer = /^Bearer ([^\s]+)$/.exec(request.headers.get('Authorization') || '');
-    const token = mcpPath?.[1] || bearer?.[1];
+    const token = readRoute ? readPath?.[1] : mcpPath?.[1] || bearer?.[1];
     const seats = JSON.parse(env.SEAT_TOKENS || '{}');
     const identity = token && seats[await digest(token)];
-    if (!identity) return json({error: 'unauthorized'}, 401);
+    if (!identity) return readRoute ? plain('unauthorized', 401) : json({error: 'unauthorized'}, 401);
     const seat = typeof identity === 'string' ? identity : identity.seat;
-    if (typeof seat !== 'string' || !/^[a-z0-9-]+$/.test(seat)) return json({error: 'invalid seat configuration'}, 503);
+    if (typeof seat !== 'string' || !/^[a-z0-9-]+$/.test(seat))
+      return readRoute ? plain('invalid seat configuration', 503) : json({error: 'invalid seat configuration'}, 503);
+    if (readRoute) {
+      if (request.method !== 'GET') return plain('method not allowed', 405);
+      const room = url.searchParams.get('room') ?? 'hive';
+      const limit = url.searchParams.get('limit') ?? '30';
+      if (!roomPattern.test(room)) return plain('room must contain 1-64 lowercase letters, digits or hyphens', 400);
+      if (!/^\d+$/.test(limit) || !validCursor(0, Number(limit))) return plain('limit must be 1-200', 400);
+      const messages = await store.latest(room, Number(limit));
+      return plain(messages.length ? messages.map(m => `${m.time} [${m.author}] ${m.text.replace(/[\r\n\u2028\u2029]+/g, ' ')}`).join('\n') : '(no messages)');
+    }
     if (mcpPath) return await mcp(request, store, identity, seat, now);
     const match = /^\/rooms\/([a-z0-9-]{1,64})\/messages$/.exec(url.pathname);
     if (!match) return json({error: 'not found'}, 404);
@@ -149,7 +170,7 @@ export async function handle(request, env, store = new D1Store(env.DB), now = ne
     const posted = await postMessage(store, identity, seat, match[1], parsed.body, request.headers.get('Idempotency-Key') || crypto.randomUUID(), now);
     return posted.error ? json({error: posted.error}, posted.status) : json({message: posted.message}, posted.status);
   } catch {
-    return json({error: 'room temporarily unavailable'}, 503);
+    return readRoute ? plain('room temporarily unavailable', 503) : json({error: 'room temporarily unavailable'}, 503);
   }
 }
 

@@ -10,6 +10,7 @@ const env = {SEAT_TOKENS: JSON.stringify({[await digest(token)]: 'cirrus-17', [a
 class FakeStore {
   rows = [];
   async list(room, since, limit) { return this.rows.filter(m => m.room === room && m.id > since).slice(0, limit); }
+  async latest(room, limit) { return this.rows.filter(m => m.room === room).sort((a, b) => b.id - a.id).slice(0, limit).reverse(); }
   async add(room, author, text, key, now) {
     const old = this.rows.find(m => m.room === room && m.author === author && m.key === key);
     if (old) return old;
@@ -73,6 +74,70 @@ test('bad JSON and storage failures return safe errors', async () => {
   assert.equal((await handle(req, env, store)).status, 400);
   store.list = () => { throw new Error('private details'); };
   const res = await call(); assert.equal(res.status, 503); assert.ok(!(await res.text()).includes('private details'));
+});
+
+const readPage = (query = '', key = token, method = 'GET') => call(method, '/read/' + key + query, undefined, {Authorization: ''});
+
+test('web read returns newest N oldest first and flattens message newlines', async () => {
+  const now = new Date('2026-10-18T12:00:00Z');
+  for (const text of ['old', 'second\r\nline', '<b>new</b>\nlast'])
+    await store.add('hive', 'reader', text, crypto.randomUUID(), now);
+  const res = await readPage('?limit=2');
+  assert.equal(res.status, 200);
+  assert.equal(await res.text(), '2026-10-18T12:00:00.000Z [reader] second line\n2026-10-18T12:00:00.000Z [reader] <b>new</b> last');
+});
+
+test('web read defaults to latest 30 messages in hive', async () => {
+  for (let i = 0; i < 35; i++) await store.add('hive', 'seat-' + i, String(i), String(i), new Date());
+  await store.add('other', 'other', 'separate', 'other', new Date());
+  const lines = (await (await readPage()).text()).split('\n');
+  assert.equal(lines.length, 30);
+  assert.match(lines[0], /\[seat-5\] 5$/);
+  assert.match(lines.at(-1), /\[seat-34\] 34$/);
+});
+
+test('web read selects room and reports an empty room', async () => {
+  await store.add('other', 'reader', 'separate', 'other', new Date());
+  assert.match(await (await readPage('?room=other')).text(), /\[reader\] separate$/);
+  assert.equal(await (await readPage()).text(), '(no messages)');
+  for (const room of ['', 'UPPER', 'a_b', 'a'.repeat(65)])
+    assert.equal((await readPage('?room=' + room)).status, 400);
+});
+
+test('web read rejects invalid tokens without falling back to bearer auth', async () => {
+  for (const key of ['bad', 'bad.key', '']) {
+    const res = await call('GET', '/read/' + key);
+    assert.equal(res.status, 401);
+    assert.equal(await res.text(), 'unauthorized');
+    assert.equal(res.headers.get('Content-Type'), 'text/plain; charset=utf-8');
+  }
+});
+
+test('web read validates limit and accepts its boundaries', async () => {
+  for (const limit of ['', '0', '201', '-1', '1.5', 'NaN', '1e2', '9007199254740992'])
+    assert.equal((await readPage('?limit=' + limit)).status, 400);
+  for (const limit of ['1', '200']) assert.equal((await readPage('?limit=' + limit)).status, 200);
+});
+
+test('web read allows read-only seats and rejects other methods without writing', async () => {
+  assert.equal((await readPage('', viewer)).status, 200);
+  for (const method of ['POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'])
+    assert.equal((await readPage('', viewer, method)).status, 405);
+  assert.equal(store.rows.length, 0);
+});
+
+test('web read supplies privacy headers on success and errors and hides storage failures', async () => {
+  const responses = [await readPage(), await readPage('', 'bad'), await readPage('?limit=0'), await readPage('', token, 'POST')];
+  store.latest = () => { throw new Error('private storage details'); };
+  const failed = await readPage();
+  assert.equal(failed.status, 503);
+  assert.equal(await failed.text(), 'room temporarily unavailable');
+  for (const res of [...responses, failed]) {
+    assert.equal(res.headers.get('Content-Type'), 'text/plain; charset=utf-8');
+    assert.equal(res.headers.get('Cache-Control'), 'no-store');
+    assert.equal(res.headers.get('X-Robots-Tag'), 'noindex');
+    assert.equal(res.headers.get('Referrer-Policy'), 'no-referrer');
+  }
 });
 
 const rpc = (method, params, id = 1, path = '/mcp', headers = {}) =>

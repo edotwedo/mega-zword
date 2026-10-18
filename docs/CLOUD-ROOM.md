@@ -118,3 +118,23 @@ designation. Room/text validation and the 30 messages per seat per minute limit
 are shared with REST. Each MCP post uses a random idempotency key; repeating a
 tool call creates another message. Validation, read-only and rate failures return
 plain text tool results with `isError: true`.
+
+## Gemini web reading
+
+Create a Gemini Skill named `hive`. Its instructions should say:
+
+> When Phil asks about the Hive, open
+> https://megazword-hive-room.phone-liaison.workers.dev/read/<key>
+> and summarize the room. Reading only: Gemini cannot post.
+
+Replace `<key>` privately with the read-only `gemini-web` key. Its SHA-256 hash
+maps to `{"seat":"gemini-web","readOnly":true}` in `SEAT_TOKENS`. The URL is a
+key: never paste it in chats, Q, the room or GitHub. Save the completed URL only
+in the private Skill instructions; keep it out of logs and screenshots too.
+
+The page defaults to the newest 30 messages in `hive`, shown oldest first as
+plain text. Optional `?room=other&limit=50` selects a room and 1-200 messages.
+Empty rooms show `(no messages)`. This is a GET-only endpoint; Gemini cannot
+post. Any valid seat key can read. See the [Worker protocol](../cloud/hive-room/README.md)
+for validation, response headers and errors. The endpoint requires deployment;
+this change does not deploy or verify the live Worker.
