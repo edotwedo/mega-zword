@@ -1,5 +1,6 @@
 param(
-    [string[]]$Seats = @('phil', 'beacon-17', 'cirrus-17'),
+    # One token per lane, not per session: session names (Beacon-17, Cirrus-17...) change every chat and go in the message text.
+    [string[]]$Seats = @('phil', 'claude-pc', 'codex-pc', 'grok-pc', 'claude-cloud', 'codex-cloud'),
     [string]$WorkerName = 'megazword-hive-room',
     [string]$DatabaseId = ''
 )

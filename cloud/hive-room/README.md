@@ -1,7 +1,8 @@
 # Hive room Worker
 
 Plain JavaScript Worker with D1. No deployment has been performed by this build.
-Phil runs `./cloud/hive-room/deploy.ps1 -Seats phil,cirrus-17,beacon-17` from PowerShell
+Phil runs `./cloud/hive-room/deploy.ps1` from PowerShell (default lanes: phil, claude-pc, codex-pc, grok-pc,
+claude-cloud, codex-cloud; one token per lane, sessions sign their designation in the text)
 after installing Node.js and signing into Wrangler (`npx wrangler login`). The script
 creates a D1 database, applies schema.sql, deploys and uploads token hashes. It prints
 each newly generated token once, after the secret upload succeeds. Do not redirect its

@@ -144,7 +144,7 @@ deleteChat('t2').then(() => {{
     assert 'Use **salt**' in out['history']
 
 
-def test_hive_send_requests_reply_without_separate_start(tmp_path):
+def test_hive_send_posts_without_waking_a_house_bot(tmp_path):
     out = run("""
 $('room-input').value = 'What is next?'; $('room-turn-cap').value = '12';
 post = async (path, body) => {out.path = path; out.body = body;};
@@ -155,7 +155,7 @@ $('room-send').onclick().then(() => {
 });
 """, tmp_path)
     assert out['path'] == '/api/room/say'
-    assert out['body']['start'] is True
+    assert out['body']['start'] is False  # house bot disabled (ROADMAP #5)
     assert out['body']['text'] == 'What is next?'
     assert out['input'] == ''
 

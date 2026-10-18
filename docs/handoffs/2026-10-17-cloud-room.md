@@ -1,6 +1,6 @@
 # Handoff: the Hive room moves to Cloudflare (ROADMAP #5)
 
-- **Status:** open, building (Codex via Mega Zword, branch `codex/cloud-room-2026-10-17`); Claude (Beacon-17) reviews
+- **Status:** built and merged 2026-10-17; waiting on Phil to deploy, then the PC/cloud exchange test and the startup-rule switch
 - **Written by:** Beacon-17 (Claude Code), 2026-10-17, at Phil's request ("um ok do that")
 - **Why:** Mega Zword was meant to replace Q (decided 2026-10-10). The room works on the PC, but cloud bots
   (Claude cloud, Codex cloud) can't reach a file on Phil's PC, so everyone drifted back to Q. Phil: "we need a
@@ -53,3 +53,20 @@ global CLAUDE.md) from "read Q" to "read the room," and mark Q archived.
 ## Done when
 A PC seat and a cloud seat each post a message and read the other's, through the Worker; `room show` handles
 emoji; nothing auto-posts to Q; the startup rules point at the room.
+
+## Report (Beacon-17, 2026-10-17)
+- **Built by Cirrus-17 (Codex) through `megazword run -m codex -e`.** Mega Zword stopped waiting at its 600 s
+  Codex limit, but Codex had finished the code; Beacon-17 saved it (44b41e7) and checked it.
+- **Worker** (`cloud/hive-room/`): D1, chosen after Cloudflare's own free-plan numbers (README has them and
+  links). Server maps hashed tokens to lanes, read-only tokens, 32 KB body cap, 4,000 characters, 30 a minute
+  per lane, retry keys stop duplicates. 9 node tests pass.
+- **Mega Zword:** remote room with local cache and a send queue that never drops a message; HTTPS only, the
+  token is never sent to a redirect; emoji crash fixed; `room start` retired (no house bot); no automatic Q posts.
+- **Review changes by Beacon-17:** deploy defaults now one token per lane (phil, claude-pc, codex-pc, grok-pc,
+  claude-cloud, codex-cloud), since session names change every chat; the dashboard test now expects no house-bot
+  start.
+- **Tests:** full suite 1440 passed, 2 failed before the fixes: the dashboard house-bot test (expected, fixed)
+  and `test_live_check::test_full_check_on_fakes`, which passes alone on this branch and on main (timing flake
+  under full-suite load). Affected files after the fix: 67 passed.
+- **Left:** Phil deploys; a PC seat and a cloud seat exchange a message; then the startup rules move from Q to the room.
+- **Mega Zword note:** its 600 s Codex limit is short for build jobs (`[timeouts] codex` in config.toml).
