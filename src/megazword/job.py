@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -192,53 +191,37 @@ def add_parser(sub) -> None:
     combine.add_argument("--no-push", action="store_true", help="keep job/ID local")
 
 
-def command_run(job_id: str, workers: int, repo: str | None,
-                cfg: config.Config, backends: dict[str, Backend]) -> int:
-    """Execute a planned job, print one line per piece."""
+def run_job(job_id: str, workers: int, repo: str | None, cfg: config.Config,
+            backends: dict[str, Backend], write: Callable[[str], None] = print) -> int:
+    """`megazword job run ID`: run a saved plan's pieces, one line per piece."""
     from . import job_workers
-    
-    # Load job.json
-    job_path = jobs_home() / job_id / "job.json"
-    if not job_path.exists():
-        print(f"job run: no job {job_id}", file=sys.stderr)
-        return 1
+    path = jobs_home() / job_id / "job.json"
     try:
-        with job_path.open(encoding="utf-8") as f:
-            plan = json.load(f)
-    except (json.JSONDecodeError, OSError) as exc:
-        print(f"job run: cannot read {job_path}: {exc}", file=sys.stderr)
+        plan = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        write(f"job run: no job {job_id} (make one with `megazword job plan`)")
         return 1
-    
-    # Validate job is a plan (has pieces)
-    pieces = plan.get("pieces")
-    if not pieces or not isinstance(pieces, list):
-        print(f"job run: job {job_id} is not a plan (no pieces)", file=sys.stderr)
+    except (OSError, ValueError) as exc:
+        write(f"job run: can't read {path}: {exc}")
         return 1
-    
-    # Use default repo if not provided
+    if not isinstance(plan.get("pieces"), list) or not plan["pieces"]:
+        write(f"job run: job {job_id} has no pieces")
+        return 1
     if repo is None:
-        from . import heartbeat
-        repo = heartbeat.GITEA
-    
-    # Run the pieces
+        from .heartbeat import GITEA
+        repo = GITEA
     try:
-        report = job_workers.run_pieces(
-            plan, repo, job_id=job_id, workers=workers,
-            cfg=cfg, backends=backends, usage=cfg.usage,
-            job_minutes=30, test_minutes=20
-        )
-    except Exception as exc:
-        print(f"job run: {exc}", file=sys.stderr)
+        report = job_workers.run_pieces(plan, repo, job_id=job_id, workers=workers,
+                                        cfg=cfg, backends=backends)
+    except (ValueError, RuntimeError, OSError) as exc:
+        write(f"job run: {exc}")
         return 1
-    
-    # Print one line per piece
-    for result in report.get("results", []):
-        line = f"{result['index']}. {result['title']}  {result['status']}  {result['ai']}"
-        if result['reason']:
-            line += f"  ({result['reason']})"
-        print(line)
-    
-    return 0 if report["runner_status"] == "complete" else 1
+    for row in report.get("results", []):
+        line = f"{row.get('index')}. {row.get('title', '')}  {row.get('status', '')}  {row.get('ai') or '-'}"
+        if row.get("reason"):
+            line += f"  ({row['reason']})"
+        write(line)
+    return 0 if report.get("runner_status") == "complete" else 1
 
 
 def command(args, backends: dict[str, Backend], cfg: config.Config,
@@ -246,7 +229,7 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
     if args.job_cmd == "plan":
         return plan_job(args.text, backends, write=write)
     if args.job_cmd == "run":
-        return command_run(args.id, args.workers, args.repo, cfg, backends)
+        return run_job(args.id, args.workers, args.repo, cfg, backends, write=write)
     if args.job_cmd == "combine":
         from . import team
         try:
