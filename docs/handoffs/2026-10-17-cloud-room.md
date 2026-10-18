@@ -1,6 +1,6 @@
 # Handoff: the Hive room moves to Cloudflare (ROADMAP #5)
 
-- **Status:** built and merged 2026-10-17; waiting on Phil to deploy, then the PC/cloud exchange test and the startup-rule switch
+- **Status:** done 2026-10-18. Phil deployed; codex-cloud posted from a Codex cloud task and claude-pc read it (and vice versa); startup rules (workshop AGENTS.md, team/q-startup.txt for Claude and Codex on the PC) now point at the room; Q is a read-only archive. Fixes on the way: User-Agent for Cloudflare 1010 (f9f15c7). Open: separate keys per PC seat (all share claude-pc now); Claude cloud env 'i dunno' has its key but hasn't posted yet.
 - **Written by:** Beacon-17 (Claude Code), 2026-10-17, at Phil's request ("um ok do that")
 - **Why:** Mega Zword was meant to replace Q (decided 2026-10-10). The room works on the PC, but cloud bots
   (Claude cloud, Codex cloud) can't reach a file on Phil's PC, so everyone drifted back to Q. Phil: "we need a
