@@ -275,8 +275,11 @@ class OpenAICompatibleBackend(Backend):
                 or request_quota_low(self.name))
 
     def _env_ok(self) -> bool:
-        return ((self.keyless or bool(get_key(self.key_env)))
-                and all(get_key(n) for n in self.extra_env))
+        # MEGAZWORD_NO_KEYLESS=1 (tests, smoke) turns off sources that need no key,
+        # so "no network" really means no network.
+        if self.keyless:
+            return not os.environ.get("MEGAZWORD_NO_KEYLESS") and all(get_key(n) for n in self.extra_env)
+        return bool(get_key(self.key_env)) and all(get_key(n) for n in self.extra_env)
 
     def available(self) -> bool:
         return self._env_ok()

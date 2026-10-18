@@ -652,6 +652,15 @@ def test_ovh_is_keyless_and_never_sends_a_key(monkeypatch):
     assert "ovh" in config.DEFAULT_FREE_FAILOVER
 
 
+def test_no_keyless_switch_turns_off_only_keyless_sources(monkeypatch):
+    from megazword.free_apis import KEYLESS, free_backends
+    monkeypatch.setenv("MEGAZWORD_NO_KEYLESS", "1")
+    monkeypatch.setattr("megazword.free_apis.get_key", lambda name: "test-key")
+    backends = {b.name: b for b in free_backends(config.DEFAULT_FREE)}
+    assert not any(backends[n].available() for n in KEYLESS)
+    assert backends["groq"].available()
+
+
 def test_keyed_backend_without_key_still_refuses(monkeypatch):
     monkeypatch.delenv("MISSING_TEST_KEY", raising=False)
     backend = OpenAICompatibleBackend("t", base_url="https://example.test/v1", model="m",

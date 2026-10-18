@@ -61,6 +61,9 @@ def make_env(tmp: Path) -> dict:
         "MEGAZWORD_OLLAMA_URL": "http://127.0.0.1:9",
         # ...and don't refill the removed keys from the Windows User environment.
         "MEGAZWORD_NO_USER_ENV": "1",
+        # Keyless free sources (OVH, Kilo) need no key, so stripping keys
+        # doesn't stop them; without this, easy prompts reach real models.
+        "MEGAZWORD_NO_KEYLESS": "1",
         # No CLI logins or logs here, so usage meters can't reach the network.
         "USERPROFILE": str(home), "HOME": str(home),
         "PYTHONPATH": str(REPO / "src"),
