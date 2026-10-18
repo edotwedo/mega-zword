@@ -39,7 +39,7 @@ class Summary:
             if len(self.windows) > 1:
                 text = left + " (" + ", ".join(f"{name} {used:.0f}% used" for name, used in self.windows) + ")"
             else:
-                filled = max(0, min(10, round(self.used / 10)))
+                filled = max(0, min(10, round((100 - self.used) / 10)))  # the bar is what is left
                 text = f"[{'#' * filled}{'.' * (10 - filled)}] {left} ({self.window} {self.used:.0f}% used)"
         else:
             text = shorten(self.note or "no meter", width=60, placeholder="...")
