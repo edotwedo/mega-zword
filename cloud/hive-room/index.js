@@ -26,52 +26,128 @@ export class D1Store {
   }
 }
 
+const roomPattern = /^[a-z0-9-]{1,64}$/;
+const textError = body => !body || typeof body.text !== 'string' || !body.text.trim() || [...body.text].length > 4000
+  ? 'text must contain 1-4000 characters' : null;
+const cursorError = 'since must be a nonnegative integer; limit must be 1-200';
+const validCursor = (since, limit) => Number.isSafeInteger(since) && since >= 0 && Number.isInteger(limit) && limit >= 1 && limit <= 200;
+
+async function readBody(request) {
+  if (!(request.headers.get('Content-Type') || '').toLowerCase().startsWith('application/json'))
+    return {error: 'use application/json', status: 415};
+  // Bound streamed bodies too; Content-Length is not trusted.
+  const reader = request.body?.getReader();
+  let size = 0;
+  const chunks = [];
+  if (reader) {
+    while (true) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 32000) { await reader.cancel(); return {error: 'body too large', status: 413}; }
+      chunks.push(value);
+    }
+  }
+  try {
+    const bytes = new Uint8Array(size); let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    return {body: JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes))};
+  } catch { return {error: 'invalid JSON', status: 400}; }
+}
+
+async function postMessage(store, identity, seat, room, body, key, now) {
+  if (typeof identity === 'object' && identity.readOnly) return {error: 'read only', status: 403};
+  const error = textError(body);
+  if (error) return {error, status: 400};
+  if (!/^[A-Za-z0-9-]{1,128}$/.test(key)) return {error: 'invalid retry key', status: 400};
+  const message = await store.add(room, seat, body.text, key, now);
+  return message ? {message, status: 201} : {error: 'seat limit: 30 messages per minute', status: 429};
+}
+
+const tools = [
+  {name: 'read_room', description: 'Read Hive coordination messages, oldest first.', inputSchema: {
+    type: 'object', properties: {
+      room: {type: 'string', pattern: '^[a-z0-9-]{1,64}$', default: 'hive'},
+      since: {type: 'integer', minimum: 0, default: 0},
+      limit: {type: 'integer', minimum: 1, maximum: 200, default: 30}
+    }
+  }},
+  {name: 'post_message', description: 'Post a coordination message. Start with your designation.', inputSchema: {
+    type: 'object', properties: {
+      text: {type: 'string', minLength: 1, maxLength: 4000},
+      room: {type: 'string', pattern: '^[a-z0-9-]{1,64}$', default: 'hive'}
+    }, required: ['text']
+  }}
+];
+const rpcError = (id, code, message) => json({jsonrpc: '2.0', id, error: {code, message}});
+const toolResult = (text, isError = false) => ({content: [{type: 'text', text}], ...(isError ? {isError: true} : {})});
+
+async function mcp(request, store, identity, seat, now) {
+  if (request.method !== 'POST') return json({error: 'method not allowed'}, 405);
+  const parsed = await readBody(request);
+  if (parsed.error) return parsed.status === 400 ? rpcError(null, -32700, 'Parse error') : json({error: parsed.error}, parsed.status);
+  const body = parsed.body;
+  if (!body || Array.isArray(body) || body.jsonrpc !== '2.0' || typeof body.method !== 'string' ||
+      (Object.hasOwn(body, 'id') && body.id !== null && typeof body.id !== 'string' && !(typeof body.id === 'number' && Number.isFinite(body.id))) ||
+      (body.params !== undefined && (!body.params || typeof body.params !== 'object' || Array.isArray(body.params))))
+    return rpcError(null, -32600, 'Invalid Request');
+  if (!Object.hasOwn(body, 'id')) return new Response(null, {status: 202, headers: {'Cache-Control': 'no-store'}});
+  const result = value => json({jsonrpc: '2.0', id: body.id, result: value});
+  switch (body.method) {
+    case 'initialize': return result({
+      protocolVersion: ['2025-06-18', '2025-03-26'].includes(body.params?.protocolVersion) ? body.params.protocolVersion : '2025-06-18',
+      capabilities: {tools: {}}, serverInfo: {name: 'hive-room', version: '1'},
+      instructions: "This is Phil's Hive coordination room; start messages with your designation."
+    });
+    case 'ping': return result({});
+    case 'tools/list': return result({tools});
+    case 'tools/call': {
+      const name = body.params?.name;
+      if (!tools.some(tool => tool.name === name)) return rpcError(body.id, -32602, 'Unknown tool');
+      const args = body.params?.arguments === undefined ? {} : body.params.arguments;
+      if (!args || typeof args !== 'object' || Array.isArray(args)) return result(toolResult('arguments must be an object', true));
+      const room = args.room === undefined ? 'hive' : args.room;
+      if (typeof room !== 'string' || !roomPattern.test(room)) return result(toolResult('room must contain 1-64 lowercase letters, digits or hyphens', true));
+      if (name === 'read_room') {
+        const since = args.since === undefined ? 0 : args.since;
+        const limit = args.limit === undefined ? 30 : args.limit;
+        if (!validCursor(since, limit)) return result(toolResult(cursorError, true));
+        return result(toolResult(JSON.stringify({messages: await store.list(room, since, limit)})));
+      }
+      const posted = await postMessage(store, identity, seat, room, args, crypto.randomUUID(), now);
+      return result(posted.error ? toolResult(posted.error, true) : toolResult(JSON.stringify({message: posted.message})));
+    }
+    default: return rpcError(body.id, -32601, 'Method not found');
+  }
+}
+
 export async function handle(request, env, store = new D1Store(env.DB), now = new Date()) {
   try {
+    const url = new URL(request.url);
+    const mcpPath = /^\/mcp(?:\/([A-Za-z0-9_-]+))?$/.exec(url.pathname);
     const bearer = /^Bearer ([^\s]+)$/.exec(request.headers.get('Authorization') || '');
+    const token = mcpPath?.[1] || bearer?.[1];
     const seats = JSON.parse(env.SEAT_TOKENS || '{}');
-    const identity = bearer && seats[await digest(bearer[1])];
+    const identity = token && seats[await digest(token)];
     if (!identity) return json({error: 'unauthorized'}, 401);
     const seat = typeof identity === 'string' ? identity : identity.seat;
     if (typeof seat !== 'string' || !/^[a-z0-9-]+$/.test(seat)) return json({error: 'invalid seat configuration'}, 503);
-    const url = new URL(request.url);
+    if (mcpPath) return await mcp(request, store, identity, seat, now);
     const match = /^\/rooms\/([a-z0-9-]{1,64})\/messages$/.exec(url.pathname);
     if (!match) return json({error: 'not found'}, 404);
     if (request.method === 'GET') {
       const since = url.searchParams.get('since') || '0';
       const limit = url.searchParams.get('limit') || '100';
-      if (!/^\d+$/.test(since) || !Number.isSafeInteger(Number(since)) || !/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 200)
-        return json({error: 'since must be a nonnegative integer; limit must be 1-200'}, 400);
+      if (!/^\d+$/.test(since) || !/^\d+$/.test(limit) || !validCursor(Number(since), Number(limit)))
+        return json({error: cursorError}, 400);
       return json({messages: await store.list(match[1], Number(since), Number(limit))});
     }
     if (request.method !== 'POST') return json({error: 'method not allowed'}, 405);
     if (typeof identity === 'object' && identity.readOnly) return json({error: 'read only'}, 403);
-    if (!(request.headers.get('Content-Type') || '').toLowerCase().startsWith('application/json'))
-      return json({error: 'use application/json'}, 415);
-    // Bound streamed bodies too; Content-Length is not trusted.
-    const reader = request.body?.getReader();
-    let size = 0, chunks = [];
-    if (reader) {
-      while (true) {
-        const {value, done} = await reader.read();
-        if (done) break;
-        size += value.byteLength;
-        if (size > 32000) { await reader.cancel(); return json({error: 'body too large'}, 413); }
-        chunks.push(value);
-      }
-    }
-    let body;
-    try {
-      const bytes = new Uint8Array(size); let offset = 0;
-      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
-      body = JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes));
-    } catch { return json({error: 'invalid JSON'}, 400); }
-    if (!body || typeof body.text !== 'string' || !body.text.trim() || [...body.text].length > 4000)
-      return json({error: 'text must contain 1-4000 characters'}, 400);
-    const key = request.headers.get('Idempotency-Key') || crypto.randomUUID();
-    if (!/^[A-Za-z0-9-]{1,128}$/.test(key)) return json({error: 'invalid retry key'}, 400);
-    const message = await store.add(match[1], seat, body.text, key, now);
-    return message ? json({message}, 201) : json({error: 'seat limit: 30 messages per minute'}, 429);
+    const parsed = await readBody(request);
+    if (parsed.error) return json({error: parsed.error}, parsed.status);
+    const posted = await postMessage(store, identity, seat, match[1], parsed.body, request.headers.get('Idempotency-Key') || crypto.randomUUID(), now);
+    return posted.error ? json({error: posted.error}, posted.status) : json({message: posted.message}, posted.status);
   } catch {
     return json({error: 'room temporarily unavailable'}, 503);
   }

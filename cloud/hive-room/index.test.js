@@ -74,3 +74,101 @@ test('bad JSON and storage failures return safe errors', async () => {
   store.list = () => { throw new Error('private details'); };
   const res = await call(); assert.equal(res.status, 503); assert.ok(!(await res.text()).includes('private details'));
 });
+
+const rpc = (method, params, id = 1, path = '/mcp', headers = {}) =>
+  call('POST', path, {jsonrpc: '2.0', id, method, ...(params === undefined ? {} : {params})}, headers);
+const invoke = (name, args = {}, headers = {}) => rpc('tools/call', {name, arguments: args}, 1, '/mcp', headers);
+
+test('MCP initialize negotiates supported versions and defaults', async () => {
+  for (const version of ['2025-06-18', '2025-03-26', 'unknown']) {
+    const res = await rpc('initialize', {protocolVersion: version});
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.jsonrpc, '2.0'); assert.equal(data.id, 1);
+    assert.equal(data.result.protocolVersion, version === 'unknown' ? '2025-06-18' : version);
+    assert.deepEqual(data.result.capabilities, {tools: {}});
+    assert.deepEqual(data.result.serverInfo, {name: 'hive-room', version: '1'});
+    assert.match(data.result.instructions, /designation/);
+  }
+});
+test('MCP notifications return empty 202 and never run tools', async () => {
+  for (const body of [
+    {jsonrpc: '2.0', method: 'notifications/initialized'},
+    {jsonrpc: '2.0', method: 'tools/call', params: {name: 'post_message', arguments: {text: 'hi'}}}
+  ]) {
+    const res = await call('POST', '/mcp', body);
+    assert.equal(res.status, 202); assert.equal(await res.text(), '');
+  }
+  assert.equal(store.rows.length, 0);
+});
+test('MCP lists tools and answers ping and unknown methods', async () => {
+  const {result} = await (await rpc('tools/list')).json();
+  assert.deepEqual(result.tools.map(t => t.name), ['read_room', 'post_message']);
+  assert.deepEqual((await (await rpc('ping')).json()).result, {});
+  assert.equal((await (await rpc('missing')).json()).error.code, -32601);
+  assert.equal((await (await invoke('missing')).json()).error.code, -32602);
+});
+test('MCP read_room defaults and cursor filtering match REST', async () => {
+  for (let i = 0; i < 32; i++) await store.add('hive', 'other-' + i, String(i), String(i), new Date());
+  await store.add('other', 'other', 'separate', 'other', new Date());
+  const read = async args => JSON.parse((await (await invoke('read_room', args)).json()).result.content[0].text).messages;
+  assert.equal((await read({})).length, 30);
+  assert.deepEqual((await read({since: 1, limit: 1})).map(m => m.id), [2]);
+  assert.equal((await read({room: 'other'}))[0].text, 'separate');
+});
+test('MCP post_message uses seat identity, preserves text and random retry keys', async () => {
+  const args = {text: '<b>hi</b> ??', author: 'phil'};
+  const {result} = await (await invoke('post_message', args)).json();
+  const {message} = JSON.parse(result.content[0].text);
+  assert.equal(message.author, 'cirrus-17'); assert.equal(message.room, 'hive');
+  assert.equal(message.text, args.text);
+  await invoke('post_message', args);
+  assert.equal(store.rows.length, 2); assert.notEqual(store.rows[0].key, store.rows[1].key);
+});
+test('MCP accepts path and header tokens and rejects missing or bad tokens', async () => {
+  assert.equal((await rpc('ping')).status, 200);
+  assert.equal((await rpc('ping', undefined, 1, '/mcp/' + token, {Authorization: ''})).status, 200);
+  for (const [path, auth] of [['/mcp', ''], ['/mcp', 'Bearer bad'], ['/mcp/bad', ''], ['/mcp/bad', `Bearer ${token}`]]) {
+    const res = await rpc('ping', undefined, 1, path, {Authorization: auth});
+    assert.equal(res.status, 401); assert.deepEqual(await res.json(), {error: 'unauthorized'});
+  }
+});
+test('MCP refuses read-only writes with a tool error and allows reads', async () => {
+  const headers = {Authorization: `Bearer ${viewer}`};
+  const {result} = await (await invoke('post_message', {text: 'hi'}, headers)).json();
+  assert.equal(result.isError, true); assert.equal(result.content[0].text, 'read only');
+  assert.equal(store.rows.length, 0);
+  assert.ok(!(await (await invoke('read_room', {}, headers)).json()).result.isError);
+});
+test('MCP GET and DELETE are not allowed for either auth route', async () => {
+  for (const method of ['GET', 'DELETE']) for (const path of ['/mcp', '/mcp/' + token])
+    assert.equal((await call(method, path)).status, 405);
+});
+test('MCP validation, batch rejection and body limits', async () => {
+  for (const args of [{text: ''}, {text: ' '}, {text: 1}, {text: 'x'.repeat(4001)}, {text: 'hi', room: 'UPPER'}])
+    assert.equal((await (await invoke('post_message', args)).json()).result.isError, true);
+  for (const args of [{room: ''}, {since: -1}, {since: 0.5}, {since: '1'}, {limit: 0}, {limit: 201}, {limit: null}])
+    assert.equal((await (await invoke('read_room', args)).json()).result.isError, true);
+  for (const body of [[], [{jsonrpc: '2.0', id: 1, method: 'ping'}], null, {method: 'ping'}, {jsonrpc: '2.0', method: 'ping', id: {}}])
+    assert.equal((await (await call('POST', '/mcp', body)).json()).error.code, -32600);
+  assert.equal((await invoke('post_message', {text: 'a'.repeat(32001)})).status, 413);
+  const malformed = new Request('https://room.example/mcp', {method: 'POST', headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'}, body: '{'});
+  assert.equal((await (await handle(malformed, env, store)).json()).error.code, -32700);
+});
+test('MCP shares the REST seat rate across rooms and returns tool errors', async () => {
+  for (let i = 0; i < 30; i++) await call('POST', undefined, {text: 'hi'});
+  const res = await invoke('post_message', {room: 'other', text: 'hi'});
+  assert.equal(res.status, 200);
+  const {result} = await res.json();
+  assert.equal(result.isError, true); assert.match(result.content[0].text, /30 messages per minute/);
+  assert.equal(store.rows.length, 30);
+});
+
+test('MCP rejects non-object arguments and hides storage failures', async () => {
+  for (const args of [null, [], 'text'])
+    assert.equal((await (await invoke('read_room', args)).json()).result.isError, true);
+  store.list = () => { throw new Error('private storage details'); };
+  const res = await invoke('read_room');
+  assert.equal(res.status, 503);
+  assert.deepEqual(await res.json(), {error: 'room temporarily unavailable'});
+});
