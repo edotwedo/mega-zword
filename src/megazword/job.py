@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -182,15 +183,70 @@ def add_parser(sub) -> None:
     jsub = job.add_subparsers(dest="job_cmd", required=True)
     plan = jsub.add_parser("plan", help="ask one AI to split a job into pieces")
     plan.add_argument("text", help="the job to split")
+    run = jsub.add_parser("run", help="execute a planned job on multiple workers")
+    run.add_argument("id", help="job ID from `megazword job plan`")
+    run.add_argument("--workers", "-w", type=int, default=2, help="number of parallel workers (1-8)")
+    run.add_argument("--repo", help="repo URL to clone (default: local Gitea mega-zword URL)")
     combine = jsub.add_parser("combine", help="merge a job's passed pieces on job/ID, test and review it")
     combine.add_argument("id", help="job ID from `megazword job plan`")
     combine.add_argument("--no-push", action="store_true", help="keep job/ID local")
+
+
+def command_run(job_id: str, workers: int, repo: str | None,
+                cfg: config.Config, backends: dict[str, Backend]) -> int:
+    """Execute a planned job, print one line per piece."""
+    from . import job_workers
+    
+    # Load job.json
+    job_path = jobs_home() / job_id / "job.json"
+    if not job_path.exists():
+        print(f"job run: no job {job_id}", file=sys.stderr)
+        return 1
+    try:
+        with job_path.open(encoding="utf-8") as f:
+            plan = json.load(f)
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"job run: cannot read {job_path}: {exc}", file=sys.stderr)
+        return 1
+    
+    # Validate job is a plan (has pieces)
+    pieces = plan.get("pieces")
+    if not pieces or not isinstance(pieces, list):
+        print(f"job run: job {job_id} is not a plan (no pieces)", file=sys.stderr)
+        return 1
+    
+    # Use default repo if not provided
+    if repo is None:
+        from . import heartbeat
+        repo = heartbeat.GITEA
+    
+    # Run the pieces
+    try:
+        report = job_workers.run_pieces(
+            plan, repo, job_id=job_id, workers=workers,
+            cfg=cfg, backends=backends, usage=cfg.usage,
+            job_minutes=30, test_minutes=20
+        )
+    except Exception as exc:
+        print(f"job run: {exc}", file=sys.stderr)
+        return 1
+    
+    # Print one line per piece
+    for result in report.get("results", []):
+        line = f"{result['index']}. {result['title']}  {result['status']}  {result['ai']}"
+        if result['reason']:
+            line += f"  ({result['reason']})"
+        print(line)
+    
+    return 0 if report["runner_status"] == "complete" else 1
 
 
 def command(args, backends: dict[str, Backend], cfg: config.Config,
             write: Callable[[str], None] = print) -> int:
     if args.job_cmd == "plan":
         return plan_job(args.text, backends, write=write)
+    if args.job_cmd == "run":
+        return command_run(args.id, args.workers, args.repo, cfg, backends)
     if args.job_cmd == "combine":
         from . import team
         try:
