@@ -62,12 +62,11 @@ def test_persist_resume_and_reset(name, fake_cli):
     assert bs[name].args == original_args
     if name == "codex":
         cmd = calls[1][1]
-        assert cmd.index("-s") < cmd.index("resume")
-        assert cmd[cmd.index("-s") + 1] == "read-only"
+        assert cmd.index("--dangerously-bypass-approvals-and-sandbox") < cmd.index("resume")
         assert "--json" in cmd and "mcp_servers={}" in cmd
     if name == "claude":
         assert calls[1][1][calls[1][1].index("--output-format") + 1] == "json"
-        assert "--restricted" in calls[1][1]
+        assert "--dangerously-skip-permissions" in calls[1][1] and "--restricted" not in calls[1][1]
     reset = tabs.new_session(tab["id"])
     assert not reset["session_id"] and reset["history"] == []
     fresh = tabs.send(tab["id"], "Start over", bs, cfg(), rate(), statuses=dict)

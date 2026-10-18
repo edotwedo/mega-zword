@@ -314,20 +314,20 @@ class App:
             raise ValueError("empty prompt")
         args = ["run", "-p", self.project_for(body.get("project"))]
         from .request_mode import code_review, free_only
-        reviewing = not body.get('edit') and (body.get('review') is True or code_review(prompt))
+        reviewing = body.get('review') is True  # only when asked; no read-only by guesswork
         if reviewing:
             args.append('--review')
             if self.project_for(body.get('project')) == 'mega-zword':
                 # Inspect the code the user is actually running, even when their
                 # shared repository checkout is older than the installed build.
                 args += ['--review-root', str(Path(__file__).resolve().parent)]
-        if body.get('free_only') is True or free_only(prompt) or reviewing or body.get('edit'):
+        if body.get('free_only') is True or free_only(prompt) or reviewing:
             args.append('--free-only')
         model = body.get("model") or ""
         picks = [str(n) for n in body.get("compare") or []]
         if body.get("edit"):
-            if picks or not isinstance(model, str) or model not in (set(config.DEFAULT_FREE) - {"ollama"}):
-                raise ValueError("for coding, choose one free API bot and turn off compare")
+            if picks:
+                raise ValueError("for coding, turn off compare")
             args.append("-e")
         if picks:
             if not 2 <= len(picks) <= 3 or any(n not in self.backends for n in picks):

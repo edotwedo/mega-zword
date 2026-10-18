@@ -281,28 +281,27 @@ def test_out_table_loads_dates_and_times(tmp_path):
     cfg = config.load(p)
     assert cfg.out_until["grok"].isoformat() == "2026-10-17T23:30:00-07:00"
     assert cfg.out_until["codex"].tzinfo is not None
-def test_edit_mode_backend_args():
-    from megazword.backends import default_backends
-    ro, rw = default_backends(), default_backends(edit=True)
-    assert "acceptEdits" not in ro["claude"].args and "acceptEdits" in rw["claude"].args
-    assert "read-only" in ro["codex"].args and "workspace-write" in rw["codex"].args
-    assert "bypassPermissions" not in " ".join(rw["claude"].args)
-
-
-def test_grok_edit_only_with_sandbox(monkeypatch):
+def test_cli_backends_always_have_full_access(monkeypatch):
+    """Phil (2026-10-18): no read-only mode; every paid CLI gets every drive."""
     from megazword import backends as b
-    monkeypatch.setattr(b.sys, "platform", "win32")
-    assert "grok" not in b.default_backends(edit=True) and "grok" in b.default_backends()
-    monkeypatch.setattr(b.sys, "platform", "linux")
-    args = b.default_backends(edit=True)["grok"].args
-    assert args[args.index("--sandbox") + 1] == "workspace"
+    monkeypatch.setattr(b, "drive_roots", lambda: ["C:\\", "D:\\"])
+    for bs in (b.default_backends(), b.default_backends(edit=False), b.default_backends(edit=True)):
+        claude = bs["claude"].args
+        assert "--dangerously-skip-permissions" in claude and "--restricted" not in claude
+        assert claude[claude.index("--add-dir") + 1] == "C:\\" and "D:\\" in claude
+        assert "--dangerously-bypass-approvals-and-sandbox" in bs["codex"].args
+        assert "-s" not in bs["codex"].args
+        assert "--always-approve" in bs["grok"].args and "--sandbox" not in bs["grok"].args
+        assert "gemini" in bs
 
 
-def test_forced_grok_edit_on_windows_explains(capsys, cfg, monkeypatch):
-    from megazword import backends as b
-    monkeypatch.setattr(b.sys, "platform", "win32")
-    assert main(["run", "hi", "--edit", "-m", "grok"], None, cfg) == 2
-    assert "can't edit files safely" in capsys.readouterr().err
+def test_code_review_prompt_is_not_forced_read_only(cfg, capsys):
+    from megazword.request_mode import code_review
+    prompt = "audit your code"
+    assert code_review(prompt)
+    assert main(["run", prompt, "-m", "claude"], {"claude": FakeBackend("claude", reply="done")}, cfg) == 0
+    out = capsys.readouterr()
+    assert "done" in out.out and "read-only" not in out.err
 
 
 def test_long_prompt_via_prompt_file_and_stdin():

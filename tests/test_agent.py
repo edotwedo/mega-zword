@@ -98,20 +98,17 @@ def test_cli_review_has_no_subscription_or_reviewer_fallback(tmp_path, monkeypat
     assert 'a.py:1' in capsys.readouterr().out
 
 
-def test_old_dashboard_audit_prompt_gets_tools_at_cli_entrypoint(tmp_path, monkeypatch):
+def test_audit_prompt_is_not_forced_into_review(tmp_path, monkeypatch):
     from megazword import cli
     monkeypatch.chdir(tmp_path)
-    model = Scripted([call('read_file', path='routing.py', start=1, end=45),
-                      call('finish', summary='routing.py:8 defines the Tencent backend group.')])
+    model = Scripted([{'content': 'Here is the audit.'}])
     prompt = "i want you to do a full audit of your code.  Then i want you to suggest possible upgrade paths."
     cfg = config.Config(log_path=tmp_path/'log.jsonl', quality_check=False)
     # Exact old-server shape: no --review, --review-root or --free-only.
     assert cli.main(['run',prompt,'-p','mega-zword','-m','groq'], {'groq':model}, cfg) == 0
     last = json.loads((config.HOME/'last_run.json').read_text())
-    assert last['policy']['review'] and last['policy']['free_only']
-    assert last['policy']['review_root'] == str(__import__('pathlib').Path(cli.__file__).resolve().parent)
-    assert "not the model's weights" in last['sent']
-    assert 'routing.py:8' in last['answer']
+    # Phil (2026-10-18): sounding like a code review no longer forces read-only free-only.
+    assert not last['policy']['review'] and not last['policy']['free_only']
 
 
 def test_no_paid_prompt_rejects_forced_subscription_before_call(tmp_path, capsys):
@@ -156,15 +153,14 @@ def test_review_free_policy_accepts_all_configured_tencent_identities():
     assert all(free_backend(models[name]) for name in TENCENT_BACKENDS)
 
 
-def test_retry_upgrades_legacy_prompt_only_code_review(tmp_path, monkeypatch):
+def test_retry_keeps_legacy_code_review_prompt_unforced(tmp_path, monkeypatch):
     from megazword import cli
     from types import SimpleNamespace
     cli.save_last_run('access your code','access your code',['groq'],'groq','generic answer','mega-zword','hard')
     calls = []
     monkeypatch.setattr(cli, 'main', lambda argv, **kw: calls.append(argv) or 0)
-    assert cli.retry_last(SimpleNamespace(model=None),{},config.Config()) == 0
-    assert '--review' in calls[0] and '--free-only' in calls[0]
-    assert calls[0][calls[0].index('--review-root')+1] == str(__import__('pathlib').Path(cli.__file__).resolve().parent)
+    cli.retry_last(SimpleNamespace(model=None),{},config.Config())
+    assert not any('--review' in c or '--free-only' in c for c in calls)
 
 
 @pytest.mark.parametrize("path", ["../escape", ".git/config", ".env", ".env.local",

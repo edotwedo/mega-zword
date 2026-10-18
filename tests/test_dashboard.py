@@ -78,16 +78,16 @@ def test_hive_lists_real_workers_and_targets_without_starting_one_shot(app):
     assert not app.room_running()
 
 
-def test_self_review_gets_read_only_source_tools_without_edit_checkbox(app):
+def test_code_review_prompt_is_not_forced_read_only(app):
     job_id = app.run({'prompt': "access your code. make a plan. dont' use any paid usage", 'project': 'proj'})['job']
     command = app.jobs[job_id].cmd
-    assert '--review' in command and '--free-only' in command and '-e' not in command
+    assert '--review' not in command and '--free-only' in command  # "don't use paid" still honored
 
 
 def test_self_review_inspects_installed_megazword_code(app):
     from pathlib import Path
     app.project = 'mega-zword'
-    job_id = app.run({'prompt': 'Review your code', 'project': 'mega-zword'})['job']
+    job_id = app.run({'prompt': 'Review your code', 'project': 'mega-zword', 'review': True})['job']
     command = app.jobs[job_id].cmd
     assert command[command.index('--review-root') + 1] == str(Path(dashboard.__file__).resolve().parent)
 

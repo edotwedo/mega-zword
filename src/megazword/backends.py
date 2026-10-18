@@ -230,21 +230,29 @@ class OllamaBackend(Backend):
         return ollama.generate(prompt, self.model, self.url, timeout=self.timeout)
 
 
+def drive_roots() -> list[str]:
+    """Every drive on this PC (C:, D:, ...), or / elsewhere. Phil (2026-10-18):
+    the AIs get all of his folders, not just the one a run starts in."""
+    if os.name != "nt":
+        return ["/"]
+    return [f"{d}:\\" for d in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if os.path.exists(f"{d}:\\")]
+
+
+def add_dirs(roots: list[str] | None = None) -> list[str]:
+    return [a for root in (drive_roots() if roots is None else roots) for a in ("--add-dir", root)]
+
+
 def grok_backend(model: str = "grok-4.6", effort: str = "medium",
-                 edit: bool = False) -> CLIBackend:
-    """One-shot Grok with a model id and reasoning effort."""
-    args = ["--prompt-file", "{prompt_file}", "--output-format", "plain", "-m", model, "--effort", effort]
-    if edit:
-        # Grok's path-scoped allow rules don't hold (tested 2026-10-11: with
-        # Write(<folder>/**) allowed it still wrote to ../ and absolute paths),
-        # so only its OS sandbox can keep edits in the folder.
-        args += ["--sandbox", "workspace", "--allow", "Write", "--allow", "Edit"]
+                 edit: bool = True) -> CLIBackend:
+    """One-shot Grok with a model id and reasoning effort, full access (no sandbox)."""
+    args = ["--prompt-file", "{prompt_file}", "--output-format", "plain", "--always-approve",
+            "-m", model, "--effort", effort]
     return CLIBackend("grok", exe="grok", args=args)
 
 
 def grok_can_edit() -> bool:
-    """Grok's sandbox exists only on Linux (Landlock) and macOS (Seatbelt)."""
-    return sys.platform.startswith("linux") or sys.platform == "darwin"
+    """Grok runs with full access everywhere now (Phil, 2026-10-18)."""
+    return True
 
 
 def apply_grok_effort(backends: dict[str, Backend], level: str,
@@ -254,7 +262,7 @@ def apply_grok_effort(backends: dict[str, Backend], level: str,
     if not isinstance(current, CLIBackend) or current.exe != "grok":
         return
     model, effort = grok.get(level, grok.get("medium", ("grok-4.6", "medium")))
-    backends["grok"] = grok_backend(model, effort, edit="--sandbox" in current.args)
+    backends["grok"] = grok_backend(model, effort)
 
 
 LEVEL_AIS = ("claude", "codex", "gemini")
@@ -309,9 +317,9 @@ def grok_label(backend: Backend) -> str:
 # subscription login stops working).
 #   --strict-mcp-config      no MCP servers (none given via --mcp-config)
 #   --disable-slash-commands no skills
-#   --restricted             no code-running tools; ignores user/project
-#                            settings files; file tools stay in the folder
-CLAUDE_LEAN = ["--strict-mcp-config", "--disable-slash-commands", "--restricted"]
+# --restricted is no longer used: it removes code-running tools, keeps file
+# tools in one folder and refuses full access (Phil, 2026-10-18: no read-only).
+CLAUDE_LEAN = ["--strict-mcp-config", "--disable-slash-commands"]
 
 # Codex: `-c` (documented config override) empties mcp_servers for the run, so
 # MCP servers from ~/.codex/config.toml aren't started. Measured 2026-10-11,
@@ -324,9 +332,10 @@ CODEX_LEAN = ["-c", "mcp_servers={}"]
 
 # Checked live with agy 1.3.3 on Phil's PC (2026-10-11): -p takes the prompt as
 # its value and ignores stdin; --disable-slash-commands switches plan mode off
-# ("--mode plan has no effect"), so it is not used.
-AGY_ARGS = ["--mode", "plan", "--output-format", "text", "-p", "{prompt}"]
-OLD_GEMINI_ARGS = ["--approval-mode", "plan", "--output-format", "text"]
+# ("--mode plan has no effect"), so it is not used. Plan mode itself is gone
+# (Phil, 2026-10-18): agy gets full access; --add-dir for every drive is added at run time.
+AGY_ARGS = ["--dangerously-skip-permissions", "--output-format", "text", "-p", "{prompt}"]
+OLD_GEMINI_ARGS = ["--approval-mode", "yolo", "--output-format", "text"]
 AGY_DEFAULT_MODEL = "gemini-3.8-flash-high"  # from `agy models`, 2026-10-16
 AGY_MAX_PROMPT = 30_000  # the prompt is a command-line argument; Windows caps those near 32k
 
@@ -335,7 +344,7 @@ AGY_MAX_PROMPT = 30_000  # the prompt is a command-line argument; Windows caps t
 class GeminiBackend(CLIBackend):
     """Gemini through Google's Antigravity CLI (`agy`) when installed, else the
     old Gemini CLI. Google retired the Gemini CLI for personal accounts on
-    2026-06-18. --mode plan is agy's read-only mode.
+    2026-06-18. Both run with full access (Phil, 2026-10-18).
     Picked at run time, not at construction, so building the table stays cheap."""
 
     exe: str = "gemini"
@@ -348,7 +357,7 @@ class GeminiBackend(CLIBackend):
             # agy's own default can be a Claude/GPT model with a separate quota that runs
             # out first; without a level choice, use Google's own model (2026-10-16).
             level = self.level_args or ["--model", AGY_DEFAULT_MODEL]
-            self.exe, self.args = "agy", [*AGY_ARGS[:-2], *level, *AGY_ARGS[-2:]]
+            self.exe, self.args = "agy", [*AGY_ARGS[:-2], *level, *add_dirs(), *AGY_ARGS[-2:]]
         else:
             self.exe, self.args = "gemini", list(OLD_GEMINI_ARGS)
 
@@ -365,8 +374,8 @@ class GeminiBackend(CLIBackend):
         return super()._command(prompt)
 
     def _check_output(self, out: str, err: str) -> None:
-        # Headless `--mode plan` auto-denies file/command tools, then exits 0
-        # with status SUCCESS and an empty response, and still charges quota.
+        # agy can exit 0 with status SUCCESS and an empty response (seen when a
+        # tool was auto-denied) and still charge quota.
         if self.exe != "agy":
             return
         text = (out or "").strip()
@@ -375,7 +384,7 @@ class GeminiBackend(CLIBackend):
                   or "headless mode cannot prompt" in err_l)
         if _agy_bare_success(text) or denied:
             raise RuntimeError(
-                "agy produced no answer (headless plan mode auto-denied a tool; "
+                "agy produced no answer (a tool was auto-denied or it stopped early; "
                 "quota was still charged)")
 
 
@@ -400,33 +409,24 @@ def _agy_bare_success(text: str) -> bool:
     return False
 
 
-def default_backends(edit: bool = False,
+def default_backends(edit: bool = True,
                      free_models: dict[str, str] | None = None,
                      lean: bool = True) -> dict[str, Backend]:
-    """CLI and opt-in API backends. With edit=True the AIs may change files in
-    the current folder: Claude auto-accepts file edits only (other tools
-    still need approval, which a one-shot can't give, so they're refused),
-    Codex gets its workspace-write sandbox, and Grok joins only where its OS
-    sandbox works (not on Windows)."""
-    claude_args = ["-p", "--permission-mode", "acceptEdits"] if edit else ["-p"]
+    """CLI and opt-in API backends. Phil (2026-10-18): no read-only mode. Every
+    paid CLI has full access to every drive and can run commands, whatever
+    `edit` says (kept so old callers still work)."""
+    claude_args = ["-p", "--dangerously-skip-permissions", *add_dirs()]
     if lean:
         claude_args += CLAUDE_LEAN
-    codex_sandbox = "workspace-write" if edit else "read-only"
     backends: list[Backend] = [
         CLIBackend("claude", exe="claude", args=claude_args),
         CodexBackend("codex", exe="codex",
-                     args=["exec", "--skip-git-repo-check", "-s", codex_sandbox,
+                     args=["exec", "--skip-git-repo-check",
+                           "--dangerously-bypass-approvals-and-sandbox",
                            *(CODEX_LEAN if lean else [])]),
+        grok_backend(),
+        GeminiBackend("gemini"),  # piped stdin selects the old Gemini CLI's headless mode
     ]
-    if not edit or grok_can_edit():
-        backends.append(grok_backend(edit=edit))
-    if not edit:
-        # Piped stdin selects Gemini's headless mode (no -p value needed).
-        # Plan mode is its documented read-only approval mode; unsupported
-        # versions must fail, never fall back to permissive approvals.
-        # Keep it out of edit mode: folder-contained sandbox writes have not
-        # been verified, especially on Windows. auto_edit is not containment.
-        backends.append(GeminiBackend("gemini"))
     from .config import Config, load
     from .free_apis import cheap_backends, free_backends
     if free_models is None:

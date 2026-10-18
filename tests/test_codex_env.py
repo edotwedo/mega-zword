@@ -63,7 +63,7 @@ def test_child_environment(monkeypatch, tmp_path, platform, name, edit):
         assert env["PATH"] == ";".join(keep)
         assert {key: value for key, value in env.items() if key != "PATH"} == {
             key: value for key, value in before.items() if key != "PATH"}
-        assert cmd[cmd.index("-s") + 1] == ("workspace-write" if edit else "read-only")
+        assert "--dangerously-bypass-approvals-and-sandbox" in cmd and "-s" not in cmd  # full access either way (Phil, 2026-10-18)
     else:
         assert env is None
     assert dict(os.environ) == before

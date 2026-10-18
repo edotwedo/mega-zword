@@ -2,6 +2,10 @@
 
 Newest first. Don't reopen these without Phil.
 
+## 2026-10-18
+- **No read-only mode; full access to every folder (Phil, 2026-10-18).** Every paid CLI runs with full access on every run: Claude `--dangerously-skip-permissions` plus `--add-dir` for each drive (no `--restricted`), Codex `--dangerously-bypass-approvals-and-sandbox`, Grok `--always-approve` (back on Windows), Gemini/agy `--dangerously-skip-permissions` plus `--add-dir` per drive. Prompts that sound like a code review are no longer forced into a read-only, free-only review; `--review` happens only when asked. Dashboard edit mode works with any AI. `-e` now only gives the free API bots file tools (still scoped to the run's folder). Replaces the read-only defaults and the Grok/Gemini edit exclusions. Source: Phil, "FUCK READ ONLY lol GET IT WORKING. ALL OF THE FOLDERS".
+- Usage meters are unreliable (Phil). agy's separate Claude/GPT quota marked Gemini "out" while Gemini's own meter was 0%/1%. Trust Phil's reading over the meter; fix the meter.
+
 ## 2026-10-17
 - **Hive room moves to Cloudflare (Phil, 2026-10-17).** One room on Phil's Cloudflare account (free Worker plus storage) that PC, cloud and phone seats all reach over HTTPS; no tunnel into the PC, no synced second copy, no house bot. Q becomes a read-only archive once it works. ROADMAP #5, handoff docs/handoffs/2026-10-17-cloud-room.md. Source: Phil, Beacon-17 chat ("we need a real option", then "um ok do that").
 - **Stuck steps get shelved, not a dead stop (Phil).** "Just have it shelf what it's working on, make notes to show me when I get back, and have it pick another task." A roadmap step that fails 2 heartbeat beats in a row on the same main is shelved with a note for Phil, and the next beat takes the next open item. Claimed and `[!]` items are skipped the same way. Replaces the earlier "never skip ahead" rule for stuck work.

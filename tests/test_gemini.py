@@ -44,7 +44,7 @@ def test_gemini_pipes_long_prompt_and_reports_errors(monkeypatch, returncode):
     assert backend.available()
     backend.timeout = 19
     result = backend.run(prompt)
-    assert calls == [["fake-gemini.cmd", "--approval-mode", "plan", "--output-format", "text"]]
+    assert calls == [["fake-gemini.cmd", "--approval-mode", "yolo", "--output-format", "text"]]
     assert result.backend == "gemini"
     assert result.ok == (returncode == 0)
     if returncode:
@@ -54,11 +54,8 @@ def test_gemini_pipes_long_prompt_and_reports_errors(monkeypatch, returncode):
         assert result.text == "fake answer"
 
 
-def test_gemini_edit_is_excluded_and_explained(capsys):
-    assert "gemini" not in backends.default_backends(edit=True, free_models={})
-    assert cli.main(["run", "write a file", "--edit", "-m", "gemini"],
-                    cfg=config.Config()) == 2
-    assert "Gemini edit mode is disabled" in capsys.readouterr().err
+def test_gemini_is_included_for_edits():
+    assert "gemini" in backends.default_backends(edit=True, free_models={})
 
 
 @pytest.mark.parametrize("installed", [False, True])
@@ -159,13 +156,12 @@ def test_gemini_prefers_antigravity_cli(monkeypatch):
             return "hi\n", ""
 
     monkeypatch.setattr(backends.subprocess, "Popen", Process)
+    monkeypatch.setattr(backends, "drive_roots", lambda: ["C:\\"])
     backend = backends.default_backends(free_models=config.Config().free)["gemini"]
     result = backend.run("hello")
-    # No --disable-slash-commands: it turns agy's read-only plan mode off.
-    assert calls == [["fake-agy.exe", "--mode", "plan", "--output-format", "text",
-                      "--model", backends.AGY_DEFAULT_MODEL, "-p", "hello"]]
+    assert calls == [["fake-agy.exe", "--dangerously-skip-permissions", "--output-format", "text",
+                      "--model", backends.AGY_DEFAULT_MODEL, "--add-dir", "C:\\", "-p", "hello"]]
     assert result.ok and result.text == "hi" and result.backend == "gemini"
-    assert "gemini" not in backends.default_backends(edit=True, free_models={})
     long = backend.run("x" * (backends.AGY_MAX_PROMPT + 1))
     assert not long.ok and "command line" in long.error and len(calls) == 1
 

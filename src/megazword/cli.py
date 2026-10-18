@@ -73,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
                      help="include this project's memory (decisions, recent activity)")
     run.add_argument("-p", "--project", help="project name (default: current repo/folder)")
     run.add_argument("-e", "--edit", action="store_true",
-                     help="let the AI change files in the current folder")
+                     help="give the free API bots file tools too (paid CLIs always have full access)")
     run.add_argument('--review', action='store_true', help='inspect source with read-only tools using free API/local models')
     run.add_argument('--review-root', type=Path, help='source folder for --review (default: current folder)')
     run.add_argument('--free-only', action='store_true', help='exclude subscription CLI and paid-model fallbacks')
@@ -613,8 +613,9 @@ def main(argv: list[str] | None = None,
         print("No prompt given.", file=sys.stderr)
         return 2
     from .request_mode import free_only, free_backend, code_review
-    # Enforce at the child entrypoint too: older dashboards can omit --review.
-    args.review = args.review or (not args.edit and not args.compare and code_review(prompt))
+    # Phil (2026-10-18): no read-only. The paid CLIs always have full access; -e
+    # only gives the free API bots file tools. Prompts that merely sound like a
+    # code review are no longer forced into a read-only free-only review.
     if args.review and not args.review_root and (args.project or project_name()) == 'mega-zword':
         args.review_root = Path(__file__).resolve().parent
     args.free_only = args.free_only or free_only(prompt) or args.review
@@ -650,14 +651,6 @@ def main(argv: list[str] | None = None,
     if args.model:
         apply_levels(backends, "medium", cfg.grok, cfg.levels)
         backend = backends.get(args.model)
-        if backend is None and args.edit and args.model == "gemini":
-            print("[megazword] Gemini edit mode is disabled (folder-contained writes "
-                  "are unverified); use claude or codex for --edit", file=sys.stderr)
-            return 2
-        if backend is None and args.edit and args.model == "grok":
-            print("[megazword] Grok can't edit files safely on Windows (no sandbox); "
-                  "use claude or codex for --edit", file=sys.stderr)
-            return 2
         if backend is None:
             print(f"Unknown AI '{args.model}'. Choose from: {', '.join(backends)}",
                   file=sys.stderr)
@@ -941,7 +934,7 @@ def retry_last(args, backends: dict[str, Backend], cfg: config.Config,
         return 2
     from .request_mode import free_only, free_backend, code_review
     policy = last.get('policy') or {}
-    reviewing = policy.get('review') or (not policy.get('edit') and code_review(last['prompt']))
+    reviewing = bool(policy.get('review'))  # explicit --review only (Phil, 2026-10-18)
     must_free = policy.get('free_only') or free_only(last['prompt']) or reviewing
     if reviewing or policy.get('edit'):
         argv = ['run', last['prompt'], '-p', last['project']]

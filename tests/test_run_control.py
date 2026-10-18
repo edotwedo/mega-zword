@@ -107,7 +107,7 @@ def test_instruction_before_write_skips_old_tool_and_replans(tmp_path, monkeypat
     assert phases[-1] == "finished"
 
 
-def test_dashboard_edit_requires_one_free_bot(tmp_path):
+def test_dashboard_edit_works_with_any_bot(tmp_path):
     class Fake:
         def available(self):
             return True
@@ -121,10 +121,8 @@ def test_dashboard_edit_requires_one_free_bot(tmp_path):
     app = dashboard.App(config.Config(), "test", backends={"groq": Fake(), "codex": Fake()}, launcher=launch)
     app.run({"prompt": "add tests", "model": "groq", "edit": True})
     assert "-e" in captured[0][2]
-    with pytest.raises(ValueError, match="choose one free"):
-        app.run({"prompt": "x", "model": "codex", "edit": True})
-    with pytest.raises(ValueError, match="choose one free"):
-        app.run({"prompt": "x", "edit": True})
+    app.run({"prompt": "x", "model": "codex", "edit": True})
+    assert "-e" in captured[1][2] and "--free-only" not in captured[1][2]
 
 
 def test_dashboard_child_owns_control_and_briefing_identity(monkeypatch):

@@ -52,7 +52,7 @@ def test_agy_level_args_go_before_the_prompt(monkeypatch):
     g = GeminiBackend("gemini", level_args=["--model", "m1", "--effort", "low"])
     g._pick()
     assert g.args[-2:] == ["-p", "{prompt}"]
-    assert g.args[:2] == ["--mode", "plan"] and "--model" in g.args and "--effort" in g.args
+    assert g.args[0] == "--dangerously-skip-permissions" and "--model" in g.args and "--effort" in g.args
 
 
 def test_fakes_are_left_alone():
