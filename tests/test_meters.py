@@ -22,7 +22,7 @@ def test_out_beats_the_meter():
 
 def test_expired_out_mark_shows_the_meter_again():
     s = summarize(plan(used=40), {"codex": NOW - timedelta(minutes=1)}, NOW)
-    assert s.state == "meter" and "40% 5-hour" in s.line()
+    assert s.state == "meter" and "60% left (5-hour 40% used)" in s.line()
 
 
 def test_snapshot_age_and_stale():

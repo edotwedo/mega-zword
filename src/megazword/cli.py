@@ -252,7 +252,7 @@ def free_spread_line(runs: dict) -> str:
 
 
 def show_usage() -> int:
-    from datetime import timedelta
+    from datetime import datetime, timedelta, timezone
     from .runlog import summarize
     from .meters import summarize_all
     from .usage_sources import all_usage
@@ -270,14 +270,16 @@ def show_usage() -> int:
             parts = []
             for w in plan.windows:
                 reset = f", resets {w.resets_at.astimezone():%a %I:%M %p}" if w.resets_at else ""
-                parts.append(f"{w.name} {w.used_percent:.0f}%{reset}")
+                if w.resets_at and w.resets_at < datetime.now(timezone.utc):
+                    reset += " (passed; reading not refreshed yet)"
+                parts.append(f"{w.name} {w.used_percent:.0f}% used{reset}")
             print(f"{'':8}{' | '.join(parts)}")
     from . import budget
     print(budget.line())  # last saved reading; no network call here
     print(free_spread_line(summarize(config.HOME / "log.jsonl", timedelta(hours=24))))
     print("\nMega Zword runs (last 24h)")
     runs = summarize(config.HOME / "log.jsonl", timedelta(hours=24))
-    print("AI      runs ok rej/bad sec chars est_tokens")
+    print("AI      runs ok rej/bad sec chars est_tokens   (rej/bad: answers rejected / failed)")
     for name in ("claude", "codex", "grok", "gemini"):
         item = runs.get(name)
         if item:

@@ -34,11 +34,13 @@ class Summary:
         if self.state == "out":
             text = f"out until {self.out_until.astimezone():%a %b %d %I:%M %p}"
         elif self.state == "meter":
+            # Lead with what's left: "2% 5-hour" read as 2% remaining (Phil, 2026-10-17).
+            left = f"{max(0, 100 - self.used):.0f}% left"
             if len(self.windows) > 1:
-                text = " / ".join(f"{used:.0f}% {name}" for name, used in self.windows)
+                text = left + " (" + ", ".join(f"{name} {used:.0f}% used" for name, used in self.windows) + ")"
             else:
                 filled = max(0, min(10, round(self.used / 10)))
-                text = f"[{'#' * filled}{'.' * (10 - filled)}] {self.used:3.0f}% {self.window}"
+                text = f"[{'#' * filled}{'.' * (10 - filled)}] {left} ({self.window} {self.used:.0f}% used)"
         else:
             text = shorten(self.note or "no meter", width=60, placeholder="...")
         if self.as_of and self.state != "out":
