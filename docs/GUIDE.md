@@ -520,6 +520,13 @@ Findings two reviewers report about the same thing are marked "N reviewers agree
 
 - `megazword job plan "the job"` asks one AI to split a job into pieces and saves
   `~\.megazword\jobs\<ID>\job.json`.
+- `megazword job run <ID> [--workers N] [--repo URL]` runs a saved plan's pieces in parallel.
+  One line per piece: number, title, status, which AI, reason. Defaults: 2 workers,
+  local Gitea repo. Exit code 0 only when every piece passed. Example:
+  `megazword job run 20261018-a1b2c3 --workers 4`
+- `megazword job status <ID>` shows the job without running anything: overall state, then
+  each piece's status, tests, the AI that delivered it, the AIs tried, its branch and why it
+  failed. A plan that hasn't run shows "not started".
 - `megazword job combine <ID>` merges every piece that passed onto `job/<ID>`, runs
   the full tests, and has reviewers from companies that wrote none of the pieces
   check it. Only `job/<ID>` is pushed, never main; you approve it. `--no-push`

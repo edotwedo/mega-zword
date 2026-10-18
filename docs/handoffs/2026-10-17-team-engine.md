@@ -54,7 +54,7 @@ branch to approve. A scoreboard shows who is good at what and what it cost.
    `~/.megazword/jobs/*/job.json`: per AI, pieces delivered, pieces failed, pass rate,
    estimated tokens; plus `megazword job scores` printing it best first. Tests with
    fixtures.
-7. [ ] docs/GUIDE.md "Team jobs" section (started by Juniper-16 with plan and combine):
+7. [ ] docs/GUIDE.md "Team jobs" section (started by Juniper-16 with plan and combine; run by zai via `megazword run`, status by Juniper-16, 2026-10-18; scores still to add after step 6):
    add run, status and scores once they exist, in the same plain style, with one
    example. Check every command against `megazword job --help`.
 8. [phil] First real job on another project (e.g. Up Dawg), chosen by Phil.
