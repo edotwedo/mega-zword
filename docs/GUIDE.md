@@ -527,6 +527,8 @@ Findings two reviewers report about the same thing are marked "N reviewers agree
 - `megazword job status <ID>` shows the job without running anything: overall state, then
   each piece's status, tests, the AI that delivered it, the AIs tried, its branch and why it
   failed. A plan that hasn't run shows "not started".
+- `megazword job scores` reads every saved job and ranks the AIs, best first: pieces each
+  one delivered that passed, tries that failed, pass rate, and rough tokens spent.
 - `megazword job combine <ID>` merges every piece that passed onto `job/<ID>`, runs
   the full tests, and has reviewers from companies that wrote none of the pieces
   check it. Only `job/<ID>` is pushed, never main; you approve it. `--no-push`

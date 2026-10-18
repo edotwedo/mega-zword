@@ -211,6 +211,7 @@ def add_parser(sub) -> None:
     run.add_argument("--repo", help="repo URL to clone (default: local Gitea mega-zword URL)")
     status = jsub.add_parser("status", help="show a job's pieces: status, tests, AIs, branch")
     status.add_argument("id", help="job ID from `megazword job plan`")
+    jsub.add_parser("scores", help="which AI delivers passing pieces, from every saved job")
     combine = jsub.add_parser("combine", help="merge a job's passed pieces on job/ID, test and review it")
     combine.add_argument("id", help="job ID from `megazword job plan`")
     combine.add_argument("--no-push", action="store_true", help="keep job/ID local")
@@ -286,6 +287,10 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
             write: Callable[[str], None] = print) -> int:
     if args.job_cmd == "status":
         return status_job(args.id, write=write)
+    if args.job_cmd == "scores":
+        from . import scores
+        write(scores.format_scores(scores.scoreboard(scores.load_reports(jobs_home()))))
+        return 0
     if args.job_cmd == "plan":
         return plan_job(args.text, backends, write=write)
     if args.job_cmd == "run":

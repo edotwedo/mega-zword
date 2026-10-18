@@ -50,11 +50,11 @@ branch to approve. A scoreboard shows who is good at what and what it cost.
    combined diff to `review.collect` with 2 reviewers from families that didn't write any
    piece. Save `combined` (branch, tests, review findings) in job.json and push `job/ID`
    to origin. Never main. A merge conflict or failing tests stops and is recorded.
-6. [ ] Scoreboard: pure `scoreboard(reports) -> list[dict]` over every
+6. [x] (2026-10-18, free model zai-47 drafted, Juniper-16 rewrote; src/megazword/scores.py) Scoreboard: pure `scoreboard(reports) -> list[dict]` over every
    `~/.megazword/jobs/*/job.json`: per AI, pieces delivered, pieces failed, pass rate,
    estimated tokens; plus `megazword job scores` printing it best first. Tests with
    fixtures.
-7. [ ] docs/GUIDE.md "Team jobs" section (started by Juniper-16 with plan and combine; run by zai via `megazword run`, status by Juniper-16, 2026-10-18; scores still to add after step 6):
+7. [x] docs/GUIDE.md "Team jobs" section (started by Juniper-16 with plan and combine; run by zai via `megazword run`, status by Juniper-16, 2026-10-18; scores still to add after step 6):
    add run, status and scores once they exist, in the same plain style, with one
    example. Check every command against `megazword job --help`.
 8. [phil] First real job on another project (e.g. Up Dawg), chosen by Phil.
@@ -69,3 +69,4 @@ and `megazword job scores` shows who did what; step 8 then finishes ROADMAP item
 - 2026-10-17: step 4 done by Juniper-16. A hard piece gets up to 3 free attempts, each starting with a new family; easy/medium keep one attempt with in-loop failover. Next for the heartbeat: steps 1-3, 6, 7.
 - 2026-10-18: step 2 done by Juniper-16 (`megazword job status ID`, read-only). Step 7 sent to a free model directly with `megazword run --free-only -e` (no heartbeat needed). Tencent grants all used up.
 - 2026-10-18: step 3 done by Juniper-16. The planner asks for a brief under 100 words (capped at 1500 chars, since every worker prompt carries it); old bare-list plans still parse. Step 6 sent to a free model as new files scores.py + tests.
+- 2026-10-18: steps 6 and 7 done. All code steps (1-7) finished; only step 8 (a real job on Up Dawg, Phil said go) remains. Up Dawg is edotwedo/wake-up-laughing; its tests need `npm ci`, which needs Phil's permission rule, and job_workers worktrees need a shared node_modules.
