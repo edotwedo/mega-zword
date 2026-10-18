@@ -12,7 +12,7 @@ from . import credential_store as vault
 
 def key_names() -> tuple[str, ...]:
     from .free_apis import FREE_KEYS
-    return tuple(dict.fromkeys([name for _, name in FREE_KEYS] + ["CLOUDFLARE_ACCOUNT_ID"]))
+    return tuple(dict.fromkeys([name for _, name in FREE_KEYS] + ["CLOUDFLARE_ACCOUNT_ID", "HIVE_ROOM_TOKEN"]))
 
 
 def get_key(env_name: str) -> str | None:
@@ -124,6 +124,8 @@ def show() -> int:
         provider_key = "CLOUDFLARE_API_TOKEN" if name == "CLOUDFLARE_ACCOUNT_ID" else name
         if source == "missing":
             result = "no answer"
+        elif name == "HIVE_ROOM_TOKEN":
+            result = "stored (room token; not probed)"
         else:
             if provider_key not in results:
                 results[provider_key] = _probe(providers[provider_key])

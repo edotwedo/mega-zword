@@ -1,4 +1,4 @@
-"""The Hive room: bot group chat with token-budget optimizations."""
+"""The Hive room: authenticated remote chat, local cache and durable send queue."""
 
 from __future__ import annotations
 
@@ -10,6 +10,9 @@ import subprocess
 import sys
 from dataclasses import asdict, dataclass, field, fields
 import uuid
+import hashlib
+import urllib.request
+from urllib.parse import urlsplit
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
@@ -34,6 +37,8 @@ class RoomMessage:
     text: str
     mentions: list[str] = field(default_factory=list)
     prompt_chars: int = 0
+    remote_id: int = 0
+    remote_url: str = ""
 
 
 @dataclass
@@ -123,6 +128,8 @@ def read_messages(room: str = DEFAULT_ROOM, home: Path | None = None) -> list[Ro
                     text=data.get("text", ""),
                     mentions=data.get("mentions", []),
                     prompt_chars=data.get("prompt_chars", 0),
+                    remote_id=data.get("remote_id", 0),
+                    remote_url=data.get("remote_url", ""),
                 ))
             except (json.JSONDecodeError, TypeError):
                 continue
@@ -446,152 +453,8 @@ def run_room(room: str = DEFAULT_ROOM,
              write: Callable[[str], None] = print,
              home: Path | None = None,
              session: str | None = None) -> int:
-    """Run the room turn loop with token budgeting and guardrails. `session` lets a host
-    (the dashboard) know its session id so it can release the room when it exits."""
-    cfg = cfg or config.load()
-    primary = project or cfg.room_primary or project_name()
-    backends = backends or default_backends(edit=False, free_models=cfg.free, lean=cfg.lean)
-
-    state = load_state(room, home)
-    if other_session_running(state):
-        write(f"[megazword room] room '{room}' is already running in another window; "
-              "`megazword room stop` ends it")
-        return 1
-    me = session or uuid.uuid4().hex
-    state.session = me
-    state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    resuming = state.paused
-    if not resuming:
-        state.turn_count = 0
-    state.primary = primary
-    state.active = True
-    state.stopped = False
-    state.paused = False
-    turn_cap = max_turns if max_turns is not None else cfg.room_turn_cap
-    state.turn_cap = turn_cap
-    save_state(state, home)
-
-    write(f"[megazword room] started room '{room}' for project '{primary}' (turn cap: {turn_cap})")
-
-    turns_taken = state.turn_count if resuming else 0
-    session_active: dict[str, bool] = {name: False for name in backends}
-
-    try:
-        while turns_taken < turn_cap:
-            state = load_state(room, home)
-            if state.stopped:
-                write(f"[megazword room] session stopped on command")
-                break
-            if state.session != me:  # stopped and restarted elsewhere: the newer one wins
-                write("[megazword room] a newer session took over this room; stopping")
-                break
-            if state.paused:
-                write("[megazword room] paused after current reply")
-                break
-            state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-            messages = read_messages(room, home)
-            last_msg = messages[-1] if messages else None
-
-            # One-shots answer Phil. Bot-to-bot @mentions used to keep Start running
-            # until the turn cap and look like extra live sessions.
-            if last_msg and last_msg.author != "phil":
-                write("[megazword room] waiting for Phil; live seats read the log")
-                break
-
-            # Guard rail: check eligible AIs
-            cur_statuses = (statuses or (lambda: {}))()
-            eligible = get_eligible_backends(backends, cfg, cur_statuses)
-            if not eligible:
-                write("[megazword room] stopped early: all AIs are out of usage or over pace")
-                break
-
-            burn_order = get_burn_order(eligible, cur_statuses)
-            speaker = pick_next_speaker(last_msg, list(eligible.keys()), burn_order, state.last_speaker)
-            if not speaker:
-                write("[megazword room] stopped early: no eligible AI to speak next")
-                break
-
-            # Token budget: rolling summary check
-            if len(messages) > RECENT_MESSAGES_COUNT and (len(messages) - state.summarized_count) >= SUMMARY_EVERY:
-                older = messages[:-RECENT_MESSAGES_COUNT]
-                state.rolling_summary = condense_messages(older, state.rolling_summary)
-                state.summarized_count = len(messages)
-                save_state(state, home)
-
-            # Build token-budgeted prompt
-            card = build_state_card(primary, home)
-            recent_text = format_recent(messages, RECENT_MESSAGES_COUNT)
-            prompt = build_turn_prompt(
-                card, state.rolling_summary, recent_text,
-                speaker, primary, last_msg.author if last_msg else None,
-                others=[b for b in eligible if b != speaker],
-            )
-            prompt_chars = len(prompt)
-
-            # Execute turn
-            backend = eligible[speaker]
-            text, ok, seconds, err = run_speaker(speaker, backend, prompt, session_active[speaker])
-            if not ok:
-                log.append(cfg.log_path, cfg.log_lines, backend=speaker, forced=False,
-                           project=primary, room=room, seconds=round(seconds, 2), ok=False,
-                           prompt_chars=prompt_chars, answer_chars=0, est_tokens=prompt_chars // 4)
-                session_active[speaker] = False
-                # Out of usage mid-session: mark it out (like a normal run) and let the
-                # others carry on. It drops out of `eligible` next turn, so this can't loop.
-                from .cli import auto_mark_out
-                if auto_mark_out(speaker, err, cfg):
-                    write(f"[megazword room] {speaker} is out of usage; the others carry on")
-                    continue
-                write(f"[megazword room] {speaker} failed: {err}")
-                break
-
-            session_active[speaker] = True
-
-            # Save message
-            appended = append_message(room, speaker, text, prompt_chars=prompt_chars, home=home)
-            turns_taken += 1
-            # Reload: a Pause, Stop or newer session may have changed the state during the turn.
-            state = load_state(room, home)
-            if state.session == me:
-                state.turn_count += 1
-                state.last_speaker = speaker
-                state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
-                save_state(state, home)
-
-            # Log to run log
-            log.append(
-                cfg.log_path, cfg.log_lines,
-                backend=speaker, forced=False, project=primary,
-                room=room, seconds=round(seconds, 2), ok=True,
-                prompt_chars=prompt_chars, answer_chars=len(text),
-                est_tokens=(prompt_chars + len(text)) // 4
-            )
-
-            write(f"[{speaker}] {text}")
-
-        final = load_state(room, home)
-        if turns_taken >= LESSON_MIN_TURNS and final.session == me and not final.paused:
-            cur_statuses = (statuses or (lambda: {}))()
-            eligible = get_eligible_backends(backends, cfg, cur_statuses)
-            order = get_burn_order(eligible, cur_statuses)
-            if order:
-                saved = write_lessons(read_messages(room, home), primary, order[0],
-                                      eligible[order[0]], cfg, room, home)
-                if saved:
-                    write(f"[megazword room] saved {len(saved)} lessons to '{primary}' memory")
-
-    except KeyboardInterrupt:
-        write("\n[megazword room] paused/interrupted by user")
-    finally:
-        messages = read_messages(room, home)
-        save_summary_report(room, messages, primary, home)
-        state = load_state(room, home)
-        if state.session == me:  # don't mark a newer session's room idle
-            state.active = False
-            save_state(state, home)
-        write(f"[megazword room] session finished ({turns_taken} turns)")
-
+    """Compatibility entry point: the room no longer launches one-shot house bots."""
+    write("[megazword room] house bot disabled; real seats use room say/show")
     return 0
 
 
@@ -602,26 +465,155 @@ def check_author(author: str) -> None:
         raise PermissionError(f"seat '{seat}' cannot post as phil")
 
 
+def safe_write(write: Callable[[str], None], text: str) -> None:
+    """Windows redirected cp1252 consoles cannot represent every room character."""
+    try:
+        write(text)
+    except UnicodeEncodeError as exc:
+        write(text.encode(exc.encoding, errors="replace").decode(exc.encoding))
+
+
+class RemoteRoom:
+    def __init__(self, room: str, cfg: config.Config, home: Path | None):
+        from .keys import get_key
+        self.url = (os.environ.get("HIVE_ROOM_URL") or cfg.room_url).rstrip("/")
+        parsed = urlsplit(self.url)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ("", "/"):
+            raise ValueError("room URL must be an HTTPS origin without credentials, path or query")
+        if not re.fullmatch(r"[a-z0-9-]{1,64}", room):
+            raise ValueError("remote room names use lowercase a-z, digits and - (1-64 characters)")
+        self.token = get_key("HIVE_ROOM_TOKEN")
+        if not self.token:
+            raise ValueError("HIVE_ROOM_TOKEN missing: set it in Keymaster or environment secrets")
+        self.room, self.home = room, home
+        self.endpoint = f"{self.url}/rooms/{room}/messages"
+        # A queue belongs to one origin and credential; never replay it as a different seat.
+        binding = hashlib.sha256((self.url + "\0" + self.token).encode()).hexdigest()[:24]
+        self.queue = room_dir(home) / f"{room}.{binding}.queue.json"
+
+    def request(self, method: str, suffix: str = "", item: dict | None = None) -> dict:
+        headers = {"Authorization": "Bearer " + self.token, "Content-Type": "application/json"}
+        data = None
+        if item is not None:
+            headers["Idempotency-Key"] = item["id"]
+            data = json.dumps({"text": item["text"]}).encode("utf-8")
+        req = urllib.request.Request(self.endpoint + suffix, data=data, headers=headers, method=method)
+        # Never forward a seat token to a redirect target.
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *args, **kwargs):
+                return None
+        with urllib.request.build_opener(NoRedirect()).open(req, timeout=10) as response:
+            return json.load(response)
+
+    def cached(self) -> list[RoomMessage]:
+        return [m for m in read_messages(self.room, self.home) if m.remote_url == self.url]
+
+    def cache(self, rows: list[dict]) -> None:
+        path = room_path(self.room, self.home)
+        with locked(path) as acquired:
+            if not acquired:
+                raise OSError("cache busy")
+            # read_messages uses the same sidecar lock, so read directly while holding it.
+            raw = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+            records = [json.loads(line) for line in raw if line.strip()]
+            known = {r.get("remote_id") for r in records if r.get("remote_url") == self.url}
+            for row in rows:
+                if (not isinstance(row, dict) or type(row.get("id")) is not int or row["id"] < 1
+                        or not all(isinstance(row.get(k), str) for k in ("author", "text", "time"))):
+                    raise ValueError("invalid server message")
+                if row["id"] not in known:
+                    records.append(asdict(RoomMessage(row["time"], row["author"], row["text"],
+                        extract_mentions(row["text"]), remote_id=row["id"], remote_url=self.url)))
+                    known.add(row["id"])
+            records.sort(key=lambda r: r.get("remote_id", 0))
+            write_atomic(path, "".join(json.dumps(r) + "\n" for r in records))
+
+    def flush(self, text: str | None = None) -> int:
+        with locked(self.queue) as acquired:
+            if not acquired:
+                raise OSError("send queue busy; message not queued")
+            pending = json.loads(self.queue.read_text(encoding="utf-8")) if self.queue.exists() else []
+            if text is not None:
+                pending.append({"id": uuid.uuid4().hex, "text": text})
+                write_atomic(self.queue, json.dumps(pending))  # durable before any network call
+            while pending:
+                try:
+                    message = self.request("POST", item=pending[0])["message"]
+                    self.cache([message])
+                except (OSError, ValueError, KeyError, TypeError):
+                    break  # keep the item on every HTTP/storage/validation failure
+                pending.pop(0)
+                write_atomic(self.queue, json.dumps(pending))
+            return len(pending)
+
+    def refresh(self) -> None:
+        # Start from the last contiguous GET cursor, not a POST's potentially later ID.
+        cursor_path = self.queue.with_suffix(".cursor.json")
+        with locked(cursor_path) as acquired:
+            if not acquired:
+                raise OSError("room refresh busy")
+            since = int(cursor_path.read_text(encoding="utf-8")) if cursor_path.exists() else 0
+            while True:
+                rows = self.request("GET", f"?since={since}&limit=200")["messages"]
+                self.cache(rows)
+                if not rows:
+                    break
+                next_id = rows[-1]["id"]
+                if next_id <= since:
+                    raise ValueError("invalid server cursor")
+                since = next_id
+                write_atomic(cursor_path, str(since))
+                if len(rows) < 200:
+                    break
+
+
+def remote_configured(cfg: config.Config) -> bool:
+    return bool(os.environ.get("HIVE_ROOM_URL") or cfg.room_url)
+
+
 def say(room: str, text: str, author: str = "phil",
-        home: Path | None = None, write: Callable[[str], None] = print) -> int:
-    """Post a message to the room. It doesn't clear a stop: a message typed after Stop
-    must not restart a session that is still finishing its turn (`room start` does that)."""
+        home: Path | None = None, write: Callable[[str], None] = print,
+        cfg: config.Config | None = None) -> int:
+    """Post as the authenticated seat, or append locally when no URL is configured."""
+    cfg = cfg or config.load()
+    if not text.strip() or len(text) > 4000:
+        raise ValueError("message must contain 1-4000 characters")
+    if remote_configured(cfg):
+        client = RemoteRoom(room, cfg, home)
+        pending = client.flush(text)
+        safe_write(write, f"[megazword room] {pending} queued; retry on next say/show" if pending else "[megazword room] sent as the authenticated seat")
+        return 0
     check_author(author)
     msg = append_message(room, author, text, home=home)
-    write(f"[{msg.author}] {msg.text}")
+    safe_write(write, f"[{msg.author}] {msg.text}")
     return 0
 
 
 def show(room: str, n: int = 20, home: Path | None = None,
-         write: Callable[[str], None] = print) -> int:
+         write: Callable[[str], None] = print, cfg: config.Config | None = None) -> int:
     """Show recent messages from the room."""
-    messages = read_messages(room, home)
+    if n < 1:
+        raise ValueError("message count must be positive")
+    cfg = cfg or config.load()
+    if remote_configured(cfg):
+        # Credential failures must not look like a successful local post/read.
+        client = RemoteRoom(room, cfg, home)
+        pending = client.flush()
+        if pending:
+            safe_write(write, f"[megazword room] {pending} messages still queued; retry on next say/show")
+        try:
+            client.refresh()
+        except (OSError, ValueError, KeyError, TypeError):
+            safe_write(write, "[megazword room] remote unavailable; showing local cache")
+        messages = client.cached()
+    else:
+        messages = read_messages(room, home)
     if not messages:
-        write(f"[megazword room] room '{room}' has no messages yet")
+        safe_write(write, f"[megazword room] room '{room}' has no messages yet")
         return 0
     for m in messages[-n:]:
         mentions = f" (mentions: {', '.join(m.mentions)})" if m.mentions else ""
-        write(f"{m.time[:16]} [{m.author}]{mentions}: {m.text}")
+        safe_write(write, f"{m.time[:16]} [{m.author}]{mentions}: {m.text}")
     return 0
 
 

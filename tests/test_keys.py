@@ -57,7 +57,8 @@ def test_show_deduplicates_providers_and_never_prints_values(store, monkeypatch,
     assert cli.main(["keys"]) == 0
     output = capsys.readouterr().out
     assert "fake-private-value" not in output
-    assert len(calls) == len(set(calls)) == len(keys.key_names()) - 1
+    assert len(calls) == len(set(calls)) == len(keys.key_names()) - 2
+    assert "room token; not probed" in output
     for name in keys.key_names():
         assert output.count(name) == 1
 

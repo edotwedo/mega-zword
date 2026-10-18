@@ -284,7 +284,7 @@ def main() -> int:
         r = mz(env, work, "room", "show")
         check("room say / show", r.returncode == 0 and "hello hive" in r.stdout, r.stdout + r.stderr)
         r = mz(env, work, "room", "start", "--turns", "2")
-        check("room start runs turn loop", r.returncode == 0 and "session finished" in r.stdout,
+        check("room start cannot launch a house bot", r.returncode == 0 and "house bot disabled" in r.stdout,
               r.stdout + r.stderr)
         r = mz(env, work, "room", "stop")
         check("room stop stops room", r.returncode == 0 and "stopped room" in r.stdout, r.stdout + r.stderr)

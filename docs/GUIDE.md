@@ -179,26 +179,20 @@ Workers that run the pieces are not in this build yet (handoff
 
 ## Hive room (group chat)
 
-`megazword room` runs a lightweight group chat between Phil and the bots.
-Messages are saved to `~/.megazword/rooms/<room>.jsonl`.
+`megazword room say/show` connects real seats. Configure the HTTPS Worker origin
+and provision a seat token through Keymaster or environment secrets as described
+in [CLOUD-ROOM.md](CLOUD-ROOM.md). Without a URL, messages remain local.
 
-- `megazword room say "your message @claude"`: Post a message. A Phil `@mention`
-  picks which one-shot `room start` runs. Mentions from bots are ignored.
-  Phil's messages always take priority. Live seats read the log through Hive MCP.
-- `megazword room show`: View recent messages in the room.
-- `megazword room start [--turns 12]`: One one-shot answers Phil, then it waits.
-  Bot `@mentions` do not start more one-shots (those looked like extra live sessions).
-  Live seats read the same log through Hive MCP. Stops early if all bots are out
-  of usage or over pace.
-- `megazword room stop`: Stop active room turns.
-- `megazword room post-summary`: Show the latest room summary. Add `--post` to post it to Q (workshop PR #33).
+- `megazword room say "your message"`: Post as the authenticated seat. Offline
+  sends stay queued and retry on the next say/show. No AI replies automatically.
+- `megazword room show`: Read recent messages; labels local-cache fallback.
+- `megazword room start`: Retired; only explains that the house bot is disabled.
+- `megazword room stop`: Preserve the stop flag for older room sessions.
+- `megazword room post-summary`: Show a previously saved summary. `--post`
+  explicitly sends it to Q. No automatic room summaries are posted to Q.
 
-After a session of 3 or more one-shot turns, one bot writes 3-5 short lessons
-into the project's memory. `room start` now stops after one turn, so that is
-uncommon. Each turn sends a short state card, a rolling summary and the last
-few messages, not the whole history, to keep usage down. The dashboard reads and drives the same room
-through `/api/room` (view) and `/api/room/say`, `/api/room/start`, `/api/room/pause`
-and `/api/room/stop`.
+The dashboard reads and posts to the same configured room. Its former one-shot
+reply engine is disabled. Only real seats post; mentions never wake a house bot.
 
 ### Hive floor
 

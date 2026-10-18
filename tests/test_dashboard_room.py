@@ -1,4 +1,4 @@
-"""Room API for the B4 Hive tab: say, start (background thread), stop, view. Fakes only."""
+"""Room API for the B4 Hive tab: say, disabled house bot, stop, view. Fakes only."""
 
 from dataclasses import dataclass
 
@@ -25,77 +25,10 @@ def app(tmp_path, monkeypatch):
     return dashboard.App(cfg, "workshop", None, backends)
 
 
-def test_say_start_and_view(app):
-    view = app.room_say({"text": "plan the day @claude"})
-    assert view["messages"][-1]["author"] == "phil" and not view["running"]
-    app.room_start({"turns": 2})
-    app._room_thread.join(10)
-    view = app.room_view()
-    authors = [m["author"] for m in view["messages"]]
-    # One-shots answer Phil once; Claude's @codex reply must not chain.
-    assert authors == ["phil", "claude"]
-    assert view["messages"][-1]["text"] == "ok @codex"
-    assert view["turn_count"] == 1 and not view["running"]
-
-
-def test_send_can_post_and_start_the_reply_in_one_request(app):
-    app.room_say({'text': 'What is next? @claude', 'start': True, 'turns': 2})
-    app._room_thread.join(10)
-    assert [m['author'] for m in app.room_view()['messages']] == ['phil', 'claude']
-
-
 def test_invalid_send_options_do_not_post_an_unanswered_message(app):
     with pytest.raises(ValueError, match='turns'):
         app.room_say({'text': 'hello', 'start': True, 'turns': 500})
     assert app.room_view()['messages'] == []
-
-
-def test_start_twice_is_refused_and_stop_sets_flag(app, monkeypatch):
-    import threading
-    gate = threading.Event()
-    monkeypatch.setattr(dashboard.room, "run_room", lambda **kw: gate.wait(5))
-    app.room_start({})
-    with pytest.raises(ValueError, match="already running"):
-        app.room_start({})
-    app.room_stop({})
-    assert dashboard.room.load_state("hive").stopped
-    gate.set()
-    app._room_thread.join(5)
-
-
-def test_bad_input_is_rejected(app):
-    with pytest.raises(ValueError):
-        app.room_say({"text": "  "})
-    with pytest.raises(ValueError):
-        app.room_view("../etc")
-    with pytest.raises(ValueError):
-        app.room_start({"turns": 500})
-
-
-def test_closing_the_dashboard_mid_session_pauses_the_room(app, tmp_path):
-    """Closing the app window kills the room thread before its cleanup; the room must
-    be resumable right away, not refused as 'running in another window' for 20 minutes."""
-    import threading
-    gate, started = threading.Event(), threading.Event()
-
-    @dataclass
-    class Slow(Fake):
-        def _run(self, prompt):
-            started.set()
-            gate.wait(10)
-            return self.reply
-
-    app.backends["claude"] = Slow("claude")
-    app.backends["codex"] = Slow("codex")
-    app.room_say({"text": "go @claude"})
-    app.room_start({"turns": 5})
-    assert started.wait(5)
-    app.shutdown()  # what serve() does when the window closes
-    state = dashboard.room.load_state("hive")
-    assert state.paused and not state.active
-    assert not dashboard.room.other_session_running(state)
-    gate.set()
-    app._room_thread.join(10)
 
 
 def test_release_leaves_another_sessions_room_alone(tmp_path):
@@ -116,16 +49,14 @@ def test_shutdown_without_a_room_does_nothing(app):
     assert not dashboard.room.load_state("hive").active
 
 
-def test_start_falls_back_to_launch_project_when_room_primary_is_missing(tmp_path, monkeypatch):
-    """Fresh install: the default room primary ('workshop') has no project folder yet.
-    Start used to fail with "no project named 'workshop'"; it now uses the launch project."""
-    monkeypatch.setattr(config, "HOME", tmp_path)
-    monkeypatch.setattr(cli, "plan_statuses", lambda: {})
-    cfg = config.Config(log_path=tmp_path / "log.jsonl")
-    app = dashboard.App(cfg, "mine", None, {"claude": Fake("claude", reply="hi")})
-    app.room_say({"text": "hello"})
-    app.room_start({"turns": 1})
-    app._room_thread.join(10)
-    assert dashboard.room.load_state("hive").primary == "mine"
-    with pytest.raises(ValueError, match="no project named"):
-        app.room_start({"project": "nope"})
+def test_real_seats_only_even_with_legacy_start_request(app, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("house bot called")
+    monkeypatch.setattr(dashboard.room, "run_room", forbidden)
+    view = app.room_say({"text": "hello @claude", "start": True})
+    assert [m["author"] for m in view["messages"]] == ["phil"]
+    assert not view["running"] and app._room_thread is None
+    with pytest.raises(ValueError, match="house bot disabled"):
+        app.room_start({})
+    app.room_stop({})
+    assert dashboard.room.load_state("hive").stopped

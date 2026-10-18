@@ -112,69 +112,6 @@ def test_pick_next_speaker_alternates_away_from_last_speaker():
     assert speaker2 == "codex"
 
 
-def test_guard_rail_stops_early_when_all_ais_out(tmp_path):
-    cfg = config.Config(log_path=tmp_path / "log.jsonl")
-    backends = {
-        "claude": FakeBackend("claude", reply="hello from claude"),
-        "codex": FakeBackend("codex", reply="hello from codex"),
-    }
-    # All are marked out or over pace
-    statuses = {
-        "claude": PlanStatus("claude", 20.0, 99.0, "out", []),
-        "codex": PlanStatus("codex", 15.0, 90.0, "hard-only", []),
-    }
-    output = []
-    code = room.run_room(
-        room="testroom",
-        max_turns=5,
-        project="workshop",
-        backends=backends,
-        cfg=cfg,
-        statuses=lambda: statuses,
-        write=output.append,
-    )
-    assert code == 0
-    assert any("all AIs are out of usage or over pace" in line for line in output)
-
-
-def test_turn_cap_and_prompt_logging(tmp_path):
-    cfg = config.Config(log_path=tmp_path / "log.jsonl", room_turn_cap=3)
-    claude = FakeBackend("claude", reply="I'm on it! @codex what do you think?")
-    codex = FakeBackend("codex", reply="Looks great. @claude we are rolling.")
-    backends = {"claude": claude, "codex": codex}
-
-    # Phil starts with a message
-    room.say("hivelog", "Let's review the plan @claude", home=tmp_path)
-
-    output = []
-    code = room.run_room(
-        room="hivelog",
-        max_turns=3,
-        project="workshop",
-        backends=backends,
-        cfg=cfg,
-        statuses=lambda: {},
-        write=output.append,
-        home=tmp_path,
-    )
-    assert code == 0
-    messages = room.read_messages("hivelog", home=tmp_path)
-    # Phil's 1 message + one one-shot. Bot @mentions do not take further turns.
-    assert len(messages) == 2
-    assert messages[1].author == "claude"
-    assert messages[1].prompt_chars > 0
-    assert any("waiting for Phil" in line for line in output)
-
-    log_file = tmp_path / "log.jsonl"
-    assert log_file.exists()
-    logged_entries = [json.loads(l) for l in log_file.read_text(encoding="utf-8").splitlines() if l.strip()]
-    assert all(e["room"] == "hivelog" for e in logged_entries)
-    assert sum(1 for e in logged_entries if e.get("lessons")) == 0
-    logged_entries = [e for e in logged_entries if not e.get("lessons")]
-    assert len(logged_entries) == 1
-    assert logged_entries[0]["prompt_chars"] > 0
-
-
 def test_room_stop_command(tmp_path):
     room.set_stopped("stoproom", False, home=tmp_path)
     state = room.load_state("stoproom", home=tmp_path)
@@ -183,37 +120,6 @@ def test_room_stop_command(tmp_path):
     room.stop("stoproom", home=tmp_path)
     state = room.load_state("stoproom", home=tmp_path)
     assert state.stopped
-
-
-def test_room_pause_waits_for_current_fake_reply(tmp_path, monkeypatch):
-    cfg = config.Config(log_path=tmp_path / "log.jsonl")
-    room.say("pauseroom", "Please reply @codex", home=tmp_path)
-
-    replies = 0
-    def fake_reply(speaker, backend, prompt, resume):
-        nonlocal replies
-        replies += 1
-        if replies == 1:
-            room.set_paused("pauseroom", home=tmp_path)
-        return "finished this reply", True, 0.1, ""
-
-    monkeypatch.setattr(room, "run_speaker", fake_reply)
-    output = []
-    room.run_room("pauseroom", max_turns=4, project="sample",
-                  backends={"codex": FakeBackend("codex")}, cfg=cfg,
-                  statuses=lambda: {}, write=output.append, home=tmp_path)
-    state = room.load_state("pauseroom", home=tmp_path)
-    assert state.paused and not state.active
-    assert [m.text for m in room.read_messages("pauseroom", home=tmp_path)] == [
-        "Please reply @codex", "finished this reply"]
-    assert any("paused after current reply" in line for line in output)
-
-    room.say("pauseroom", "one more @codex", home=tmp_path)
-    room.run_room("pauseroom", max_turns=2, project="sample",
-                  backends={"codex": FakeBackend("codex")}, cfg=cfg,
-                  statuses=lambda: {}, write=output.append, home=tmp_path)
-    state = room.load_state("pauseroom", home=tmp_path)
-    assert state.turn_count == 2 and not state.paused and replies == 2
 
 
 def test_save_summary_report(tmp_path):
@@ -249,13 +155,12 @@ def test_room_cli_commands(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "hello room @claude" in out
 
-    # start: one one-shot answers Phil; bot @mentions do not take more turns
+    # start is retained only to explain that the house bot is disabled
     code = main(["room", "start", "--turns", "2"], backends=backends, cfg=cfg)
     assert code == 0
     out = capsys.readouterr().out
-    assert "[claude] Understood @codex" in out
+    assert "house bot disabled" in out
     assert "[codex] Ready @claude" not in out
-    assert "waiting for Phil" in out
 
     # stop
     code = main(["room", "stop"], backends=backends, cfg=cfg)
@@ -308,77 +213,6 @@ def test_parse_lessons_strips_bullets_and_caps_at_five():
     assert "x" not in lessons and len(lessons) == 5
 
 
-def test_room_saves_lessons_and_next_card_shows_them(tmp_path):
-    cfg = config.Config(log_path=tmp_path / "log.jsonl")
-    claude = FakeBackend("claude", reply="- Check usage first\n- Mention one bot per reply")
-    backends = {"claude": claude, "codex": FakeBackend("codex", reply="Ready @claude")}
-    room.say("hive", "plan B2 @claude", home=tmp_path, write=lambda s: None)
-    out = []
-    room.run_room("hive", max_turns=3, project="workshop", backends=backends, cfg=cfg,
-                  write=out.append, home=tmp_path)
-    assert any("waiting for Phil" in line for line in out)
-    assert not any("saved" in line and "lessons" in line for line in out)
-    assert not [e for e in Memory(tmp_path, "workshop").entries() if e.kind == "lesson"]
-
-
-def test_short_room_session_skips_lessons(tmp_path):
-    cfg = config.Config(log_path=tmp_path / "log.jsonl")
-    claude = FakeBackend("claude", reply="- a lesson here")
-    room.say("hive", "hi @claude", home=tmp_path, write=lambda s: None)
-    room.run_room("hive", max_turns=2, project="workshop", backends={"claude": claude},
-                  cfg=cfg, write=lambda s: None, home=tmp_path)
-    assert len(claude.calls) == 1
-    assert not [e for e in Memory(tmp_path, "workshop").entries() if e.kind == "lesson"]
-
-
-def test_second_session_is_refused_while_first_is_alive(tmp_path):
-    from datetime import datetime, timezone
-    state = room.load_state("hive", tmp_path)
-    state.active, state.session = True, "other"
-    state.heartbeat = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    room.save_state(state, tmp_path)
-    out = []
-    code = room.run_room("hive", max_turns=1, project="workshop",
-                         backends={"claude": FakeBackend("claude")},
-                         cfg=config.Config(log_path=tmp_path / "log.jsonl"),
-                         write=out.append, home=tmp_path)
-    assert code == 1 and "already running" in out[-1]
-    assert room.load_state("hive", tmp_path).session == "other"
-
-
-def test_stale_session_does_not_block(tmp_path):
-    state = room.load_state("hive", tmp_path)
-    state.active, state.session, state.heartbeat = True, "dead", "2026-01-01T00:00:00+00:00"
-    room.save_state(state, tmp_path)
-    room.say("hive", "hi @claude", home=tmp_path, write=lambda s: None)
-    code = room.run_room("hive", max_turns=1, project="workshop",
-                         backends={"claude": FakeBackend("claude")},
-                         cfg=config.Config(log_path=tmp_path / "log.jsonl"),
-                         write=lambda s: None, home=tmp_path)
-    assert code == 0 and not room.load_state("hive", tmp_path).active
-
-
-def test_newer_session_takes_over_and_say_keeps_stop(tmp_path):
-    room.set_stopped("hive", True, tmp_path)
-    room.say("hive", "one more thing @claude", home=tmp_path, write=lambda s: None)
-    assert room.load_state("hive", tmp_path).stopped  # typing after Stop doesn't un-stop
-
-    class Takeover(FakeBackend):
-        def _run(self, prompt):
-            s = room.load_state("hive", tmp_path)
-            s.session = "newer"
-            room.save_state(s, tmp_path)
-            return super()._run(prompt)
-
-    bot = Takeover("claude", reply="hi")
-    out = []
-    room.run_room("hive", max_turns=5, project="workshop", backends={"claude": bot},
-                  cfg=config.Config(log_path=tmp_path / "log.jsonl"), write=out.append,
-                  home=tmp_path)
-    assert len(bot.calls) == 1 and any("newer session" in line for line in out)
-    assert room.load_state("hive", tmp_path).session == "newer"
-
-
 def test_room_names_cannot_leave_the_rooms_folder(tmp_path):
     with pytest.raises(ValueError):
         room.room_path("../evil", tmp_path)
@@ -412,40 +246,6 @@ def test_state_survives_concurrent_saves_and_extra_keys(tmp_path):
     assert not bad
 
 
-def test_bot_out_of_usage_mid_session_is_marked_out_and_others_continue(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "HOME", tmp_path)
-
-    class Limited(FakeBackend):
-        def _run(self, prompt):
-            self.calls.append(prompt)
-            raise RuntimeError("You've hit your usage limit. Try again in 3 hours.")
-
-    claude, codex = Limited("claude"), FakeBackend("codex", reply="on it @codex")
-    cfg = config.Config(log_path=tmp_path / "log.jsonl")
-    room.say("hive", "go @claude", home=tmp_path, write=lambda s: None)
-    out = []
-    room.run_room("hive", max_turns=2, project="workshop", backends={"claude": claude, "codex": codex},
-                  cfg=cfg, write=out.append, home=tmp_path)
-    assert len(claude.calls) == 1 and len(codex.calls) == 1
-    assert "claude" in cfg.out_now()
-    assert any("out of usage" in line for line in out)
-    logged = [json.loads(l) for l in (tmp_path / "log.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert [e["ok"] for e in logged if e["backend"] == "claude"] == [False]
-
-
-def test_other_failures_still_end_the_session(tmp_path):
-    class Broken(FakeBackend):
-        def _run(self, prompt):
-            raise RuntimeError("segfault")
-
-    out = []
-    room.say("hive", "go @claude", home=tmp_path, write=lambda s: None)
-    room.run_room("hive", max_turns=3, project="workshop",
-                  backends={"claude": Broken("claude"), "codex": FakeBackend("codex")},
-                  cfg=config.Config(log_path=tmp_path / "log.jsonl"), write=out.append, home=tmp_path)
-    assert any("claude failed: segfault" in line for line in out)
-
-
 def test_bad_lines_in_the_room_log_are_skipped(tmp_path):
     room.append_message("messy", "phil", "first", home=tmp_path)
     with room.room_path("messy", tmp_path).open("a", encoding="utf-8") as f:
@@ -460,22 +260,6 @@ def test_broken_state_file_starts_fresh(tmp_path):
     room.state_path("broken", tmp_path).write_text("{oops", encoding="utf-8")
     state = room.load_state("broken", tmp_path)
     assert state.room == "broken" and not state.stopped
-
-
-def test_long_session_condenses_older_messages_into_the_prompt(tmp_path):
-    cfg = config.Config(log_path=tmp_path / "log.jsonl", room_turn_cap=10)
-    claude = FakeBackend("claude", reply="claude turn @codex")
-    codex = FakeBackend("codex", reply="codex turn @claude")
-    for n in range(room.RECENT_MESSAGES_COUNT + 3):
-        room.say("long", f"kick off {n} @claude", home=tmp_path)
-        room.run_room(room="long", max_turns=1, project="workshop",
-                      backends={"claude": claude, "codex": codex}, cfg=cfg,
-                      statuses=lambda: {}, write=lambda s: None, home=tmp_path)
-    turns = [p for p in claude.calls if "[Sent by Mega Zword" in p]
-    assert "[Earlier room summary]" not in turns[0]
-    assert any("[Earlier room summary]" in p for p in turns)
-    state = room.load_state("long", tmp_path)
-    assert state.rolling_summary and state.summarized_count > room.RECENT_MESSAGES_COUNT
 
 
 def test_show_empty_room(tmp_path):

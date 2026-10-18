@@ -194,7 +194,7 @@ def build_parser() -> argparse.ArgumentParser:
     room = sub.add_parser("room", help="Hive bot room: group chat between Phil and the bots")
     room_sub = room.add_subparsers(dest="action", metavar="ACTION")
 
-    room_start = room_sub.add_parser("start", help="start or resume a room session")
+    room_start = room_sub.add_parser("start", help="retired: house bot is disabled; use say/show")
     room_start.add_argument("--room", default="hive", help="room name (default: hive)")
     room_start.add_argument("--turns", type=int, help="max turns to run (default: 12)")
     room_start.add_argument("-p", "--project", help="primary project override")
@@ -589,12 +589,16 @@ def main(argv: list[str] | None = None,
             return room.stop(args.room)
         if action == "say":
             try:
-                return room.say(args.room, args.text, author=args.by)
-            except PermissionError as e:
+                return room.say(args.room, args.text, author=args.by, cfg=cfg)
+            except (OSError, ValueError) as e:
                 print(f"[megazword room] {e}", file=sys.stderr)
                 return 2
         if action == "show":
-            return room.show(args.room, n=args.n)
+            try:
+                return room.show(args.room, n=args.n, cfg=cfg)
+            except (OSError, ValueError) as e:
+                print(f"[megazword room] {e}", file=sys.stderr)
+                return 2
         if action == "post-summary":
             return room.post_summary(args.room, post=args.post)
 

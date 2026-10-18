@@ -119,7 +119,7 @@ answers next; your messages always come first.
 
 ```text
 megazword room say "plan today's work @claude"
-megazword room start --turns 6
+megazword room show                  # real seats only; house bot disabled
 megazword room show
 megazword room stop
 megazword room post-summary          # prints it; add --post to send it to Q

@@ -153,6 +153,7 @@ USER_ENV_KEYS = (
     "CLOUDFLARE_ACCOUNT_ID", "ZAI_API_KEY", "GOOGLE_AI_API_KEY",
     "NVIDIA_API_KEY", "MISTRAL_API_KEY", "CEREBRAS_API_KEY",
     "TENCENT_TOKENHUB_API_KEY",
+    "HIVE_ROOM_TOKEN",
 )
 
 
@@ -223,6 +224,7 @@ class Config:
     room_primary: str = "workshop"
     room_turn_cap: int = 12
     room_name: str = "hive"
+    room_url: str = ""
     sentinel_urls: list[str] = field(default_factory=lambda: list(DEFAULT_SENTINEL_URLS))
     ntfy_topic: str = ""
     healthchecks_url: str = ""
@@ -319,6 +321,8 @@ def load(path: Path | None = None) -> Config:
 
         room_block = data.get("room", {})
         if isinstance(room_block, dict):
+            if isinstance(room_block.get("url"), str):
+                cfg.room_url = room_block["url"].strip()
             if "primary" in room_block and isinstance(room_block["primary"], str) and room_block["primary"].strip():
                 cfg.room_primary = room_block["primary"].strip()
             if "turn_cap" in room_block and isinstance(room_block["turn_cap"], int) and room_block["turn_cap"] > 0:

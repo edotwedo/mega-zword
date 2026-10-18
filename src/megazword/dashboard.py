@@ -437,18 +437,26 @@ class App:
     def room_view(self, name: object = None, n: int = 50) -> dict:
         from . import workers
         name = self._room_name(name)
+        notices = []
+        if room.remote_configured(self.cfg):
+            room.show(name, n=n, cfg=self.cfg, write=notices.append)
         state = room.load_state(name)
+        messages = room.read_messages(name)
+        if room.remote_configured(self.cfg):
+            origin = (os.environ.get("HIVE_ROOM_URL") or self.cfg.room_url).rstrip("/")
+            messages = [m for m in messages if m.remote_url == origin]
         return {"room": name, "running": self.room_running(), "paused": state.paused,
                 "primary": state.primary,
                 "turn_count": state.turn_count, "turn_cap": state.turn_cap,
                 "last_speaker": state.last_speaker,
-                "messages": [asdict(m) for m in room.read_messages(name)[-n:]],
+                "messages": [asdict(m) for m in messages[-n:]],
+                "notices": [line for line in notices if line.startswith("[megazword room]")],
                 "workers": workers.roster()}
 
     def worker_send(self, body: dict) -> dict:
         from . import workers
         result = workers.send(str(body.get('target') or ''), body.get('text', ''))
-        room.say(self.cfg.room_name, body['text'], author='phil → workers', write=lambda _: None)
+        room.say(self.cfg.room_name, body['text'], author='phil → workers', write=lambda _: None, cfg=self.cfg)
         return result
 
     def room_say(self, body: dict) -> dict:
@@ -463,9 +471,7 @@ class App:
                     raise ValueError("turns must be 1-50")
                 if body.get("project"):
                     self.project_for(body["project"])
-            room.say(name, text, author="phil", write=lambda s: None)
-            if body.get("start") is True and not self.room_running():
-                return self.room_start({**body, "room": name})
+            room.say(name, text, author="phil", write=lambda s: None, cfg=self.cfg)
             return self.room_view(name)
 
     def room_start(self, body: dict) -> dict:
@@ -473,28 +479,7 @@ class App:
             return self._start_room(body)
 
     def _start_room(self, body: dict) -> dict:
-        name = self._room_name(body.get("room"))
-        if self.room_running():
-            raise ValueError("the room is already running; stop it first")
-        turns = body.get("turns")
-        if turns is not None and (not isinstance(turns, int) or not 1 <= turns <= 50):
-            raise ValueError("turns must be 1-50")
-        if body.get("project"):
-            project = self.project_for(body["project"])
-        else:
-            try:
-                project = self.project_for(self.cfg.room_primary)
-            except ValueError:  # room primary not set up on this PC (fresh install): launch project
-                project = self.project
-        from . import cli
-        self._room_session = (name, uuid.uuid4().hex)
-        self._room_thread = threading.Thread(
-            target=room.run_room, daemon=True,
-            kwargs=dict(room=name, max_turns=turns, project=project, backends=self.backends,
-                        cfg=self.cfg, statuses=cli.plan_statuses, write=lambda s: None,
-                        session=self._room_session[1]))
-        self._room_thread.start()
-        return self.room_view(name)
+        raise ValueError("house bot disabled; real seats use room say/show")
 
     def shutdown(self) -> None:
         """The dashboard is closing: a room still running here is paused, not left 'active'."""

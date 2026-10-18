@@ -1087,13 +1087,11 @@ async function sendChat() {
 function renderRoom(data) {
   renderWorkers(data.workers || []);
   const turnsLeft = Math.max(0, data.turn_cap - data.turn_count);
-  $("room-summary").innerHTML = `<span>Primary project: <b>${esc(data.primary)}</b></span>
+  $("room-summary").innerHTML = `${(data.notices || []).map(esc).join("<br>")} <span>Primary project: <b>${esc(data.primary)}</b></span>
     <span>Turns: <b>${data.turn_count}/${data.turn_cap}</b> (${turnsLeft} left)</span>
     <span>Last speaker: <b>${esc(data.last_speaker || "none")}</b></span>`;
-  $("room-status").textContent = data.running
-    ? data.paused ? "Pause requested; the current reply will finish first." : "Room is running."
-    : data.paused ? "Room is paused. Send a message to continue, or resume the pending reply." : "Ready. Send a message to get a reply.";
-  $("room-start").hidden = !data.paused || data.running;
+  $("room-status").textContent = "Real seats share this room. Replies arrive when a seat posts.";
+  $("room-start").hidden = true;
   $("room-start").disabled = data.running;
   $("room-pause").disabled = !data.running || data.paused;
   $("room-stop").disabled = !data.running && !data.paused;
@@ -1164,7 +1162,7 @@ $("room-send").onclick = async () => {
     try { await sendToWorkers($("worker-target").value, text); } catch (e) { toast(e.message); }
     $("room-send").disabled = false; return;
   }
-  try { await post("/api/room/say", {room:"hive", text, start:true,
+  try { await post("/api/room/say", {room:"hive", text, start:false,
     turns:Number($("room-turn-cap").value), project:state?.launch_project}); $("room-input").value = ""; await loadRoom(); }
   catch (e) { toast(e.message); }
   $("room-send").disabled = false;
