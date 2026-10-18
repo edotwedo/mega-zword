@@ -499,7 +499,8 @@ def test_gemini_cli_and_developer_api_are_distinct_backends():
     assert isinstance(backends["gemini"], GeminiBackend)
     assert isinstance(backends["gemini-api"], OpenAICompatibleBackend)
     assert backends["gemini"].name != backends["gemini-api"].name
-    assert all("gemini-api" in route and "gemini" in route
+    # Gemini (agy) is Phil's advisor, picked only with -m gemini (2026-10-18).
+    assert all("gemini-api" in route and "gemini" not in route
                for route in config.DEFAULT_ROUTE.values())
 
 

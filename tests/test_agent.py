@@ -163,14 +163,28 @@ def test_retry_keeps_legacy_code_review_prompt_unforced(tmp_path, monkeypatch):
     assert not any('--review' in c or '--free-only' in c for c in calls)
 
 
-@pytest.mark.parametrize("path", ["../escape", ".git/config", ".env", ".env.local",
-                                   "nested/.git/config", "C:/outside"])
+@pytest.mark.parametrize("path", [".git/config", ".env", ".env.local", "nested/.git/config"])
 def test_paths_refused(tmp_path, path):
     loop, model = coding(tmp_path, [call("write_file", path=path, text="bad"),
                                  call("finish", summary="refused")])
     assert loop.run("try").ok
     assert "refused" in model.seen[-1][0][-1]["content"]
     assert not list(tmp_path.iterdir())
+
+
+def test_any_folder_is_reachable(tmp_path):
+    """Phil (2026-10-18): the free bots' file tools reach every folder, not just the work folder."""
+    work, other = tmp_path / "work", tmp_path / "other"
+    work.mkdir(); other.mkdir()
+    (other / "notes.txt").write_text("hello from elsewhere")
+    loop, model = coding(work, [call("read_file", path=(other / "notes.txt").as_posix()),
+                                call("list_files", glob=other.as_posix() + "/*.txt"),
+                                call("write_file", path="../other/new.txt", text="made it"),
+                                call("finish", summary="done")])
+    assert loop.run("job").ok
+    contents = [m[0][-1]["content"] for m in model.seen]
+    assert "hello from elsewhere" in contents[1] and "notes.txt" in contents[2]
+    assert (other / "new.txt").read_text() == "made it"
 
 
 def test_step_cap(tmp_path):
@@ -187,13 +201,15 @@ def test_agent_prompt_tracks_remaining_tool_steps_without_rewriting_history(tmp_
 
     assert loop.run("inspect source").ok
 
-    first_system = model.seen[0][0][0]["content"]
-    second_system = model.seen[1][0][0]["content"]
-    assert "2 tool steps remaining" in first_system
-    assert "1 tool steps remaining" in second_system
+    first, second = model.seen[0][0], model.seen[1][0]
+    # The system prompt is identical every step so providers can cache the prefix
+    # (Phil, 2026-10-18); the budget rides on the last message instead.
+    assert first[0]["content"] == second[0]["content"]
+    assert "Execution budget" not in first[0]["content"]
+    assert "2 tool steps remaining" in first[-1]["content"]
+    assert "1 tool steps remaining" in second[-1]["content"]
     # Runtime guidance is ephemeral; it does not accumulate in the conversation.
-    assert first_system.count("Execution budget:") == 1
-    assert second_system.count("Execution budget:") == 1
+    assert sum(json.dumps(m).count("Execution budget:") for m in second) == 1
 
 
 @pytest.mark.parametrize("first", [ToolsUnsupported("tools"), {"content": "bad JSON"}])
@@ -237,9 +253,9 @@ def test_symlink_escape_and_secret_alias(tmp_path):
     except OSError:
         pytest.skip("symlink privilege unavailable")
     loop, _ = coding(tmp_path, [])
-    for path in ("link", "alias"):
-        with pytest.raises(ValueError):
-            loop._path(path)
+    assert loop._path("link") == outside.resolve()  # all folders are open (Phil, 2026-10-18)
+    with pytest.raises(ValueError):
+        loop._path("alias")  # secrets stay refused
 
 
 def test_test_command_timeout(tmp_path):
@@ -267,8 +283,9 @@ def test_output_tail_and_no_model_commands(tmp_path):
         test_command=(sys.executable, "-c", "print('a'*500); print('TAIL')"))
     assert loop.run("job").ok
     assert "invalid tool arguments" in model.seen[1][0][-1]["content"]
-    assert len(model.seen[2][0][-1]["content"]) <= 80
-    assert "TAIL" in model.seen[2][0][-1]["content"]
+    result = model.seen[2][0][-1]["content"].split("\n\n[Execution budget")[0]
+    assert len(result) <= 80
+    assert "TAIL" in result
 
 
 @pytest.mark.parametrize("forced", [True, False])
@@ -319,7 +336,7 @@ def test_listing_filters_private_paths(tmp_path):
     (tmp_path / "visible.py").write_text("ok")
     loop, model = coding(tmp_path, [call("list_files", glob="*"), call("finish", summary="done")])
     assert loop.run("job").ok
-    assert model.seen[-1][0][-1]["content"] == "visible.py"
+    assert model.seen[-1][0][-1]["content"].split("\n\n[Execution budget")[0] == "visible.py"
 
 
 def test_malformed_native_arguments_recover(tmp_path):
@@ -641,7 +658,7 @@ def test_glob_patterns_are_not_resolved(tmp_path, monkeypatch, pattern):
     assert "nested/a.py" in model.seen[-1][0][-1]["content"]
 
 
-@pytest.mark.parametrize("pattern", ["../*", "C:/*", "nested\\*", "bad\0*", "/*"])
+@pytest.mark.parametrize("pattern", ["../*", "bad\0*"])
 def test_unsafe_glob_patterns_refused(tmp_path, pattern):
     loop, model = coding(tmp_path, [call("list_files", glob=pattern), call("finish", summary="done")])
     assert loop.run("job").ok
@@ -764,3 +781,28 @@ def test_model_that_never_forms_a_tool_call_is_dropped_early(tmp_path):
     mixed = [chatter[0]] * 3 + [call("list_files", glob="*")] + [chatter[0]] * 3 + [call("finish", summary="ok")]
     loop, _ = coding(tmp_path, mixed, max_steps=60)
     assert loop.run("job").ok
+
+
+def test_history_condenses_every_ten_steps_with_progress_note(tmp_path):
+    """Phil (2026-10-18): resend cost stays flat on long jobs instead of growing every step."""
+    for i in range(12):
+        (tmp_path / f"f{i}.txt").write_text("x" * 100)
+    replies = [call("read_file", path=f"f{i}.txt") for i in range(11)] + [call("finish", summary="done")]
+    loop, model = coding(tmp_path, replies, max_steps=20)
+    assert loop.run("read them").ok
+    step10 = json.dumps(model.seen[10][0])
+    assert "Progress so far" in step10 and "f9.txt" in step10
+    assert len(model.seen[10][0]) < len(model.seen[9][0])
+
+
+def test_five_failed_tool_calls_in_a_row_stop_the_job(tmp_path):
+    replies = [call("read_file", path=f"missing{i}.txt") for i in range(10)]
+    loop, model = coding(tmp_path, replies, max_steps=30)
+    result = loop.run("job")
+    assert not result.ok and "5 failed tool calls in a row" in result.error
+    assert loop.request_count == 5
+    assert "Finish now" in json.dumps(model.seen[3][0])  # nudged after 3
+
+
+def test_tencent_grants_use_a_smaller_history():
+    assert agent.SMALL_HISTORY["tencent"] < agent.HISTORY_CHARS

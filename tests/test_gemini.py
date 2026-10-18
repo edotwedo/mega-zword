@@ -71,10 +71,11 @@ def test_init_keeps_gemini_identities_separate(monkeypatch, capsys, tmp_path, in
     output = capsys.readouterr().out
     # ovh needs no key, so it is always available.
     assert f"installed AIs: {'gemini, ' if installed else ''}ovh" in output
-    assert all("gemini" in route and "gemini-api" in route
+    # Gemini (agy) is Phil's advisor, picked only with -m gemini (2026-10-18).
+    assert all("gemini" not in route and "gemini-api" in route
                for route in config.Config().route.values())
     generated = config.load(config.HOME / "config.toml").route
-    assert all(("gemini" in route) is installed for route in generated.values())
+    assert all("gemini" not in route for route in generated.values())
     assert all("gemini-api" not in route for route in generated.values())
 
 
@@ -257,3 +258,17 @@ def test_parse_agy_usage_tolerates_odd_shapes():
     assert usage_sources.parse_agy_usage({}) == []
     assert usage_sources.parse_agy_usage({"command": {"data": {"groups": [
         "junk", {"name": "Gemini Models", "buckets": [{"window": "5h"}, "junk"]}]}}}) == []
+
+
+def test_agy_quota_error_does_not_mark_gemini_out_when_its_own_meter_has_room(monkeypatch, tmp_path):
+    """agy's Claude/GPT quota ran out and marked Gemini out while Google's model was at 1%."""
+    from megazword import usage_sources
+    from megazword.usage_sources import PlanUsage, Window
+    error = "agy exited with code 3: error: Individual quota reached. Resets in 50h27m35s."
+    cfg = config.Config(log_path=tmp_path / "log.jsonl")
+    room = PlanUsage("gemini", [Window("weekly", 1.0, None), Window("Claude and GPT models: weekly", 100.0, None)], "agy /usage")
+    monkeypatch.setattr(usage_sources, "gemini", lambda *a, **k: room)
+    assert not cli.auto_mark_out("gemini", error, cfg) and "gemini" not in cfg.out_until
+    empty = PlanUsage("gemini", [Window("weekly", 100.0, None)], "agy /usage")
+    monkeypatch.setattr(usage_sources, "gemini", lambda *a, **k: empty)
+    assert cli.auto_mark_out("gemini", error, cfg) and "gemini" in cfg.out_until

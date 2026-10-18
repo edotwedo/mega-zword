@@ -30,6 +30,15 @@ repo is the only handoff. Nothing lives only in a chat.
   PC is asleep, so say so). Then write a labor plan: which AI does which part, by spare usage and fit,
   with the reading quoted. `megazword plan` ranks them. Plans and lanes follow the live reading: re-plan
   when it changes; nothing in STATUS is fixed. Do this before any work, not partway through.
+- **Fewest tokens, same message (Phil, 2026-10-18): priority 1 for every agent and all
+  automation.** Anything that calls a model (Mega Zword code, Night Shift, heartbeat, team
+  jobs, chat, and prompts you write for `megazword run` or handoffs) sends the least text
+  that carries the same meaning: short instructions and briefs, condensed history, no
+  re-sending what the model already has. Keep the start of repeated requests byte-identical
+  (put changing parts like step counters last) so providers bill it at the cached rate.
+  Stop jobs that keep failing instead of riding them to a step cap. Measure what a call
+  resends before adding features to it. (Six 1M Tencent grants burned in two nights,
+  ~92% on failed 60-step jobs resending a 90k-char history each step.)
 - **Own folder per seat (Phil, 2026-10-13).** Never edit, stash or checkout in the shared
   `C:\Users\mrmar\mega-zword` while other seats run. Work in your own worktree:
   `git worktree add %USERPROFILE%\mz-seats\<your-name> -B seat/<your-name> origin/main`

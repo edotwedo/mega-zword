@@ -61,25 +61,27 @@ DEFAULT_ROUTE = {
     # picks the order: least-used free source in the last 24 hours first,
     # Tencent's one-time grants at a quarter share except on hard work
     # (Phil, 2026-10-16: "a tiny bit from every free source").
+    # Gemini (agy) is left out on purpose: she's Phil's advisor and chat partner,
+    # used only when picked with -m gemini (Phil, 2026-10-18).
     "easy": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
              "tencent-kimi-k2.7-code", "tencent-kimi-k3",
              "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
              "mistral", "gemini-api", "openrouter", "groq", "cloudflare",
-             "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "nvidia", "nvidia-lightning", "ollama", "gemini", "grok", "codex", "claude"],
+             "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "nvidia", "nvidia-lightning", "ollama", "grok", "codex", "claude"],
     "medium": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
                "tencent-kimi-k2.7-code", "tencent-kimi-k3",
                "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
                "openrouter", "groq",
                "cloudflare", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "gemini-api",
                "mistral", "nvidia", "nvidia-lightning", "ollama", "cheap-deepseek-flash",
-               "gemini", "codex", "grok", "claude"],
+               "codex", "grok", "claude"],
     "hard": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
              "tencent-kimi-k2.7-code", "tencent-kimi-k3",
              "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
              "openrouter", "groq",
              "cloudflare", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "gemini-api",
              "mistral", "nvidia", "nvidia-lightning", "ollama", "cheap-deepseek-pro",
-             "cheap-deepseek-flash", "gemini", "claude", "codex", "grok"],
+             "cheap-deepseek-flash", "claude", "codex", "grok"],
 }
 
 DEFAULT_FREE = {

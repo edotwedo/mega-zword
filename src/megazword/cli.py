@@ -870,12 +870,30 @@ def explain_failure(name: str, error: str, cfg: config.Config):
     return failure
 
 
+def gemini_has_room() -> bool:
+    """agy's quota error doesn't say which model ran out. Its Claude/GPT models
+    have their own quota, and that running out marked Gemini out for days while
+    Google's own model sat at 1% used (Phil, 2026-10-18). True when the meter's
+    Gemini windows all have room; False when they don't or it can't be read."""
+    try:
+        from .usage_sources import gemini
+        windows = [w for w in gemini().windows if ":" not in w.name]
+    except Exception:
+        return False
+    return bool(windows) and all(w.used_percent < 100 for w in windows)
+
+
 def auto_mark_out(name: str, error: str, cfg: config.Config) -> bool:
     """If `error` is a usage-limit message, mark that AI out until its reset
     so auto-pick skips it. Returns True if it marked one."""
     from .limits import detect
     hit = detect(error)
     if hit is None:
+        return False
+    if name == "gemini" and gemini_has_room():
+        print("[megazword] gemini hit a limit, but agy's meter shows Google's own model "
+              "still has room (the limit was its separate Claude/GPT quota); not marking it out",
+              file=sys.stderr)
         return False
     try:
         config.set_out(config.HOME / "config.toml", name, hit.until)
