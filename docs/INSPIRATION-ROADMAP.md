@@ -11,10 +11,17 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
 1. [ ] **Erlang restart window (#11).** 3 failures in 10 minutes stops a job and posts
    to Phil instead of riding it to the step cap. `agent.py`.
    Done when: a scripted model that fails repeatedly stops early, with a test.
-2. [ ] **PagerDuty escalation (#2).** A Broadcast from `phil`/`phone` with no reply in
+2. [x] **PagerDuty escalation (#2).** A Broadcast from `phil`/`phone` with no reply in
    N minutes escalates through the roster, then the phone topic ("nobody picked up").
    New `src/megazword/escalate_watch.py` + tests + a CLI hook.
    Done when: a fake clock shows primary -> secondary -> phone.
+   Implemented: `megazword room escalate [--room hive]` runs one pass. Unanswered
+   calls ping roster seats at 5/10 minutes, then the phone at 15. No scheduler.
+   Set `[room] ntfy_pc_topic` and `ntfy_phone_topic` in config.toml (or environment
+   `MEGAZWORD_NTFY_PC_TOPIC` / `MEGAZWORD_NTFY_PHONE_TOPIC`; Worker-style
+   `NTFY_PC_TOPIC` / `NTFY_PHONE_TOPIC` also work). No topics means no sends.
+   Replies start with a Word-NN designation or reference `hive:ID`, `#ID`,
+   `call ID` or `message ID`. State is saved beside the room wait bookmarks.
 3. [ ] **Tool-result cache (#10).** `read_file` / `search_files` results cached by
    path+mtime per job and reused instead of re-read. `agent.py`.
    Done when: a repeated read returns cached text and `tool_chars` stays flat.

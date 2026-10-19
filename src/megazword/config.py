@@ -242,6 +242,8 @@ class Config:
     room_turn_cap: int = 12
     room_name: str = "hive"
     room_url: str = ""
+    room_ntfy_pc_topic: str = ""
+    room_ntfy_phone_topic: str = ""
     sentinel_urls: list[str] = field(default_factory=lambda: list(DEFAULT_SENTINEL_URLS))
     ntfy_topic: str = ""
     healthchecks_url: str = ""
@@ -338,6 +340,10 @@ def load(path: Path | None = None) -> Config:
 
         room_block = data.get("room", {})
         if isinstance(room_block, dict):
+            for kind in ("pc", "phone"):
+                value = room_block.get(f"ntfy_{kind}_topic")
+                if isinstance(value, str):
+                    setattr(cfg, f"room_ntfy_{kind}_topic", value.strip())
             if isinstance(room_block.get("url"), str):
                 cfg.room_url = room_block["url"].strip()
             if "primary" in room_block and isinstance(room_block["primary"], str) and room_block["primary"].strip():

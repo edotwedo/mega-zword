@@ -233,6 +233,9 @@ def build_parser() -> argparse.ArgumentParser:
     room_wait_parser.add_argument("--topic", default="megazword-hive", help="ntfy topic the room pings")
     room_wait_parser.add_argument("--state", help="bookmark file (default: per-seat under the Mega Zword home)")
 
+    room_escalate = room_sub.add_parser("escalate", help="escalate unanswered Phil calls once")
+    room_escalate.add_argument("--room", default="hive", help="room name (default: hive)")
+
     room_post = room_sub.add_parser("post-summary", help="show the room summary; --post sends it to Q (PR #33)")
     room_post.add_argument("--room", default="hive", help="room name (default: hive)")
     room_post.add_argument("--post", action="store_true", help="actually post it to Q with gh")
@@ -645,6 +648,9 @@ def main(argv: list[str] | None = None,
             if getattr(args, "state", None):
                 argv += ["--state", args.state]
             return room_wait.main(argv)
+        if action == "escalate":
+            from . import escalate_watch
+            return escalate_watch.main(["--room", args.room])
         if action == "post-summary":
             return room.post_summary(args.room, post=args.post)
 
