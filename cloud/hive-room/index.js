@@ -85,29 +85,40 @@ button.cast{background:#3a4452}
       .catch(function(){ note(false); return -1; });
   }
   function catchUp(since){ return pull(since).then(function(n){ return n === 200 ? catchUp(last) : n; }); }
+  // Resolves true once the room has the message, so the caller clears the box only then.
   function send(text){
-    if (!text.trim()) return;
+    if (!text.trim()) return Promise.resolve(false);
     if (/^broadcasttohive:/i.test(text)) text = 'Broadcast: ' + text.replace(/^broadcasttohive:/i, '').trim();
     var id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
-    fetch('/rooms/' + ROOM + '/messages', auth({method: 'POST',
+    return fetch('/rooms/' + ROOM + '/messages', auth({method: 'POST',
       headers: {'Content-Type': 'application/json', 'Idempotency-Key': id}, body: JSON.stringify({text: text})}))
       .then(function(r){ if (!r.ok) throw 0; return r.json(); })
-      .then(function(d){ if (d.message) { add(d.message); persist([d.message]); } note(true); scroll(); })
-      .catch(function(){ note(false); });
+      .then(function(d){ if (d.message) { add(d.message); persist([d.message]); } note(true); scroll(); return true; })
+      .catch(function(){ note(false); return false; });
+  }
+  function sendBox(text){
+    var typed = input.value;
+    send(text).then(function(ok){ if (ok && input.value === typed) input.value = ''; });
   }
   document.getElementById('compose').addEventListener('submit', function(e){
-    e.preventDefault(); var v = input.value; input.value = ''; send(v);
+    e.preventDefault(); sendBox(input.value);
   });
   document.getElementById('cast').addEventListener('click', function(){
-    var v = input.value.trim(); input.value = '';
-    send(v ? 'Broadcast: ' + v : 'Broadcast: check in - every seat reply with your current task.');
+    var v = input.value.trim();
+    sendBox(v ? 'Broadcast: ' + v : 'Broadcast: check in - every seat reply with your current task.');
   });
   log.addEventListener('scroll', function(){ atBottom = (log.scrollHeight - log.scrollTop - log.clientHeight) < 40; });
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) markSeen(); });
   who.textContent = KEY.slice(0, 6) + '...';
   try { JSON.parse(localStorage.getItem(LS_LOG) || '[]').forEach(add); } catch(e){}
   markSeen();
-  catchUp(last).then(function(){ markSeen(); setInterval(function(){ pull(last); }, 3000); });
+  // Every 3 s while visible, every 60 s while hidden (free plan: 100k requests a day).
+  var hiddenTicks = 0;
+  catchUp(last).then(function(){ markSeen(); setInterval(function(){
+    if (document.hidden && ++hiddenTicks % 20) return;
+    hiddenTicks = 0; pull(last);
+  }, 3000); });
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) pull(last); });
 })();
 </script>
 </body></html>`;
