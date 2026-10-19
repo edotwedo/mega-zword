@@ -20,6 +20,7 @@ from .room_wait import PHIL_AUTHORS
 DESIGNATION = re.compile(r"^[A-Za-z]+-\d+\b")
 ROSTER = Path(__file__).resolve().parents[2] / "docs" / "HIVE-ROSTER.md"
 PHONE_BODY = "Nobody picked up Phil's Hive message"
+MAX_AGE = 60 * 60  # older calls are history, not emergencies: never escalate them
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,8 @@ def escalate(messages, now, roster, state) -> list[Action]:
     seats = list(roster or [])[:2]
     for call, stamp in timed:
         if call.author not in PHIL_AUTHORS or call.remote_id <= 0:
+            continue
+        if (now - stamp).total_seconds() > MAX_AGE:
             continue
         reference = re.compile(
             rf"(?:\bhive:\s*|#|\b(?:call|message)\s+#?){call.remote_id}\b", re.I)

@@ -55,6 +55,12 @@ def test_answer_at_seven_stops_after_first_step(tmp_path):
     assert sends == [("pc", "hive:1")]
 
 
+def test_old_calls_never_escalate_so_a_first_run_cannot_flood_the_phone():
+    old = [message(minute=0, remote_id=1), message(minute=1, remote_id=2)]
+    assert watch.escalate(old, START + timedelta(minutes=61, seconds=1), ROSTER, {}) == []
+    assert len(watch.escalate(old, START + timedelta(minutes=60), ROSTER, {})) == 6
+
+
 @pytest.mark.parametrize("author", ["codex", "floor", "claude-web", "chatgpt", "grok-web"])
 def test_bot_posts_are_never_calls(author):
     assert watch.escalate([message(author)], START + timedelta(minutes=20), ROSTER, {}) == []
