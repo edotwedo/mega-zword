@@ -23,9 +23,12 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
    `NTFY_PC_TOPIC` / `NTFY_PHONE_TOPIC` also work). No topics means no sends.
    Replies start with a Word-NN designation or reference `hive:ID`, `#ID`,
    `call ID` or `message ID`. State is saved beside the room wait bookmarks.
-3. [ ] **Tool-result cache (#10).** `read_file` / `search_files` results cached by
+   Per-seat paging: steps 1-2 target `megazword-hive-seat-<seat>`; a seat listens on
+   `shared,megazword-hive-seat-<designation>` (one ntfy subscription, comma-separated).
+3. [~] **Tool-result cache (#10).** `read_file` / `search_files` results cached by
    path+mtime per job and reused instead of re-read. `agent.py`.
    Done when: a repeated read returns cached text and `tool_chars` stays flat.
+   Owner: Lumen-20 (agent.py is free after #1 landed).
 4. [ ] **`megazword job cost ID` (#13).** One command prints tokens and steps per model
    for a saved job, from `log.jsonl`. New module + tests.
 5. [ ] **Repo map (#17).** Regex-based ranked map of key symbols (~1-2k tokens) offered
@@ -64,3 +67,7 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
   `HIVE_ROOM_KEY_<SEAT>` over the shared token. Conductor posts read `lumen-20`.
   `megazword announce` now pings the PC ntfy topic and `room_wait` treats
   `ANNOUNCE:` as actionable, so an announcement actually wakes seats.
+- 2026-10-19 01:35: reconciled the shared checkout. Recovered Quill-21's business
+  lane (`5721f26`: `BUSINESS-MODEL.md`, `LANDING-PAGE.md`) and Gauge-18's
+  `REPO-MAP.md`; landed with `REVENUE-OS.md` and per-seat ntfy paging at `606eb91`.
+  Added lanes `quill-21` and `cinder-21` without rotating keys.
