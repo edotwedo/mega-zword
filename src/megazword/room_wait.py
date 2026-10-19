@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import time
 import urllib.request
@@ -79,13 +80,20 @@ def wait_for_phil(room_obj, topic: str, state_path: Path,
         delay = min(delay * 2, MAX_DELAY)
 
 
+def default_state(room: str) -> Path:
+    """Per-seat bookmark, so one waiter cannot consume another seat's messages."""
+    seat = os.environ.get("MEGAZWORD_SEAT") or f"pid-{os.getpid()}"
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", seat)
+    return room_dir() / f"{room}.{safe}.wait.json"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--room", default=DEFAULT_ROOM)
     parser.add_argument("--topic", default="megazword-hive", help="ntfy topic the room pings")
     parser.add_argument("--state", type=Path, help="cursor file (default: rooms/<room>.wait.json)")
     args = parser.parse_args(argv)
-    state = args.state or (room_dir() / f"{args.room}.wait.json")
+    state = args.state or default_state(args.room)
     room_obj = RemoteRoom(args.room, config.load(), None)
     for message in wait_for_phil(room_obj, args.topic, state):
         print(f"{message.time} [{message.author}] {message.text}")

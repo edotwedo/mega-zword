@@ -101,3 +101,19 @@ def test_main_prints_each_message(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "2026-10-19T00:00 [phil] phil says hi" in out
     assert "[chatgpt]" in out
+
+
+def test_default_state_is_per_seat(tmp_path, monkeypatch):
+    monkeypatch.setattr(room_wait.config, "HOME", tmp_path)
+    monkeypatch.setenv("MEGAZWORD_SEAT", "Beacon-17")
+    a = room_wait.default_state("hive")
+    monkeypatch.setenv("MEGAZWORD_SEAT", "Juniper-16")
+    b = room_wait.default_state("hive")
+    assert a != b, "each seat needs its own bookmark"
+    assert a.name == "hive.Beacon-17.wait.json"
+
+
+def test_room_wait_is_wired_into_the_cli():
+    from megazword import cli
+    args = cli.build_parser().parse_args(["room", "wait", "--topic", "t"])
+    assert args.command == "room" and args.action == "wait" and args.topic == "t"

@@ -228,6 +228,11 @@ def build_parser() -> argparse.ArgumentParser:
     room_show.add_argument("--room", default="hive", help="room name (default: hive)")
     room_show.add_argument("-n", type=int, default=20, help="number of messages to show")
 
+    room_wait_parser = room_sub.add_parser("wait", help="block until Phil posts (wakes this session)")
+    room_wait_parser.add_argument("--room", default="hive", help="room name (default: hive)")
+    room_wait_parser.add_argument("--topic", default="megazword-hive", help="ntfy topic the room pings")
+    room_wait_parser.add_argument("--state", help="bookmark file (default: per-seat under the Mega Zword home)")
+
     room_post = room_sub.add_parser("post-summary", help="show the room summary; --post sends it to Q (PR #33)")
     room_post.add_argument("--room", default="hive", help="room name (default: hive)")
     room_post.add_argument("--post", action="store_true", help="actually post it to Q with gh")
@@ -615,7 +620,7 @@ def main(argv: list[str] | None = None,
         from . import room
         action = getattr(args, "action", None)
         if not action:
-            print("Usage: megazword room start|stop|say|show|post-summary", file=sys.stderr)
+            print("Usage: megazword room start|stop|say|show|wait|post-summary", file=sys.stderr)
             return 2
         if action == "start":
             return room.run_room(args.room, args.turns, args.project, backends=backends, cfg=cfg,
@@ -634,6 +639,12 @@ def main(argv: list[str] | None = None,
             except (OSError, ValueError) as e:
                 print(f"[megazword room] {e}", file=sys.stderr)
                 return 2
+        if action == "wait":
+            from . import room_wait
+            argv = ["--room", args.room, "--topic", args.topic]
+            if getattr(args, "state", None):
+                argv += ["--state", args.state]
+            return room_wait.main(argv)
         if action == "post-summary":
             return room.post_summary(args.room, post=args.post)
 
