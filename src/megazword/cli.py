@@ -21,7 +21,7 @@ from .routing import spread
 COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job"),
     "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
-            "sentinel", "floor", "brief", "announce", "free", "map"),
+            "sentinel", "floor", "brief", "announce", "free", "map", "spot"),
     "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab"),
     "Memory": ("note", "decide", "import-hive"),
 }
@@ -147,6 +147,7 @@ def build_parser() -> argparse.ArgumentParser:
     route_preview.add_argument("--approve", action="store_true",
                                help="approve the selected simulated route and run local verification")
     route_actions.add_parser("benchmark", help="run reproducible synthetic routing benchmark")
+    sub.add_parser("spot", help="warn before an AI hits the 20% floor and hand off")
     sub.add_parser("start", help="text start screen (plain `megazword` opens the app window)")
     sub.add_parser("projects", help="list projects with memory entries and last activity")
     sub.add_parser("advise", help="suggest a route order from stats and votes (changes nothing)")
@@ -426,6 +427,9 @@ def main(argv: list[str] | None = None,
     if args.command == "route-lab":
         from .router_lab import command as route_lab_command
         return route_lab_command(args)
+    if args.command == "spot":
+        from .spot import command as spot_command
+        return spot_command(args)
     if args.command == "keys":
         from .keys import command
         return command(args.action)
