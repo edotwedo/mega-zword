@@ -206,6 +206,9 @@ SEARCH_HITS = 60  # matching lines returned by one search_files call
 # how a job goes from cents to dollars; low-TPM free tiers get a smaller share.
 STEP_TOOL_CHARS = 24_000
 SMALL_STEP_TOOL_CHARS = 8_000
+# A ranked repo map in the system prompt replaces blind file dumping (Aider-style).
+# Computed once per job, so it stays byte-identical for prompt caching.
+REPO_MAP_CHARS = 6_000
 # Replies in a row with no usable tool call before giving up on a model. Cloudflare
 # spent all 60 steps this way in 103 s on 2026-10-17.
 MAX_INVALID = 4
@@ -709,7 +712,20 @@ class AgentBackend(Backend):
         self._tools = TOOLS if web else [t for t in TOOLS if t["function"]["name"] != "fetch_public_url"]
         instructions = INSTRUCTIONS if web else INSTRUCTIONS.replace(FETCH_SENTENCE, "").replace(
             SCHEMA_TEXT, "The available tool schemas are: " + json.dumps(self._tools))
-        messages = [{"role": "system", "content": REVIEW_INSTRUCTIONS if self.read_only else instructions},
+        # Offer a small ranked map first so the model reads targeted files instead of
+        # exploring blindly. One map per job, constant, so the prefix stays cacheable.
+        map_text = ""
+        try:
+            from .repo_map import build as build_map
+            focus = tuple(re.findall(r"[A-Za-z_]{4,}", prompt)[:20])
+            built = build_map(self.root, max_chars=REPO_MAP_CHARS, focus=focus)
+            if built:
+                map_text = ("\n\n[Repository map: use it to find files, then read only what you need]\n"
+                            + built)
+        except (OSError, ValueError):
+            map_text = ""
+        base = REVIEW_INSTRUCTIONS if self.read_only else instructions
+        messages = [{"role": "system", "content": base + map_text},
                     {"role": "user", "content": prompt}]
         text_mode = self.text_protocol or isinstance(self.model_backend, OllamaBackend)
         compacted = False

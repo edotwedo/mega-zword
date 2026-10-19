@@ -863,6 +863,14 @@ def test_metered_job_stops_at_its_spending_cap(tmp_path, monkeypatch):
     assert len(calls) < 10
 
 
+def test_repo_map_is_offered_in_the_system_prompt(tmp_path):
+    (tmp_path / "a.py").write_text("def add(a, b):\n    return a + b\n")
+    loop, model = coding(tmp_path, [call("finish", summary="done")], max_steps=3)
+    assert loop.run("fix add").ok
+    system = model.seen[0][0][0]["content"]
+    assert "Repository map" in system and "def add" in system and "a.py" in system
+
+
 def test_clip_result_keeps_head_and_tail():
     text = "H" * 100 + "MIDDLE" + "T" * 100
     out = agent._clip_result(text, 90)
