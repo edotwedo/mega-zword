@@ -2,9 +2,12 @@
 
 import re
 from collections.abc import Mapping
+from datetime import datetime, timedelta, timezone
 
 
-PREFIX = re.compile(r"^([A-Za-z]+-\d+):\s*(.*)$", re.DOTALL)
+# "Beacon-17: ..." or "Beacon-17 (claude-pc): ..."
+PREFIX = re.compile(r"^([A-Za-z]+-\d+)(?:\s*\([^)]*\))?:\s*(.*)$", re.DOTALL)
+STALE = timedelta(hours=24)  # TEAM.md: a claim with no release frees up after 24 hours
 CLAIM = re.compile(r"claiming\s+(.+)", re.IGNORECASE | re.DOTALL)
 ITEM = re.compile(r"#(\d+)\b|\bitem\s+(\d+)\b", re.IGNORECASE)
 
@@ -23,8 +26,26 @@ def _field(message, name, default=""):
     return message.get(name, default) if isinstance(message, Mapping) else getattr(message, name, default)
 
 
-def active_claims(messages):
-    """Return designation -> (item text, message ID, time), retaining the first open claim."""
+def _fresh(stamp, now):
+    if now is None:
+        return True
+    try:
+        when = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    when = when if when.tzinfo else when.replace(tzinfo=timezone.utc)
+    return now - when <= STALE
+
+
+def active_claims(messages, now=None):
+    """Return designation -> (item text, message ID, time), retaining the first open claim.
+
+    With ``now``, claims older than STALE are dropped (the claimer is presumed gone).
+    """
+    return {d: c for d, c in _open_claims(messages).items() if _fresh(c[2], now)}
+
+
+def _open_claims(messages):
     active = {}
     names = {}
     for message in messages:

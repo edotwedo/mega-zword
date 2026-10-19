@@ -588,7 +588,7 @@ def say(room: str, text: str, author: str = "phil",
     claim = claim_from_text(text)
     if claim and not force:
         try:
-            opened = active_claims(claim_messages(room, cfg, home))
+            opened = active_claims(claim_messages(room, cfg, home), now=datetime.now(timezone.utc))
         except (OSError, ValueError, KeyError, TypeError):
             opened = {}  # A failed read must never prevent posting.
         for designation, (item, _, _) in opened.items():
@@ -620,7 +620,8 @@ def show_claims(room: str, home: Path | None = None,
                 write: Callable[[str], None] = print, cfg: config.Config | None = None) -> int:
     from .claims import active_claims, claim_conflicts
     try:
-        opened = active_claims(claim_messages(room, cfg or config.load(), home))
+        opened = active_claims(claim_messages(room, cfg or config.load(), home),
+                               now=datetime.now(timezone.utc))
     except (OSError, ValueError, KeyError, TypeError):
         safe_write(write, "[megazword room] claims unavailable; room could not be read")
         return 1

@@ -109,3 +109,17 @@ def test_unreadable_local_room_posts(local, tmp_path, monkeypatch):
     monkeypatch.setattr(room, "read_messages", lambda *a: (_ for _ in ()).throw(OSError("unreadable")))
     assert room.say("hive", "Cedar-21: claiming #10", cfg=local, home=tmp_path) == 0
     assert "claiming #10" in room.room_path("hive", tmp_path).read_text()
+
+
+def test_designation_with_lane_label_still_parses():
+    claims = active_claims([message("Beacon-17 (claude-pc): claiming #9 spot warning")])
+    assert claims["Beacon-17"][0] == "#9 spot warning"
+
+
+def test_claims_older_than_a_day_expire():
+    from datetime import datetime, timedelta, timezone
+    rows = [message("Gauge-18: claiming #5 design")]
+    noon = datetime(2026, 10, 19, 12, tzinfo=timezone.utc)
+    assert "Gauge-18" in active_claims(rows, now=noon + timedelta(hours=23))
+    assert active_claims(rows, now=noon + timedelta(hours=25)) == {}
+    assert "Gauge-18" in active_claims(rows)  # no clock: nothing expires
