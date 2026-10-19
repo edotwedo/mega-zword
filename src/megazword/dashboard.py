@@ -293,6 +293,50 @@ class App:
             self.cfg = config.load()
             return {"ok": True, "settings": self.settings_state()}
 
+    def setup_view(self) -> dict:
+        """Whether this machine can run anything yet, in the dashboard.
+
+        Setup lived only in a terminal (clone, install.ps1, init, doctor), which is
+        the worst possible first five minutes for someone who just paid. This
+        reports the same doctor checks the CLI prints, in one screen, with the fix
+        for each gap beside it.
+
+        Read-only: no prompt is sent and nothing is written. `can_init` is the one
+        case where the panel can be useful, and it is the first thing a new
+        install needs - with no config there is nothing to route with.
+        """
+        from . import doctor
+        path = config.HOME / "config.toml"
+        checks = doctor.checks()
+        installed = sorted(n for n, b in self.backends.items() if b.available())
+        return {
+            # A bench needs something to route to, and a config that parses.
+            "ready": bool(installed) and not any(c.level == "FAIL" for c in checks),
+            "installed": installed,
+            "can_init": not path.exists(),
+            "config_path": str(path),
+            "checks": [{"level": c.level, "name": c.name, "detail": c.detail, "hint": c.hint}
+                       for c in checks],
+        }
+
+    def setup_init(self, body: dict) -> dict:
+        """Write the starting config the setup panel offers when none exists.
+
+        Same writer `megazword init` uses, so the two can never drift apart. On
+        success the app reloads its config, so the new routes are live without a
+        restart - the panel should never tell someone to restart the dashboard
+        they are looking at.
+        """
+        installed = [n for n, b in self.backends.items() if b.available()]
+        path = config.HOME / "config.toml"
+        force = isinstance(body, dict) and bool(body.get("force"))
+        with config._WRITE_LOCK:
+            if path.exists() and not force:
+                return {"error": f"config already exists: {path}", "setup": self.setup_view()}
+            config.write_default(path, installed, False)
+            self.cfg = config.load()
+        return {"ok": True, "setup": self.setup_view()}
+
     def _start(self, label: str, args: list[str], stdin: str = "") -> dict:
         with self._jobs_lock:
             if len(self.jobs) >= MAX_JOBS:
@@ -574,6 +618,8 @@ def make_handler(app: App, port: int, remote: bool = False):
                     return self._json(400, {"error": str(exc)})
             if path == "/api/briefing":
                 return self._json(200, app.briefing_view())
+            if path == "/api/setup":
+                return self._json(200, app.setup_view())
             if path.startswith("/api/job/"):
                 job = app.jobs.get(path.rsplit("/", 1)[-1])
                 return self._json(200, job.view()) if job else self._json(404, {})
@@ -603,6 +649,7 @@ def make_handler(app: App, port: int, remote: bool = False):
                           "/api/note": app.note, "/api/vote": app.vote, "/api/cancel": app.cancel,
                           "/api/job/control": app.intervene,
                           "/api/settings": app.settings,
+                          "/api/setup/init": app.setup_init,
                           "/api/briefing/report": briefing.publish,
                           "/api/briefing/camera": app.briefing_camera,
                           "/api/tabs": app.tabs_create,

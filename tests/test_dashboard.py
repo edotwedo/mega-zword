@@ -168,6 +168,65 @@ def _post(url, body, token=None, host=None):
     return urllib.request.urlopen(req, timeout=10)
 
 
+# --- setup, in the dashboard ------------------------------------------------
+
+
+def test_setup_view_lists_doctors_checks_and_rates_readiness(app, monkeypatch):
+    from megazword import doctor
+    monkeypatch.setattr(doctor, "checks", lambda home=None: [
+        doctor.Check("OK", "Python", "3.12.0"),
+        doctor.Check("WARN", "grok", "not on PATH", "install grok or add it to PATH"),
+    ])
+    view = app.setup_view()
+    assert view["ready"] is True                      # something to route to, nothing broken
+    assert view["installed"] == ["claude", "grok"]
+    assert view["can_init"] is True                   # this HOME has no config yet
+    assert view["checks"][1]["hint"] == "install grok or add it to PATH"
+    json.dumps(view)
+
+
+def test_one_failing_check_is_enough_to_not_be_ready(app, monkeypatch):
+    from megazword import doctor
+    monkeypatch.setattr(doctor, "checks", lambda home=None: [doctor.Check("FAIL", "config", "broken")])
+    assert app.setup_view()["ready"] is False
+
+
+def test_nothing_to_route_to_is_not_ready(app, monkeypatch):
+    from megazword import doctor
+    monkeypatch.setattr(doctor, "checks", lambda home=None: [doctor.Check("OK", "Python", "3.12.0")])
+    app.backends = {"claude": FakeBackend(ok=False)}
+    view = app.setup_view()
+    assert view["installed"] == [] and view["ready"] is False
+
+
+def test_setup_init_writes_the_config_and_the_app_picks_it_up(app, monkeypatch):
+    from megazword import config, doctor
+    monkeypatch.setattr(doctor, "checks", lambda home=None: [doctor.Check("OK", "config", "parses")])
+    assert app.setup_view()["can_init"] is True
+    result = app.setup_init({})
+    assert result["ok"] is True
+    assert (config.HOME / "config.toml").is_file()
+    assert result["setup"]["can_init"] is False       # there is one now
+    assert app.setup_view()["ready"] is True
+
+
+def test_setup_init_refuses_to_overwrite_an_existing_config(app):
+    from megazword import config
+    path = config.HOME / "config.toml"
+    path.write_text("[route]\n", encoding="utf-8")
+    result = app.setup_init({})
+    assert "already exists" in result["error"]
+    assert path.read_text(encoding="utf-8") == "[route]\n"   # left exactly as it was
+
+
+def test_setup_endpoints_are_wired(server):
+    base, app = server
+    view = json.loads(urllib.request.urlopen(base + "/api/setup", timeout=10).read())
+    assert "checks" in view and "can_init" in view
+    posted = json.loads(_post(base + "/api/setup/init", {}, app.token).read())
+    assert posted["ok"] is True and posted["setup"]["can_init"] is False
+
+
 def test_page_carries_token_and_state_serves(server):
     base, app = server
     html = urllib.request.urlopen(base + "/", timeout=10).read().decode()

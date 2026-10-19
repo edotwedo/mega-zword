@@ -256,6 +256,7 @@ section { box-shadow:none; }
   <div><p class="side-label">Workspace</p><nav class="tab-strip" aria-label="Workspace tabs">
     <button class="nav-tab" id="tab-home" type="button" aria-pressed="true" data-view="home"><span class="nav-icon" aria-hidden="true">⌂</span>Home</button>
     <button class="nav-tab" id="tab-hive" type="button" aria-pressed="false" data-view="hive"><span class="nav-icon" aria-hidden="true">◇</span>Hive</button>
+    <button class="nav-tab" id="tab-setup" type="button" aria-pressed="false" data-view="setup"><span class="nav-icon" aria-hidden="true">⚙</span>Setup</button>
   </nav></div>
   <div><p class="side-label">Chats</p><nav class="tab-strip" id="chat-tabs" aria-label="Chat tabs"></nav>
     <div class="row new-chat">
@@ -355,6 +356,14 @@ section { box-shadow:none; }
   </section>
   </div></details>
 </main>
+<div id="setup" class="hive-view" role="region" aria-labelledby="setup-title" hidden>
+  <h2 id="setup-title">Setup</h2>
+  <p id="setup-verdict">Checking this machine…</p>
+  <p><button class="nav-tab" type="button" id="setup-init" hidden>Create the starting config</button></p>
+  <div id="setup-checks"></div>
+  <p class="side-label" id="setup-config-path"></p>
+</div>
+
 <div id="hive" class="hive-view" role="region" aria-labelledby="hive-title" hidden>
   <section class="wide console">
     <h2 id="hive-title">Hive room</h2>
@@ -1013,13 +1022,17 @@ function setView(view) {
   currentView = view;
   if (previous !== view) $("chat-input").value = view.startsWith("tab:") ? chatDrafts.get(view.slice(4)) || "" : "";
   const hive = view === "hive";
+  const setup = view === "setup";
   $("home-view").hidden = view !== "home";
   $("hive").hidden = !hive;
+  $("setup").hidden = !setup;
   $("chat").hidden = !tab;
-  $("view-title").textContent = hive ? "Hive" : tab ? tab.title : "Home";
+  $("view-title").textContent = setup ? "Setup" : hive ? "Hive" : tab ? tab.title : "Home";
   updateWindowTitle();
   $("tab-home").setAttribute("aria-pressed", String(view === "home"));
   $("tab-hive").setAttribute("aria-pressed", String(hive));
+  $("tab-setup").setAttribute("aria-pressed", String(setup));
+  if (setup) renderSetup();
   renderChatTabs();
   if (tab) renderChat(tab);
   if (hive) loadRoom();
@@ -1124,6 +1137,31 @@ async function roomAction(path, body = {}) {
 
 $("tab-home").onclick = () => setView("home");
 $("tab-hive").onclick = () => setView("hive");
+$("tab-setup").onclick = () => setView("setup");
+
+// Setup, in the dashboard: the same doctor checks the CLI prints, plus the one
+// action a new install needs. Setup used to mean a terminal, which is the worst
+// first five minutes for someone who just paid for this.
+async function renderSetup() {
+  let view;
+  try { view = await (await fetch("/api/setup")).json(); }
+  catch { $("setup-verdict").textContent = "Could not read the setup checks."; return; }
+  $("setup-verdict").textContent = view.ready
+    ? "Ready. " + (view.installed.length ? view.installed.join(", ") + " can run jobs." : "")
+    : "Not ready yet — fix anything marked FAIL below.";
+  $("setup-checks").innerHTML = (view.checks || []).map(c =>
+    `<p class="side-label">${esc(c.level)} ${esc(c.name)}: ${esc(c.detail)}${c.hint ? " — " + esc(c.hint) : ""}</p>`
+  ).join("");
+  $("setup-config-path").textContent = "Config: " + view.config_path;
+  $("setup-init").hidden = !view.can_init;
+}
+$("setup-init").onclick = async () => {
+  try {
+    const result = await post("/api/setup/init", {});
+    if (result.error) $("setup-verdict").textContent = result.error;
+  } catch (err) { $("setup-verdict").textContent = String(err.message || err); }
+  renderSetup();
+};
 function renderWorkers(workers) {
   const signature = JSON.stringify(workers);
   if ($("hive-workers").dataset.signature === signature) return;
