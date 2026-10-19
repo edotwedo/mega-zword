@@ -72,6 +72,32 @@ async function postMessage(store, identity, seat, room, body, key, now) {
   return message ? {message, status: 201} : {error: 'seat limit: 30 messages per minute', status: 429};
 }
 
+const PC_SEATS = new Set(['phil', 'claude-web', 'chatgpt', 'grok-web']);
+
+// Fire an ntfy notification after a successful POST. Never includes message text.
+// Uses ctx.waitUntil when available so the response is not delayed; otherwise awaits.
+// Notify errors are always swallowed.
+async function notify(env, seat, text, message, ctx, fetcher = globalThis.fetch) {
+  let topic, body, title;
+  if (PC_SEATS.has(seat) && env.NTFY_PC_TOPIC) {
+    topic = env.NTFY_PC_TOPIC;
+    body = `hive:${message.id}`;
+  } else if (/@phil/i.test(text || '') && env.NTFY_PHONE_TOPIC) {
+    topic = env.NTFY_PHONE_TOPIC;
+    body = `New Hive message from ${seat}`;
+    title = 'Hive';
+  } else {
+    return;
+  }
+  const promise = fetcher(`https://ntfy.sh/${topic}`, {
+    method: 'POST',
+    body,
+    headers: title ? {Title: title} : {}
+  }).catch(() => {});
+  if (ctx?.waitUntil) ctx.waitUntil(promise);
+  else await promise;
+}
+
 const tools = [
   {name: 'read_room', description: 'Read Hive coordination messages, oldest first.', inputSchema: {
     type: 'object', properties: {
@@ -90,7 +116,7 @@ const tools = [
 const rpcError = (id, code, message) => json({jsonrpc: '2.0', id, error: {code, message}});
 const toolResult = (text, isError = false) => ({content: [{type: 'text', text}], ...(isError ? {isError: true} : {})});
 
-async function mcp(request, store, identity, seat, now) {
+async function mcp(request, store, identity, seat, now, env, ctx, fetcher) {
   if (request.method !== 'POST') return json({error: 'method not allowed'}, 405);
   const parsed = await readBody(request);
   if (parsed.error) return parsed.status === 400 ? rpcError(null, -32700, 'Parse error') : json({error: parsed.error}, parsed.status);
@@ -123,13 +149,14 @@ async function mcp(request, store, identity, seat, now) {
         return result(toolResult(JSON.stringify({messages: await store.list(room, since, limit)})));
       }
       const posted = await postMessage(store, identity, seat, room, args, crypto.randomUUID(), now);
+      if (!posted.error) await notify(env, seat, args.text, posted.message, ctx, fetcher);
       return result(posted.error ? toolResult(posted.error, true) : toolResult(JSON.stringify({message: posted.message})));
     }
     default: return rpcError(body.id, -32601, 'Method not found');
   }
 }
 
-export async function handle(request, env, store = new D1Store(env.DB), now = new Date()) {
+export async function handle(request, env, store = new D1Store(env.DB), now = new Date(), ctx, fetcher = globalThis.fetch) {
   let readRoute = false;
   try {
     const url = new URL(request.url);
@@ -153,7 +180,7 @@ export async function handle(request, env, store = new D1Store(env.DB), now = ne
       const messages = await store.latest(room, Number(limit));
       return plain(messages.length ? messages.map(m => `${m.time} [${m.author}] ${m.text.replace(/[\r\n\u2028\u2029]+/g, ' ')}`).join('\n') : '(no messages)');
     }
-    if (mcpPath) return await mcp(request, store, identity, seat, now);
+    if (mcpPath) return await mcp(request, store, identity, seat, now, env, ctx, fetcher);
     const match = /^\/rooms\/([a-z0-9-]{1,64})\/messages$/.exec(url.pathname);
     if (!match) return json({error: 'not found'}, 404);
     if (request.method === 'GET') {
@@ -168,10 +195,11 @@ export async function handle(request, env, store = new D1Store(env.DB), now = ne
     const parsed = await readBody(request);
     if (parsed.error) return json({error: parsed.error}, parsed.status);
     const posted = await postMessage(store, identity, seat, match[1], parsed.body, request.headers.get('Idempotency-Key') || crypto.randomUUID(), now);
+    if (!posted.error) await notify(env, seat, parsed.body?.text, posted.message, ctx, fetcher);
     return posted.error ? json({error: posted.error}, posted.status) : json({message: posted.message}, posted.status);
   } catch {
     return readRoute ? plain('room temporarily unavailable', 503) : json({error: 'room temporarily unavailable'}, 503);
   }
 }
 
-export default {fetch: (request, env) => handle(request, env)};
+export default {fetch: (request, env, ctx) => handle(request, env, undefined, undefined, ctx)};

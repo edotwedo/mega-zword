@@ -237,3 +237,43 @@ test('MCP rejects non-object arguments and hides storage failures', async () => 
   assert.equal(res.status, 503);
   assert.deepEqual(await res.json(), {error: 'room temporarily unavailable'});
 });
+
+// ntfy pings (2026-10-18): Phil's lanes wake the PC; @phil pings his phone. Never the text.
+const philToken = crypto.randomUUID();
+const pingEnv = {...env, NTFY_PC_TOPIC: 'pc-topic', NTFY_PHONE_TOPIC: 'phone-topic',
+  SEAT_TOKENS: JSON.stringify({...JSON.parse(env.SEAT_TOKENS), [await digest(philToken)]: 'claude-web'})};
+const pings = [];
+const fakeFetch = async (url, init) => { pings.push({url, ...init}); return new Response('ok'); };
+const post = (tok, text, e = pingEnv, path = '/rooms/hive/messages') => handle(new Request('https://room.example' + path, {
+  method: 'POST', headers: {Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json'},
+  body: JSON.stringify(path === '/mcp' ? {jsonrpc: '2.0', id: 1, method: 'tools/call',
+    params: {name: 'post_message', arguments: {text}}} : {text})}), e, store, new Date(), undefined, fakeFetch);
+beforeEach(() => { pings.length = 0; });
+
+test('a post from one of Phil\'s lanes pings the PC topic with only the id', async () => {
+  assert.equal((await post(philToken, 'secret tax stuff')).status, 201);
+  assert.equal(pings.length, 1);
+  assert.equal(pings[0].url, 'https://ntfy.sh/pc-topic'); assert.equal(pings[0].body, 'hive:1');
+  assert.ok(!JSON.stringify(pings).includes('secret'));
+});
+test('MCP posts from Phil\'s lanes ping too', async () => {
+  assert.equal((await post(philToken, 'status?', pingEnv, '/mcp')).status, 200);
+  assert.equal(pings.length, 1); assert.equal(pings[0].url, 'https://ntfy.sh/pc-topic');
+});
+test('a bot @phil pings the phone without the text; plain bot posts ping nothing', async () => {
+  await post(token, 'routine note');
+  assert.equal(pings.length, 0);
+  await post(token, '@Phil done: private detail');
+  assert.equal(pings.length, 1);
+  assert.equal(pings[0].url, 'https://ntfy.sh/phone-topic');
+  assert.equal(pings[0].body, 'New Hive message from cirrus-17');
+  assert.ok(!JSON.stringify(pings).includes('private'));
+});
+test('no topics configured means no pings, and a failing ntfy never fails the post', async () => {
+  assert.equal((await post(philToken, 'hi', {...pingEnv, NTFY_PC_TOPIC: ''})).status, 201);
+  assert.equal(pings.length, 0);
+  const res = await handle(new Request('https://room.example/rooms/hive/messages', {method: 'POST',
+    headers: {Authorization: `Bearer ${philToken}`, 'Content-Type': 'application/json'}, body: JSON.stringify({text: 'x'})}),
+    pingEnv, store, new Date(), undefined, async () => { throw new Error('down'); });
+  assert.equal(res.status, 201);
+});

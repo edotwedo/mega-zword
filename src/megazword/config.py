@@ -61,7 +61,8 @@ DEFAULT_ROUTE = {
     # picks the order: least-used free source in the last 24 hours first,
     # Tencent's one-time grants at a quarter share except on hard work
     # (Phil, 2026-10-16: "a tiny bit from every free source").
-    # Command Code (cmd-*) is Phil's $10/month GOAT plan: prepaid, use it.
+    # Command Code's own CLI (cmdc*) on Phil's $10/month GOAT plan: prepaid, use it.
+    # The raw-API cmd-* backends stay out: our agent loop wanders on them (2026-10-18).
     # cmd-deepseek-flash stays out: its tool-call arguments come back with
     # DeepSeek's DSML markup in them, so agent jobs fail (2026-10-18).
     # Gemini (agy) is left out on purpose: she's Phil's advisor and chat partner,
@@ -69,13 +70,13 @@ DEFAULT_ROUTE = {
     "easy": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
              "tencent-kimi-k2.7-code", "tencent-kimi-k3",
              "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
-             "cmd-glm-flash", "cmd-ling-flash", "cmd-hy3", "cmd-qwen-27b", "cmd-laguna", "cmd-cat-jam", "cmd-beam",
+             "cmdc", "cmdc-glm", "cmdc-qwen",
              "mistral", "gemini-api", "openrouter", "groq", "cloudflare",
              "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "nvidia", "nvidia-lightning", "ollama", "grok", "codex", "claude"],
     "medium": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
                "tencent-kimi-k2.7-code", "tencent-kimi-k3",
                "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
-             "cmd-glm-flash", "cmd-ling-flash", "cmd-hy3", "cmd-qwen-27b", "cmd-laguna", "cmd-cat-jam", "cmd-beam",
+             "cmdc", "cmdc-glm", "cmdc-qwen",
                "openrouter", "groq",
                "cloudflare", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "gemini-api",
                "mistral", "nvidia", "nvidia-lightning", "ollama", "cheap-deepseek-flash",
@@ -83,7 +84,7 @@ DEFAULT_ROUTE = {
     "hard": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
              "tencent-kimi-k2.7-code", "tencent-kimi-k3",
              "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
-             "cmd-glm-flash", "cmd-ling-flash", "cmd-hy3", "cmd-qwen-27b", "cmd-laguna", "cmd-cat-jam", "cmd-beam",
+             "cmdc", "cmdc-glm", "cmdc-qwen",
              "openrouter", "groq",
              "cloudflare", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "gemini-api",
              "mistral", "nvidia", "nvidia-lightning", "ollama", "cheap-deepseek-pro",
@@ -152,7 +153,6 @@ DEFAULT_FREE_FAILOVER = ["tencent-glm-5.3-flash", "tencent-glm-5.3",
                          "tencent-kimi-k2.7-code", "tencent-kimi-k3",
                          "tencent-deepseek-v4-pro",
                          "tencent-deepseek-v4-flash-vision-exp",
-                         "cmd-glm-flash", "cmd-ling-flash", "cmd-hy3", "cmd-qwen-27b", "cmd-laguna", "cmd-cat-jam", "cmd-beam",
                          "openrouter", "groq", "groq-120b", "groq-qwen",
                          "cloudflare", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "gemini-api",
                          "gemini-api-31-lite",

@@ -8,6 +8,7 @@ CLI accepts the prompt on stdin we use that, because Windows .cmd shims
 from __future__ import annotations
 
 import json
+from pathlib import Path
 import os
 import shutil
 import sys
@@ -250,6 +251,22 @@ def grok_backend(model: str = "grok-4.6", effort: str = "medium",
     return CLIBackend("grok", exe="grok", args=args)
 
 
+def cmdc_backend(name: str = "cmdc", model: str = "") -> CLIBackend:
+    """Command Code's own CLI on Phil's GOAT plan, full access. Phil, 2026-10-18: "we need
+    megazword to behave exactly like this thing". Side by side, it finished a tested,
+    pushed job while our agent loop on a Command Code model spent 60 steps reading."""
+    args = ["-p", "--yolo", "--skip-onboarding", "--no-auto-update", "--max-turns", "60",
+            *(["-m", model] if model else []), *add_dirs()]
+    return CmdcBackend(name, exe="cmdc", args=args)  # prompt goes in on stdin
+
+
+@dataclass
+class CmdcBackend(CLIBackend):
+    def available(self) -> bool:
+        # Signed out (or a test's empty HOME) means every run would fail.
+        return super().available() and (Path.home() / ".commandcode" / "auth.json").exists()
+
+
 def grok_can_edit() -> bool:
     """Grok runs with full access everywhere now (Phil, 2026-10-18)."""
     return True
@@ -425,6 +442,9 @@ def default_backends(edit: bool = True,
                            "--dangerously-bypass-approvals-and-sandbox",
                            *(CODEX_LEAN if lean else [])]),
         grok_backend(),
+        cmdc_backend(),  # the CLI's default model (DeepSeek V4 Flash) works fine in its own harness
+        cmdc_backend("cmdc-glm", "z-ai/glm-5.3-flash"),
+        cmdc_backend("cmdc-qwen", "Qwen/Qwen3.8-27B"),
         GeminiBackend("gemini"),  # piped stdin selects the old Gemini CLI's headless mode
     ]
     from .config import Config, load
