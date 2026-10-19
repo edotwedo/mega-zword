@@ -223,3 +223,8 @@ def test_claims_older_than_a_day_expire():
     assert "Gauge-18" in active_claims(rows, now=noon + timedelta(hours=23))
     assert active_claims(rows, now=noon + timedelta(hours=25)) == {}
     assert "Gauge-18" in active_claims(rows)  # no clock: nothing expires
+
+
+def test_a_quotation_inside_a_claim_is_not_an_item():
+    rows = [message('Quill-21: taking conductor for the night - Phil\'s words, "conduct, own it"')]
+    assert active_claims(rows) == {}

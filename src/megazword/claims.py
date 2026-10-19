@@ -71,8 +71,11 @@ def _name(raw):
 
 
 def item_keys(text):
-    """Roadmap numbers (ints) and quoted names (normalized strings) a text names."""
-    return item_numbers(text) | {_name(a or b or c) for a, b, c in NAME.findall(text)}
+    """Roadmap numbers (ints) a text names, plus the quoted name it starts with.
+    Only a leading quote names the item: "conductor ... Phil's words, "conduct ..."" is
+    a quotation, and counting it made a phantom claim that blocked its seat."""
+    named = NAME.match(text.lstrip())
+    return item_numbers(text) | ({_name(next(g for g in named.groups() if g))} if named else set())
 
 
 def mentions(body, keys):
