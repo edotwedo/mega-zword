@@ -31,8 +31,12 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
    Done 2026-10-19 (Fathom-19, claimed 08:33): an identical read on an unchanged file
    (mtime+size) or a search with no edit since costs a one-line note while the earlier
    result is still whole in the history, else the cached text; no disk re-read.
-4. [ ] **`megazword job cost ID` (#13).** One command prints tokens and steps per model
+4. [x] **`megazword job cost ID` (#13).** One command prints tokens and steps per model
    for a saved job, from `log.jsonl`. New module + tests.
+   Done 2026-10-19 by Quill-21: `src/megazword/job_cost.py` + `megazword job cost ID`.
+   Reads the run log's `project=<job id>` lines, totals steps (`requests`) and
+   `est_tokens` per backend, and prints the estimate's definition rather than
+   letting it pass as billed tokens. 7 tests; suite 1604.
 5. [x] **Repo map (#17).** Regex-based ranked map of key symbols offered to models
    instead of file dumps. Module by Juniper-16 (`megazword map`); prompt hook by
    Lumen-20 (`81b4f2d`): 6k chars, built once per job, focused by task words, and
