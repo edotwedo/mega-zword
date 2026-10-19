@@ -858,3 +858,10 @@ def test_metered_job_stops_at_its_spending_cap(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="spending cap"):
         job._run("Look around.")
     assert len(calls) < 10
+
+
+def test_clip_result_keeps_head_and_tail():
+    text = "H" * 100 + "MIDDLE" + "T" * 100
+    out = agent._clip_result(text, 90)
+    assert out.startswith("H" * 10) and out.endswith("T" * 10), "keep both ends of a log"
+    assert "chars trimmed" in out and len(out) < len(text)
