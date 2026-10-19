@@ -277,3 +277,16 @@ test('no topics configured means no pings, and a failing ntfy never fails the po
     pingEnv, store, new Date(), undefined, async () => { throw new Error('down'); });
   assert.equal(res.status, 201);
 });
+
+test('the phone app page is served only under a valid key', async () => {
+  const ok = await call('GET', '/app/' + token);
+  assert.equal(ok.status, 200);
+  assert.match(ok.headers.get('content-type'), /text\/html/);
+  assert.equal(ok.headers.get('x-robots-tag'), 'noindex');
+  assert.match(ok.headers.get('content-security-policy'), /connect-src 'self'/);
+  const html = await ok.text();
+  assert.match(html, /<title>Hive<\/title>/);
+  assert.ok(!html.includes(token), 'the key must not be baked into the page');
+  assert.equal((await call('GET', '/app/not-a-real-key')).status, 401);
+  assert.equal((await call('POST', '/app/' + token)).status, 405);
+});

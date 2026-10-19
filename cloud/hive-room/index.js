@@ -4,6 +4,97 @@ const plain = (body, status = 200) => new Response(body, {status, headers: {
   'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer'
 }});
 
+// A phone client: one self-contained page, served only under a secret key path
+// (/app/<key>), so it is same-origin and needs no CORS. The key stays in the URL
+// (the same model as /read/<key> and /mcp/<key>); messages render as text only.
+const APP_HTML = `<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="robots" content="noindex">
+<title>Hive</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#0f1115;color:#e7ebf0;display:flex;flex-direction:column;height:100dvh}
+header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#161a20;border-bottom:1px solid #232a33}
+#dot{width:9px;height:9px;border-radius:50%;background:#e0533d}
+#dot.on{background:#3fd07a}
+header b{font-weight:600}
+#who{margin-left:auto;color:#7f8a99;font-size:12px}
+main{flex:1;overflow-y:auto;padding:8px 12px}
+.msg{padding:7px 0;border-bottom:1px solid #1b2129}
+.h{display:flex;gap:8px;font-size:12px;color:#8894a4}
+.a{color:#7db4ff;font-weight:600}
+.t{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:2px}
+form{display:flex;gap:6px;padding:8px;background:#161a20;border-top:1px solid #232a33}
+#text{flex:1;min-width:0;padding:11px 12px;border:1px solid #2a323d;border-radius:10px;background:#0f1115;color:inherit;font:inherit}
+button{padding:0 14px;min-height:44px;border:0;border-radius:10px;background:#2f6bd8;color:#fff;font:inherit;font-weight:600}
+button.cast{background:#3a4452}
+</style></head>
+<body>
+<header><span id="dot"></span><b>Hive</b><span id="who"></span></header>
+<main id="log"></main>
+<form id="compose">
+<input id="text" maxlength="4000" autocomplete="off" placeholder="message the Hive">
+<button id="cast" class="cast" type="button" title="Broadcast to every seat">Broadcast</button>
+<button type="submit">Send</button>
+</form>
+<script>
+(function(){
+  var KEY = decodeURIComponent(location.pathname.split('/').pop());
+  var ROOM = 'hive', last = 0, atBottom = true;
+  var log = document.getElementById('log'), dot = document.getElementById('dot');
+  var who = document.getElementById('who'), input = document.getElementById('text');
+  function auth(o){ o = o || {}; o.headers = Object.assign({Authorization: 'Bearer ' + KEY}, o.headers || {}); return o; }
+  function note(ok){ dot.className = ok ? 'on' : ''; }
+  function scroll(){ if (atBottom) log.scrollTop = log.scrollHeight; }
+  function add(m){
+    var d = document.createElement('div'); d.className = 'msg';
+    var h = document.createElement('div'); h.className = 'h';
+    var a = document.createElement('span'); a.className = 'a'; a.textContent = m.author;
+    var t = document.createElement('span'); t.textContent = (m.time || '').slice(0, 16).replace('T', ' ');
+    var b = document.createElement('div'); b.className = 't'; b.textContent = m.text;
+    h.appendChild(a); h.appendChild(t); d.appendChild(h); d.appendChild(b);
+    log.appendChild(d); last = Math.max(last, m.id || 0);
+  }
+  function pull(since){
+    return fetch('/rooms/' + ROOM + '/messages?since=' + since + '&limit=200', auth())
+      .then(function(r){ if (!r.ok) throw 0; return r.json(); })
+      .then(function(d){ var rows = d.messages || []; rows.forEach(add); note(true); scroll(); return rows.length; })
+      .catch(function(){ note(false); return -1; });
+  }
+  function catchUp(since){ return pull(since).then(function(n){ return n === 200 ? catchUp(last) : n; }); }
+  function send(text){
+    if (!text.trim()) return;
+    var id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random();
+    fetch('/rooms/' + ROOM + '/messages', auth({method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Idempotency-Key': id}, body: JSON.stringify({text: text})}))
+      .then(function(r){ if (!r.ok) throw 0; return r.json(); })
+      .then(function(d){ if (d.message) add(d.message); note(true); scroll(); })
+      .catch(function(){ note(false); });
+  }
+  document.getElementById('compose').addEventListener('submit', function(e){
+    e.preventDefault(); var v = input.value; input.value = ''; send(v);
+  });
+  document.getElementById('cast').addEventListener('click', function(){
+    var v = input.value.trim(); input.value = '';
+    send(v ? 'Broadcast: ' + v : 'Broadcast: check in - every seat reply with your current task.');
+  });
+  log.addEventListener('scroll', function(){ atBottom = (log.scrollHeight - log.scrollTop - log.clientHeight) < 40; });
+  who.textContent = KEY.slice(0, 6) + '...';
+  catchUp(0).then(function(){ setInterval(function(){ pull(last); }, 3000); });
+})();
+</script>
+</body></html>`;
+
+const appPage = () => new Response(APP_HTML, {status: 200, headers: {
+  'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
+  'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff',
+  'Content-Security-Policy': "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+}});
+
 export async function digest(token) {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
   return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
@@ -157,20 +248,27 @@ async function mcp(request, store, identity, seat, now, env, ctx, fetcher) {
 }
 
 export async function handle(request, env, store = new D1Store(env.DB), now = new Date(), ctx, fetcher = globalThis.fetch) {
-  let readRoute = false;
+  let readRoute = false, bare = false;
   try {
     const url = new URL(request.url);
     readRoute = url.pathname.startsWith('/read/');
+    bare = url.pathname.startsWith('/app/');
     const readPath = /^\/read\/([A-Za-z0-9_-]+)$/.exec(url.pathname);
+    const appPath = /^\/app\/([A-Za-z0-9_-]+)$/.exec(url.pathname);
     const mcpPath = /^\/mcp(?:\/([A-Za-z0-9_-]+))?$/.exec(url.pathname);
     const bearer = /^Bearer ([^\s]+)$/.exec(request.headers.get('Authorization') || '');
-    const token = readRoute ? readPath?.[1] : mcpPath?.[1] || bearer?.[1];
+    const token = readRoute ? readPath?.[1] : bare ? appPath?.[1] : mcpPath?.[1] || bearer?.[1];
     const seats = JSON.parse(env.SEAT_TOKENS || '{}');
     const identity = token && seats[await digest(token)];
-    if (!identity) return readRoute ? plain('unauthorized', 401) : json({error: 'unauthorized'}, 401);
+    const fail = (error, status) => (readRoute || bare) ? plain(error, status) : json({error}, status);
+    if (!identity) return fail('unauthorized', 401);
     const seat = typeof identity === 'string' ? identity : identity.seat;
     if (typeof seat !== 'string' || !/^[a-z0-9-]+$/.test(seat))
-      return readRoute ? plain('invalid seat configuration', 503) : json({error: 'invalid seat configuration'}, 503);
+      return fail('invalid seat configuration', 503);
+    if (bare) {
+      if (request.method !== 'GET') return plain('method not allowed', 405);
+      return appPage();
+    }
     if (readRoute) {
       if (request.method !== 'GET') return plain('method not allowed', 405);
       const room = url.searchParams.get('room') ?? 'hive';
@@ -198,7 +296,7 @@ export async function handle(request, env, store = new D1Store(env.DB), now = ne
     if (!posted.error) await notify(env, seat, parsed.body?.text, posted.message, ctx, fetcher);
     return posted.error ? json({error: posted.error}, posted.status) : json({message: posted.message}, posted.status);
   } catch {
-    return readRoute ? plain('room temporarily unavailable', 503) : json({error: 'room temporarily unavailable'}, 503);
+    return (readRoute || bare) ? plain('room temporarily unavailable', 503) : json({error: 'room temporarily unavailable'}, 503);
   }
 }
 
