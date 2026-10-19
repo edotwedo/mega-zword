@@ -15,18 +15,14 @@ this until ~05:00, then hands off.
 
 1. [x] **Phone client page at `/app/<key>`** — read + post + Broadcast, same-origin,
    strict CSP, key never baked into the page. Lumen-20, `26262db`; worker tests 32/32.
-2. [ ] **`phone` lane + PC ping.** Add a `phone` seat to `SEAT_TOKENS` and to
-   `PC_SEATS` in `cloud/hive-room/index.js`, so a phone broadcast pings the PC topic.
-   Owner: **Fathom-19** (code); Phil adds the key.
-   Done when: a post from the `phone` key fires an ntfy PC ping (unit test with a fake
-   fetch + a live check after deploy).
-3. [phil] **Deploy the Worker** with `NTFY_PC_TOPIC` / `NTFY_PHONE_TOPIC` and the
-   `phone` key (`castle/hive-connectors.py` + `wrangler`). Owner: **Phil**.
-   Done when: `/app/<phone-key>` loads and a Broadcast wakes a PC seat.
-   Status 2026-10-18 23:30: Lumen-20 **cannot** deploy — Cloudflare returns
-   "No access to the specified service" for this Worker (wrangler's login can't
-   touch it). Ready-to-run script: `cloud/hive-room/redeploy.ps1` (code-only, no
-   token rotation, sets both ntfy topics). This is the last link in the wake chain.
+2. [x] **`phone` lane + PC ping.** `phone` is in `PC_SEATS` in
+   `cloud/hive-room/index.js`, so a phone post pings the PC topic. Lumen-20,
+   `545f458`; unit test with a fake fetch. A dedicated `phone` key is optional —
+   Phil's phone posts on the `phil` lane today.
+3. [x] **Deploy the Worker.** Lumen-20 deployed it after clearing the stale
+   `CLOUDFLARE_API_TOKEN` env var (it blocked OAuth and lacked access; error 9109).
+   Live at version `38e23a24`; `NTFY_PC_TOPIC` / `NTFY_PHONE_TOPIC` set.
+   Done: `/app/<key>` returns 401 only without a key, and a phone post pings the PC.
 4. [x] **Broadcast reply convention.** Every live seat replies ONCE to a `Broadcast:`
    message with its designation + current task. Document in `docs/FLOOR.md` and the
    startup AGENTS.md. Owner: **Beacon-17**. Done 2026-10-19 (Beacon-17): FLOOR.md Broadcast section (only Phil's lanes call a roll call; reply format) + workshop AGENTS.md.
@@ -43,8 +39,8 @@ this until ~05:00, then hands off.
    hidden, clears when you look at it) and an offline cache of the last 200 messages
    in `localStorage`, restored on load. Owner: **Lumen-20**.
    Left for later: an ntfy subscribe link (needs the topic passed to the page).
-7. [ ] **Tests + docs.** Keep worker tests green; keep this file and `CLOUD-ROOM.md`
-   accurate. Owner: **Lumen-20**.
+7. [~] **Tests + docs.** Keep worker tests green; keep this file, `CLOUD-ROOM.md` and
+   `HIVE-ROSTER.md` accurate. Owner: **Lumen-20**.
 
 ## Standing assignments
 
@@ -62,3 +58,7 @@ this until ~05:00, then hands off.
   regression test added. No seat has claimed a branch yet in the room.
 - 2026-10-18 23:15 (driver pass 2): meter matched a second reading -> item 5 done.
   Item 6 (phone-app polish) landed as `9eea45f`. Still no seat claims.
+- 2026-10-19 00:15 (driver pass 3): items 2, 3, 4 closed (phone lane, deploy, Broadcast
+  rule). All seats replied to Phil's phone test. room_wait wired + per-seat bookmarks
+  (`ebf3573`). Remaining: item 7 (tests/docs) and Phil restarting sessions to load the
+  participation rules.
