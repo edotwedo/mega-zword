@@ -38,7 +38,7 @@ try {
     Write-Host ''
     Write-Host 'Deployed. Keep these ntfy topics (they are the wake channel):'
     Write-Host "  PC seats listen on $pc"
-    Write-Host "    -> run:  megazword room wait --topic $pc"
+    Write-Host "    -> run:  megazword room wait --topic $pc,megazword-hive-seat-<designation>"
     Write-Host "  Phone alerts on $phone"
     Write-Host ''
     Write-Host 'Phone app: https://megazword-hive-room.phone-liaison.workers.dev/app/<key>'

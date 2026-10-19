@@ -38,7 +38,9 @@ def test_ladder_and_persistent_once_only_steps(tmp_path):
         actions += watch.run_pass(room, START + timedelta(minutes=minute), ROSTER,
                                   state, "pc", "phone", lambda *args: sends.append(args))
     assert [(a.step, a.seat) for a in actions] == [(1, ROSTER[0]), (2, ROSTER[1]), (3, None)]
-    assert sends == [("pc", "hive:1"), ("pc", "hive:1"), ("phone", watch.PHONE_BODY)]
+    assert sends == [(watch.seat_topic(ROSTER[0]), "hive:1"),
+                     (watch.seat_topic(ROSTER[1]), "hive:1"),
+                     ("phone", watch.PHONE_BODY)]
     assert all(SECRET not in body for _, body in sends)
     assert json.loads(state.read_text()) == {"1": [1, 2, 3]}
 
@@ -52,7 +54,7 @@ def test_answer_at_seven_stops_after_first_step(tmp_path):
     assert len(run(5)) == 1
     room.messages.append(message("codex", "Beacon-17: on it", 7, 2))
     assert run(10) == run(15) == []
-    assert sends == [("pc", "hive:1")]
+    assert sends == [(watch.seat_topic("Beacon-17"), "hive:1")]
 
 
 def test_old_calls_never_escalate_so_a_first_run_cannot_flood_the_phone():
@@ -122,6 +124,14 @@ def test_failed_send_is_not_bookmarked(tmp_path):
         watch.run_pass(FakeRoom([message()]), START + timedelta(minutes=5),
                        ROSTER, path, "pc", "phone", fail)
     assert not path.exists()
+
+
+def test_seat_steps_page_only_that_seat_topic(tmp_path):
+    sends = []
+    watch.run_pass(FakeRoom([message()]), START + timedelta(minutes=5), ROSTER,
+                   tmp_path / "s.json", "pc", "phone", lambda *a: sends.append(a))
+    assert sends == [(watch.seat_topic("Beacon-17"), "hive:1")]
+    assert "beacon-17" in sends[0][0]
 
 
 def test_phone_only_configuration_skips_seat_sends(tmp_path):

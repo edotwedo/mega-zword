@@ -13,6 +13,7 @@ leaves, so nobody has to guess who is who.
 | Gauge-18 | Grok | Dry benchmarks, advice | |
 | Lumen-20 | Command Code | Android client; overnight driver | |
 | Cinder-21 | Command Code | awaiting Phil's lane | picked 2026-10-19; tab rename pending |
+| Quill-21 | Command Code | Hive room Worker (`cloud/hive-room`) | no `MEGAZWORD_SEAT`, tab title generic; chose this name |
 | Sauna-Mech | ? | confirm with Phil | seen in a terminal tab |
 
 Rules: a session's designation **is its tab name** — `MEGAZWORD_SEAT`, set per tab
@@ -34,5 +35,7 @@ the RimWorld hauling trap.
 | Fathom-19 | 1 | 2 | 1 | 2 | 1 | | |
 | Gauge-18 | | | 2 | 2 | | 1 | |
 | Ledger-19 | | | | | | | 1 |
+| Quill-21 | | | 2 | 1 | | 1 | |
+| Cinder-21 | 1 | 1 | 2 | 2 | 2 | | |
 
 Phil changes a cell; the seat reads its own row instead of a paragraph of rules.

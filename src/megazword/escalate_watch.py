@@ -15,7 +15,7 @@ from pathlib import Path
 from . import config
 from .filelock import locked, write_atomic
 from .room import DEFAULT_ROOM, RemoteRoom, room_dir
-from .room_wait import PHIL_AUTHORS
+from .room_wait import PHIL_AUTHORS, seat_topic
 
 DESIGNATION = re.compile(r"^[A-Za-z]+-\d+\b")
 ROSTER = Path(__file__).resolve().parents[2] / "docs" / "HIVE-ROSTER.md"
@@ -127,7 +127,11 @@ def run_pass(room_obj, now, roster, state_path: Path, pc_topic: str,
         actions = escalate(room_obj.cached(), now, roster, planned)
         sent = []
         for action in actions:
-            topic = pc_topic if action.step < 3 else phone_topic
+            if action.step < 3:
+                # Page the one seat whose turn it is, not the whole PC.
+                topic = (seat_topic(action.seat) or pc_topic) if pc_topic else ""
+            else:
+                topic = phone_topic
             if not topic:
                 continue
             sender(topic, action.body)

@@ -83,6 +83,12 @@ def wait_for_phil(room_obj, topic: str, state_path: Path,
         delay = min(delay * 2, MAX_DELAY)
 
 
+def seat_topic(seat: str) -> str:
+    """Deterministic per-seat ntfy topic, so escalation can page one seat."""
+    slug = re.sub(r"[^a-z0-9]+", "-", (seat or "").strip().lower()).strip("-")
+    return f"megazword-hive-seat-{slug}" if slug else ""
+
+
 def default_state(room: str) -> Path:
     """Per-seat bookmark, so one waiter cannot consume another seat's messages."""
     seat = os.environ.get("MEGAZWORD_SEAT") or f"pid-{os.getpid()}"

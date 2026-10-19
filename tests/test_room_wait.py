@@ -103,6 +103,21 @@ def test_main_prints_each_message(tmp_path, monkeypatch, capsys):
     assert "[chatgpt]" in out
 
 
+def test_multiple_topics_share_one_subscription(tmp_path, monkeypatch):
+    monkeypatch.setattr(room_wait.config, "HOME", tmp_path)
+    seen = {}
+
+    def opener(url, timeout=None):
+        seen["url"] = url
+        return FakeStream([line("message", "hive:1")])
+
+    room_obj = FakeRoom([], [msg("phil", 1)])
+    got = room_wait.wait_for_phil(room_obj, "shared,seat-topic", tmp_path / "s.json",
+                                  opener=opener, sleep=lambda s: None)
+    assert seen["url"] == "https://ntfy.sh/shared,seat-topic/json"
+    assert [m.remote_id for m in got] == [1]
+
+
 def test_announce_lines_wake_a_seat(tmp_path, monkeypatch):
     monkeypatch.setattr(room_wait.config, "HOME", tmp_path)
     announce = room.RoomMessage(time="2026-10-19T00:00", author="floor",

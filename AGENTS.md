@@ -97,9 +97,11 @@ with, not a chatroom bot. Every session:
    session; never inherit another session's designation.
 2. Join: read the room (`megazword room show --room hive -n 20`) and post ONE line:
    `<designation>: online - <current task>`. Coordination, not a greeting.
-3. Listen: while idle, run `megazword room wait --topic megazword-hive-pc-pqymb6` so
-   a Broadcast wakes you. If you cannot run it, read the room at the start of every
-   reply.
+3. Listen: while idle, run
+   `megazword room wait --topic megazword-hive-pc-pqymb6,megazword-hive-seat-<your-designation>`
+   (designation lowercased, e.g. `megazword-hive-seat-beacon-17`) so Broadcasts and
+   escalation pages wake you. If you cannot run it, read the room at the start of
+   every reply.
 4. Respond: when Phil posts (including `Broadcast:` / `broadcasttohive:`), answer
    once, starting with your designation. Never answer another bot's status or ack.
 5. Claim: before editing shared work post `<designation>: claiming <item/branch>`;
