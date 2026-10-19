@@ -1,5 +1,6 @@
 """Reports stay factual, bounded, local, and readable without model calls."""
 
+import io
 import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -138,3 +139,17 @@ def test_unwritable_status_does_not_fail_the_job(tmp_path, monkeypatch, capsys):
 
     assert run("sent", "Task", [], None, SimpleNamespace(project="mega-zword"), None, False) == 0
     assert "could not save session report: OSError" in capsys.readouterr().err
+
+
+def test_brief_survives_a_redirected_cp1252_console(tmp_path, monkeypatch):
+    """A redirected Windows console is cp1252; a card with an emoji or arrow must
+    not crash `megazword brief` (it used to raise UnicodeEncodeError)."""
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    briefing.publish({"seat": "emoji", "doing": "ship it 😀 → done", "next": "push"}, tmp_path, NOW)
+    sink = io.BytesIO()
+    stream = io.TextIOWrapper(sink, encoding="cp1252")
+    monkeypatch.setattr(cli.sys, "stdout", stream)
+    assert cli.main(["brief"]) == 0
+    stream.flush()
+    written = sink.getvalue()
+    assert b"emoji" in written and b"\x3f" in written  # unencodable chars became '?'

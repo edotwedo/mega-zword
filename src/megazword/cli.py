@@ -360,11 +360,23 @@ def launch_app() -> None:
                      start_new_session=os.name != "nt", close_fds=True)
 
 
+def tolerant_console() -> None:
+    """A redirected Windows console is cp1252 and cannot encode every character a
+    command prints (session cards, emoji, arrows), which crashed `megazword brief`.
+    Replace the unencodable ones instead. No-op where reconfigure is unavailable."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError, OSError):  # io.UnsupportedOperation is a ValueError
+            pass
+
+
 def main(argv: list[str] | None = None,
          backends: dict[str, Backend] | None = None,
          cfg: config.Config | None = None,
          rater: Callable[[str], Rating] | None = None,
          statuses: Callable[[], dict] | None = None) -> int:
+    tolerant_console()
     if argv is None:  # real CLI run, not a test calling main([...])
         config.load_user_env()
     args = build_parser().parse_args(argv)

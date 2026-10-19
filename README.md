@@ -8,6 +8,13 @@ Gemini has two separate identities: `gemini-api` is the Google AI Studio Develop
 
 **Status:** Beta 1 (v0.1.0b1, 2026-10-11). Tested on Windows; CI runs on Windows and Linux.
 
+## Where development happens
+
+Mega Zword is built and coordinated on a private Gitea instance. **This GitHub repository is
+the finished, public side of the project** — it carries production snapshots, tagged releases
+and open-source sharing. It intentionally trails the working repo, so treat the latest tag here
+as the stable copy and expect `main` to lag behind active development.
+
 ## What's new in Beta 3.0
 
 - **Hive floor:** seats for each AI, peek/wait on the shared floor (`megazword floor`).
