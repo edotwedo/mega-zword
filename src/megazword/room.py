@@ -482,7 +482,11 @@ class RemoteRoom:
             raise ValueError("room URL must be an HTTPS origin without credentials, path or query")
         if not re.fullmatch(r"[a-z0-9-]{1,64}", room):
             raise ValueError("remote room names use lowercase a-z, digits and - (1-64 characters)")
-        self.token = get_key("HIVE_ROOM_TOKEN")
+        # Prefer this seat's own lane key so posts carry the real designation;
+        # fall back to the shared HIVE_ROOM_TOKEN (all PC seats share one slot today).
+        seat = (os.environ.get("MEGAZWORD_SEAT") or "").strip()
+        own = get_key("HIVE_ROOM_KEY_" + seat.replace("-", "_").upper()) if seat else None
+        self.token = own or get_key("HIVE_ROOM_TOKEN")
         if not self.token:
             raise ValueError("HIVE_ROOM_TOKEN missing: set it in Keymaster or environment secrets")
         self.room, self.home = room, home
