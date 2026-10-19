@@ -144,6 +144,99 @@ const rpc = (method, params, id = 1, path = '/mcp', headers = {}) =>
   call('POST', path, {jsonrpc: '2.0', id, method, ...(params === undefined ? {} : {params})}, headers);
 const invoke = (name, args = {}, headers = {}) => rpc('tools/call', {name, arguments: args}, 1, '/mcp', headers);
 
+test('second different claim by the same designation is refused regardless of lane', async () => {
+  assert.equal((await call('POST', undefined, {text: 'Beacon-17: claiming #3'})).status, 201);
+  const res = await call('POST', undefined, {text: 'beacon-17: claiming #4'});
+  assert.equal(res.status, 409);
+  assert.deepEqual(await res.json(), {error: "Beacon-17 has open claim '#3'; post 'Beacon-17: releasing #3' first"});
+  assert.equal(store.rows.length, 1);
+  // Repeating the same claim (including a retry) does not claim different work.
+  assert.equal((await call('POST', undefined, {text: 'Beacon-17: claiming #3'})).status, 201);
+});
+
+test('another designation cannot claim the same numbered item', async () => {
+  await call('POST', undefined, {text: 'Beacon-17: claiming #3 server'});
+  assert.equal((await call('POST', undefined, {text: 'Birch-18: claiming item 3 tests'})).status, 409);
+  assert.equal((await call('POST', undefined, {text: 'Birch-18: claiming #30'})).status, 201);
+});
+
+test('release then claim succeeds, including another seats numbered completion', async () => {
+  for (const release of ['releasing #3', 'released #3', 'dropping #3', 'dropped #3',
+    'landed #3', 'done #3', 'complete #3', 'completed #3', 'merged #3', 'shipped #3', 'pushed #3', 'fixed #3']) {
+    store = new FakeStore();
+    await call('POST', undefined, {text: 'Beacon-17: claiming #3'});
+    await call('POST', undefined, {text: `Beacon-17: ${release}`});
+    assert.equal((await call('POST', undefined, {text: 'Beacon-17: claiming #4'})).status, 201, release);
+  }
+  store = new FakeStore();
+  await call('POST', undefined, {text: 'Beacon-17: claiming #3'});
+  await call('POST', undefined, {text: 'Birch-18: completed #3'});
+  assert.equal((await call('POST', undefined, {text: 'Beacon-17: claiming #4'})).status, 201);
+});
+
+test('negated or unrelated completion does not release a claim', async () => {
+  await call('POST', undefined, {text: 'Beacon-17: claiming #3'});
+  for (const body of ['#3 is not done yet', '#3 hasnt shipped', 'done #4']) {
+    await call('POST', undefined, {text: `Beacon-17: ${body}`});
+    assert.equal((await call('POST', undefined, {text: 'Birch-18: claiming #3'})).status, 409);
+  }
+});
+
+test('claims older than 24 hours are ignored', async () => {
+  await store.add('hive', 'a-lane', 'Beacon-17: claiming #3', 'old', new Date(Date.now() - 86400001));
+  assert.equal((await call('POST', undefined, {text: 'Beacon-17: claiming #4'})).status, 201);
+  assert.equal((await call('POST', undefined, {text: 'Birch-18: claiming #3'})).status, 201);
+});
+
+test('lane labels are parsed and designation comes only from text', async () => {
+  await call('POST', undefined, {text: 'Beacon-17 (claude-pc): claiming #3'});
+  const res = await call('POST', undefined, {text: 'Beacon-17 (chatgpt): claiming #4'});
+  assert.equal(res.status, 409);
+  assert.match((await res.json()).error, /^Beacon-17 has open claim/);
+  assert.equal((await call('POST', undefined, {text: 'Birch-18 (claude-pc): claiming #4'})).status, 201);
+});
+
+test('MCP post_message shares the REST claim check and returns a tool error', async () => {
+  await invoke('post_message', {text: 'Beacon-17: claiming #3'});
+  const {result} = await (await invoke('post_message', {text: 'Birch-18: claiming #3'})).json();
+  assert.equal(result.isError, true);
+  assert.equal(result.content[0].text, "Beacon-17 has open claim '#3'; post 'Beacon-17: releasing #3' first");
+  assert.equal(store.rows.length, 1);
+});
+
+test('--force bypasses checks and the newest claim replaces the old claim', async () => {
+  await call('POST', undefined, {text: 'Beacon-17: claiming #3'});
+  assert.equal((await call('POST', undefined, {text: 'Beacon-17: claiming --force #4'})).status, 201);
+  assert.equal((await call('POST', undefined, {text: 'Birch-18: claiming #3'})).status, 201);
+  assert.equal((await call('POST', undefined, {text: 'Cedar-19: claiming #4'})).status, 409);
+  const {result} = await (await invoke('post_message', {text: 'Cedar-19: claiming --force #4'})).json();
+  assert.ok(!result.isError);
+});
+
+test('claim parsing matches ownership verbs, first line and first sentence rules', async () => {
+  for (const verb of ['claim', 'claiming', 'take', 'taking', 'reserve', 'reserving', 'grab', 'grabbing', 'owning']) {
+    store = new FakeStore();
+    await call('POST', undefined, {text: `Beacon-17: ${verb} #3. Also landed #4\n#5`});
+    assert.equal((await call('POST', undefined, {text: 'Birch-18: claiming #3'})).status, 409, verb);
+    assert.equal((await call('POST', undefined, {text: 'Cedar-19: claiming #5'})).status, 201, verb);
+  }
+});
+
+test('normal posts do not read claims and claim history is scoped to the latest 200 in the room', async () => {
+  const latest = store.latest.bind(store);
+  store.latest = () => { throw new Error('must not read for non-claims'); };
+  for (const text of ['hi', 'Beacon-17: taking conductor', 'claiming #3', 'Beacon-17: note\nclaiming #3'])
+    assert.equal((await call('POST', undefined, {text})).status, 201);
+  store.latest = async (room, limit) => {
+    assert.equal(room, 'hive'); assert.equal(limit, 200);
+    return latest(room, limit);
+  };
+  await store.add('other', 'lane', 'Beacon-17: claiming #3', 'other', new Date());
+  await store.add('hive', 'lane', 'Beacon-17: claiming #3', 'old', new Date());
+  for (let i = 0; i < 200; i++) await store.add('hive', `lane-${i}`, 'ordinary note', String(i), new Date());
+  assert.equal((await call('POST', undefined, {text: 'Beacon-17: claiming #4'})).status, 201);
+});
+
 test('MCP initialize negotiates supported versions and defaults', async () => {
   for (const version of ['2025-06-18', '2025-03-26', 'unknown']) {
     const res = await rpc('initialize', {protocolVersion: version});

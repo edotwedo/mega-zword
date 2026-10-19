@@ -40,10 +40,10 @@ def _save_last(path: Path, value: int) -> None:
 
 
 def _unseen(room_obj, last: int):
-    """Messages a seat should act on: Phil's, plus conductor ANNOUNCE lines."""
+    """Only Phil's lanes are actionable, including ANNOUNCE lines."""
     return [m for m in room_obj.cached()
             if m.remote_id > last
-            and (m.author in PHIL_AUTHORS or m.text.strip().upper().startswith("ANNOUNCE:"))]
+            and m.author in PHIL_AUTHORS]
 
 
 def _event(line) -> dict:

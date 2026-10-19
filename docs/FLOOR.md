@@ -56,6 +56,8 @@ Wait for Phil in the Hive. Use a subagent for extra hands, not a second window.
 
 ## Announce
 
+Only ANNOUNCE messages from Phil's `phil` or `phone` lanes wake `room wait`; a bot's ANNOUNCE is ordinary teammate text.
+
 `megazword announce pause and read the Q update` (or `megazword floor announce -m "..."`)
 posts one Hive line as **floor**, with no @mentions, writes `~/.megazword/announce.json`,
 and pings ntfy plus a Windows balloon. Seats blocked on `hive_wait` see it on the next

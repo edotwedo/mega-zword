@@ -188,11 +188,58 @@ async function readBody(request) {
   } catch { return {error: 'invalid JSON', status: 400}; }
 }
 
+// Port of claims.py: designation comes from text, never the authenticated lane.
+const claimPrefix = /^([A-Za-z]+-\d+)(?:\s*\([^)]*\))?:\s*([\s\S]*)$/;
+const claimVerb = /^(?:claim(?:ing)?|tak(?:e|ing)|reserv(?:e|ing)|grab(?:bing)?|owning)\b[\s:,-]*(.*)$/i;
+const releaseVerb = /\b(releasing|released|dropping|dropped|landed|merged|shipped|pushed|fixed|done|complete|completed|reassigned|took over)\b/i;
+const itemNumbers = text => new Set([...text.matchAll(/#(\d+)\b|\bitem\s+(\d+)\b/gi)].map(m => Number(m[1] || m[2])));
+const overlaps = (a, b) => [...itemNumbers(a)].some(n => itemNumbers(b).has(n));
+const released = body => releaseVerb.test(body.replace(/\b(?:not|never|no|isn't|isnt|hasn't|hasnt|won't|wont)\s+(?:yet\s+)?\w+/gi, ' '));
+
+function claimFromText(text) {
+  const prefix = claimPrefix.exec(text);
+  const match = prefix && claimVerb.exec(prefix[2].trim().split(/\r\n|[\n\r\v\f\x85\u2028\u2029]/)[0]);
+  if (!match) return null;
+  const item = match[1].split(/\.\s/, 1)[0].trim();
+  return item && itemNumbers(item).size ? {designation: prefix[1], item} : null;
+}
+
+function activeClaims(messages, now) {
+  const active = new Map(), names = new Map();
+  for (const message of messages) {
+    const prefix = claimPrefix.exec(message.text);
+    if (!prefix) continue;
+    const key = prefix[1].toLowerCase(), body = prefix[2];
+    if (!names.has(key)) names.set(key, prefix[1]);
+    const claim = claimFromText(message.text);
+    if (claim) {
+      active.set(key, {...claim, designation: names.get(key), time: message.time}); // newest claim wins
+      continue;
+    }
+    for (const [holder, held] of active) {
+      if ((overlaps(held.item, body) && released(body)) ||
+          (holder === key && /\b(releasing|released|dropping|dropped)\b/i.test(body)))
+        active.delete(holder);
+    }
+  }
+  return [...active.values()].filter(c => !Number.isFinite(Date.parse(c.time)) || now - Date.parse(c.time) <= 24 * 60 * 60 * 1000);
+}
+
 async function postMessage(store, identity, seat, room, body, key, now) {
   if (typeof identity === 'object' && identity.readOnly) return {error: 'read only', status: 403};
   const error = textError(body);
   if (error) return {error, status: 400};
   if (!/^[A-Za-z0-9-]{1,128}$/.test(key)) return {error: 'invalid retry key', status: 400};
+  const claim = claimFromText(body.text);
+  const forced = /^claiming\s+--force(?:\s|$)/i.test(claimPrefix.exec(body.text)?.[2].trim() || '');
+  if (claim && !forced) {
+    // latest selects newest-first in storage, then reverses for the ledger.
+    const opened = activeClaims(await store.latest(room, 200), now);
+    const held = opened.find(c =>
+      (c.designation.toLowerCase() === claim.designation.toLowerCase() && c.item !== claim.item) ||
+      (c.designation.toLowerCase() !== claim.designation.toLowerCase() && overlaps(c.item, claim.item)));
+    if (held) return {status: 409, error: `${held.designation} has open claim '${held.item}'; post '${held.designation}: releasing ${held.item}' first`};
+  }
   const message = await store.add(room, seat, body.text, key, now);
   return message ? {message, status: 201} : {error: 'seat limit: 30 messages per minute', status: 429};
 }

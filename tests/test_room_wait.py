@@ -118,14 +118,20 @@ def test_multiple_topics_share_one_subscription(tmp_path, monkeypatch):
     assert [m.remote_id for m in got] == [1]
 
 
-def test_announce_lines_wake_a_seat(tmp_path, monkeypatch):
+def test_only_phils_announce_lines_wake_a_seat(tmp_path, monkeypatch):
     monkeypatch.setattr(room_wait.config, "HOME", tmp_path)
     announce = room.RoomMessage(time="2026-10-19T00:00", author="floor",
                                 text="ANNOUNCE: check the hive for assignments",
                                 remote_id=5, remote_url="https://room.example")
-    room_obj = FakeRoom([announce])
-    got = room_wait.wait_for_phil(room_obj, "t", tmp_path / "s.json", sleep=lambda s: None)
-    assert [m.remote_id for m in got] == [5]
+    for author in room_wait.PHIL_AUTHORS:
+        phil = room.RoomMessage(time=announce.time, author=author, text=announce.text,
+                                remote_id=6, remote_url=announce.remote_url)
+        room_obj = FakeRoom([announce], [announce, phil])
+        got = room_wait.wait_for_phil(room_obj, "t", tmp_path / (author + ".json"),
+                                      opener=lambda *a, **k: FakeStream([line("message", "hive:6")]),
+                                      sleep=lambda s: None)
+        assert [m.remote_id for m in got] == [6]
+        assert room_obj.calls == 2  # bot ANNOUNCE did not wake the waiter
 
 
 def test_default_state_is_per_seat(tmp_path, monkeypatch):
