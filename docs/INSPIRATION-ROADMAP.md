@@ -33,11 +33,10 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
    result is still whole in the history, else the cached text; no disk re-read.
 4. [ ] **`megazword job cost ID` (#13).** One command prints tokens and steps per model
    for a saved job, from `log.jsonl`. New module + tests.
-5. [ ] **Repo map (#17).** Regex-based ranked map of key symbols (~1-2k tokens) offered
-   to models instead of file dumps. New `src/megazword/repo_map.py` + tests + one
-   prompt hook.
-   Module done (Juniper-16, 2026-10-19): `megazword map [focus...] [--root] [--chars]`,
-   ~5k chars for this repo. Prompt hook still to do, after #1 lands in `agent.py`.
+5. [x] **Repo map (#17).** Regex-based ranked map of key symbols offered to models
+   instead of file dumps. Module by Juniper-16 (`megazword map`); prompt hook by
+   Lumen-20 (`81b4f2d`): 6k chars, built once per job, focused by task words, and
+   cache-stable in `agent.py`.
 6. [x] **RimWorld priority grid (#14).** Seats x work types in one table Phil can edit.
    Done 2026-10-19: grid added to `docs/HIVE-ROSTER.md`.
 7. [x] **Powerwall reserve (#8).** `megazword usage` appends each metered AI's
