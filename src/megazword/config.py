@@ -61,16 +61,19 @@ DEFAULT_ROUTE = {
     # picks the order: least-used free source in the last 24 hours first,
     # Tencent's one-time grants at a quarter share except on hard work
     # (Phil, 2026-10-16: "a tiny bit from every free source").
+    # Command Code (cmd-*) is Phil's $10/month GOAT plan: prepaid, use it.
     # Gemini (agy) is left out on purpose: she's Phil's advisor and chat partner,
     # used only when picked with -m gemini (Phil, 2026-10-18).
     "easy": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
              "tencent-kimi-k2.7-code", "tencent-kimi-k3",
              "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
+             "cmd-deepseek-flash", "cmd-glm-flash", "cmd-ling-flash", "cmd-hy3", "cmd-qwen-27b", "cmd-laguna", "cmd-cat-jam", "cmd-beam",
              "mistral", "gemini-api", "openrouter", "groq", "cloudflare",
              "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "nvidia", "nvidia-lightning", "ollama", "grok", "codex", "claude"],
     "medium": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
                "tencent-kimi-k2.7-code", "tencent-kimi-k3",
                "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
+             "cmd-deepseek-flash", "cmd-glm-flash", "cmd-ling-flash", "cmd-hy3", "cmd-qwen-27b", "cmd-laguna", "cmd-cat-jam", "cmd-beam",
                "openrouter", "groq",
                "cloudflare", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "gemini-api",
                "mistral", "nvidia", "nvidia-lightning", "ollama", "cheap-deepseek-flash",
@@ -78,6 +81,7 @@ DEFAULT_ROUTE = {
     "hard": ["tencent-glm-5.3-flash", "tencent-glm-5.3",
              "tencent-kimi-k2.7-code", "tencent-kimi-k3",
              "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
+             "cmd-deepseek-flash", "cmd-glm-flash", "cmd-ling-flash", "cmd-hy3", "cmd-qwen-27b", "cmd-laguna", "cmd-cat-jam", "cmd-beam",
              "openrouter", "groq",
              "cloudflare", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "gemini-api",
              "mistral", "nvidia", "nvidia-lightning", "ollama", "cheap-deepseek-pro",
@@ -132,12 +136,21 @@ DEFAULT_FREE = {
     # The free account returns 429/code 1300 for Mistral Small but allows
     # Ministral 3B under the same key and API limits (verified 2026-10-14).
     "mistral": "ministral-3b-2512",
+    "cmd-deepseek-flash": "deepseek/deepseek-v4.1-flash",
+    "cmd-glm-flash": "z-ai/glm-5.3-flash",
+    "cmd-ling-flash": "inclusionai/ling-3.1-flash",
+    "cmd-hy3": "tencent/hy3-paid",
+    "cmd-qwen-27b": "Qwen/Qwen3.8-27B",
+    "cmd-laguna": "poolside/laguna-s-2.1-free",
+    "cmd-cat-jam": "stealth/cat-jam:free",
+    "cmd-beam": "reflection/beam:free",
 }
 
 DEFAULT_FREE_FAILOVER = ["tencent-glm-5.3-flash", "tencent-glm-5.3",
                          "tencent-kimi-k2.7-code", "tencent-kimi-k3",
                          "tencent-deepseek-v4-pro",
                          "tencent-deepseek-v4-flash-vision-exp",
+                         "cmd-deepseek-flash", "cmd-glm-flash", "cmd-ling-flash", "cmd-hy3", "cmd-qwen-27b", "cmd-laguna", "cmd-cat-jam", "cmd-beam",
                          "openrouter", "groq", "groq-120b", "groq-qwen",
                          "cloudflare", "zai", "zai-47", "ovh", "ovh-120b", "ovh-qwen", "kilo", "kilo-cohere", "kilo-nemotron", "gemini-api",
                          "gemini-api-31-lite",
@@ -154,7 +167,7 @@ USER_ENV_KEYS = (
     "GROQ_API_KEY", "OPENROUTER_API_KEY", "CLOUDFLARE_API_TOKEN",
     "CLOUDFLARE_ACCOUNT_ID", "ZAI_API_KEY", "GOOGLE_AI_API_KEY",
     "NVIDIA_API_KEY", "MISTRAL_API_KEY", "CEREBRAS_API_KEY",
-    "TENCENT_TOKENHUB_API_KEY",
+    "TENCENT_TOKENHUB_API_KEY", "COMMANDCODE_API_KEY",
     "HIVE_ROOM_TOKEN",
 )
 

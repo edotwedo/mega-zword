@@ -145,7 +145,9 @@ HISTORY_CHARS = 90_000
 SMALL_HISTORY = {"groq": 24_000, "cloudflare": 24_000, "mistral": 24_000, "ollama": 24_000,
                  # One-time grants: a 90k history resent for 60 steps is ~1.3M tokens, more
                  # than a whole 1M Tencent grant (2026-10-17: six grants gone in two nights).
-                 "tencent": 40_000}
+                 "tencent": 40_000,
+                 # Command Code GOAT credits are a monthly allowance; same care.
+                 "cmd": 40_000}
 # Condense history into a progress note this often, whatever its size, so a long
 # job's resend cost stays flat instead of growing every step (Phil, 2026-10-18).
 COMPACT_EVERY = 10

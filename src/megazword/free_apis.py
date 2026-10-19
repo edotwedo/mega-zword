@@ -491,6 +491,14 @@ FREE_KEYS = (
     ("tencent-deepseek-v4-pro", "TENCENT_TOKENHUB_API_KEY"),
     ("tencent-deepseek-v4-flash-vision-exp", "TENCENT_TOKENHUB_API_KEY"),
     ("mistral", "MISTRAL_API_KEY"),
+    ("cmd-deepseek-flash", "COMMANDCODE_API_KEY"),
+    ("cmd-glm-flash", "COMMANDCODE_API_KEY"),
+    ("cmd-ling-flash", "COMMANDCODE_API_KEY"),
+    ("cmd-hy3", "COMMANDCODE_API_KEY"),
+    ("cmd-qwen-27b", "COMMANDCODE_API_KEY"),
+    ("cmd-laguna", "COMMANDCODE_API_KEY"),
+    ("cmd-cat-jam", "COMMANDCODE_API_KEY"),
+    ("cmd-beam", "COMMANDCODE_API_KEY"),
 )
 
 
@@ -563,6 +571,22 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
             ("tencent-deepseek-v4-pro", "deepseek-v4-pro"),
             ("tencent-deepseek-v4-flash-vision-exp",
              "deepseek/deepseek-v4-flash-vision-exp"),
+        )],
+        # Command Code GOAT plan, $10/month prepaid credits (Phil, 2026-10-18).
+        # One key; per-model monthly allowances. Stealth/free previews may train.
+        *[OpenAICompatibleBackend(
+            name, base_url="https://api.commandcode.ai/provider/v1",
+            model=m.get(name, model), key_env="COMMANDCODE_API_KEY",
+            trains_on_data=trains,
+        ) for name, model, trains in (
+            ("cmd-deepseek-flash", "deepseek/deepseek-v4.1-flash", False),
+            ("cmd-glm-flash", "z-ai/glm-5.3-flash", False),
+            ("cmd-ling-flash", "inclusionai/ling-3.1-flash", False),
+            ("cmd-hy3", "tencent/hy3-paid", False),
+            ("cmd-qwen-27b", "Qwen/Qwen3.8-27B", False),
+            ("cmd-laguna", "poolside/laguna-s-2.1-free", True),
+            ("cmd-cat-jam", "stealth/cat-jam:free", True),
+            ("cmd-beam", "reflection/beam:free", True),
         )],
         # OpenRouter chooses the serving provider. Its training policy can
         # vary by endpoint (and configured model); unknown means scrub prompts.
