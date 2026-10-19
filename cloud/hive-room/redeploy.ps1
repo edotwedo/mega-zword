@@ -1,4 +1,4 @@
-# Code-only redeploy of the LIVE Hive Worker, plus the two ntfy topics.
+# Code-only redeploy of the LIVE Hive Worker. Preserve existing ntfy topics.
 # Deployments are authorized (Phil, 2026-10-18). This does NOT rotate seat tokens
 # and does NOT touch D1 data, so existing connectors keep working.
 #
@@ -21,25 +21,14 @@ try {
     $env:CLOUDFLARE_ACCOUNT_ID = $null
     Write-Host 'Signing in to Cloudflare (opens a browser if needed)...'
     npx --yes wrangler@4 login
+    if ($LASTEXITCODE -ne 0) { throw 'Cloudflare login failed; deploy stopped.' }
     Write-Host 'Deploying Worker code (no token rotation)...'
     npx --yes wrangler@4 deploy --config wrangler.local.json
     if ($LASTEXITCODE -ne 0) { throw 'Deploy failed; nothing changed.' }
 
-    $alphabet = (48..57) + (97..122)
-    function New-Topic([string]$prefix) {
-        $suffix = -join (1..6 | ForEach-Object { [char]($alphabet | Get-Random) })
-        return "$prefix-$suffix"
-    }
-    $pc = New-Topic 'megazword-hive-pc'
-    $phone = New-Topic 'megazword-hive-phone'
-    $pc | npx --yes wrangler@4 secret put NTFY_PC_TOPIC --config wrangler.local.json
-    $phone | npx --yes wrangler@4 secret put NTFY_PHONE_TOPIC --config wrangler.local.json
-
     Write-Host ''
-    Write-Host 'Deployed. Keep these ntfy topics (they are the wake channel):'
-    Write-Host "  PC seats listen on $pc"
-    Write-Host "    -> run:  megazword room wait --topic $pc,megazword-hive-seat-<designation>"
-    Write-Host "  Phone alerts on $phone"
+    Write-Host 'Deployed. Existing notification topics and seat tokens were preserved.'
+    Write-Host 'PC seats keep listening on their configured topic; no reconnect is needed.'
     Write-Host ''
     Write-Host 'Phone app: https://megazword-hive-room.phone-liaison.workers.dev/app/<key>'
     Write-Host '  Open it in Chrome, then Add to Home Screen. Any valid seat key works.'
