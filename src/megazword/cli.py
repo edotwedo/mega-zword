@@ -141,13 +141,13 @@ def build_parser() -> argparse.ArgumentParser:
     route_preview.add_argument("--budget-usd", type=float, default=0.0,
                                help="simulated per-task spend ceiling (default: $0)")
     route_preview.add_argument("--reliability-floor", type=float,
-                               help="override the task's minimum 95% lower-bound reliability (0..1)")
+                               help="override the task's minimum 95%% lower-bound reliability (0..1)")
     route_preview.add_argument("--no-remote", action="store_true",
                                help="exclude remote candidates, including free hosted APIs")
     route_preview.add_argument("--approve", action="store_true",
                                help="approve the selected simulated route and run local verification")
     route_actions.add_parser("benchmark", help="run reproducible synthetic routing benchmark")
-    sub.add_parser("spot", help="warn before an AI hits the 20% floor and hand off")
+    sub.add_parser("spot", help="warn before an AI hits the 20%% floor and hand off")
     sub.add_parser("start", help="text start screen (plain `megazword` opens the app window)")
     sub.add_parser("projects", help="list projects with memory entries and last activity")
     sub.add_parser("advise", help="suggest a route order from stats and votes (changes nothing)")
