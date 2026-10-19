@@ -25,10 +25,12 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
    `call ID` or `message ID`. State is saved beside the room wait bookmarks.
    Per-seat paging: steps 1-2 target `megazword-hive-seat-<seat>`; a seat listens on
    `shared,megazword-hive-seat-<designation>` (one ntfy subscription, comma-separated).
-3. [~] **Tool-result cache (#10).** `read_file` / `search_files` results cached by
+3. [x] **Tool-result cache (#10).** `read_file` / `search_files` results cached by
    path+mtime per job and reused instead of re-read. `agent.py`.
    Done when: a repeated read returns cached text and `tool_chars` stays flat.
-   Owner: Lumen-20 (agent.py is free after #1 landed).
+   Done 2026-10-19 (Fathom-19, claimed 08:33): an identical read on an unchanged file
+   (mtime+size) or a search with no edit since costs a one-line note while the earlier
+   result is still whole in the history, else the cached text; no disk re-read.
 4. [ ] **`megazword job cost ID` (#13).** One command prints tokens and steps per model
    for a saved job, from `log.jsonl`. New module + tests.
 5. [ ] **Repo map (#17).** Regex-based ranked map of key symbols (~1-2k tokens) offered

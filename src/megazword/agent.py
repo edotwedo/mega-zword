@@ -197,6 +197,10 @@ COMPACT_EVERY = 10
 FAIL_NUDGE, FAIL_STOP = 3, 5
 WINDOW_FAILS, WINDOW_SECONDS = 3, 600
 STALE_LIMIT = 400
+# Tool-result cache (INSPIRATION-ROADMAP #3): an identical read_file/search_files call on
+# unchanged files is answered from the job's cache, and with this short note when the
+# earlier result is still whole in the history, so a re-read costs almost nothing.
+CACHE_NOTE = "[unchanged since your identical earlier call; that result is above]"
 SEARCH_HITS = 60  # matching lines returned by one search_files call
 # Total tool output handed back to the model in one step. Re-sending huge results is
 # how a job goes from cents to dollars; low-TPM free tiers get a smaller share.
@@ -322,6 +326,18 @@ class AgentBackend(Backend):
                     yield rel
             if time.monotonic() >= self._deadline:
                 raise TimeoutError("agent wall-clock cap reached")
+
+    def _cache_stamp(self, name, args):
+        """What a cached read_file/search_files result depends on, or None (not cacheable)."""
+        try:
+            if name == "read_file" and isinstance(args.get("path"), str):
+                stat = self._path(args["path"]).stat()
+                return (stat.st_mtime_ns, stat.st_size)
+            if name == "search_files":
+                return self._edits
+        except (OSError, ValueError):
+            pass
+        return None
 
     def _perform(self, name, args, remaining):
         if self.read_only and name not in ('list_files', 'search_files', 'read_file', 'finish'):
@@ -674,6 +690,8 @@ class AgentBackend(Backend):
         self._originals = {}
         self._read_paths = set()
         self._seen_reads = []  # files read, oldest first, for the progress note
+        self._tool_cache = {}  # (tool, args) -> (stamp, result as shown to the model)
+        self._edits = 0  # bumps on every edit or test run; search_files results key on it
         self._last_test = ""
         self._allow_test_edits = (self.allow_test_edits if self.allow_test_edits is not None else
                                  bool(re.search(r"\b(?:tests?|testing|pytest|unittest)\b", prompt, re.I)))
@@ -861,6 +879,7 @@ class AgentBackend(Backend):
                     raise TimeoutError("agent wall-clock cap reached")
                 name = ""
                 bad_protocol = False
+                stamp, cached = None, False
                 try:
                     name = call["function"]["name"]
                     args = json.loads(call["function"]["arguments"])
@@ -871,7 +890,16 @@ class AgentBackend(Backend):
                     repeats = repeats + 1 if signature == previous_call else 1
                     previous_call = signature
                     nudge_finish = nudge_finish or repeats == 3
-                    result = self._perform(name, args, remaining)
+                    stamp = self._cache_stamp(name, args)
+                    hit = self._tool_cache.get(signature) if stamp is not None else None
+                    if hit and hit[0] == stamp:
+                        cached = True
+                        result = (CACHE_NOTE if any(m.get("content") == hit[1] for m in messages)
+                                  else hit[1])
+                    else:
+                        result = self._perform(name, args, remaining)
+                    if name in ("write_file", "replace_in_file", "run_tests"):
+                        self._edits += 1
                     if name in ("write_file", "replace_in_file"):
                         self._event("file edited", file=args["path"])
                 except TimeoutError:
@@ -907,6 +935,8 @@ class AgentBackend(Backend):
                         result = "[tool-output budget for this step is used up; finish or ask again next step]"
                     else:
                         result = _clip_result(result, min(self.max_chars, room))
+                        if stamp is not None and not cached and not failed:
+                            self._tool_cache[signature] = (stamp, result)
                     step_chars += len(result)
                 else:
                     result = result[:self.max_chars]

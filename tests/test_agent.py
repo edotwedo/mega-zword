@@ -868,3 +868,35 @@ def test_clip_result_keeps_head_and_tail():
     out = agent._clip_result(text, 90)
     assert out.startswith("H" * 10) and out.endswith("T" * 10), "keep both ends of a log"
     assert "chars trimmed" in out and len(out) < len(text)
+
+
+def test_repeated_reads_come_from_the_job_cache(tmp_path):
+    """INSPIRATION-ROADMAP #3: a repeat read of an unchanged file costs a short note,
+    not the file again; an edit or a search after an edit is read fresh."""
+    (tmp_path / "a.py").write_text("x = 1\n" * 200)
+    replies = [call("read_file", path="a.py"), call("read_file", path="a.py"),
+               call("search_files", pattern="x ="), call("search_files", pattern="x ="),
+               call("replace_in_file", path="a.py", old="x = 1\n" * 200, new="y = 2\n"),
+               call("read_file", path="a.py"), call("search_files", pattern="x ="),
+               call("finish", summary="done")]
+    loop, model = coding(tmp_path, replies, max_steps=20)
+    events = []
+    loop._event = lambda phase, **d: events.append(d) if phase == "step" else None
+    assert loop.run("job").ok
+    chars = [e["tool_chars"] for e in events]
+    assert chars[1] == len(agent.CACHE_NOTE) and chars[3] == len(agent.CACHE_NOTE)
+    assert chars[0] > 500 and chars[2] > 500
+    last_tool = [m for m in model.seen[-1][0] if m.get("role") == "tool"]
+    assert last_tool[-2]["content"] == "y = 2\n" and last_tool[-1]["content"].startswith("no matches\n")
+
+
+def test_cache_stamps_only_reads_and_searches(tmp_path):
+    (tmp_path / "a.py").write_text("x = 1\n")
+    loop, _ = coding(tmp_path, [])
+    loop.root, loop._edits = tmp_path, 0
+    first = loop._cache_stamp("read_file", {"path": "a.py"})
+    (tmp_path / "a.py").write_text("x = 22\n")
+    assert loop._cache_stamp("read_file", {"path": "a.py"}) != first  # size changed
+    assert loop._cache_stamp("read_file", {"path": "missing.py"}) is None
+    assert loop._cache_stamp("search_files", {"pattern": "x"}) == 0
+    assert loop._cache_stamp("list_files", {"glob": "*"}) is None
