@@ -434,7 +434,7 @@ def main(argv: list[str] | None = None,
         return spot_command(args)
     if args.command == "andon":
         from .andon import command
-        return command(args.state)
+        return command(args.state, " ".join(args.reason))
     if args.command == "keys":
         from .keys import command
         return command(args.action)

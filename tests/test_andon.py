@@ -1,106 +1,122 @@
-"""The andon cord: one switch stops every agent job before its next step.
-
-The point of these tests is that pulling it costs nothing and throws nothing
-away: no step is spent after it goes up, and edits already made stay on disk.
-"""
-
+﻿"""Andon uses local state and scripted jobs; no network or real models."""
 import json
+from datetime import datetime
 
 import pytest
 
-from megazword import agent, andon
-
-
-def flag(tmp_path):
-    return tmp_path / "ANDON"
-
-
-def call(name, **args):
-    return {"tool_calls": [{"id": "c1", "type": "function", "function": {
-        "name": name, "arguments": json.dumps(args)}}]}
-
-
-def backend(replies, after=None):
-    from megazword.free_apis import OpenAICompatibleBackend
-
-    class Scripted2(OpenAICompatibleBackend):
-        def __init__(self):
-            super().__init__("groq")
-            self.replies = iter(replies)
-            self.calls = 0
-
-        def available(self):
-            return True
-
-        def chat(self, messages, tools=None, timeout=None):
-            self.calls += 1
-            reply = next(self.replies)
-            if after is not None:
-                after()
-            return reply
-
-    return Scripted2()
+from megazword import agent, andon, config, room
+from megazword.cli import main
+from megazword.run_control import Control
+from test_agent import call, coding
 
 
 @pytest.fixture(autouse=True)
-def pace_free(monkeypatch):
+def isolated(monkeypatch):
     monkeypatch.setattr(agent, "DEFAULT_PACE", dict.fromkeys(agent.DEFAULT_PACE, 0))
+    posts = []
+    monkeypatch.setattr(room, "say", lambda *args, **kwargs: posts.append((args, kwargs)))
+    return posts
 
 
-# --- the switch itself ------------------------------------------------------
-
-
-def test_pull_release_and_state_line(tmp_path, monkeypatch):
-    monkeypatch.setattr(andon, "flag_path", lambda: flag(tmp_path))
-    assert andon.status_line() == "andon off: jobs run"
-    andon.pull("smoke in the room")
-    assert andon.is_on()
-    assert "smoke in the room" in andon.status_line()
-    assert andon.release() is True
+def test_cli_round_trip(capsys, monkeypatch, isolated):
+    monkeypatch.setenv("MEGAZWORD_SEAT", "Andon-test")
+    assert main(["andon"]) == 0
+    assert "andon off" in capsys.readouterr().out
+    assert main(["andon", "on", "inspect", "the draft"]) == 0
+    data = json.loads((config.HOME / "ANDON").read_text(encoding="utf-8"))
+    assert data["reason"] == "inspect the draft"
+    assert data["who"] == "Andon-test"
+    assert datetime.fromisoformat(data["time"]).utcoffset().total_seconds() == 0
+    assert "andon ON" in capsys.readouterr().out
+    assert main(["andon"]) == 0
+    assert "inspect the draft" in capsys.readouterr().out
+    assert main(["andon", "off"]) == 0
     assert not andon.is_on()
-    assert andon.release() is False          # already off, and it says so
+    assert "andon off" in capsys.readouterr().out
+    assert main(["andon", "off"]) == 0
+    assert [args[1] for args, _ in isolated] == [
+        "Andon-test: ANDON on - inspect the draft. All jobs pause at their next step.",
+        "Andon-test: ANDON off", "Andon-test: ANDON off"]
 
 
-def test_command_output(tmp_path, monkeypatch):
-    monkeypatch.setattr(andon, "flag_path", lambda: flag(tmp_path))
-    said = []
-    assert andon.command("on", write=said.append) == 0
-    assert said[-1].startswith("andon ON")
-    assert andon.command("off", write=said.append) == 0
-    assert said[-1] == "andon released: jobs run again"
-    andon.command("off", write=said.append)
-    assert said[-1] == "andon was already off"
-    andon.command(None, write=said.append)
-    assert said[-1] == "andon off: jobs run"
+def test_no_reason_unknown_seat_and_atomic_write(monkeypatch):
+    writes = []
+    original = andon.write_atomic
+
+    def capture(path, text):
+        writes.append((path, text))
+        original(path, text)
+
+    monkeypatch.setattr(andon, "write_atomic", capture)
+    assert main(["andon", "on"]) == 0
+    assert len(writes) == 1 and writes[0][0] == config.HOME / "ANDON"
+    assert andon.details()["who"] == "unknown"
+    assert andon.details()["reason"] == ""
 
 
-def test_flag_without_a_reason_reads_cleanly(tmp_path, monkeypatch):
-    monkeypatch.setattr(andon, "flag_path", lambda: flag(tmp_path))
-    andon.pull()
-    assert andon.status_line() == "andon ON: jobs stop before their next step"
-    assert "edits remain in the work folder" in andon.stop_message()
+def test_room_failure_does_not_block_switch(monkeypatch):
+    def broken(*args, **kwargs):
+        raise OSError("offline")
+
+    monkeypatch.setattr(room, "say", broken)
+    assert main(["andon", "on", "review"]) == 0
+    assert andon.is_on()
+    assert main(["andon", "off"]) == 0
+    assert not andon.is_on()
 
 
-# --- the loop obeys it ------------------------------------------------------
+def test_mid_job_pause_keeps_edits_and_does_not_count_failure(tmp_path, monkeypatch, isolated):
+    control = Control(tmp_path / "run-controls" / "job-andon")
+    ticks = []
+    loop, model = coding(tmp_path, [call("read_file", path="missing-1"),
+                                   call("read_file", path="missing-2"),
+                                   call("write_file", path="draft.txt", text="work so far")],
+                         control=control, clock=lambda: ticks.append(0) or 0)
+    original = model.chat
+
+    def chat(*args, **kwargs):
+        reply = original(*args, **kwargs)
+        if len(model.seen) == 3:
+            andon.pull("inspect draft")
+        return reply
+
+    monkeypatch.setattr(model, "chat", chat)
+    result = loop.run("edit the draft")
+    assert not result.ok
+    assert result.error == ("paused by andon: inspect draft; edits remain in the work folder; "
+                            "run `megazword andon off` and re-run")
+    assert len(model.seen) == 3
+    assert (tmp_path / "draft.txt").read_text() == "work so far"
+    assert len(ticks) == 2  # Only the two tool failures entered the restart window.
+    phases = [event["phase"] for event in control.view()["events"]]
+    assert phases[-1] == "paused: andon (inspect draft)"
+    assert "failed" not in phases
+    assert not any(phase.startswith("stopped:") for phase in phases)
+    assert not isolated  # No failure-window escalation.
 
 
-def test_a_pulled_andon_costs_nothing(tmp_path, monkeypatch):
-    monkeypatch.setattr(andon, "flag_path", lambda: flag(tmp_path))
-    model = backend([call("write_file", path="a.py", text="should not happen")])
-    loop = agent.wrap(model, {"root": tmp_path}, None)
-    andon.pull("stopping the line")
-    with pytest.raises(RuntimeError, match="andon is pulled"):
-        loop._run("do the work")
-    assert model.calls == 0                       # not one step was spent
-    assert not (tmp_path / "a.py").exists()
+def test_flag_on_before_start_uses_no_model_steps(tmp_path):
+    andon.pull("hold")
+    loop, model = coding(tmp_path, [])
+    result = loop.run("work")
+    assert not result.ok and "paused by andon: hold" in result.error
+    assert not model.seen
 
 
-def test_pulled_mid_job_stops_at_the_next_step_and_keeps_edits(tmp_path, monkeypatch):
-    monkeypatch.setattr(andon, "flag_path", lambda: flag(tmp_path))
-    model = backend([call("write_file", path="a.py", text="work so far")],
-                    after=lambda: andon.pull("pulled while it ran"))
-    loop = agent.wrap(model, {"root": tmp_path}, None)
-    with pytest.raises(RuntimeError, match="andon is pulled"):
-        loop._run("keep working")
-    assert model.calls == 1                       # the second step was not taken
-    assert (tmp_path / "a.py").read_text() == "work so far"   # nothing rolled back
+def test_off_runs_normally_with_one_flag_stat_per_step(tmp_path, monkeypatch):
+    andon.pull("old pause")
+    andon.release()
+    path = andon.flag_path()
+    original = type(path).stat
+    stats = []
+
+    def stat(self, *args, **kwargs):
+        if self == path:
+            stats.append(self)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(type(path), "stat", stat)
+    loop, model = coding(tmp_path, [call("list_files", glob="*"), call("finish", summary="done")])
+    result = loop.run("inspect folder")
+    assert result.ok and result.text == "done"
+    assert len(model.seen) == len(stats) == 2

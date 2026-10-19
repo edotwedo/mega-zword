@@ -1,88 +1,74 @@
-"""The andon cord: one switch that stops every agent job before its next step.
-
-A shop-floor andon stops the line for everyone, and nothing on it is thrown away.
-`megazword night stop` stops the night shift; this stops the agent loop itself,
-wherever it is running, and leaves every edit in the work folder. Pulling it is
-cheap and instant, which is the point - the person who spots the problem is
-rarely the person who owns the job.
-"""
-
+﻿"""A local andon cord, checked once before each agent step."""
 from __future__ import annotations
 
+import json
+import os
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Callable
 
 from . import config
 from .filelock import write_atomic
 
-FLAG_NAME = "ANDON"
+
+class Paused(RuntimeError):
+    """An intentional stop, outside the agent's failure window."""
 
 
-def flag_path() -> Path:
-    return config.HOME / FLAG_NAME
+def flag_path():
+    return config.HOME / "ANDON"
 
 
 def is_on() -> bool:
     return flag_path().exists()
 
 
-def note(path: Path | None = None) -> str:
-    """What the puller wrote, or "" when the cord was pulled without a reason.
-
-    The file's first line is the timestamp, so it answers "when" without the
-    reason ever reading as a date.
-    """
+def details() -> dict:
     try:
-        text = (path or flag_path()).read_text(encoding="utf-8")
-    except OSError:
-        return ""
-    return " ".join(text.splitlines()[1:]).strip()
+        return json.loads(flag_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
 
 
-def pull(reason: str = "", path: Path | None = None) -> Path:
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    target = path or flag_path()
-    write_atomic(target, f"{stamp}\n{reason.strip()}\n" if reason.strip() else f"{stamp}\n")
-    return target
+def pull(reason=""):
+    data = {"reason": reason.strip(), "who": os.environ.get("MEGAZWORD_SEAT") or "unknown",
+            "time": datetime.now(timezone.utc).isoformat()}
+    write_atomic(flag_path(), json.dumps(data))
+    return data
 
 
-def release(path: Path | None = None) -> bool:
-    """False when it was already off, so the command can say so instead of lying."""
-    try:
-        (path or flag_path()).unlink()
-        return True
-    except FileNotFoundError:
-        return False
+def release():
+    flag_path().unlink(missing_ok=True)
 
 
-def stop_message() -> str:
-    why = note()
-    return ("andon is pulled: work is paused"
-            + (f" ({why})" if why else "")
-            + "; edits remain in the work folder. Clear it with `megazword andon off`")
-
-
-def status_line() -> str:
+def status_line():
     if not is_on():
         return "andon off: jobs run"
-    why = note()
-    return "andon ON: jobs stop before their next step" + (f" - {why}" if why else "")
+    data = details()
+    return (f"andon ON: {data.get('reason', '')} "
+            f"(by {data.get('who', 'unknown')} at {data.get('time', 'unknown')})")
 
 
-def command(state: str | None, write: Callable[[str], None] = print) -> int:
+def command(state: str | None, reason="", write: Callable[[str], None] = print) -> int:
+    seat = os.environ.get("MEGAZWORD_SEAT") or "unknown"
     if state == "on":
-        pull()
+        data = pull(reason)
+        line = f"{seat}: ANDON on - {data['reason']}. All jobs pause at their next step."
+    elif state == "off":
+        release()
+        line = f"{seat}: ANDON off"
+    else:
         write(status_line())
         return 0
-    if state == "off":
-        write("andon released: jobs run again" if release() else "andon was already off")
-        return 0
     write(status_line())
+    try:
+        from .room import say
+        say("hive", line, author="floor", write=lambda _: None)
+    except Exception:
+        pass  # The local switch must work even when the room is unavailable.
     return 0
 
 
-def add_parser(sub) -> None:
-    andon = sub.add_parser("andon", help="pull the cord: stop every agent job before its next step")
-    andon.add_argument("state", nargs="?", choices=("on", "off"),
-                       help="on pauses every job, off releases them; bare shows the state")
+def add_parser(sub):
+    parser = sub.add_parser("andon", help="pause all agent jobs before their next step")
+    parser.add_argument("state", nargs="?", choices=("on", "off"))
+    parser.add_argument("reason", nargs="*", help="why the jobs should pause")

@@ -672,10 +672,13 @@ class AgentBackend(Backend):
 
     def _run(self, prompt):
         from .run_control import Control
+        from .andon import Paused
         self.control = self.control or Control.from_env()
         self._event("starting", folder=self.root)
         try:
             result = self._run_loop(prompt)
+        except Paused:
+            raise
         except Exception:
             self._event("failed")
             raise
@@ -761,12 +764,11 @@ class AgentBackend(Backend):
         from . import andon
 
         for step in range(self.max_steps):
-            # The andon cord stops every job, not just this one, so it is checked
-            # before each step: cheaper to stop here than to spend the step. Every
-            # edit made so far stays in the work folder, nothing is rolled back.
             if andon.is_on():
-                self._event("stopped: andon", job_id=job_id)
-                raise RuntimeError(andon.stop_message())
+                reason = andon.details().get("reason", "")
+                self._event(f"paused: andon ({reason})", job_id=job_id)
+                raise andon.Paused(f"paused by andon: {reason}; edits remain in the work folder; "
+                                   "run `megazword andon off` and re-run")
             messages.extend(self._checkpoint())
             if not self.read_only:
                 # Every step resends the history, so stale bulk costs credits again
