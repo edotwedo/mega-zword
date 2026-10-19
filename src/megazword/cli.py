@@ -22,7 +22,7 @@ COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job"),
     "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "announce", "free", "map"),
-    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp"),
+    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab"),
     "Memory": ("note", "decide", "import-hive"),
 }
 
@@ -182,6 +182,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_job_parser(sub)
     from .repo_map import add_parser as add_map_parser
     add_map_parser(sub)
+    from .tab_title import add_parser as add_tab_parser
+    add_tab_parser(sub)
 
     out = sub.add_parser("out", help="keep auto-picks and background jobs off an AI")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -419,6 +421,9 @@ def main(argv: list[str] | None = None,
     if args.command == "doctor":
         from .doctor import run
         return run()
+    if args.command == "tab":
+        from .tab_title import command
+        return command(args)
     if args.command == "export":
         from .export import command
         return command(args, cfg)

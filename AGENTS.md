@@ -17,16 +17,17 @@ repo is the only handoff. Nothing lives only in a chat.
   Phil normally drives interactive setup from short prompts; take over the UI
   only when he asks. The terminal reboot/restore test is explicitly deferred
   until Phil is ready near 90% Codex usage; never reboot at a meter threshold.
-- **Designation in your console tab (Phil, 2026-10-17).** As soon as you pick your
-  designation, put it in the title of the terminal tab you run in. The launchers
-  (`scripts/hive_up.ps1`, `start_beta2.ps1`) name the tab with `--suppressApplicationTitle`
-  so Claude Code can't overwrite it. A bot can't rename its own tab: tool commands run
-  in a hidden console, so title escape codes and `[Console]::Title` hit that console,
-  not Phil's tab. If you weren't started by a launcher, ask Phil to rename the tab
-  (right-click the tab, Rename Tab) and never claim you did it. Keep the
-  same designation for the whole session, including after a restart or summary.
-  Never rename yourself without asking Phil: STATUS, handoffs and scheduled tasks
-  refer to you by that name.
+- **Designation in your console tab (Phil, 2026-10-17; updated 2026-10-19).** As soon as you pick your
+  designation, put it in the title of the terminal tab you run in. Run
+  `megazword tab <designation>`: it finds the shell Windows Terminal hosts for this tab,
+  attaches to that console, and sets the title. Command Code re-asserts its own title, so
+  the command also starts a small keeper that re-applies yours while the tab lives;
+  `megazword tab --stop` ends it. A tab the launchers opened with
+  `--suppressApplicationTitle` (`scripts/hive_up.ps1`, `start_beta2.ps1`) ignores
+  application titles, so there ask Phil to rename the tab (right-click the tab, Rename
+  Tab) and never claim you did it. Keep the same designation for the whole session,
+  including after a restart or summary. Never rename yourself to a different name than
+  your designation: STATUS, handoffs and scheduled tasks refer to you by it.
 - **Usage first, every time (Phil).** Before you start, claim or hand out any work: run `megazword usage`
   (on Phil's PC) or read the usage board in Q
   (https://github.com/edotwedo/workshop/pull/33#issuecomment-6115098816; over 30 minutes old means the

@@ -40,6 +40,15 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
    agent loop checks before each step).
 9. [ ] **Spot warning (#9).** A seat near 25% writes a checkpoint note and hands off.
 10. [ ] **WIP cap (#7b).** At most one active claim per seat in the room.
+11. [x] **Seat renames its own tab (#18).** A bot runs under a hidden console, so it
+   cannot see or set the tab Phil is looking at, and Command Code keeps re-asserting
+   its own title over any one-shot change.
+   Implemented 2026-10-19 (Cinder-21): `megazword tab <designation>` walks up to the
+   shell Windows Terminal hosts for this tab, attaches to that console, and sets the
+   title; a small keeper re-applies it while the tab lives (`megazword tab --stop`
+   ends it). New `src/megazword/tab_title.py` + tests.
+   Limits: a tab started with `--suppressApplicationTitle` (claude/codex/grok/gemini
+   via `hive_up.ps1`) ignores application titles, so the rename will not show there.
 
 ## Later (needs data or a stable process)
 
