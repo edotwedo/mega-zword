@@ -286,6 +286,8 @@ test('the phone app page is served only under a valid key', async () => {
   assert.match(ok.headers.get('content-security-policy'), /connect-src 'self'/);
   const html = await ok.text();
   assert.match(html, /<title>Hive<\/title>/);
+  assert.match(html, /id="badge"/);
+  assert.match(html, /localStorage/);
   assert.ok(!html.includes(token), 'the key must not be baked into the page');
   assert.equal((await call('GET', '/app/not-a-real-key')).status, 401);
   assert.equal((await call('POST', '/app/' + token)).status, 405);

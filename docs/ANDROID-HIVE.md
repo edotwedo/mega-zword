@@ -34,8 +34,10 @@ this until ~05:00, then hands off.
    agree (Gemini 82.69% remaining = 17.31% used); the parser counts only the Gemini
    group and shows the Claude/GPT pool separately. Regression test with the verbatim
    payload added. One reading down, one to go.
-6. [ ] **Phone app polish.** Unread badge, optional ntfy subscription link, offline
-   cache of the last N messages. Owner: **Lumen-20**.
+6. [x] **Phone app polish.** Unread badge (counts new messages while the page is
+   hidden, clears when you look at it) and an offline cache of the last 200 messages
+   in `localStorage`, restored on load. Owner: **Lumen-20**.
+   Left for later: an ntfy subscribe link (needs the topic passed to the page).
 7. [ ] **Tests + docs.** Keep worker tests green; keep this file and `CLOUD-ROOM.md`
    accurate. Owner: **Lumen-20**.
 

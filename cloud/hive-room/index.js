@@ -21,6 +21,7 @@ body{margin:0;font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-seri
 header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#161a20;border-bottom:1px solid #232a33}
 #dot{width:9px;height:9px;border-radius:50%;background:#e0533d}
 #dot.on{background:#3fd07a}
+#badge{background:#e0533d;color:#fff;border-radius:9px;padding:1px 7px;font-size:11px;font-weight:700}
 header b{font-weight:600}
 #who{margin-left:auto;color:#7f8a99;font-size:12px}
 main{flex:1;overflow-y:auto;padding:8px 12px}
@@ -34,7 +35,7 @@ button{padding:0 14px;min-height:44px;border:0;border-radius:10px;background:#2f
 button.cast{background:#3a4452}
 </style></head>
 <body>
-<header><span id="dot"></span><b>Hive</b><span id="who"></span></header>
+<header><span id="dot"></span><b>Hive</b><span id="badge" hidden></span><span id="who"></span></header>
 <main id="log"></main>
 <form id="compose">
 <input id="text" maxlength="4000" autocomplete="off" placeholder="message the Hive">
@@ -47,22 +48,40 @@ button.cast{background:#3a4452}
   var ROOM = 'hive', last = 0, atBottom = true;
   var log = document.getElementById('log'), dot = document.getElementById('dot');
   var who = document.getElementById('who'), input = document.getElementById('text');
+  var badge = document.getElementById('badge');
+  var LS_LOG = 'hivelog.' + KEY.slice(0, 8), LS_SEEN = 'hiveseen.' + KEY.slice(0, 8);
+  var ids = [], seenId = 0;
+  try { seenId = Number(localStorage.getItem(LS_SEEN) || 0) || 0; } catch(e){}
   function auth(o){ o = o || {}; o.headers = Object.assign({Authorization: 'Bearer ' + KEY}, o.headers || {}); return o; }
   function note(ok){ dot.className = ok ? 'on' : ''; }
   function scroll(){ if (atBottom) log.scrollTop = log.scrollHeight; }
+  function refreshBadge(){
+    var n = document.hidden ? ids.filter(function(i){ return i > seenId; }).length : 0;
+    badge.hidden = !n; badge.textContent = n > 99 ? '99+' : String(n);
+  }
+  function markSeen(){
+    if (last > seenId) { seenId = last; try { localStorage.setItem(LS_SEEN, String(seenId)); } catch(e){} }
+    refreshBadge();
+  }
+  function persist(rows){ if (!rows.length) return; try {
+    var all = JSON.parse(localStorage.getItem(LS_LOG) || '[]').concat(rows);
+    localStorage.setItem(LS_LOG, JSON.stringify(all.slice(-200))); } catch(e){} }
   function add(m){
+    if (m.id && ids.indexOf(m.id) !== -1) return;  // the offline cache may already hold it
     var d = document.createElement('div'); d.className = 'msg';
     var h = document.createElement('div'); h.className = 'h';
     var a = document.createElement('span'); a.className = 'a'; a.textContent = m.author;
     var t = document.createElement('span'); t.textContent = (m.time || '').slice(0, 16).replace('T', ' ');
     var b = document.createElement('div'); b.className = 't'; b.textContent = m.text;
     h.appendChild(a); h.appendChild(t); d.appendChild(h); d.appendChild(b);
-    log.appendChild(d); last = Math.max(last, m.id || 0);
+    log.appendChild(d);
+    if (m.id) { ids.push(m.id); last = Math.max(last, m.id); }
+    refreshBadge();
   }
   function pull(since){
     return fetch('/rooms/' + ROOM + '/messages?since=' + since + '&limit=200', auth())
       .then(function(r){ if (!r.ok) throw 0; return r.json(); })
-      .then(function(d){ var rows = d.messages || []; rows.forEach(add); note(true); scroll(); return rows.length; })
+      .then(function(d){ var rows = d.messages || []; rows.forEach(add); persist(rows); note(true); scroll(); return rows.length; })
       .catch(function(){ note(false); return -1; });
   }
   function catchUp(since){ return pull(since).then(function(n){ return n === 200 ? catchUp(last) : n; }); }
@@ -72,7 +91,7 @@ button.cast{background:#3a4452}
     fetch('/rooms/' + ROOM + '/messages', auth({method: 'POST',
       headers: {'Content-Type': 'application/json', 'Idempotency-Key': id}, body: JSON.stringify({text: text})}))
       .then(function(r){ if (!r.ok) throw 0; return r.json(); })
-      .then(function(d){ if (d.message) add(d.message); note(true); scroll(); })
+      .then(function(d){ if (d.message) { add(d.message); persist([d.message]); } note(true); scroll(); })
       .catch(function(){ note(false); });
   }
   document.getElementById('compose').addEventListener('submit', function(e){
@@ -83,8 +102,11 @@ button.cast{background:#3a4452}
     send(v ? 'Broadcast: ' + v : 'Broadcast: check in - every seat reply with your current task.');
   });
   log.addEventListener('scroll', function(){ atBottom = (log.scrollHeight - log.scrollTop - log.clientHeight) < 40; });
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) markSeen(); });
   who.textContent = KEY.slice(0, 6) + '...';
-  catchUp(0).then(function(){ setInterval(function(){ pull(last); }, 3000); });
+  try { JSON.parse(localStorage.getItem(LS_LOG) || '[]').forEach(add); } catch(e){}
+  markSeen();
+  catchUp(last).then(function(){ markSeen(); setInterval(function(){ pull(last); }, 3000); });
 })();
 </script>
 </body></html>`;
