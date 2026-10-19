@@ -31,10 +31,42 @@ def test_release_and_reclaim(release):
     assert active_claims(rows)["Cedar-21"][0:2] == ("item 11", 3)
 
 
-def test_unrelated_done_and_other_seat_release_do_not_close_claim():
-    rows = [message("Cedar-21: claiming #10"), message("Birch-22: released #10"),
-            message("Cedar-21: done #100")]
+def test_another_seat_closes_a_dead_claim_when_it_names_the_item():
+    # Reversed deliberately (2026-10-19). Holder-only release looked safer, but a
+    # seat went dark holding #4: the conductor reassigned and shipped it and the
+    # ledger still showed the dead seat holding it, so `room claims` - the ledger
+    # the WIP cap trusts - told the next worker the item was taken. A re-claim
+    # costs one line; a stale claim blocks real work.
+    rows = [message("Cinder-21: claiming #4"), message("Quill-21: #4 job cost is landed")]
+    assert active_claims(rows) == {}
+
+
+def test_an_unrelated_or_negated_release_does_not_close_a_claim():
+    rows = [message("Cedar-21: claiming #10"), message("Birch-22: done #100"),
+            message("Birch-22: #10 is not done yet")]
     assert active_claims(rows)["Cedar-21"][0] == "#10"
+
+
+def test_other_claim_verbs_count_too():
+    rows = [message("Beacon-17: taking #5"), message("Gauge-18: claiming #7")]
+    claims = active_claims(rows)
+    assert claims["Beacon-17"][0] == "#5"
+    assert claims["Gauge-18"][0] == "#7"
+
+
+def test_only_the_first_line_is_taken_as_the_item():
+    rows = [message("Beacon-17: taking #5 now. Also landed #18 ages ago.\n#99 much later")]
+    item = active_claims(rows)["Beacon-17"][0]
+    assert item == "#5 now"
+    assert item != "taking #5 now. Also landed #18"  # the sentence before the stop holds
+
+
+def test_a_phrase_without_an_item_number_is_not_a_claim():
+    # Widening the verbs made "taking conductor for the rest of the night" register
+    # as a claim and block the room on a phrase, so a claim must point at an item.
+    rows = [message("Quill-21: taking conductor for the rest of the night"),
+            message("Quill-21: taking over the floor")]
+    assert active_claims(rows) == {}
 
 
 def test_newest_claim_wins_so_a_stale_first_claim_does_not_block():
