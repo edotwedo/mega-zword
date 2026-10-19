@@ -1,10 +1,12 @@
 param(
     # One token per lane, not per session: session names (Beacon-17, Cirrus-17...) change every chat and go in the message text.
-    [string[]]$Seats = @('phil', 'claude-pc', 'codex-pc', 'grok-pc', 'claude-cloud', 'codex-cloud'),
+    [string[]]$Seats = @('phil', 'phone', 'claude-pc', 'codex-pc', 'grok-pc', 'claude-cloud', 'codex-cloud'),
     [string]$WorkerName = 'megazword-hive-room',
     [string]$DatabaseId = ''
 )
-# Phil runs this script. Bots must never execute it.
+# Any seat may run this (Phil, 2026-10-18: deployments are authorized). It creates
+# or reuses D1 and issues FRESH seat tokens, so for a code-only update prefer
+# `wrangler deploy --config wrangler.local.json`; this full script is for a fresh box.
 $ErrorActionPreference = 'Stop'
 if ($WorkerName -notmatch '^[a-z0-9-]{1,63}$') { throw 'Use a lowercase Worker name.' }
 if (!$Seats.Count -or ($Seats | Select-Object -Unique).Count -ne $Seats.Count) { throw 'Supply unique seat names.' }
