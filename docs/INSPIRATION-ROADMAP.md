@@ -48,8 +48,12 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
    Display only; routing is unchanged. Default 20%; override in
    `~/.megazword/config.toml` with `[usage.reserve]` and e.g. `claude = 30`
    (clamped to 0–100). Unknown meters get no suffix.
-8. [ ] **Andon (#7).** `megazword andon on|off` pauses jobs for everyone (a flag the
+8. [x] **Andon (#7).** `megazword andon on|off` pauses jobs for everyone (a flag the
    agent loop checks before each step).
+   Done 2026-10-19 by Quill-21: `src/megazword/andon.py` writes `~/.megazword/ANDON`,
+   and `agent.py` checks it at the top of the step loop, so it stops before spending
+   the next step and keeps every edit already made. Bare `megazword andon` shows the
+   state. 5 tests; suite 1617.
 9. [x] **Spot warning (#9).** `megazword spot` prints any plan at or below 25% left,
    marks 20% as STOP, ignores unknown buckets, and writes
    `~/.megazword/spot-handoff.json`. Done 2026-10-19 (Lumen-20), 5 tests.

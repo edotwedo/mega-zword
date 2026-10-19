@@ -758,7 +758,15 @@ class AgentBackend(Backend):
                                    "without a usable tool call")
             messages.append({"role": "user", "content": text})
 
+        from . import andon
+
         for step in range(self.max_steps):
+            # The andon cord stops every job, not just this one, so it is checked
+            # before each step: cheaper to stop here than to spend the step. Every
+            # edit made so far stays in the work folder, nothing is rolled back.
+            if andon.is_on():
+                self._event("stopped: andon", job_id=job_id)
+                raise RuntimeError(andon.stop_message())
             messages.extend(self._checkpoint())
             if not self.read_only:
                 # Every step resends the history, so stale bulk costs credits again
