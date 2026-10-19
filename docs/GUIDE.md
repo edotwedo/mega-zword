@@ -670,6 +670,15 @@ select `-m cerebras`; check the balance and pricing first. The default model is
 `qwen-3.8-27b`, which supports multi-turn tool use. No key is configured here
 and no live request has been sent.
 
+**Command Code backends (cmd-*) use one paid key.** Set `COMMANDCODE_API_KEY`
+to reach all of them; their names are the `cmd-*` entries in
+`src/megazword/free_apis.py` (for example `cmd-glm-flash`, `cmd-ling-flash`,
+`cmd-hy3`). They sit in the normal easy/medium/hard routes, so automatic
+selection can pick them when the key is present. One exception: `cmd-deepseek-flash`
+is not in automatic routes because its tool calls can come back garbled, which
+breaks edit jobs. To try it anyway, force it with `-m cmd-deepseek-flash` and
+review any edits closely.
+
 On a rate limit (HTTP 429), Mega Zword uses the provider's `Retry-After` when
 available, marks that backend out until the reset, and tries another free
 backend. If the mark is stale, clear it with `megazword out groq --clear`.

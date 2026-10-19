@@ -28,6 +28,27 @@ DEFAULT_PACE = {"gemini-api": 6, "mistral": 2, "groq": 2, "cloudflare": 1,
                 "ovh": 31, "ovh-120b": 31, "ovh-qwen": 31,
                 "kilo": 18}  # Kilo: 200 requests/hour per IP, all models together
 
+# DeepSeek sometimes leaks its DSML tool markup into native tool-call arguments,
+# e.g. '{"path">README.md</parameter>' or '<parameter name="path" ...>x</parameter>'
+# (Command Code, 2026-10-18). Recover the name/value pairs instead of failing.
+_DSML_PARAM = re.compile(r'(?:name="(\w+)"[^>]*|"(\w+)")\s*>(.*?)</[^>]*parameter>', re.S)
+_NUMERIC_ARGS = ("start", "end", "line", "limit")
+
+
+def _repair_args(raw):
+    try:
+        json.loads(raw)
+        return raw
+    except (TypeError, ValueError):
+        pass
+    pairs = {(a or b): v for a, b, v in _DSML_PARAM.findall(raw or "")}
+    if not pairs:
+        return raw
+    for key in _NUMERIC_ARGS:
+        if re.fullmatch(r"-?\d+", pairs.get(key, "").strip()):
+            pairs[key] = int(pairs[key])
+    return json.dumps(pairs)
+
 
 def pace_call(name, pace, deadline):
     """Reserve a call start while holding a cross-process provider lock."""
@@ -148,6 +169,10 @@ SMALL_HISTORY = {"groq": 24_000, "cloudflare": 24_000, "mistral": 24_000, "ollam
                  "tencent": 40_000,
                  # Command Code GOAT credits are a monthly allowance; same care.
                  "cmd": 40_000}
+# Hard ceiling on what one job may send to a metered plan, about 300k tokens
+# (~$0.05-0.15 on Command Code's open models). A stuck 2026-10-18 test job sent
+# ~1M chars before it was stopped by hand; this stops it on its own.
+JOB_CHAR_CAP = {"cmd": 1_200_000, "tencent": 1_200_000}
 # Condense history into a progress note this often, whatever its size, so a long
 # job's resend cost stays flat instead of growing every step (Phil, 2026-10-18).
 COMPACT_EVERY = 10
@@ -512,8 +537,12 @@ class AgentBackend(Backend):
             remaining = self._deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError("agent wall-clock cap reached; edits remain in the work folder")
-            self.request_count += 1
             name = self.model_backend.name
+            cap = JOB_CHAR_CAP.get(name.split("-")[0])
+            if cap and self.prompt_chars >= cap:
+                raise RuntimeError(f"{name} job spending cap reached ({self.prompt_chars:,} chars sent, "
+                                   f"cap {cap:,}); edits remain in the work folder")
+            self.request_count += 1
             self.requests_by_backend[name] = self.requests_by_backend.get(name, 0) + 1
             self.prompt_chars += len(json.dumps(sent))
             self._event("request", prompt_chars=len(json.dumps(sent)))
@@ -669,9 +698,12 @@ class AgentBackend(Backend):
                               if m.get("content", "").startswith("New instruction from the user:")]
                 recent = [{**m, "content": m["content"][-2000:]} for m in flattened[2:][-4:]]
                 messages = [flattened[0], flattened[1], *directions,
-                            {"role": "user", "content": self._progress_note(used)},
+                            {"role": "user", "content": self._progress_note(used, text_mode)},
                             *recent]
-                text_mode = True
+                # The condensed history is plain text, which native tool calling accepts
+                # too. Switching to the text protocol here took the tools away from
+                # native-only models, and every job past step 10 died with "no usable
+                # tool call" (2026-10-18).
                 self._event("history condensed")
             remaining = self._deadline - time.monotonic()
             if remaining <= 0:
@@ -745,6 +777,9 @@ class AgentBackend(Backend):
                 refuse("Invalid reply. Use string content and at most eight tool calls.")
                 continue
             calls = reply.get("tool_calls")
+            if calls:
+                calls = [{**c, "function": {**c["function"],
+                          "arguments": _repair_args(c["function"]["arguments"])}} for c in calls]
             if not calls:
                 text_mode = True
                 messages = self._text_history(messages)
@@ -846,7 +881,7 @@ class AgentBackend(Backend):
         raise RuntimeError(f"agent step cap reached ({self.max_steps}); edits remain in the work folder"
                            + (f"; tool calls: {spent}" if spent else ""))
 
-    def _progress_note(self, used):
+    def _progress_note(self, used, text_mode=False):
         """Short state summary that replaces condensed history, so the model doesn't
         have to rediscover what it already did."""
         edited = [self._rel(p) for p in self._originals]
@@ -855,7 +890,7 @@ class AgentBackend(Backend):
                  "Files read (re-read only what you need): " + (", ".join(self._seen_reads[-15:]) or "none"),
                  "Last test run: " + (self._last_test or "none yet"),
                  "Tool calls so far: " + (", ".join(f"{n} {c}" for n, c in used.items()) or "none"),
-                 "Continue the task. Use one fenced JSON tool object."]
+                 "Continue the task." + (" Use one fenced JSON tool object." if text_mode else "")]
         return "\n".join(lines)
 
     @staticmethod

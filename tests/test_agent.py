@@ -806,3 +806,55 @@ def test_five_failed_tool_calls_in_a_row_stop_the_job(tmp_path):
 
 def test_tencent_grants_use_a_smaller_history():
     assert agent.SMALL_HISTORY["tencent"] < agent.HISTORY_CHARS
+
+
+def test_dsml_tool_arguments_are_repaired():
+    from megazword.agent import _repair_args
+    # Seen from DeepSeek V4.1 Flash via Command Code (2026-10-18).
+    leaked = '{"path">README.md</parameter>\n</invoke>\n</｜｜DSML｜｜: '
+    assert json.loads(_repair_args(leaked)) == {"path": "README.md"}
+    tagged = ('<｜DSML｜parameter name="path" string="true">a.py</｜DSML｜parameter>'
+              '<｜DSML｜parameter name="start" string="false">3</｜DSML｜parameter>')
+    assert json.loads(_repair_args(tagged)) == {"path": "a.py", "start": 3}
+    assert _repair_args('{"path": "x"}') == '{"path": "x"}'
+    assert _repair_args("not json") == "not json"
+
+
+def test_condensing_keeps_native_tools(tmp_path):
+    # Condensing used to switch to the text protocol and drop `tools`, so every
+    # native-only model died with "no usable tool call" after step 10 (2026-10-18).
+    from megazword.agent import wrap
+    from megazword.backends import Backend
+    (tmp_path / "README.md").write_text("\n".join(f"line {i}" for i in range(40)), encoding="utf-8")
+    seen = []
+
+    class Native(Backend):
+        def chat(self, messages, tools=None, timeout=None):
+            seen.append(bool(tools))
+            n = len(seen)
+            return {"content": "", "tool_calls": [{"id": f"c{n}", "type": "function", "function": {
+                "name": "read_file", "arguments": json.dumps({"path": "README.md", "start": n, "end": n})}}]}
+
+    agent = wrap(Native("native", timeout=30), {"root": tmp_path, "max_steps": 14})
+    with pytest.raises(RuntimeError, match="step cap"):
+        agent._run("Read README.md one line at a time.")
+    assert len(seen) == 14 and all(seen)
+
+
+def test_metered_job_stops_at_its_spending_cap(tmp_path, monkeypatch):
+    from megazword import agent as agent_mod
+    from megazword.backends import Backend
+    monkeypatch.setitem(agent_mod.JOB_CHAR_CAP, "cmd", 3_000)
+    (tmp_path / "a.py").write_text("x = 1\n" * 200, encoding="utf-8")
+    calls = []
+
+    class Wanderer(Backend):
+        def chat(self, messages, tools=None, timeout=None):
+            calls.append(1)
+            return {"content": "", "tool_calls": [{"id": f"c{len(calls)}", "type": "function", "function": {
+                "name": "read_file", "arguments": json.dumps({"path": "a.py", "start": len(calls), "end": len(calls) + 50})}}]}
+
+    job = agent_mod.wrap(Wanderer("cmd-wander", timeout=30), {"root": tmp_path, "max_steps": 60})
+    with pytest.raises(RuntimeError, match="spending cap"):
+        job._run("Look around.")
+    assert len(calls) < 10
