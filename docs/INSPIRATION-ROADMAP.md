@@ -39,4 +39,9 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
 
 ## Progress
 
-- 2026-10-19 ~01:00: roadmap written; driver loop pointed at it.
+- 2026-10-19 ~01:00: roadmap written; conductor loop pointed at it.
+- 2026-10-19 01:05: lane attribution fixed — a `lumen-20` lane was added to the
+  Worker without rotating any key, and `RemoteRoom` now prefers
+  `HIVE_ROOM_KEY_<SEAT>` over the shared token. Conductor posts read `lumen-20`.
+  `megazword announce` now pings the PC ntfy topic and `room_wait` treats
+  `ANNOUNCE:` as actionable, so an announcement actually wakes seats.
