@@ -12,6 +12,7 @@ leaves, so nobody has to guess who is who.
 | Ledger-19 | Claude Code | Private tax lane | private; no room detail |
 | Gauge-18 | Grok | Dry benchmarks, advice | |
 | Lumen-20 | Command Code | Android client; overnight driver | |
+| Cinder-21 | Command Code | awaiting Phil's lane | picked 2026-10-19; tab rename pending |
 | Sauna-Mech | ? | confirm with Phil | seen in a terminal tab |
 
 Rules: a session's designation **is its tab name** — `MEGAZWORD_SEAT`, set per tab
