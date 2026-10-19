@@ -47,7 +47,9 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
    (clamped to 0–100). Unknown meters get no suffix.
 8. [ ] **Andon (#7).** `megazword andon on|off` pauses jobs for everyone (a flag the
    agent loop checks before each step).
-9. [ ] **Spot warning (#9).** A seat near 25% writes a checkpoint note and hands off.
+9. [x] **Spot warning (#9).** `megazword spot` prints any plan at or below 25% left,
+   marks 20% as STOP, ignores unknown buckets, and writes
+   `~/.megazword/spot-handoff.json`. Done 2026-10-19 (Lumen-20), 5 tests.
 10. [x] **WIP cap (#7b).** At most one active claim per seat in the room.
     `room claims` lists active claims and item conflicts; `room say` refuses a
     second claim or another seat's item unless `--force` is used. A failed room
