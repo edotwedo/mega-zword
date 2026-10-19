@@ -70,7 +70,8 @@ def test_read_only_review_reads_source_and_refuses_writes_and_tests(tmp_path):
     loop, model = coding(tmp_path, [call('finish', summary='Generic guesses'),
         call('write_file', path='source.py', text='damaged'), call('run_tests'),
         call('read_file', path='source.py'),
-        call('finish', summary='source.py:2 returns a free route; inspect fallback handling next.')], read_only=True)
+        call('finish', summary='source.py:2 returns a free route; inspect fallback handling next.')],
+        read_only=True, clock=iter([0, 660, 1320]).__next__)
     result = loop.run('Review the code without edits')
     assert result.ok and 'source.py:2' in result.text
     assert (tmp_path / 'source.py').read_text() == 'def route():\n    return "free"\n'
@@ -775,7 +776,8 @@ def test_model_that_never_forms_a_tool_call_is_dropped_early(tmp_path):
     assert len(model.seen) == agent.MAX_INVALID  # not all 60 steps
     bad_args = {"tool_calls": [{"id": "c", "type": "function",
                                 "function": {"name": "read_file", "arguments": "{not json"}}]}
-    loop, model = coding(tmp_path, [bad_args] * 10, max_steps=60)
+    loop, model = coding(tmp_path, [bad_args] * 10, max_steps=60,
+                         clock=iter(range(0, 6600, 660)).__next__)
     assert "without a usable tool call" in loop.run("job").error and len(model.seen) == agent.MAX_INVALID
     # A good call in between resets the count.
     mixed = [chatter[0]] * 3 + [call("list_files", glob="*")] + [chatter[0]] * 3 + [call("finish", summary="ok")]
@@ -797,7 +799,8 @@ def test_history_condenses_every_ten_steps_with_progress_note(tmp_path):
 
 def test_five_failed_tool_calls_in_a_row_stop_the_job(tmp_path):
     replies = [call("read_file", path=f"missing{i}.txt") for i in range(10)]
-    loop, model = coding(tmp_path, replies, max_steps=30)
+    # Keep exercising the consecutive limit independently of the failure window.
+    loop, model = coding(tmp_path, replies, max_steps=30, clock=iter(range(0, 6600, 660)).__next__)
     result = loop.run("job")
     assert not result.ok and "5 failed tool calls in a row" in result.error
     assert loop.request_count == 5

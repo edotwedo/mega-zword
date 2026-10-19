@@ -12,6 +12,9 @@ import subprocess
 import tempfile
 import time
 import urllib.error
+import uuid
+from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .backends import Backend, OllamaBackend, process_group, _kill_tree
@@ -192,6 +195,7 @@ COMPACT_EVERY = 10
 # Failed tool calls in a row (refused tools, failing tests): nudge to finish, then stop.
 # Capped runs used to burn all 60 steps going nowhere.
 FAIL_NUDGE, FAIL_STOP = 3, 5
+WINDOW_FAILS, WINDOW_SECONDS = 3, 600
 STALE_LIMIT = 400
 SEARCH_HITS = 60  # matching lines returned by one search_files call
 # Total tool output handed back to the model in one step. Re-sending huge results is
@@ -226,6 +230,8 @@ class AgentBackend(Backend):
     prompt_chars: int = 0
     answer_chars: int = 0
     control: object | None = None
+    clock: Callable[[], float] = field(default_factory=lambda: time.monotonic)
+    job_id: str = ""
     _retry_directions: list = field(default_factory=list)
     _tools: list = field(default_factory=lambda: list(TOOLS))
 
@@ -675,6 +681,9 @@ class AgentBackend(Backend):
         self._ollama_fallback = False
         previous_call, repeats = None, 0
         fails = 0  # failed tool calls in a row
+        failures = deque()
+        control_folder = getattr(self.control, "folder", None)
+        job_id = self.job_id or (control_folder.name if control_folder else uuid.uuid4().hex)
         used = {}  # tool name -> calls, so a capped run says where its steps went
         last_text = ""
         # Only send tools the job needs: each schema is resent on every step.
@@ -687,6 +696,25 @@ class AgentBackend(Backend):
         text_mode = self.text_protocol or isinstance(self.model_backend, OllamaBackend)
         compacted = False
         invalid = 0
+
+        def record_failure():
+            now = self.clock()
+            failures.append(now)
+            while failures and failures[0] < now - WINDOW_SECONDS:
+                failures.popleft()
+            if len(failures) < WINDOW_FAILS:
+                return
+            reason = f"{WINDOW_FAILS} failures in {WINDOW_SECONDS // 60} min"
+            self._event("stopped: " + reason, job_id=job_id)
+            try:
+                from .room import say
+                say("hive", f"{job_id}: stopped after {reason}; shelved, see job log. @phil",
+                    author="floor", write=lambda _: None)
+            except Exception:
+                pass  # Notification failure must not replace the job's stop result.
+            spent = ", ".join(f"{n} {c}" for n, c in sorted(used.items(), key=lambda kv: -kv[1]))
+            raise RuntimeError(f"agent stopped after {reason}; edits remain in the work folder; "
+                               f"tool calls: {spent}")
 
         def refuse(text):
             nonlocal invalid
@@ -764,6 +792,7 @@ class AgentBackend(Backend):
                     continue
                 if not self._failover(exc):
                     raise
+                record_failure()
                 # Retry with native tools on API backends. Several models
                 # (notably Groq GPT-OSS) return tool calls even when asked for
                 # Mega Zword's text protocol, which the provider can reject.
@@ -857,6 +886,8 @@ class AgentBackend(Backend):
                 failed = result.startswith(("tool refused", "quality gate rejected")) or (
                     name == "run_tests" and not result.startswith("exit code 0"))
                 fails = fails + 1 if failed else 0
+                if failed:
+                    record_failure()
                 if fails >= FAIL_STOP:
                     spent = ", ".join(f"{n} {c}" for n, c in sorted(used.items(), key=lambda kv: -kv[1]))
                     raise RuntimeError(f"agent stopped after {fails} failed tool calls in a row; "
