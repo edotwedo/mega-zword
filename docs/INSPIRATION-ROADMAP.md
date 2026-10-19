@@ -8,9 +8,10 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
 
 ## Now
 
-1. [ ] **Erlang restart window (#11).** 3 failures in 10 minutes stops a job and posts
+1. [x] **Erlang restart window (#11).** 3 failures in 10 minutes stops a job and posts
    to Phil instead of riding it to the step cap. `agent.py`.
    Done when: a scripted model that fails repeatedly stops early, with a test.
+   Done 2026-10-19: Codex `61181b1` + Beacon-17 `f21331f` (red test runs don't count).
 2. [x] **PagerDuty escalation (#2).** A Broadcast from `phil`/`phone` with no reply in
    N minutes escalates through the roster, then the phone topic ("nobody picked up").
    New `src/megazword/escalate_watch.py` + tests + a CLI hook.
