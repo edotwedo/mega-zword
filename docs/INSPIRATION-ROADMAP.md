@@ -40,7 +40,11 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
    ~5k chars for this repo. Prompt hook still to do, after #1 lands in `agent.py`.
 6. [x] **RimWorld priority grid (#14).** Seats x work types in one table Phil can edit.
    Done 2026-10-19: grid added to `docs/HIVE-ROSTER.md`.
-7. [ ] **Powerwall reserve (#8).** Show the 20% floor per AI in `megazword usage`.
+7. [x] **Powerwall reserve (#8).** `megazword usage` appends each metered AI's
+   reserve and spendable percentage, or `AT RESERVE: hold heavy work`.
+   Display only; routing is unchanged. Default 20%; override in
+   `~/.megazword/config.toml` with `[usage.reserve]` and e.g. `claude = 30`
+   (clamped to 0–100). Unknown meters get no suffix.
 8. [ ] **Andon (#7).** `megazword andon on|off` pauses jobs for everyone (a flag the
    agent loop checks before each step).
 9. [ ] **Spot warning (#9).** A seat near 25% writes a checkpoint note and hands off.

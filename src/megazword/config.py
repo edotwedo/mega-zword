@@ -237,6 +237,8 @@ class Config:
     lean: bool = True
     # AI name -> when its usage comes back. Set by hand for plans with no meter.
     out_until: dict[str, datetime] = field(default_factory=dict)
+    # Display-only [usage.reserve] overrides; unlisted AIs keep a 20% floor.
+    usage_reserve: dict[str, float] = field(default_factory=dict)
     free: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_FREE))
     room_primary: str = "workshop"
     room_turn_cap: int = 12
@@ -277,6 +279,13 @@ def load(path: Path | None = None) -> Config:
         if isinstance(oneshot, dict) and isinstance(oneshot.get("lean"), bool):
             cfg.lean = oneshot["lean"]
         cfg.out_until = {name: _as_time(v) for name, v in data.get("out", {}).items()}
+        usage = data.get("usage", {})
+        reserve = usage.get("reserve", {}) if isinstance(usage, dict) else {}
+        if isinstance(reserve, dict):
+            import math
+            cfg.usage_reserve = {name: max(0, min(100, value))
+                                 for name, value in reserve.items()
+                                 if type(value) in (int, float) and math.isfinite(value)}
         limits = data.get("limits", {})
         for key in ("log_lines", "memory_lines"):
             if isinstance(limits.get(key), int) and limits[key] > 0:

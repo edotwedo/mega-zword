@@ -287,13 +287,23 @@ def show_usage() -> int:
     from .usage_sources import all_usage
     plans = all_usage(config.HOME / "log.jsonl")
     by_name = {p.service: p for p in plans}
+    reserves = {}
     try:
-        out_until = config.load().out_until
+        cfg = config.load()
+        out_until = cfg.out_until
+        reserves = cfg.usage_reserve
     except (ValueError, TypeError, OSError):
         out_until = {}
     # Same one-line summary as the start screen and dashboard, then details.
     for summary in summarize_all(plans, out_until):
-        print(summary.line())
+        line = summary.line()
+        if summary.state == "meter" and summary.used is not None:
+            reserve = reserves.get(summary.service, 20)
+            left = max(0, 100 - summary.used)
+            spendable = ("AT RESERVE: hold heavy work" if left <= reserve
+                         else f"{left - reserve:.0f}% spendable")
+            line += f"  (reserve {reserve:g}%, {spendable})"
+        print(line)
         plan = by_name.get(summary.service)
         if plan and plan.windows:
             parts = []
