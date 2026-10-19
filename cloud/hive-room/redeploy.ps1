@@ -14,6 +14,11 @@ try {
     if (!(Test-Path -LiteralPath 'wrangler.local.json')) {
         throw 'wrangler.local.json missing. Run deploy.ps1 once (or restore the file) first.'
     }
+    # A stale CLOUDFLARE_API_TOKEN in the environment blocks OAuth login AND is used
+    # instead of it, but it lacks access to this Worker (error 9109 / "No access to
+    # the specified service"). Clear both for this run so OAuth is used.
+    $env:CLOUDFLARE_API_TOKEN = $null
+    $env:CLOUDFLARE_ACCOUNT_ID = $null
     Write-Host 'Signing in to Cloudflare (opens a browser if needed)...'
     npx --yes wrangler@4 login
     Write-Host 'Deploying Worker code (no token rotation)...'
