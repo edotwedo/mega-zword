@@ -8,8 +8,10 @@ No @mentions (that used to spawn one-shots / wake GitHub bots).
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -66,6 +68,14 @@ def ping(body: str, cfg: config.Config | None = None) -> None:
         pass
     try:
         _toast("Mega Zword", body)
+    except (OSError, ValueError, TimeoutError):
+        pass
+    # Wake every seat running `megazword room wait`: the Worker uses the same
+    # "hive:<id>" signal on the PC topic, and any number wakes it.
+    try:
+        pc = os.environ.get("MEGAZWORD_NTFY_PC_TOPIC") or "megazword-hive-pc-pqymb6"
+        req = urllib.request.Request(f"https://ntfy.sh/{pc}", data=b"hive:0", method="POST")
+        urllib.request.urlopen(req, timeout=8).close()
     except (OSError, ValueError, TimeoutError):
         pass
 

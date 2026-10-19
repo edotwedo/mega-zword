@@ -103,6 +103,16 @@ def test_main_prints_each_message(tmp_path, monkeypatch, capsys):
     assert "[chatgpt]" in out
 
 
+def test_announce_lines_wake_a_seat(tmp_path, monkeypatch):
+    monkeypatch.setattr(room_wait.config, "HOME", tmp_path)
+    announce = room.RoomMessage(time="2026-10-19T00:00", author="floor",
+                                text="ANNOUNCE: check the hive for assignments",
+                                remote_id=5, remote_url="https://room.example")
+    room_obj = FakeRoom([announce])
+    got = room_wait.wait_for_phil(room_obj, "t", tmp_path / "s.json", sleep=lambda s: None)
+    assert [m.remote_id for m in got] == [5]
+
+
 def test_default_state_is_per_seat(tmp_path, monkeypatch):
     monkeypatch.setattr(room_wait.config, "HOME", tmp_path)
     monkeypatch.setenv("MEGAZWORD_SEAT", "Beacon-17")
