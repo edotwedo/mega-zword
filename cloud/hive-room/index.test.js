@@ -241,7 +241,7 @@ test('MCP rejects non-object arguments and hides storage failures', async () => 
 // ntfy pings (2026-10-18): Phil's lanes wake the PC; @phil pings his phone. Never the text.
 const philToken = crypto.randomUUID();
 const pingEnv = {...env, NTFY_PC_TOPIC: 'pc-topic', NTFY_PHONE_TOPIC: 'phone-topic',
-  SEAT_TOKENS: JSON.stringify({...JSON.parse(env.SEAT_TOKENS), [await digest(philToken)]: 'claude-web'})};
+  SEAT_TOKENS: JSON.stringify({...JSON.parse(env.SEAT_TOKENS), [await digest(philToken)]: 'phil'})};
 const pings = [];
 const fakeFetch = async (url, init) => { pings.push({url, ...init}); return new Response('ok'); };
 const post = (tok, text, e = pingEnv, path = '/rooms/hive/messages') => handle(new Request('https://room.example' + path, {
@@ -276,6 +276,14 @@ test('no topics configured means no pings, and a failing ntfy never fails the po
     headers: {Authorization: `Bearer ${philToken}`, 'Content-Type': 'application/json'}, body: JSON.stringify({text: 'x'})}),
     pingEnv, store, new Date(), undefined, async () => { throw new Error('down'); });
   assert.equal(res.status, 201);
+});
+
+test('web connector lanes are not Phil and never wake the PC', async () => {
+  const webToken = crypto.randomUUID();
+  const webEnv = {...env, NTFY_PC_TOPIC: 'pc-topic', NTFY_PHONE_TOPIC: 'phone-topic',
+    SEAT_TOKENS: JSON.stringify({...JSON.parse(env.SEAT_TOKENS), [await digest(webToken)]: 'claude-web'})};
+  assert.equal((await post(webToken, 'routine note', webEnv)).status, 201);
+  assert.equal(pings.length, 0);
 });
 
 test('a post from the phone lane pings the PC topic so seats wake', async () => {

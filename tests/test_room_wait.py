@@ -69,7 +69,7 @@ def test_ignores_bots_and_non_hive_lines(tmp_path):
 
 def test_state_file_written_when_missing(tmp_path):
     state = tmp_path / "nested" / "s.json"
-    room_obj = FakeRoom([msg("claude-web", 1)])
+    room_obj = FakeRoom([msg("phone", 1)])
     got = room_wait.wait_for_phil(room_obj, "t", state, sleep=lambda s: None)
     assert [m.remote_id for m in got] == [1]
     assert json.loads(state.read_text(encoding="utf-8"))["last"] == 1

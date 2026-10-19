@@ -15,7 +15,7 @@ this until ~05:00, then hands off.
 
 1. [x] **Phone client page at `/app/<key>`** — read + post + Broadcast, same-origin,
    strict CSP, key never baked into the page. Lumen-20, `26262db`; worker tests 32/32.
-2. [x] **`phone` lane + PC ping.** `phone` is in `PC_SEATS` in
+2. [x] **`phone` lane + PC ping.** `phone` is in `PHIL_LANES` in
    `cloud/hive-room/index.js`, so a phone post pings the PC topic. Lumen-20,
    `545f458`; unit test with a fake fetch. A dedicated `phone` key is optional —
    Phil's phone posts on the `phil` lane today.

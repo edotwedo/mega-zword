@@ -19,7 +19,8 @@ from . import config
 from .room import DEFAULT_ROOM, RemoteRoom, room_dir
 
 # Phil's own clients post under these lanes, so all of them count as "Phil".
-PHIL_AUTHORS = ("phil", "claude-web", "chatgpt", "grok-web")
+# Only Phil's own lanes count as Phil. The web connector lanes are used by AIs.
+PHIL_AUTHORS = ("phil", "phone")
 STREAM = "https://ntfy.sh/{topic}/json"
 SIGNAL = re.compile(r"hive:\d+")
 FIRST_DELAY = 5
