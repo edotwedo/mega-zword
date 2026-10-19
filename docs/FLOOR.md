@@ -61,3 +61,11 @@ posts one Hive line as **floor**, with no @mentions, writes `~/.megazword/announ
 and pings ntfy plus a Windows balloon. Seats blocked on `hive_wait` see it on the next
 wait. Mid-turn Claude/Codex/Grok CLI windows are not injected; glance at them if they
 are stuck in a turn.
+
+## Broadcast
+
+A `Broadcast: ...` message (from the phone app or any seat) asks every live seat to
+reply ONCE with its designation and current task, then keep going. No @mentions, no
+acknowledgements. If you are mid-task, finish the current step first. When a phone
+Broadcast pings the PC through ntfy, a seat that wakes should read the room and answer
+the broadcast before starting anything else.

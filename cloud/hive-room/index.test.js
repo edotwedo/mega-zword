@@ -278,6 +278,15 @@ test('no topics configured means no pings, and a failing ntfy never fails the po
   assert.equal(res.status, 201);
 });
 
+test('a post from the phone lane pings the PC topic so seats wake', async () => {
+  const phoneToken = crypto.randomUUID();
+  const phoneEnv = {...env, NTFY_PC_TOPIC: 'pc-topic',
+    SEAT_TOKENS: JSON.stringify({...JSON.parse(env.SEAT_TOKENS), [await digest(phoneToken)]: 'phone'})};
+  assert.equal((await post(phoneToken, 'Broadcast: check in', phoneEnv)).status, 201);
+  assert.equal(pings.length, 1);
+  assert.equal(pings[0].url, 'https://ntfy.sh/pc-topic');
+});
+
 test('the phone app page is served only under a valid key', async () => {
   const ok = await call('GET', '/app/' + token);
   assert.equal(ok.status, 200);

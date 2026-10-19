@@ -185,7 +185,7 @@ async function postMessage(store, identity, seat, room, body, key, now) {
   return message ? {message, status: 201} : {error: 'seat limit: 30 messages per minute', status: 429};
 }
 
-const PC_SEATS = new Set(['phil', 'claude-web', 'chatgpt', 'grok-web']);
+const PC_SEATS = new Set(['phil', 'claude-web', 'chatgpt', 'grok-web', 'phone']);
 
 // Fire an ntfy notification after a successful POST. Never includes message text.
 // Uses ctx.waitUntil when available so the response is not delayed; otherwise awaits.
