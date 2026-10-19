@@ -30,6 +30,8 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
 5. [ ] **Repo map (#17).** Regex-based ranked map of key symbols (~1-2k tokens) offered
    to models instead of file dumps. New `src/megazword/repo_map.py` + tests + one
    prompt hook.
+   Module done (Juniper-16, 2026-10-19): `megazword map [focus...] [--root] [--chars]`,
+   ~5k chars for this repo. Prompt hook still to do, after #1 lands in `agent.py`.
 6. [x] **RimWorld priority grid (#14).** Seats x work types in one table Phil can edit.
    Done 2026-10-19: grid added to `docs/HIVE-ROSTER.md`.
 7. [ ] **Powerwall reserve (#8).** Show the 20% floor per AI in `megazword usage`.
