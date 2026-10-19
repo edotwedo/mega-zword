@@ -1,5 +1,9 @@
 [build-system]
-requires = ["setuptools>=68"]
+# >=77 is not a preference: `license = "LicenseRef-Proprietary"` below is a
+# PEP 639 SPDX expression, and setuptools older than 77 rejects it outright
+# ("project.license must be valid exactly by one definition"), so metadata
+# generation fails before the package is built.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
