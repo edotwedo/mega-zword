@@ -18,9 +18,12 @@ repo is the only handoff. Nothing lives only in a chat.
   only when he asks. The terminal reboot/restore test is explicitly deferred
   until Phil is ready near 90% Codex usage; never reboot at a meter threshold.
 - **Designation in your console tab (Phil, 2026-10-17).** As soon as you pick your
-  designation, put it in the title of the terminal tab you run in. Try
-  `python -c "open('CONOUT$','w').write(chr(27)+']0;YOUR-NAME'+chr(7))"`; if the tab
-  doesn't change, ask Phil to rename it (right-click the tab, Rename Tab). Keep the
+  designation, put it in the title of the terminal tab you run in. The launchers
+  (`scripts/hive_up.ps1`, `start_beta2.ps1`) name the tab with `--suppressApplicationTitle`
+  so Claude Code can't overwrite it. A bot can't rename its own tab: tool commands run
+  in a hidden console, so title escape codes and `[Console]::Title` hit that console,
+  not Phil's tab. If you weren't started by a launcher, ask Phil to rename the tab
+  (right-click the tab, Rename Tab) and never claim you did it. Keep the
   same designation for the whole session, including after a restart or summary.
   Never rename yourself without asking Phil: STATUS, handoffs and scheduled tasks
   refer to you by that name.
@@ -87,9 +90,9 @@ Hive participation (mandatory, Phil 2026-10-18). You are a worker Phil collabora
 with, not a chatroom bot. Every session:
 
 1. Designation = MEGAZWORD_SEAT, which is your terminal tab's name (set per tab by
-   scripts/hive_up.ps1 and the Codex launcher). If it is unset, read the tab title:
-   `powershell -NoProfile -Command "[Console]::Title"`. Only if both are unclear,
-   use docs/HIVE-ROSTER.md or choose Word-NN and add a row. Keep it for the whole
+   scripts/hive_up.ps1 and the Codex launcher). If it is unset, use docs/HIVE-ROSTER.md
+   or choose Word-NN and add a row (reading `[Console]::Title` from a tool shell returns
+   a hidden console's title, not your tab's). Keep it for the whole
    session; never inherit another session's designation.
 2. Join: read the room (`megazword room show --room hive -n 20`) and post ONE line:
    `<designation>: online - <current task>`. Coordination, not a greeting.

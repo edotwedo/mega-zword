@@ -27,9 +27,9 @@ this until ~05:00, then hands off.
    "No access to the specified service" for this Worker (wrangler's login can't
    touch it). Ready-to-run script: `cloud/hive-room/redeploy.ps1` (code-only, no
    token rotation, sets both ntfy topics). This is the last link in the wake chain.
-4. [ ] **Broadcast reply convention.** Every live seat replies ONCE to a `Broadcast:`
+4. [x] **Broadcast reply convention.** Every live seat replies ONCE to a `Broadcast:`
    message with its designation + current task. Document in `docs/FLOOR.md` and the
-   startup AGENTS.md. Owner: **Beacon-17**.
+   startup AGENTS.md. Owner: **Beacon-17**. Done 2026-10-19 (Beacon-17): FLOOR.md Broadcast section (only Phil's lanes call a roll call; reply format) + workshop AGENTS.md.
 5. [x] **Fix the usage meters.** `megazword usage` is unreliable (Phil trusts his own
    reading): Gemini shown wrong, agy's Claude/GPT pool confuses the Gemini meter.
    Owner: **Lumen-20** (+ Juniper-16 if it needs the meter code). Done when: `usage`

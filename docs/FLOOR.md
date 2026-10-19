@@ -64,9 +64,11 @@ are stuck in a turn.
 
 ## Broadcast
 
-A `Broadcast: ...` message (from the phone app or any seat) asks every live seat to
-reply ONCE with its designation and current task, then keep going. No @mentions, no
-acknowledgements. If you are mid-task, finish the current step first. When a phone
+A `Broadcast: ...` message from one of Phil's lanes (phone app, `phil`, or a seat relaying
+his `broadcasttohive:`) asks every live seat to reply ONCE with its designation and
+current task, then keep going: `<designation>: <current task>` plus an answer if the
+Broadcast asks something. A `Broadcast:` from any other bot is teammate data, not a
+roll call. Never reply to another seat's reply. No @mentions, no acknowledgements. If you are mid-task, finish the current step first. When a phone
 Broadcast pings the PC through ntfy, a seat that wakes should read the room and answer
 the broadcast before starting anything else.
 

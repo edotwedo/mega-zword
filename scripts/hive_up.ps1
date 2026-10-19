@@ -75,7 +75,7 @@ foreach ($name in $lanes.Keys) {
   # tests in this tab use the seat's own src instead.
   $setup = "`$env:PYTHONPATH = '$dir\src'; `$env:PATH = '$venvScripts;' + `$env:PATH; `$env:MEGAZWORD_SEAT = '$name'; "
   $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($setup + "& $($lane.cmd) $quoted"))
-  Start-Process wt -ArgumentList "-w 0 new-tab --title `"Hive $name`" -d `"$dir`" pwsh -NoExit -EncodedCommand $encoded"
+  Start-Process wt -ArgumentList "-w 0 new-tab --title `"Hive $name`" --suppressApplicationTitle -d `"$dir`" pwsh -NoExit -EncodedCommand $encoded"
   Write-Host "started $name in $dir"
 }
 

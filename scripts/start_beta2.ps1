@@ -64,7 +64,7 @@ foreach ($name in $lanes.Keys) {
     continue
   }
   $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("& $($lane.cmd) $quoted"))
-  Start-Process wt -ArgumentList "-w 0 new-tab --title `"MZ $name`" -d `"$dir`" pwsh -NoExit -EncodedCommand $encoded"
+  Start-Process wt -ArgumentList "-w 0 new-tab --title `"MZ $name`" --suppressApplicationTitle -d `"$dir`" pwsh -NoExit -EncodedCommand $encoded"
   Write-Host "started $name in $dir ($($lane.branch))"
 }
 Write-Host 'Claude stays the lead in your main window. Mistral is routed by Mega Zword (B14), not a terminal lane.'
