@@ -227,6 +227,10 @@ def build_parser() -> argparse.ArgumentParser:
     room_say.add_argument("text", help="message to post")
     room_say.add_argument("--room", default="hive", help="room name (default: hive)")
     room_say.add_argument("--by", default="phil", help="author name (default: phil)")
+    room_say.add_argument("--force", action="store_true", help="post despite an active claim")
+
+    room_claims = room_sub.add_parser("claims", help="show active claims and conflicts")
+    room_claims.add_argument("--room", default="hive", help="room name (default: hive)")
 
     room_show = room_sub.add_parser("show", help="show recent room messages")
     room_show.add_argument("--room", default="hive", help="room name (default: hive)")
@@ -643,7 +647,7 @@ def main(argv: list[str] | None = None,
         from . import room
         action = getattr(args, "action", None)
         if not action:
-            print("Usage: megazword room start|stop|say|show|wait|post-summary", file=sys.stderr)
+            print("Usage: megazword room start|stop|say|show|claims|wait|post-summary", file=sys.stderr)
             return 2
         if action == "start":
             return room.run_room(args.room, args.turns, args.project, backends=backends, cfg=cfg,
@@ -652,10 +656,12 @@ def main(argv: list[str] | None = None,
             return room.stop(args.room)
         if action == "say":
             try:
-                return room.say(args.room, args.text, author=args.by, cfg=cfg)
+                return room.say(args.room, args.text, author=args.by, cfg=cfg, force=args.force)
             except (OSError, ValueError) as e:
                 print(f"[megazword room] {e}", file=sys.stderr)
                 return 2
+        if action == "claims":
+            return room.show_claims(args.room, cfg=cfg)
         if action == "show":
             try:
                 return room.show(args.room, n=args.n, cfg=cfg)

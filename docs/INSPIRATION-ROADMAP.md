@@ -48,7 +48,10 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
 8. [ ] **Andon (#7).** `megazword andon on|off` pauses jobs for everyone (a flag the
    agent loop checks before each step).
 9. [ ] **Spot warning (#9).** A seat near 25% writes a checkpoint note and hands off.
-10. [ ] **WIP cap (#7b).** At most one active claim per seat in the room.
+10. [x] **WIP cap (#7b).** At most one active claim per seat in the room.
+    `room claims` lists active claims and item conflicts; `room say` refuses a
+    second claim or another seat's item unless `--force` is used. A failed room
+    read permits posting. Claims use text designations, never lane tags.
 11. [x] **Seat renames its own tab (#18).** A bot runs under a hidden console, so it
    cannot see or set the tab Phil is looking at, and Command Code keeps re-asserting
    its own title over any one-shot change.

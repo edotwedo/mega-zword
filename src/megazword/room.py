@@ -579,11 +579,23 @@ def remote_configured(cfg: config.Config) -> bool:
 
 def say(room: str, text: str, author: str = "phil",
         home: Path | None = None, write: Callable[[str], None] = print,
-        cfg: config.Config | None = None) -> int:
+        cfg: config.Config | None = None, force: bool = False) -> int:
     """Post as the authenticated seat, or append locally when no URL is configured."""
     cfg = cfg or config.load()
     if not text.strip() or len(text) > 4000:
         raise ValueError("message must contain 1-4000 characters")
+    from .claims import active_claims, claim_from_text, item_numbers
+    claim = claim_from_text(text)
+    if claim and not force:
+        try:
+            opened = active_claims(claim_messages(room, cfg, home))
+        except (OSError, ValueError, KeyError, TypeError):
+            opened = {}  # A failed read must never prevent posting.
+        for designation, (item, _, _) in opened.items():
+            if designation.lower() == claim[0].lower() or item_numbers(item) & item_numbers(claim[1]):
+                safe_write(write, f"[megazword room] {designation} has open claim '{item}'; "
+                           f"post '{designation}: releasing {item}' first (or use --force)")
+                return 1
     if remote_configured(cfg):
         client = RemoteRoom(room, cfg, home)
         pending = client.flush(text)
@@ -592,6 +604,32 @@ def say(room: str, text: str, author: str = "phil",
     check_author(author)
     msg = append_message(room, author, text, home=home)
     safe_write(write, f"[{msg.author}] {msg.text}")
+    return 0
+
+
+def claim_messages(room: str, cfg: config.Config, home: Path | None = None) -> list[RoomMessage]:
+    """Refresh once and use the existing cache; propagate read errors to the caller."""
+    if remote_configured(cfg):
+        client = RemoteRoom(room, cfg, home)
+        client.refresh()
+        return client.cached()
+    return read_messages(room, home)
+
+
+def show_claims(room: str, home: Path | None = None,
+                write: Callable[[str], None] = print, cfg: config.Config | None = None) -> int:
+    from .claims import active_claims, claim_conflicts
+    try:
+        opened = active_claims(claim_messages(room, cfg or config.load(), home))
+    except (OSError, ValueError, KeyError, TypeError):
+        safe_write(write, "[megazword room] claims unavailable; room could not be read")
+        return 1
+    for designation, (item, message_id, time) in opened.items():
+        safe_write(write, f"{designation}: {item} (message {message_id}, {time})")
+    for first, second, number in claim_conflicts(opened):
+        safe_write(write, f"Conflict: {first} and {second} both claim #{number}")
+    if not opened:
+        safe_write(write, "[megazword room] no active claims")
     return 0
 
 
