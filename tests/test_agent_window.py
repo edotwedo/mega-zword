@@ -79,6 +79,15 @@ def test_room_failure_preserves_stop_and_edits(tmp_path, monkeypatch, isolated_c
     assert len(attempts) == 1 and "PRIVATE DRAFT" not in str(attempts)
 
 
+def test_failing_test_runs_while_fixing_do_not_trip_the_window(tmp_path, isolated_calls):
+    import sys
+    red = [call("run_tests"), call("list_files", glob="*")] * 3
+    loop, model = coding(tmp_path, red + [call("finish", summary="fixed")], max_steps=20,
+                         clock=lambda: 0, test_command=(sys.executable, "-c", "raise SystemExit(1)"))
+    assert loop.run("fix the bug").ok
+    assert not isolated_calls
+
+
 def test_window_counts_each_tool_in_a_batch(tmp_path, isolated_calls):
     batch = {"tool_calls": [call("read_file", path=f"missing-{i}")["tool_calls"][0]
                             for i in range(4)]}

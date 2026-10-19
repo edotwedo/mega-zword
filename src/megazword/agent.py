@@ -886,7 +886,9 @@ class AgentBackend(Backend):
                 failed = result.startswith(("tool refused", "quality gate rejected")) or (
                     name == "run_tests" and not result.startswith("exit code 0"))
                 fails = fails + 1 if failed else 0
-                if failed:
+                # Red test runs are normal while fixing a bug; only the in-a-row limit
+                # covers them. The window counts refusals, rejected edits and failovers.
+                if failed and name != "run_tests":
                     record_failure()
                 if fails >= FAIL_STOP:
                     spent = ", ".join(f"{n} {c}" for n, c in sorted(used.items(), key=lambda kv: -kv[1]))
