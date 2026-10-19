@@ -69,6 +69,9 @@ class CLIBackend(Backend):
     exe: str = ""
     args: list[str] = field(default_factory=list)
     cwd: str = ""  # folder the CLI works in; "" = this process's folder (night jobs set it)
+    # Exit codes that still carry a usable answer on stdout. Most CLIs use 0 only;
+    # cmdc also exits 8 (max turns) after printing the partial answer it managed.
+    ok_codes: frozenset[int] = frozenset({0})
 
     def available(self) -> bool:
         return shutil.which(self.exe) is not None
@@ -100,7 +103,7 @@ class CLIBackend(Backend):
             _kill_tree(proc)
             raise TimeoutError(f"{self.exe} gave no answer within {self.timeout}s "
                                "(change [timeouts] in config.toml)") from None
-        if proc.returncode != 0:
+        if proc.returncode not in self.ok_codes:
             detail = (err or out).strip()[-500:]
             raise RuntimeError(f"{self.exe} exited with code {proc.returncode}: {detail}")
         self._check_output(out, err)
@@ -257,7 +260,8 @@ def cmdc_backend(name: str = "cmdc", model: str = "") -> CLIBackend:
     pushed job while our agent loop on a Command Code model spent 60 steps reading."""
     args = ["-p", "--yolo", "--skip-onboarding", "--no-auto-update", "--max-turns", "60",
             *(["-m", model] if model else []), *add_dirs()]
-    return CmdcBackend(name, exe="cmdc", args=args)  # prompt goes in on stdin
+    # Exit 8 = --max-turns hit; cmdc still prints the partial answer, so keep it.
+    return CmdcBackend(name, exe="cmdc", args=args, ok_codes=frozenset({0, 8}))  # prompt on stdin
 
 
 @dataclass
