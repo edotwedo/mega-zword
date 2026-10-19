@@ -272,3 +272,29 @@ def test_agy_quota_error_does_not_mark_gemini_out_when_its_own_meter_has_room(mo
     empty = PlanUsage("gemini", [Window("weekly", 100.0, None)], "agy /usage")
     monkeypatch.setattr(usage_sources, "gemini", lambda *a, **k: empty)
     assert cli.auto_mark_out("gemini", error, cfg) and "gemini" in cfg.out_until
+
+
+# Verbatim agy /usage captured on Phil's PC, 2026-10-18 22:15. The Gemini group
+# reports a single "weekly" bucket; the Claude/GPT pool is separate and must never
+# drive the Gemini meter. Locked here so a provider shape change is caught.
+AGY_USAGE_LIVE = {"status": "SUCCESS", "command": {"name": "usage", "data": {
+    "groups": [
+        {"name": "Gemini Models",
+         "description": "Models within this group: Gemini Flash, Gemini Pro",
+         "buckets": [{"id": "gemini-weekly", "name": "Weekly Limit Remaining",
+                      "window": "weekly", "remaining_fraction": 0.8268759846687317,
+                      "reset_time": "2026-10-23T22:49:32Z"}]},
+        {"name": "Claude and GPT models",
+         "description": "Models within this group: Claude Opus, Claude Sonnet, GPT-OSS",
+         "buckets": [{"id": "3p-weekly", "name": "Weekly Limit Remaining", "window": "weekly",
+                      "remaining_fraction": 1, "reset_time": "2026-10-26T01:16:39Z"}]},
+    ]}}}
+
+
+def test_parse_agy_usage_matches_the_live_panel():
+    windows = usage_sources.parse_agy_usage(AGY_USAGE_LIVE)
+    by_name = {w.name: w for w in windows}
+    assert set(by_name) == {"weekly", "Claude and GPT models: weekly"}
+    assert by_name["weekly"].used_percent == pytest.approx(17.3124, abs=0.01)
+    assert by_name["weekly"].resets_at == datetime(2026, 10, 23, 22, 49, 32, tzinfo=timezone.utc)
+    assert by_name["Claude and GPT models: weekly"].used_percent == pytest.approx(0)
