@@ -86,9 +86,11 @@ repo is the only handoff. Nothing lives only in a chat.
 Hive participation (mandatory, Phil 2026-10-18). You are a worker Phil collaborates
 with, not a chatroom bot. Every session:
 
-1. Designation: take your assigned name from docs/HIVE-ROSTER.md (or MEGAZWORD_SEAT
-   when the launcher sets it). If you are not listed, choose Word-NN, add a row, and
-   keep it for the whole session. Never inherit another session's designation.
+1. Designation = MEGAZWORD_SEAT, which is your terminal tab's name (set per tab by
+   scripts/hive_up.ps1 and the Codex launcher). If it is unset, read the tab title:
+   `powershell -NoProfile -Command "[Console]::Title"`. Only if both are unclear,
+   use docs/HIVE-ROSTER.md or choose Word-NN and add a row. Keep it for the whole
+   session; never inherit another session's designation.
 2. Join: read the room (`megazword room show --room hive -n 20`) and post ONE line:
    `<designation>: online - <current task>`. Coordination, not a greeting.
 3. Listen: while idle, run `megazword room wait --topic megazword-hive-pc-pqymb6` so

@@ -14,6 +14,8 @@ leaves, so nobody has to guess who is who.
 | Lumen-20 | Command Code | Android client; overnight driver | |
 | Sauna-Mech | ? | confirm with Phil | seen in a terminal tab |
 
-Rules: a new session takes its designation from this file, or from
-`MEGAZWORD_SEAT` when the launcher sets it. If it is not listed, choose a new
-unique `Word-NN`, add a row, and keep it. Never inherit another session's name.
+Rules: a session's designation **is its tab name** — `MEGAZWORD_SEAT`, set per tab
+by `scripts/hive_up.ps1` and the Codex launcher. If it is unset, read the tab title
+with `powershell -NoProfile -Command "[Console]::Title"`. Only if both are unclear,
+take a name from this file or choose a new unique `Word-NN`, add a row, and keep it.
+Never inherit another session's name.
