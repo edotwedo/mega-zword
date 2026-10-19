@@ -25,6 +25,8 @@ as the stable copy and expect `main` to lag behind active development.
 - **Sentinel:** logs reboots, logins and network drops; optional alerts.
 - **Free-first routing:** configured free APIs and local Ollama get first attempts at every difficulty; Gemini API and Antigravity CLI remain separate identities. Paid CLI subscriptions are fallbacks.
 
+An offline research prototype for task-specific routing is available as `megazword route-lab benchmark` and `megazword route-lab preview --task code`. It uses synthetic candidates only and never calls a provider; see [the routing research and results](docs/ROUTING_RESEARCH.md).
+
 ## Requirements
 
 - Python 3.11 or newer.

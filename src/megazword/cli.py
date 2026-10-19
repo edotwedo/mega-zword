@@ -20,8 +20,8 @@ from .routing import spread
 
 COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job"),
-    "See": ("start", "usage", "credits", "scout", "plan", "stats", "advise", "dashboard", "projects", "history", "export",
-            "sentinel", "floor", "brief", "free"),
+    "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
+            "sentinel", "floor", "brief", "announce", "free"),
     "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp"),
     "Memory": ("note", "decide", "import-hive"),
 }
@@ -134,6 +134,19 @@ def build_parser() -> argparse.ArgumentParser:
     scout_parser.add_argument("--provider", action="append", dest="providers",
                               help="probe only this backend (repeatable; allows Tencent grants)")
     sub.add_parser("plan", help="rank the AIs for new work by live spare usage")
+    route_lab = sub.add_parser("route-lab", help="offline routing prototype; never calls a provider")
+    route_actions = route_lab.add_subparsers(dest="route_action", metavar="ACTION")
+    route_preview = route_actions.add_parser("preview", help="show a route; --approve executes only the local simulator")
+    route_preview.add_argument("--task", choices=("summary", "extract", "code"), default="code")
+    route_preview.add_argument("--budget-usd", type=float, default=0.0,
+                               help="simulated per-task spend ceiling (default: $0)")
+    route_preview.add_argument("--reliability-floor", type=float,
+                               help="override the task's minimum 95% lower-bound reliability (0..1)")
+    route_preview.add_argument("--no-remote", action="store_true",
+                               help="exclude remote candidates, including free hosted APIs")
+    route_preview.add_argument("--approve", action="store_true",
+                               help="approve the selected simulated route and run local verification")
+    route_actions.add_parser("benchmark", help="run reproducible synthetic routing benchmark")
     sub.add_parser("start", help="text start screen (plain `megazword` opens the app window)")
     sub.add_parser("projects", help="list projects with memory entries and last activity")
     sub.add_parser("advise", help="suggest a route order from stats and votes (changes nothing)")
@@ -147,15 +160,19 @@ def build_parser() -> argparse.ArgumentParser:
                       help="for install: actually create the scheduled task")
     floor = sub.add_parser("floor", help="Hive floor: seats, introduce, peek/wait; suggest picks a seat")
     floor.add_argument("action", nargs="?",
-                       choices=("status", "introduce", "peek", "wait", "suggest"),
+                       choices=("status", "introduce", "peek", "wait", "suggest", "announce"),
                        default="status")
     floor.add_argument("kind", nargs="?", choices=("bulk", "edit", "decide", "review"),
                        help="suggest: which seated model should take this kind of job")
+    floor.add_argument("-m", "--message", default="",
+                       help="announce: the one-shot text (or use: megazword announce TEXT)")
     floor.add_argument("--room", default="hive", help="hive room name (default: hive)")
     floor.add_argument("-n", type=int, default=10, help="peek: how many messages")
     floor.add_argument("--timeout", type=int, default=120, help="wait: seconds to block")
     floor.add_argument("--after", type=int, default=None,
                        help="wait: message count from peek's (after=N); returns anything newer")
+    from .announce import add_parser as add_announce_parser
+    add_announce_parser(sub)
     sub.add_parser("mcp", help="Hive MCP server on stdio (for AI CLIs to connect to)")
     from .briefing import add_parser as add_brief_parser
     add_brief_parser(sub)
@@ -380,6 +397,9 @@ def main(argv: list[str] | None = None,
     if argv is None:  # real CLI run, not a test calling main([...])
         config.load_user_env()
     args = build_parser().parse_args(argv)
+    if args.command == "route-lab":
+        from .router_lab import command as route_lab_command
+        return route_lab_command(args)
     if args.command == "keys":
         from .keys import command
         return command(args.action)
@@ -417,6 +437,9 @@ def main(argv: list[str] | None = None,
     if args.command == "night":
         from .night import command
         return command(args, cfg)
+    if args.command == "announce":
+        from . import announce
+        return announce.command(args, cfg)
     if args.command in (None, "start"):
         from .start import render
         print(render(cfg))
