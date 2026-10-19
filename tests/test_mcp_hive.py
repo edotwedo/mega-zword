@@ -376,3 +376,33 @@ def test_cli_mcp_keeps_stray_prints_off_stdout(monkeypatch):
 def test_serve_bad_content_length_header_is_protocol_error(header):
     [reply] = framed_replies(serve_bytes(header + b"\r\n\r\n"))
     assert reply["error"]["code"] == -32700
+
+
+def test_cloud_read_refreshes_and_excludes_local_only_messages(monkeypatch):
+    cloud = room.RoomMessage(time="2026-10-19", author="phil", text="cloud wake")
+    calls = []
+    class Cloud:
+        def __init__(self, *args): pass
+        def refresh(self): calls.append("refresh")
+        def cached(self): return [cloud]
+    monkeypatch.setattr(room, "remote_configured", lambda cfg: True)
+    monkeypatch.setattr(room, "RemoteRoom", Cloud)
+    assert "[phil] cloud wake" in text_result(call_tool("hive_read", {}))
+    assert "[phil] cloud wake" in text_result(call_tool("hive_wait", {"after": 0, "timeout": 0}))
+    assert len(calls) == 2
+
+
+def test_cloud_wait_refreshes_without_quarter_second_requests(monkeypatch):
+    calls = []
+    now = [0.0]
+    cloud = room.RoomMessage(time="2026-10-19", author="phil", text="arrived remotely")
+    class Cloud:
+        def __init__(self, *args): pass
+        def refresh(self): calls.append(now[0])
+        def cached(self): return [cloud] if len(calls) > 1 else []
+    monkeypatch.setattr(room, "remote_configured", lambda cfg: True)
+    monkeypatch.setattr(room, "RemoteRoom", Cloud)
+    monkeypatch.setattr(floor, "monotonic", lambda: now[0])
+    monkeypatch.setattr(floor, "sleep", lambda seconds: now.__setitem__(0, now[0] + seconds))
+    assert floor.wait_for("hive", after=0, timeout=10) == [cloud]
+    assert calls == [0.0, 5.0]

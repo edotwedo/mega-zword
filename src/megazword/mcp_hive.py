@@ -105,7 +105,7 @@ def _lines(messages: list) -> str:
 def hive_read(args: dict) -> str:
     room_name = args.get("room") or "hive"
     n = int(args.get("n", 10))
-    msgs = room.read_messages(room_name)
+    msgs = floor.room_messages(room_name)
     if n <= 0 and msgs:  # like `floor peek -n 0`: cursor only
         return f"(after={len(msgs)})"
     recent = msgs[-n:] if n > 0 else []
@@ -136,7 +136,7 @@ def hive_wait(args: dict) -> str:
     timeout = min(max(0.0, timeout), MAX_WAIT_SECONDS)
     after = args.get("after")
     # Pin the baseline here so the reply can carry the next cursor.
-    after = len(room.read_messages(room_name)) if after is None else max(0, int(after))
+    after = len(floor.room_messages(room_name)) if after is None else max(0, int(after))
     msgs = floor.wait_for(room_name, after=after, timeout=timeout)
     return f"{_lines(msgs) or '(no new hive message)'}\n(after={after + len(msgs)})" + worker_messages()
 

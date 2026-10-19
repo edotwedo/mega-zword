@@ -222,9 +222,20 @@ def format_msg(msg) -> str:
     return f"[{msg.author}] {msg.text}"
 
 
+def room_messages(room_name: str, home: Path | None = None) -> list:
+    """Read the configured room, refreshing cloud messages before returning."""
+    from . import room
+    cfg = config.load(home / 'config.toml' if home is not None else None)
+    if room.remote_configured(cfg):
+        client = room.RemoteRoom(room_name, cfg, home)
+        client.refresh()
+        return client.cached()
+    return room.read_messages(room_name, home)
+
+
 def peek_text(room_name: str, n: int = 10, home: Path | None = None) -> str:
     from . import room
-    msgs = room.read_messages(room_name, home)
+    msgs = room_messages(room_name, home)
     if not msgs:
         return "(hive empty)\n(after=0)"
     lines = [format_msg(m) for m in msgs[-n:]] if n > 0 else []  # -n 0: cursor only
@@ -235,14 +246,16 @@ def wait_for(room_name: str, home: Path | None = None, after: int | None = None,
              timeout: float = 120, pause: float = 0.25) -> list:
     """Block until hive has more than `after` messages. after=None means current count."""
     from . import room
-    msgs = room.read_messages(room_name, home)
+    msgs = room_messages(room_name, home)
     baseline = len(msgs) if after is None else after
     if len(msgs) > baseline:
         return msgs[baseline:]
     deadline = monotonic() + max(0.0, timeout)
+    cfg = config.load(home / 'config.toml' if home is not None else None)
+    interval = max(pause, 5.0) if room.remote_configured(cfg) else pause
     while monotonic() < deadline:
-        sleep(pause)
-        msgs = room.read_messages(room_name, home)
+        sleep(min(interval, max(0.0, deadline - monotonic())))
+        msgs = room_messages(room_name, home)
         if len(msgs) > baseline:
             return msgs[baseline:]
     return []
