@@ -1146,8 +1146,10 @@ async function renderSetup() {
   let view;
   try { view = await (await fetch("/api/setup")).json(); }
   catch { $("setup-verdict").textContent = "Could not read the setup checks."; return; }
+  // Say how many routes there are, not a wall of 49 names: "installed" here means
+  // anything routable (CLIs and configured keys), and the checks below carry the detail.
   $("setup-verdict").textContent = view.ready
-    ? "Ready. " + (view.installed.length ? view.installed.join(", ") + " can run jobs." : "")
+    ? `Ready — ${view.installed.length} route(s) available. Details below.`
     : "Not ready yet — fix anything marked FAIL below.";
   $("setup-checks").innerHTML = (view.checks || []).map(c =>
     `<p class="side-label">${esc(c.level)} ${esc(c.name)}: ${esc(c.detail)}${c.hint ? " — " + esc(c.hint) : ""}</p>`
