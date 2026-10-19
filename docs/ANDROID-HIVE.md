@@ -26,14 +26,15 @@ this until ~05:00, then hands off.
 4. [ ] **Broadcast reply convention.** Every live seat replies ONCE to a `Broadcast:`
    message with its designation + current task. Document in `docs/FLOOR.md` and the
    startup AGENTS.md. Owner: **Beacon-17**.
-5. [~] **Fix the usage meters.** `megazword usage` is unreliable (Phil trusts his own
+5. [x] **Fix the usage meters.** `megazword usage` is unreliable (Phil trusts his own
    reading): Gemini shown wrong, agy's Claude/GPT pool confuses the Gemini meter.
    Owner: **Lumen-20** (+ Juniper-16 if it needs the meter code). Done when: `usage`
    matches the provider's own page across two consecutive readings.
    Status 2026-10-18 22:15: **verified live.** agy's own panel and `megazword usage`
    agree (Gemini 82.69% remaining = 17.31% used); the parser counts only the Gemini
    group and shows the Claude/GPT pool separately. Regression test with the verbatim
-   payload added. One reading down, one to go.
+   payload added. Second reading at 23:15 matched again (agy 17.31% vs meter 17%),
+   so item 5 is done.
 6. [x] **Phone app polish.** Unread badge (counts new messages while the page is
    hidden, clears when you look at it) and an offline cache of the last 200 messages
    in `localStorage`, restored on load. Owner: **Lumen-20**.
@@ -55,3 +56,5 @@ this until ~05:00, then hands off.
   written; driver loop scheduled hourly until 04:13.
 - 2026-10-18 22:15 (driver pass 1): usage meters verified against agy's own panel;
   regression test added. No seat has claimed a branch yet in the room.
+- 2026-10-18 23:15 (driver pass 2): meter matched a second reading -> item 5 done.
+  Item 6 (phone-app polish) landed as `9eea45f`. Still no seat claims.
