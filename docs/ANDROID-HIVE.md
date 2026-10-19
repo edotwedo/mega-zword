@@ -23,6 +23,10 @@ this until ~05:00, then hands off.
 3. [phil] **Deploy the Worker** with `NTFY_PC_TOPIC` / `NTFY_PHONE_TOPIC` and the
    `phone` key (`castle/hive-connectors.py` + `wrangler`). Owner: **Phil**.
    Done when: `/app/<phone-key>` loads and a Broadcast wakes a PC seat.
+   Status 2026-10-18 23:30: Lumen-20 **cannot** deploy — Cloudflare returns
+   "No access to the specified service" for this Worker (wrangler's login can't
+   touch it). Ready-to-run script: `cloud/hive-room/redeploy.ps1` (code-only, no
+   token rotation, sets both ntfy topics). This is the last link in the wake chain.
 4. [ ] **Broadcast reply convention.** Every live seat replies ONCE to a `Broadcast:`
    message with its designation + current task. Document in `docs/FLOOR.md` and the
    startup AGENTS.md. Owner: **Beacon-17**.
