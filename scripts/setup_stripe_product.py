@@ -27,7 +27,7 @@ import urllib.request
 API = "https://api.stripe.com/v1"
 DEFAULT_NAME = "Mega Zword - Founding License"
 DEFAULT_AMOUNT = 4900  # $49.00 in cents
-SUCCESS_URL = "https://megazword.pages.dev/?thanks=1"
+SUCCESS_URL = "https://www.megazword.com/?thanks=1"
 
 
 def _key() -> str:
