@@ -193,6 +193,7 @@ Mega Zword rates a prompt as easy, medium, or hard, then follows that level's or
 - **Codex:** read from the rate-limit snapshot Codex writes to its own session logs, so it is as fresh as your last Codex run.
 - **Grok:** the weekly credit percentage Grok's CLI logs when it fetches billing (`~/.grok/logs`). Grok has no 5-hour window.
 - **Gemini:** `agy -p /usage` (Antigravity's quota panel). Weekly only.
+- **Command Code (`cmdc`):** dollars and tokens, totalled from the usage every committed turn records in its own transcripts (`~/.commandcode/projects`), the same way the Codex fallback reads `~/.codex/sessions`. It reports what was spent, not what is left: remaining plan credits are not readable outside the app, so this meter shows a spend line instead of a bar.
 
 The 24-hour runs table also shows `est_tokens` per AI. Each attempt logs `(prompt_chars + answer_chars) // 4`. This is a rough size estimate, not billed tokens, money, or remaining quota. It counts the original prompt and returned answer; added memory, chat context, tool calls, and internal reasoning are not measured. Old log entries without an estimate count as zero. Failed and rejected attempts are included. The dashboard shows the same daily total in each chart tooltip and a per-attempt estimate in Recent runs.
 

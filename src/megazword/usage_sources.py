@@ -12,6 +12,10 @@
 - Gemini: asks the Antigravity CLI (`agy -p /usage --output-format json`, its
   quota panel; reads, never prompts a model). Without agy, reports Mega
   Zword's own recent run counts.
+- Command Code: totals the tokens and dollars each committed turn records in
+  its own transcripts (~/.commandcode/projects), the way the Codex fallback
+  reads ~/.codex/sessions. Spend only, no percent: its remaining plan credits
+  are not readable headlessly, so there is no window to show a bar for.
 """
 
 from __future__ import annotations
@@ -332,7 +336,90 @@ def _find_key(obj, key):
     return None
 
 
-SOURCES = {"claude": claude, "codex": codex}
+COMMAND_CODE_ROOT = HOME / ".commandcode" / "projects"
+CMDC_RECENT = timedelta(hours=5)
+CMDC_WEEK = timedelta(days=7)
+
+
+def _cmdc_transcripts(root: Path, since: datetime) -> list[Path]:
+    """Transcripts touched since `since`. One file per session, in a folder per
+    working directory (~/.commandcode/projects/<slug>/<session>.jsonl)."""
+    if not root.is_dir():
+        return []
+    cutoff = since.timestamp()
+    found = []
+    for path in root.rglob("*.jsonl"):
+        try:
+            if path.stat().st_mtime >= cutoff:
+                found.append(path)
+        except OSError:
+            continue
+    return found
+
+
+def _cmdc_spend(root: Path, since: datetime) -> tuple[int, float, int]:
+    """(calls, dollars, tokens) Command Code recorded at or after `since`."""
+    calls, cost, tokens = 0, 0.0, 0
+    for path in _cmdc_transcripts(root, since):
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            if '"usage"' not in line:  # skips the header and tool-only lines
+                continue
+            try:
+                entry = json.loads(line)
+                when = _ts(entry.get("timestamp"))
+            except ValueError:
+                continue
+            if when is None or when < since:
+                continue
+            usage = entry.get("usage") or {}
+            try:
+                cost += float(usage.get("costUsd") or 0.0)
+                tokens += int(usage.get("inputTokens") or 0) + int(usage.get("outputTokens") or 0)
+            except (TypeError, ValueError):
+                continue
+            calls += 1
+    return calls, cost, tokens
+
+
+def _token_label(tokens: int) -> str:
+    """Short human form; a week of 200k-token turns must not read as '196869k'."""
+    if tokens >= 1_000_000:
+        return f"{tokens / 1_000_000:.0f}M tok"
+    return f"{tokens // 1000}k tok"
+
+
+def command_code(projects_dir: Path | None = None,
+                 now: datetime | None = None) -> PlanUsage:
+    """Command Code's own spend, totalled from its local session transcripts.
+
+    Every committed turn records the call's usage - inputTokens, outputTokens,
+    cacheReadTokens, cacheWriteTokens and costUsd - plus the model it ran on, so
+    the dollars are already on disk. Same trick the Codex fallback uses on
+    ~/.codex/sessions: read the tool's own log, spend nothing to read it.
+
+    Deliberately absent: remaining plan credits. Command Code's docs say the plan
+    is not readable headlessly and its auth file is not ours to poke, so this
+    reports what was spent and never what is left. No window, therefore no
+    percent - `megazword usage` prints the note where a bar would go.
+    """
+    root = COMMAND_CODE_ROOT if projects_dir is None else projects_dir
+    now = now or datetime.now(timezone.utc)
+    calls, cost, tokens = _cmdc_spend(root, now - CMDC_WEEK)
+    if not calls:
+        return PlanUsage("cmdc", [], "command-code session logs",
+                         note="no Command Code usage in the last 7 days")
+    _, recent_cost, _ = _cmdc_spend(root, now - CMDC_RECENT)
+    return PlanUsage(
+        "cmdc", [], "command-code session logs",
+        note=f"spent ${recent_cost:.2f}/5h, ${cost:.2f}/7d, {_token_label(tokens)}; no plan meter",
+    )
+
+
+SOURCES = {"claude": claude, "codex": codex, "cmdc": command_code}
 
 
 def all_usage(log_path: Path | None = None) -> list[PlanUsage]:
