@@ -584,15 +584,19 @@ def say(room: str, text: str, author: str = "phil",
     cfg = cfg or config.load()
     if not text.strip() or len(text) > 4000:
         raise ValueError("message must contain 1-4000 characters")
-    from .claims import active_claims, claim_from_text, item_numbers
+    from .claims import active_claims, claim_from_text, item_keys, unkeyed_claim
     claim = claim_from_text(text)
+    if not force and unkeyed_claim(text):
+        safe_write(write, "[megazword room] a claim must name its item as #N or a quoted "
+                   "'name' so other seats can check it, e.g. \"Name-19: claiming 'claim lock'\"")
+        return 1
     if claim and not force:
         try:
             opened = active_claims(claim_messages(room, cfg, home), now=datetime.now(timezone.utc))
         except (OSError, ValueError, KeyError, TypeError):
             opened = {}  # A failed read must never prevent posting.
         for designation, (item, _, _) in opened.items():
-            if designation.lower() == claim[0].lower() or item_numbers(item) & item_numbers(claim[1]):
+            if designation.lower() == claim[0].lower() or item_keys(item) & item_keys(claim[1]):
                 safe_write(write, f"[megazword room] {designation} has open claim '{item}'; "
                            f"post '{designation}: releasing {item}' first (or use --force)")
                 return 1
@@ -600,11 +604,31 @@ def say(room: str, text: str, author: str = "phil",
         client = RemoteRoom(room, cfg, home)
         pending = client.flush(text)
         safe_write(write, f"[megazword room] {pending} queued; retry on next say/show" if pending else "[megazword room] sent as the authenticated seat")
-        return 0
-    check_author(author)
-    msg = append_message(room, author, text, home=home)
-    safe_write(write, f"[{msg.author}] {msg.text}")
+    else:
+        check_author(author)
+        msg = append_message(room, author, text, home=home)
+        safe_write(write, f"[{msg.author}] {msg.text}")
+    if claim and not force:
+        return _lost_race(room, claim, cfg, home, write)
     return 0
+
+
+def _lost_race(room: str, claim: tuple[str, str], cfg: config.Config,
+               home: Path | None, write: Callable[[str], None]) -> int:
+    """Two seats can pass the check seconds apart. Re-read: the earliest open claim
+    on the item wins and a later one releases itself, so only one seat works on it."""
+    from .claims import first_holder
+    try:
+        holder = first_holder(claim_messages(room, cfg, home), *claim)
+    except (OSError, ValueError, KeyError, TypeError):
+        return 0
+    if not holder:
+        return 0
+    # No item key in the release, so it frees only this seat's claim, not the winner's.
+    say(room, f"{claim[0]}: releasing my claim; {holder} claimed it first.",
+        home=home, write=lambda _s: None, cfg=cfg, force=True)
+    safe_write(write, f"[megazword room] {holder} claimed it first; your claim was released. Pick another item.")
+    return 1
 
 
 def claim_messages(room: str, cfg: config.Config, home: Path | None = None) -> list[RoomMessage]:
@@ -628,7 +652,8 @@ def show_claims(room: str, home: Path | None = None,
     for designation, (item, message_id, time) in opened.items():
         safe_write(write, f"{designation}: {item} (message {message_id}, {time})")
     for first, second, number in claim_conflicts(opened):
-        safe_write(write, f"Conflict: {first} and {second} both claim #{number}")
+        label = f"#{number}" if isinstance(number, int) else f"'{number}'"
+        safe_write(write, f"Conflict: {first} and {second} both claim {label}")
     if not opened:
         safe_write(write, "[megazword room] no active claims")
     return 0

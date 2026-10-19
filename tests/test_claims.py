@@ -154,7 +154,55 @@ def test_remote_refresh_once_and_unreadable_room_posts(local, tmp_path, monkeypa
     monkeypatch.setattr(room, "RemoteRoom", FakeRoom)
     text = "Cedar-21: claiming #11"
     assert room.say("hive", text, cfg=local, home=tmp_path, write=lambda _: None) == (0 if offline else 1)
-    assert calls == (["refresh", text] if offline else ["refresh", "cached"])
+    # After posting, the claim is re-read once for the race check.
+    assert calls == (["refresh", text, "refresh"] if offline else ["refresh", "cached"])
+
+
+def test_a_claim_must_name_its_item(local, tmp_path):
+    out = []
+    text = "Beacon-17: claiming Phil-approved fixes: (1) announce, (2) the WIP check"
+    assert room.say("hive", text, cfg=local, home=tmp_path, write=out.append) == 1
+    assert "#N or a quoted 'name'" in out[0]
+    assert not room.room_path("hive", tmp_path).exists()
+    assert room.say("hive", "Fathom-19: claiming 'claim lock' (Phil's order)", cfg=local,
+                    home=tmp_path, write=lambda _: None) == 0
+    assert active_claims(room.read_messages("hive", tmp_path))["Fathom-19"][0].startswith("'claim lock'")
+
+
+def test_quoted_names_conflict_and_release_like_numbers(local, tmp_path):
+    rows = [message("Fathom-19: claiming 'Claim  Lock'", 1), message("Beacon-17: taking 'claim lock' too", 2)]
+    assert claim_conflicts(active_claims(rows)) == [("Fathom-19", "Beacon-17", "claim lock")]
+    rows.append(message("Lumen-20: claim lock landed on main", 3))
+    assert active_claims(rows) == {}
+    out = []
+    room.say("hive", "Fathom-19: claiming 'claim lock'", cfg=local, home=tmp_path, write=lambda _: None)
+    assert room.say("hive", "Beacon-17: claiming 'claim lock'", cfg=local, home=tmp_path, write=out.append) == 1
+    assert "Fathom-19 has open claim" in out[0]
+
+
+def test_two_claims_seconds_apart_the_later_one_backs_out(local, tmp_path, monkeypatch):
+    """Both seats passed the check before either post landed: the earliest room id
+    wins and the later seat posts its own release, which leaves the winner's claim."""
+    from megazword import claims as claims_mod
+    # Simulate the race: the pre-post check sees an empty room.
+    real = room.claim_messages
+    monkeypatch.setattr(room, "claim_messages", lambda *a: [])
+    room.say("hive", "Fathom-19: claiming #10", cfg=local, home=tmp_path, write=lambda _: None)
+    monkeypatch.setattr(room, "claim_messages", real)
+    out = []
+    state = {"first": True}
+
+    def racing(*a):
+        if state.pop("first", False):
+            return []  # Beacon-17's check ran before Fathom-19's post arrived
+        return real(*a)
+    monkeypatch.setattr(room, "claim_messages", racing)
+    assert room.say("hive", "Beacon-17: claiming #10 WIP cap", cfg=local, home=tmp_path, write=out.append) == 1
+    assert "Fathom-19 claimed it first" in out[-1]
+    rows = room.read_messages("hive", tmp_path)
+    assert rows[-1].text == "Beacon-17: releasing my claim; Fathom-19 claimed it first."
+    assert list(active_claims(rows)) == ["Fathom-19"]
+    assert claims_mod.first_holder(rows, "Fathom-19", "#10") is None
 
 
 def test_unreadable_local_room_posts(local, tmp_path, monkeypatch):
