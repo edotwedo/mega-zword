@@ -57,6 +57,9 @@ Rules: one item per driver pass; small diffs; tests; land on main. Never drain a
     `room claims` lists active claims and item conflicts; `room say` refuses a
     second claim or another seat's item unless `--force` is used. A failed room
     read permits posting. Claims use text designations, never lane tags.
+    Ledger fixed 2026-10-19 (Lumen-20, `a300cf9`): newest claim wins (a dead first
+    claim no longer blocks), release words widened (merged/shipped/complete), and
+    `MEGAZWORD_CLAIM_STALE_MINUTES` gives a night shift a shorter leash.
 11. [x] **Seat renames its own tab (#18).** A bot runs under a hidden console, so it
    cannot see or set the tab Phil is looking at, and Command Code keeps re-asserting
    its own title over any one-shot change.
