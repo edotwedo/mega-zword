@@ -33,8 +33,28 @@ def test_release_and_reclaim(release):
 
 def test_unrelated_done_and_other_seat_release_do_not_close_claim():
     rows = [message("Cedar-21: claiming #10"), message("Birch-22: released #10"),
-            message("Cedar-21: done #100"), message("Cedar-21: claiming #11")]
+            message("Cedar-21: done #100")]
     assert active_claims(rows)["Cedar-21"][0] == "#10"
+
+
+def test_newest_claim_wins_so_a_stale_first_claim_does_not_block():
+    rows = [message("Cinder-21: claiming #4"), message("Cinder-21: claiming #8")]
+    assert active_claims(rows)["Cinder-21"][0] == "#8"
+
+
+def test_release_words_cover_merged_and_shipped():
+    for word in ("merged", "shipped", "complete"):
+        rows = [message("Cedar-21: claiming #10"), message(f"Cedar-21: #10 {word}")]
+        assert active_claims(rows) == {}, word
+
+
+def test_stale_window_can_be_shortened_for_a_night_shift(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    monkeypatch.setenv("MEGAZWORD_CLAIM_STALE_MINUTES", "45")
+    noon = datetime(2026, 10, 19, 12, tzinfo=timezone.utc)
+    rows = [message("Gauge-18: claiming #5 design")]
+    assert active_claims(rows, now=noon + timedelta(minutes=44)) != {}
+    assert active_claims(rows, now=noon + timedelta(minutes=46)) == {}
 
 
 def test_named_non_numbered_item_done():
