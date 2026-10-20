@@ -20,6 +20,7 @@ def login(tmp_path, monkeypatch):
     (home / ".claude" / ".credentials.json").write_text(
         json.dumps({"claudeAiOauth": {"accessToken": "fake-token"}}), encoding="utf-8")
     monkeypatch.setattr(usage_sources, "HOME", home)
+    monkeypatch.setenv("MEGAZWORD_CLAUDE_METER", "1")  # the meter is opt-in now
 
 
 def fake_urlopen(calls, error=None):
@@ -57,3 +58,16 @@ def test_429_without_cache_still_errors(login, monkeypatch):
     monkeypatch.setattr(usage_sources.urllib.request, "urlopen", fake_urlopen([], error=429))
     with pytest.raises(urllib.error.HTTPError):
         usage_sources.claude()
+
+
+def test_meter_is_off_by_default_and_never_reads_credentials(monkeypatch, tmp_path):
+    """A shipped build must not read Claude credentials or hit the unofficial endpoint."""
+    calls = []
+    monkeypatch.delenv("MEGAZWORD_CLAUDE_METER", raising=False)
+    monkeypatch.setattr(usage_sources, "HOME", tmp_path / "empty")
+    monkeypatch.setattr(usage_sources.urllib.request, "urlopen",
+                        lambda *a, **k: calls.append(a) or pytest.fail("must not call out"))
+    plan = usage_sources.claude()
+    assert plan.windows == []
+    assert "MEGAZWORD_CLAUDE_METER" in plan.note
+    assert calls == []

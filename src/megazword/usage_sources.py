@@ -1,8 +1,10 @@
 """Read each AI plan's current usage meter without spending usage.
 
-- Claude: asks Anthropic's usage endpoint with the login Claude Code already
-  saved (~/.claude/.credentials.json). Unofficial endpoint, read-only. The
-  token is only sent to api.anthropic.com and never printed or logged.
+- Claude: OFF by default. It can read the login Claude Code saved
+  (~/.claude/.credentials.json) and ask Anthropic's unofficial usage endpoint,
+  but that is a terms-of-service risk for a shipped product and for the user's
+  own account. Set MEGAZWORD_CLAUDE_METER=1 to enable it on your own machine;
+  otherwise Claude's window is left empty rather than reading credentials.
 - Codex: asks Codex's own app server for its live rate limits
   (`account/rateLimits/read`, no model call). Falls back to the snapshot Codex
   writes into its session logs (~/.codex/sessions), as fresh as the last run.
@@ -21,6 +23,7 @@
 from __future__ import annotations
 
 import json
+import os
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -64,7 +67,15 @@ def _claude_cache() -> Path:
 def claude() -> PlanUsage:
     """Claude's meter, shared through a small cache file so the status bar,
     widget, dashboard and CLI together ask Anthropic at most every 2 minutes.
-    On HTTP 429 the last good reading is shown with its time instead."""
+    On HTTP 429 the last good reading is shown with its time instead.
+
+    Disabled unless MEGAZWORD_CLAUDE_METER=1: reading ~/.claude credentials and
+    calling the unofficial usage endpoint breaks Anthropic's terms for a third
+    party, so a shipped build must never do it."""
+    if os.environ.get("MEGAZWORD_CLAUDE_METER") != "1":
+        return PlanUsage("claude", [], "meter off (unofficial endpoint)",
+                         note="set MEGAZWORD_CLAUDE_METER=1 to read your own plan; "
+                              "shipped builds must not read Claude credentials")
     import urllib.error
     cache, now = _claude_cache(), datetime.now(timezone.utc)
     cached = None
