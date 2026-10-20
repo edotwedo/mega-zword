@@ -263,14 +263,20 @@ def show_plan() -> int:
     from .meters import labor_order, summarize_all
     from .usage_sources import all_usage
     try:
-        out_until = config.load().out_until
+        cfg = config.load()
+        out_until = cfg.out_until
     except (ValueError, TypeError, OSError):
+        cfg = config.Config()
         out_until = {}
     order = labor_order(summarize_all(all_usage(config.HOME / "log.jsonl"), out_until))
+    if cfg.work_owner:
+        print(f"Work owner: {cfg.work_owner} (human-selected; capacity does not reassign ownership)")
     print("Labor plan from live usage (most room first). A reading, not a rule:")
     for i, (name, reason) in enumerate(order, 1):
         print(f"  {i}. {name:7} {reason}")
-    if order and "left in its" in order[0][1]:
+    if cfg.work_owner:
+        print(f"{cfg.work_owner} owns assignments; use these readings to choose support. Keep existing claims.")
+    elif order and "left in its" in order[0][1]:
         print(f"New work goes to {order[0][0]} first; keep work already in progress where it is.")
     else:
         print("No live meter readings; check usage by hand before assigning work.")
@@ -297,13 +303,17 @@ def show_usage() -> int:
     plans = all_usage(config.HOME / "log.jsonl")
     by_name = {p.service: p for p in plans}
     reserves = {}
+    owner = ""
     try:
         cfg = config.load()
+        owner = cfg.work_owner
         out_until = cfg.out_until
         reserves = cfg.usage_reserve
     except (ValueError, TypeError, OSError):
         out_until = {}
     # Same one-line summary as the start screen and dashboard, then details.
+    if owner:
+        print(f"Work owner: {owner} (human-selected; capacity does not reassign ownership)")
     for summary in summarize_all(plans, out_until):
         line = summary.line()
         if summary.state == "meter" and summary.used is not None:
@@ -322,13 +332,17 @@ def show_usage() -> int:
                     reset += " (passed; reading not refreshed yet)"
                 parts.append(f"{w.name} {w.used_percent:.0f}% used{reset}")
             print(f"{'':8}{' | '.join(parts)}")
+            if plan.note:
+                print(f"{'':8}{plan.note}")
     from . import budget
     print(budget.line())  # last saved reading; no network call here
     print(free_spread_line(summarize(config.HOME / "log.jsonl", timedelta(hours=24))))
     print("\nMega Zword runs (last 24h)")
     runs = summarize(config.HOME / "log.jsonl", timedelta(hours=24))
     print("AI      runs ok rej/bad sec chars est_tokens   (rej/bad: answers rejected / failed)")
-    for name in ("claude", "codex", "grok", "gemini"):
+    names = dict.fromkeys(["cmdc", "claude", "codex", "grok", "gemini",
+                           *(n for n in runs if n.startswith("cmdc-"))])
+    for name in names:
         item = runs.get(name)
         if item:
             chars = item.prompt_chars + item.answer_chars
@@ -368,7 +382,9 @@ def candidates(rating: Rating, route: dict[str, list[str]],
             level_names = rank(statuses, level_names, rating.level)
         names += [n for n in level_names if n not in names]
     chain = [backends[n] for n in names
-             if n in backends and n not in out and backends[n].available()]
+             if n in backends and n not in out
+             and not (n.startswith("cmdc-") and "cmdc" in out)
+             and backends[n].available()]
     if rating.level == "easy":
         # B15 (Phil): AIs that train on prompts go first for small repetitive jobs.
         chain.sort(key=lambda b: not getattr(b, "trains_on_data", False))

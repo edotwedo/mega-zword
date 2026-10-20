@@ -111,7 +111,9 @@ def rank(statuses: dict[str, PlanStatus], candidates: list[str], rating: str,
     (cheapest first), except plans about to reset with usage left go first."""
     del now  # Statuses are computed with their own explicit reference time.
     # AIs with no meter at all (grok, local models) count as "unknown".
-    statuses = {name: statuses.get(name) or PlanStatus(name, 0.0, 0.0, "unknown", [])
+    statuses = {name: statuses.get(name)
+                or (statuses.get("cmdc") if name.startswith("cmdc-") else None)
+                or PlanStatus(name, 0.0, 0.0, "unknown", [])
                 for name in candidates}
     eligible = [name for name in candidates if allowed(statuses[name], rating)]
     order = {name: index for index, name in enumerate(candidates)}

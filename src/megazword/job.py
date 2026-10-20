@@ -128,8 +128,8 @@ def _pieces(data) -> list[Piece]:
     return merge_overlapping(pieces)
 
 
-def pick_planner(backends: dict[str, Backend]) -> Backend:
-    for name in PLANNER_ORDER:
+def pick_planner(backends: dict[str, Backend], owner: str = "") -> Backend:
+    for name in dict.fromkeys((owner, *PLANNER_ORDER)):
         b = backends.get(name)
         if b is not None and b.available():
             return b
@@ -166,13 +166,14 @@ def format_plan(job_id: str, pieces: list[Piece]) -> str:
 
 
 def plan_job(text: str, backends: dict[str, Backend], home: Path | None = None,
-             job_id: str | None = None, write: Callable[[str], None] = print) -> int:
+             job_id: str | None = None, write: Callable[[str], None] = print,
+             owner: str = "") -> int:
     text = (text or "").strip()
     if not text:
         write("job plan: need a job description")
         return 2
     try:
-        planner = pick_planner(backends)
+        planner = pick_planner(backends, owner)
     except RuntimeError as exc:
         write(f"job plan: {exc}")
         return 1
@@ -297,7 +298,7 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
         write(scores.format_scores(scores.scoreboard(scores.load_reports(jobs_home()))))
         return 0
     if args.job_cmd == "plan":
-        return plan_job(args.text, backends, write=write)
+        return plan_job(args.text, backends, write=write, owner=cfg.work_owner)
     if args.job_cmd == "run":
         return run_job(args.id, args.workers, args.repo, cfg, backends, write=write)
     if args.job_cmd == "combine":

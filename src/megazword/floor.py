@@ -12,7 +12,7 @@ from typing import Callable
 from . import config
 from .backends import Backend
 
-CLI_SEATS = ("claude", "codex", "grok", "gemini")
+CLI_SEATS = ("cmdc", "claude", "codex", "grok", "gemini")
 HTTP_SEATS = ("groq", "cloudflare", "zai", "gemini-api", "nvidia", "mistral",
               "openrouter", "cerebras")
 MINIMUM_CLI = ("claude", "codex", "grok")
@@ -107,10 +107,12 @@ def auth_failed(log_path: Path | None) -> set[str]:
 
 
 def suggest_seat(job_kind: str, seats: list[Seat],
-                 skip: set[str] | frozenset[str] = frozenset()) -> str | None:
+                 skip: set[str] | frozenset[str] = frozenset(), owner: str = "") -> str | None:
     """Conductor: which seated model should take this kind of job.
     Skips empty, out, and `skip` (latest run failed auth, see auth_failed)."""
     seated = {s.name: s for s in seats if s.status == "seated" and s.name not in skip}
+    if job_kind in ("edit", "decide") and owner in seated:
+        return owner
     if job_kind == "bulk":
         http = [s.name for s in seats if s.name in seated and s.kind == "http"]
         order = [n for n in BULK_ORDER if n in http] + [n for n in http if n not in BULK_ORDER]
@@ -121,12 +123,14 @@ def suggest_seat(job_kind: str, seats: list[Seat],
     return None
 
 
-def format_roster(seats: list[Seat]) -> str:
+def format_roster(seats: list[Seat], owner: str = "") -> str:
     flag = "yes" if ready(seats) else "no — seat the missing CLI windows"
     lines = ["Hive floor", f"ready: {flag}", ""]
+    if owner:
+        lines.append(f"Work owner: {owner}; Phil retains final authority.")
     lines.extend(s.line() for s in seats)
     lines.append("")
-    lines.append("One window each for claude, codex, grok (gemini when its week is back).")
+    lines.append("CLI seats: cmdc, claude, codex, grok and gemini; availability is not session liveness.")
     lines.append("HTTP seats have no window; they wait in this Hive.")
     lines.append("Phil assigns work here. Subagents stay inside their CLI.")
     lines.append(format_heard())
@@ -275,15 +279,16 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
             write(f"floor: {e}")
             return 2
     seats = roster(backends, cfg.out_until)
+    owner = getattr(cfg, "work_owner", "")
     if action in ("status", "introduce"):  # peek/wait poll often; don't rewrite floor.json
         save_snapshot(seats)
     if action == "status":
-        write(format_roster(seats))
+        write(format_roster(seats, owner=owner))
         return 0
     if action == "introduce":
         text = introduce_text(seats)
         room.say(room_name, text, author="floor")
-        write(format_roster(seats))
+        write(format_roster(seats, owner=owner))
         return 0
     if action == "peek":
         n = getattr(args, "n", None)
@@ -307,7 +312,8 @@ def command(args, backends: dict[str, Backend], cfg: config.Config,
         if kind not in JOB_KINDS:
             write("Usage: megazword floor suggest bulk|edit|decide|review")
             return 2
-        name = suggest_seat(kind, seats, auth_failed(getattr(cfg, "log_path", None)))
+        name = suggest_seat(kind, seats, auth_failed(getattr(cfg, "log_path", None)),
+                            owner=owner)
         if name is None:
             write("(no seat)")
             return 1

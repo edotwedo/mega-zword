@@ -1,5 +1,9 @@
 # Hive floor
 
+**Current owner (Phil, 2026-10-20): cmdc / Command Code.** Other AIs support its
+verified active lead. In-scope assignments carry Phil's standing delegation;
+capacity rankings do not select a new owner. See `CMDC-OWNERSHIP.md`.
+
 Phil, 2026-10-12: unfreeze. One seat for every model we can run. Launch **one**
 Claude, **one** Codex, **one** Grok. They spawn subagents. Gemini gets a chair
 when its week is back (18 Oct). HTTP models (Groq, Cloudflare, Z.ai, Mistral,

@@ -55,6 +55,8 @@ def render(cfg: config.Config, meters=None, now: datetime | None = None,
     dim = (lambda s: f"\033[2m{s}\033[0m") if color else (lambda s: s)
     from . import __version__
     lines = [bold(f"Mega Zword {__version__}") + dim("  -  one place for all your AIs"), ""]
+    if cfg.work_owner:
+        lines += [f"Work owner: {cfg.work_owner} (capacity rankings choose support, not ownership)", ""]
 
     from .meters import summarize_all
     plans = _meters() if meters is None else meters

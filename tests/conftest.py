@@ -39,6 +39,10 @@ def isolated_home(tmp_path, monkeypatch):
     monkeypatch.setattr(usage_sources, "_agy_path", lambda: None)
     # ...or a real Codex app server for its live rate limits.
     monkeypatch.setattr(usage_sources, "_codex_cmd", lambda: None)
+    # Quota checks must not open a real Command Code terminal during tests.
+    from megazword import cmdc_quota
+    monkeypatch.setattr(cmdc_quota, "_command", lambda: None)
+    monkeypatch.setenv("MEGAZWORD_NO_CMDC_METER", "1")  # inherited by fake CLI subprocesses
     # ...or run a real AI CLI. Fakes live in this repo or a temp folder; anything else
     # (the real claude/codex/grok/agy on Phil's PC) is refused. A tab test once sent a
     # real prompt to Claude (2026-10-12) because claude is installed here.

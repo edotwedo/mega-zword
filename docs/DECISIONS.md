@@ -1,5 +1,8 @@
 # Decisions
 
+## 2026-10-20
+- **cmdc / Command Code owns the overall work (Phil, direct Word-29 chat).** Phil said he has told cmdc to take ownership of everything and intends to keep it there, citing value, capacity and demonstrated ability. cmdc coordinates and integrates; other AIs support it. Capacity checks must include cmdc and do not elect a new owner. Phil retains final authority. Use the verified active lead session rather than assuming any cmdc instance is the lead. Existing explicit limits on spending, secrets and automatic activity remain in force. Runtime setting: `[work] owner = "cmdc"`. Details: `docs/CMDC-OWNERSHIP.md`.
+
 Newest first. Don't reopen these without Phil.
 
 ## 2026-10-18

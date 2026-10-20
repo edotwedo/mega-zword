@@ -231,6 +231,7 @@ class App:
         return {
             "now": now.isoformat(),
             "build": os.environ.get("MEGAZWORD_BUILD", "development"),
+            "work_owner": self.cfg.work_owner,
             "project": project,
             "launch_project": self.project,
             "working_folder": str(Path.cwd().resolve()),
@@ -264,7 +265,8 @@ class App:
         return {
             "seats": [{"name": s.name, "kind": s.kind, "status": s.status} for s in seats],
             "ready": floor.ready(seats),
-            "suggest": {k: floor.suggest_seat(k, seats, skip) for k in floor.JOB_KINDS},
+            "suggest": {k: floor.suggest_seat(k, seats, skip, owner=self.cfg.work_owner)
+                        for k in floor.JOB_KINDS},
             "workers": workers.roster(),
         }
 

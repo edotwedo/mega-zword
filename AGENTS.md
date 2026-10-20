@@ -1,6 +1,6 @@
 # Mega Zword: rules for every AI working here
 
-This file is for Claude Code, Codex and Grok alike. Phil (the owner) may switch
+This file is for Command Code (cmdc), Claude Code, Codex and Grok alike. Phil (the owner) may switch
 between them at any time, including mid-task when one runs out of usage. The
 repo is the only handoff. Nothing lives only in a chat.
 
@@ -10,6 +10,15 @@ repo is the only handoff. Nothing lives only in a chat.
 3. `docs/DECISIONS.md`: dated log of choices; don't reopen these without Phil.
 
 ## Working rules
+- **Overall work owner: cmdc / Command Code (Phil, 2026-10-20).** Phil has delegated
+  overall ownership and coordination to cmdc and explicitly wants it to remain there.
+  Other AIs support the verified active cmdc lead: it sets the queue, assigns bounded
+  work and owns integration. Ordinary assignments within Phil's approved scope carry
+  his standing delegation; do not reject them merely because an AI conveyed them.
+  Phil retains final authority. Verify the lead's designation/session before delivery;
+  a provider name or saved card is not proof of a live connection. A usage ranking
+  selects supporting capacity, never a replacement owner. Existing claims and direct
+  Phil requests remain valid. This does not enable timers or authorize new spending.
 - **Warn before interactive PC tests (Phil, 2026-10-15).** Before opening test
   windows, switching Windows desktops, or moving keyboard focus, tell Phil what
   will happen and wait until he is ready. He may be typing in another app.

@@ -542,6 +542,7 @@ function renderPlans(s) {
   let html = (s.usage || []).map(p => {
     const verdict = out[p.service] ? "out" : p.verdict;
     let badges = `<span class="badge ${esc(verdict)}">${esc(verdict === "hard-only" ? "hard tasks only" : verdict)}</span>`;
+    if (p.service === s.work_owner) badges = '<span class="badge">owner</span> ' + badges;
     if (p.burn) badges = `<span class="badge burn">use it or lose it</span> ` + badges;
     const wins = p.windows.length ? p.windows.map(w => `
       <div class="win"><div class="win-label"><span>${esc(w.name)}${w.known ? "" : " (not counted)"}</span>
@@ -550,7 +551,8 @@ function renderPlans(s) {
       ${w.elapsed != null ? `<b style="left:calc(${w.elapsed}% - 1px)"></b>` : ""}</div></div>`).join("")
       : `<div class="note">${esc(p.note || p.error || "no meter")}</div>`;
     const age = p.as_of ? `<div class="note${p.stale ? " bad" : ""}">as of ${new Date(p.as_of).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"})}${p.stale ? " (stale: over an hour old)" : ""}</div>` : "";
-    return `<div class="plan"><div class="plan-head">${aiTag(p.service)} <span>${badges}</span></div>${out[p.service] ? "" : wins}${age}
+    const note = p.windows.length && p.note ? `<div class="note">${esc(p.note)}</div>` : "";
+    return `<div class="plan"><div class="plan-head">${aiTag(p.service)} <span>${badges}</span></div>${out[p.service] ? "" : wins}${note}${age}
       ${out[p.service] ? `<div class="outmark">marked out until ${new Date(out[p.service]).toLocaleString()}</div>` : ""}
       ${outButton(p.service, out)}</div>`;
   }).join("");
@@ -574,7 +576,8 @@ function renderFloor(s) {
   let html = "";
   if (f) {
     const seated = (f.seats || []).filter(x => x.status === "seated").map(x => x.name);
-    html = `Providers available: ${seated.length ? seated.map(aiTag).join(", ") : '<span class="empty">none</span>'}`;
+    html = (s.work_owner ? `Work owner: ${aiTag(s.work_owner)} · ` : "")
+      + `Providers available: ${seated.length ? seated.map(aiTag).join(", ") : '<span class="empty">none</span>'}`;
     renderWorkers(f.workers || []);
   }
   $("floor").innerHTML = html; $("hive-floor").innerHTML = html;

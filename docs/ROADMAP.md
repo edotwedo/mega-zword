@@ -8,7 +8,7 @@ Mark items `[x]` with date, who and commit when finished. To claim an item, writ
 Mega Zword's two jobs: (1) get free AI credits by any legal means and keep a
 cushion; (2) finish big coding projects with many models working together.
 
-**Owner of open work: Juniper-16 (Claude Code on Phil's PC), from 2026-10-17** (Testlog-14 relayed Phil routing remaining work to Claude; Ledger, the cloud session, can't reach local Gitea). Automatic runs stay off except ones Phil approves one at a time (today: Alder-16's one-time 10:10-12:10 shift).
+**Overall owner: cmdc / Command Code (Phil, 2026-10-20).** Supersedes the older Juniper-16 ownership. cmdc's verified active lead owns the queue and integration; other AIs support it. Capacity rankings do not reassign ownership. Existing task claims remain valid. Automatic work stays off except specifically authorized runs; the old October 17 one-time shift is historical. See `CMDC-OWNERSHIP.md`.
 
 ## Done
 - [x] Fair-share routing: a little from every free source; Tencent grants saved for hard work. 2026-10-16, Juniper-16, 8bf2aa0

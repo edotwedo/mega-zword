@@ -4,6 +4,11 @@ Active workers and their designations (Phil, 2026-10-18). One designation per
 session; keep it for the whole session. Update this file when a worker joins or
 leaves, so nobody has to guess who is who.
 
+**Overall owner: Command Code (cmdc), by Phil's direct decision 2026-10-20.**
+Other seats support its verified active lead. Usage rankings choose support,
+not ownership. See `CMDC-OWNERSHIP.md`; confirm the exact lead session before
+handing off. Provider availability is not worker liveness.
+
 | Designation | Worker | Role / lane | Notes |
 | --- | --- | --- | --- |
 | Juniper-16 | Claude Code | Mega Zword owner; team engine | `seat/juniper-16` is on main |

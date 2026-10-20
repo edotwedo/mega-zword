@@ -14,10 +14,9 @@
 - Gemini: asks the Antigravity CLI (`agy -p /usage --output-format json`, its
   quota panel; reads, never prompts a model). Without agy, reports Mega
   Zword's own recent run counts.
-- Command Code: totals the tokens and dollars each committed turn records in
-  its own transcripts (~/.commandcode/projects), the way the Codex fallback
-  reads ~/.codex/sessions. Spend only, no percent: its remaining plan credits
-  are not readable headlessly, so there is no window to show a bar for.
+- Command Code: reads its supported /usage panel in a private Windows terminal
+  (no model prompt or credential parsing), caching quota fields for two minutes.
+  Falls back to local transcript spend; dollars are not remaining plan credits.
 """
 
 from __future__ import annotations
@@ -412,14 +411,19 @@ def command_code(projects_dir: Path | None = None,
     the dollars are already on disk. Same trick the Codex fallback uses on
     ~/.codex/sessions: read the tool's own log, spend nothing to read it.
 
-    Deliberately absent: remaining plan credits. Command Code's docs say the plan
-    is not readable headlessly and its auth file is not ours to poke, so this
-    reports what was spent and never what is left. No window, therefore no
-    percent - `megazword usage` prints the note where a bar would go.
+    Read supported /usage in a private terminal when available. Its quota fields
+    are separate from transcript dollar totals: dollars are not plan credits.
+    Explicit projects_dir calls only inspect those transcripts (offline use).
     """
     root = COMMAND_CODE_ROOT if projects_dir is None else projects_dir
     now = now or datetime.now(timezone.utc)
+    from .cmdc_quota import read_quota
+    quota = read_quota(now) if projects_dir is None else None
     calls, cost, tokens = _cmdc_spend(root, now - CMDC_WEEK)
+    if quota:
+        if calls:
+            quota.note += f"; logged ${cost:.2f}/7d, {_token_label(tokens)} (not plan credits)"
+        return quota
     if not calls:
         return PlanUsage("cmdc", [], "command-code session logs",
                          note="no Command Code usage in the last 7 days")

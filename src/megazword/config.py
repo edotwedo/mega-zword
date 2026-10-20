@@ -249,6 +249,8 @@ class Config:
     sentinel_urls: list[str] = field(default_factory=lambda: list(DEFAULT_SENTINEL_URLS))
     ntfy_topic: str = ""
     healthchecks_url: str = ""
+    # The human-selected conductor; capacity rankings do not change ownership.
+    work_owner: str = ""
 
     def out_now(self, now: datetime | None = None) -> set[str]:
         """AIs marked out whose return time hasn't passed yet."""
@@ -275,6 +277,12 @@ def load(path: Path | None = None) -> Config:
         cfg.rater_model = data.get("rater_model", cfg.rater_model)
         cfg.route.update(data.get("route", {}))
         cfg.quality_check = bool(data.get("quality_check", cfg.quality_check))
+        work = data.get("work", {})
+        if not isinstance(work, dict) or not isinstance(work.get("owner", ""), str):
+            raise ValueError("work.owner must be a backend name")
+        cfg.work_owner = work.get("owner", "").strip()
+        if cfg.work_owner and not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", cfg.work_owner):
+            raise ValueError("work.owner must be a backend name")
         oneshot = data.get("oneshot", {})
         if isinstance(oneshot, dict) and isinstance(oneshot.get("lean"), bool):
             cfg.lean = oneshot["lean"]
@@ -573,6 +581,12 @@ def _set_key(path: Path, table: str, key: str, value: str | None) -> None:
                 else:
                     _atomic_replace(path, old)
             raise
+
+
+def set_work_owner(name: str, path: Path | None = None) -> None:
+    if not isinstance(name, str) or (name and not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", name)):
+        raise ValueError("work.owner must be a backend name")
+    _set_key(path or HOME / "config.toml", "work", "owner", json.dumps(name) if name else None)
 
 
 def _known_ai(name: str) -> None:
