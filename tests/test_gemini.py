@@ -20,11 +20,11 @@ def test_missing_gemini_is_harmless(monkeypatch):
 
 
 @pytest.mark.parametrize("returncode", [0, 42])
-def test_gemini_pipes_long_prompt_and_reports_errors(monkeypatch, returncode):
-    prompt = 'private "quoted" & | %PATH% $value\n' + "x" * 50_000
-    # Old Gemini CLI only (no agy installed).
+def test_gemini_runs_agy_and_reports_errors(monkeypatch, returncode):
+    prompt = 'private "quoted" & | %PATH% $value\n' + "x" * 50
     monkeypatch.setattr(backends.shutil, "which",
-                        lambda name: None if name == "agy" else "fake-gemini.cmd")
+                        lambda name: "fake-agy.cmd" if name == "agy" else None)
+    monkeypatch.setattr(backends, "add_dirs", lambda: [])
     calls = []
 
     class Process:
@@ -35,7 +35,7 @@ def test_gemini_pipes_long_prompt_and_reports_errors(monkeypatch, returncode):
             self.returncode = returncode
 
         def communicate(self, stdin, timeout):
-            assert stdin == prompt
+            assert stdin is None  # agy takes the prompt as a command-line argument
             assert timeout == 19
             return "  fake answer\n", "unsupported approval mode" if returncode else ""
 
@@ -44,7 +44,7 @@ def test_gemini_pipes_long_prompt_and_reports_errors(monkeypatch, returncode):
     assert backend.available()
     backend.timeout = 19
     result = backend.run(prompt)
-    assert calls == [["fake-gemini.cmd", "--approval-mode", "yolo", "--output-format", "text"]]
+    assert calls[0][-2:] == ["-p", prompt]
     assert result.backend == "gemini"
     assert result.ok == (returncode == 0)
     if returncode:
@@ -52,6 +52,14 @@ def test_gemini_pipes_long_prompt_and_reports_errors(monkeypatch, returncode):
         assert "unsupported approval mode" in result.error
     else:
         assert result.text == "fake answer"
+
+
+def test_gemini_refuses_a_prompt_too_long_for_the_command_line(monkeypatch):
+    monkeypatch.setattr(backends.shutil, "which",
+                        lambda name: "fake-agy.cmd" if name == "agy" else None)
+    backend = backends.default_backends(free_models=config.Config().free)["gemini"]
+    result = backend.run("x" * (backends.AGY_MAX_PROMPT + 1))
+    assert not result.ok and "command line" in result.error
 
 
 def test_gemini_is_included_for_edits():
@@ -65,7 +73,7 @@ def test_init_keeps_gemini_identities_separate(monkeypatch, capsys, tmp_path, in
     monkeypatch.delenv("GOOGLE_AI_API_KEY", raising=False)
     monkeypatch.setattr(config, "HOME", tmp_path)
     monkeypatch.setattr(backends.shutil, "which", lambda name:
-                        "fake-gemini.cmd" if installed and name == "gemini" else None)
+                        "fake-agy.cmd" if installed and name == "agy" else None)
     monkeypatch.setattr(ollama, "reachable", lambda *args, **kwargs: False)
     assert cli.main(["init"], cfg=config.Config()) == 0
     output = capsys.readouterr().out
@@ -83,7 +91,7 @@ def test_init_keeps_gemini_identities_separate(monkeypatch, capsys, tmp_path, in
 def test_doctor_checks_gemini_and_accepts_custom_route(tmp_path, monkeypatch, installed):
     fake_external(monkeypatch)
     monkeypatch.setattr(doctor.shutil, "which", lambda name:
-                        f"/fake/{name}" if installed and name != "agy" else None)
+                        f"/fake/{name}" if installed and name != "gemini" else None)
     commands = []
 
     def version(cmd, **kwargs):
@@ -95,7 +103,7 @@ def test_doctor_checks_gemini_and_accepts_custom_route(tmp_path, monkeypatch, in
     (tmp_path / "config.toml").write_text('[route]\neasy = ["gemini"]\n')
     lines = "\n".join(item.line() for item in doctor.checks(tmp_path))
     assert ("OK gemini: fake 1.0" if installed else "WARN gemini: not on PATH") in lines
-    assert (["/fake/gemini", "--version"] in commands) == installed
+    assert (["/fake/agy", "--version"] in commands) == installed
     assert "OK routes: known backends only" in lines
     assert "gemini 600s" in lines
 

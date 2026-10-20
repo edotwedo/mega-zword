@@ -62,8 +62,9 @@ def checks(home: Path | None = None) -> list[Check]:
     found.append(install_check())
 
     for name in ("claude", "codex", "grok", "gemini"):
-        # Gemini now ships as the Antigravity CLI (`agy`); the old `gemini` still counts.
-        path = shutil.which(name) if name != "gemini" else (shutil.which("agy") or shutil.which("gemini"))
+        # Gemini ships only as the Antigravity CLI (`agy`); the old `gemini` is retired
+        # for personal accounts, so it no longer counts.
+        path = shutil.which(name) if name != "gemini" else shutil.which("agy")
         if not path:
             found.append(Check("WARN", name, "not on PATH", f"install {name} or add it to PATH" if name != "gemini"
                                  else "install the Antigravity CLI (agy) or add it to PATH"))

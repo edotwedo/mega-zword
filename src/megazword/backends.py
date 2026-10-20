@@ -356,35 +356,37 @@ CODEX_LEAN = ["-c", "mcp_servers={}"]
 # ("--mode plan has no effect"), so it is not used. Plan mode itself is gone
 # (Phil, 2026-10-18): agy gets full access; --add-dir for every drive is added at run time.
 AGY_ARGS = ["--dangerously-skip-permissions", "--output-format", "text", "-p", "{prompt}"]
-OLD_GEMINI_ARGS = ["--approval-mode", "yolo", "--output-format", "text"]
 AGY_DEFAULT_MODEL = "gemini-3.8-flash-high"  # from `agy models`, 2026-10-16
 AGY_MAX_PROMPT = 30_000  # the prompt is a command-line argument; Windows caps those near 32k
 
 
 @dataclass
 class GeminiBackend(CLIBackend):
-    """Gemini through Google's Antigravity CLI (`agy`) when installed, else the
-    old Gemini CLI. Google retired the Gemini CLI for personal accounts on
-    2026-06-18. Both run with full access (Phil, 2026-10-18).
-    Picked at run time, not at construction, so building the table stays cheap."""
+    """Gemini through Google's Antigravity CLI (`agy`) - the only Google CLI path.
 
-    exe: str = "gemini"
-    args: list[str] = field(default_factory=lambda: list(OLD_GEMINI_ARGS))
+    Google retired the old Gemini CLI for personal accounts (2026-06-18), so the
+    fallback is gone: without `agy` installed this backend is simply unavailable.
+    agy runs with full access (Phil, 2026-10-18). Picked at run time so building
+    the table stays cheap, and we only ever run the vendor's own binary with the
+    user's own login (see docs/PROVIDER-TERMS.md)."""
+
+    exe: str = "agy"
+    args: list[str] = field(default_factory=list)
     # B12: agy's --model/--effort for this task's level; empty = agy's own default.
     level_args: list[str] = field(default_factory=list)
 
     def _pick(self) -> None:
-        if shutil.which("agy"):
-            # agy's own default can be a Claude/GPT model with a separate quota that runs
-            # out first; without a level choice, use Google's own model (2026-10-16).
-            level = self.level_args or ["--model", AGY_DEFAULT_MODEL]
-            self.exe, self.args = "agy", [*AGY_ARGS[:-2], *level, *add_dirs(), *AGY_ARGS[-2:]]
-        else:
-            self.exe, self.args = "gemini", list(OLD_GEMINI_ARGS)
+        if not shutil.which("agy"):
+            self.exe, self.args = "agy", []      # nothing installed: unavailable
+            return
+        # agy's own default can be a Claude/GPT model with a separate quota that runs
+        # out first; without a level choice, use Google's own model (2026-10-16).
+        level = self.level_args or ["--model", AGY_DEFAULT_MODEL]
+        self.exe, self.args = "agy", [*AGY_ARGS[:-2], *level, *add_dirs(), *AGY_ARGS[-2:]]
 
     def available(self) -> bool:
         self._pick()
-        return super().available()
+        return bool(self.args) and super().available()
 
     def _command(self, prompt: str) -> tuple[list[str], str | None]:
         self._pick()
@@ -449,7 +451,7 @@ def default_backends(edit: bool = True,
         cmdc_backend(),  # the CLI's default model (DeepSeek V4 Flash) works fine in its own harness
         cmdc_backend("cmdc-glm", "z-ai/glm-5.3-flash"),
         cmdc_backend("cmdc-qwen", "Qwen/Qwen3.8-27B"),
-        GeminiBackend("gemini"),  # piped stdin selects the old Gemini CLI's headless mode
+        GeminiBackend("gemini"),  # agy when installed; unavailable otherwise (no retired CLI)
     ]
     from .config import Config, load
     from .free_apis import cheap_backends, free_backends
