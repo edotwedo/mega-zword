@@ -71,7 +71,10 @@ def test_hook_file_survives_the_windows_checkout():
     raw = HOOK.read_bytes()
     assert raw.startswith(b"#!/bin/sh"), "hook must be a sh script"
     assert b"\r\n" not in raw, "a CRLF shebang breaks the hook under sh"
-    assert b"megazword.gate" in raw, "hook must call the gate module"
+    assert b"-m pytest" in raw, "hook must run the suite"
+    # It must not pre-check the megazword install: that is how it skipped itself on
+    # its first run, because the editable install pointed at the main checkout.
+    assert b'-c "import megazword' not in raw
 
 
 def test_install_check_flags_a_snapshot_install(tmp_path):
