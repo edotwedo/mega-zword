@@ -22,7 +22,7 @@ COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job"),
     "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "announce", "free", "map", "spot"),
-    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon"),
+    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate"),
     "Memory": ("note", "decide", "import-hive"),
 }
 
@@ -187,6 +187,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_tab_parser(sub)
     from .andon import add_parser as add_andon_parser
     add_andon_parser(sub)
+    from .gate import add_parser as add_gate_parser
+    add_gate_parser(sub)
 
     out = sub.add_parser("out", help="keep auto-picks and background jobs off an AI")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -446,6 +448,9 @@ def main(argv: list[str] | None = None,
         return run()
     if args.command == "tab":
         from .tab_title import command
+        return command(args)
+    if args.command == "gate":
+        from .gate import command
         return command(args)
     if args.command == "export":
         from .export import command

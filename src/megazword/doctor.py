@@ -36,6 +36,20 @@ def _meter_error(note: str) -> str:
     return f"unreadable ({kind}{' ' + code.group(1) if code else ''})"
 
 
+def install_check(module_file: Path | None = None) -> Check:
+    """Editable, or a frozen snapshot of whatever main looked like at install time.
+
+    A seat re-installed without ``-e`` on 2026-10-19, which replaced the venv with
+    a snapshot: already-committed work looked invisible and time went into
+    debugging code that was fine. Where the module is loaded from says which it is.
+    """
+    here = Path(module_file or __file__).resolve()
+    if here.parent.parent.name == "src":
+        return Check("OK", "install", "editable (runs the working tree)")
+    return Check("WARN", "install", "site-packages snapshot",
+                 "a non-editable install hides committed work; run pip install -e .")
+
+
 def checks(home: Path | None = None) -> list[Check]:
     home = home or config.HOME
     found: list[Check] = []
@@ -45,6 +59,7 @@ def checks(home: Path | None = None) -> list[Check]:
         found.append(Check("FAIL", "Python", sys.version.split()[0],
                            "install Python 3.11 or newer"))
     found.append(Check("OK", "megazword", __version__))
+    found.append(install_check())
 
     for name in ("claude", "codex", "grok", "gemini"):
         # Gemini now ships as the Antigravity CLI (`agy`); the old `gemini` still counts.

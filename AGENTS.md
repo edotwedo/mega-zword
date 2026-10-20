@@ -52,6 +52,14 @@ repo is the only handoff. Nothing lives only in a chat.
   another AI and is less than 2 hours old, stop and ask Phil before continuing.
 - **Small steps, pushed often.** Commit and push after each working step. A
   step that isn't pushed doesn't exist for the next AI.
+- **The suite is the gate (Phil, 2026-10-19).** Run it before you land. On the night
+  of 18/19 Oct a crash reached main in `megazword --help` (a bare `%` in a help
+  string) because a change was pushed without the suite being run; a red front door
+  is the first thing a stranger sees. `megazword gate --install` points the repo at
+  `.githooks/pre-push`, which runs the suite and blocks a red push to main for every
+  seat. Two escapes, both deliberate and both visible in the log: `MZ_SKIP_GATE=1`
+  and `git push --no-verify`. The winpty failure in `tests/test_terminal_input.py`
+  is a contention flake that passes alone - re-run it before you blame your change.
 - **Keep STATUS.md true.** Update it with every push: what changed, what's
   next, anything half-done or broken. Write the next step so precisely that a
   different AI with no chat history can start on it immediately.

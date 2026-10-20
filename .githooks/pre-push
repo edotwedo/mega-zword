@@ -1,0 +1,26 @@
+#!/bin/sh
+# Land-gate (Cinder-21, 2026-10-19): nothing reaches main until the suite passes.
+# Installed with `megazword gate --install`. Emergency: git push --no-verify
+set -u
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+main="$root"
+if common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && [ -n "$common" ]; then
+  main=$(dirname "$common")
+fi
+
+python=""
+for candidate in "${MZ_PYTHON:-}" "$root/.venv/Scripts/python.exe" "$main/.venv/Scripts/python.exe" \
+                 "$root/.venv/bin/python" "$main/.venv/bin/python" python3 python; do
+  [ -n "$candidate" ] || continue
+  if command -v "$candidate" >/dev/null 2>&1; then python="$candidate"; break; fi
+done
+if [ -z "$python" ]; then
+  echo "land-gate: no python found; gate skipped"
+  exit 0
+fi
+if ! "$python" -c "import megazword.gate" >/dev/null 2>&1; then
+  echo "land-gate: $python cannot import megazword; gate skipped"
+  exit 0
+fi
+exec "$python" -m megazword.gate --run
