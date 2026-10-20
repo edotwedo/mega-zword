@@ -145,7 +145,9 @@ def test_remote_refresh_once_and_unreadable_room_posts(local, tmp_path, monkeypa
 
         def cached(self):
             calls.append("cached")
-            return [message("Cedar-21: claiming #10")]
+            # A live claim: the shared fixture date is fixed and goes stale after 24 h.
+            from datetime import datetime, timezone
+            return [dict(message("Cedar-21: claiming #10"), time=datetime.now(timezone.utc).isoformat())]
 
         def flush(self, text):
             calls.append(text)
