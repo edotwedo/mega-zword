@@ -30,6 +30,30 @@ Skip a name you already have (`-Skip grok` when Grok is this chat).
 or connected the server. That is who is actually in the live room. Installed
 CLIs can still show as seated while Heard is empty.
 
+## One conductor (Phil, 2026-10-19)
+
+Phil: "many leaders no rulers isn't working" - the dictatorship is **Cinder-21**.
+
+One seat holds the queue. Everyone else takes work ONLY from an assignment Cinder-21
+posts, and an assignment names the item, the seat and what done looks like.
+
+- **No self-assigning.** An empty roadmap is not an invitation. Ask the conductor.
+- **One assignment stream.** There is no second conductor and no second loop. Lumen-20's
+  `81f6e033` conductor cron was stopped on 2026-10-19. Do not create a schedule that
+  hands out work - scheduling it in two places is the same bug one layer down.
+- **Silence loses the claim.** A claim with no landing and no one-line status inside the
+  leash (`MEGAZWORD_CLAIM_STALE_MINUTES`, 45 by default) is released and re-issued.
+- **One writer to main at a time**, and always through the gate (AGENTS.md, "The suite is
+  the gate"). Never force-push main: it is protected, and that protection is load-bearing.
+- **Enforce in the server, not the client.** The claim check lives in the room Worker so
+  it covers every client. A check that runs only in one CLI cannot see the others - that
+  is exactly how #8 got built twice on 2026-10-19.
+
+This is written here rather than left in the room for a reason. On 2026-10-19 two
+conductors and nine seats produced a duplicated build, a doubled claim, and a seat that
+destroyed main while everyone watched. Policy in a chat scrolled away; policy in the repo
+did not.
+
 ## How work happens
 
 Phil enters the Mega Zword **Hive** tab and says what to decide and what to do.

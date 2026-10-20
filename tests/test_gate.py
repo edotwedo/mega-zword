@@ -5,6 +5,8 @@ front door red. These cover the gate's decision, the git wiring, and the hook
 file itself (a CRLF shebang would silently break it under sh).
 """
 
+import os
+import shutil
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,6 +17,22 @@ from megazword import doctor, gate
 
 ROOT = Path(__file__).resolve().parents[1]
 HOOK = ROOT / ".githooks" / "pre-push"
+
+
+def _find_sh():
+    """The hook is a sh script. Git Bash's sh is usually not on PATH in PowerShell,
+    and a test that always skips is not a test - so look where Git installs it."""
+    found = shutil.which("sh")
+    if found:
+        return found
+    for candidate in (r"C:\Program Files\Git\bin\sh.exe",
+                      r"C:\Program Files (x86)\Git\bin\sh.exe"):
+        if Path(candidate).is_file():
+            return candidate
+    return None
+
+
+SH = _find_sh()
 
 
 def _proc(returncode):
@@ -78,6 +96,30 @@ def test_hook_file_survives_the_windows_checkout():
     # git exports GIT_DIR and friends to hooks; the suite makes its own temp repos and
     # would otherwise run those git commands against this repo.
     assert b"unset GIT_DIR" in raw
+
+
+@pytest.mark.skipif(SH is None, reason="needs sh (Git Bash) on PATH")
+def test_hook_skips_a_delete_only_push():
+    """Deleting a branch cannot break the suite. Running it anyway turned a branch
+    cleanup into a four-minute push (2026-10-19), which is how a gate earns a
+    reputation for being in the way and gets bypassed."""
+    proc = subprocess.run([SH, str(HOOK)], input="(delete) 0 refs/heads/old abc123\n",
+                          capture_output=True, text=True, cwd=ROOT)
+    assert proc.returncode == 0
+    assert "delete-only" in proc.stdout
+    assert "running the suite" not in proc.stdout
+
+
+@pytest.mark.skipif(SH is None, reason="needs sh (Git Bash) on PATH")
+def test_hook_does_not_shortcut_a_real_push():
+    """The counterpart: a normal push must fall through to the suite, not the shortcut.
+    MZ_PYTHON points at `false`, so this stops at the python probe instead of running
+    the whole suite from inside the suite."""
+    proc = subprocess.run([SH, str(HOOK)], input="refs/heads/x abc refs/heads/x 000\n",
+                          capture_output=True, text=True, cwd=ROOT,
+                          env={**os.environ, "MZ_PYTHON": "false"})
+    assert "delete-only" not in proc.stdout
+    assert "NOTHING WAS VERIFIED" in proc.stdout
 
 
 def test_install_check_flags_a_snapshot_install(tmp_path):

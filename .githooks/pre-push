@@ -14,6 +14,20 @@ if [ "${MZ_SKIP_GATE:-}" = "1" ]; then
   exit 0
 fi
 
+# git feeds the refs being pushed on stdin. Deleting a branch cannot break the suite,
+# and running it anyway cost a four-minute push for nothing (2026-10-19).
+saw_any=0
+deletes_only=1
+while read -r local_ref _local_sha _remote_ref _remote_sha; do
+  [ -n "${local_ref:-}" ] || continue
+  saw_any=1
+  [ "$local_ref" = "(delete)" ] || deletes_only=0
+done
+if [ "$saw_any" = "1" ] && [ "$deletes_only" = "1" ]; then
+  echo "land-gate: delete-only push - no code to verify"
+  exit 0
+fi
+
 root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 main="$root"
 if common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && [ -n "$common" ]; then
