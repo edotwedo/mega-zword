@@ -34,8 +34,13 @@ sequence, and marks what still needs Phil's call.
 | **Aider / Cline / OpenHands / OpenCode / Goose / Plandex** | Open source | Free + your tokens | Terminal/IDE coding agents (Aider Apache-2.0 ~39k★; Cline ~60k★; OpenHands ~68k★; OpenCode 100k+★) | One agent, one model config, no shared floor or usage pacing |
 | **AI agencies** | Service | $5k-50k projects, $2k-15k/mo retainers | Done-for-you automation | Not a productized setup; our $150-300 session undercuts the door |
 
-Read across it: the paid layer in this market is **polish and hosting**, not routing.
-That supports the plan's open-core split (Apache-2.0 guts, proprietary polish).
+Read across it: the paid layer in this market is **polish and hosting**, not routing — and that is
+what the licence sale pays for. The split
+itself, however, is **not decided**: `docs/DECISIONS.md` records Phil's standing decision that Mega
+Zword is proprietary and that no open-source licence goes in without him. On 2026-10-19 the landing
+page claimed "open source (Apache-2.0)" anyway, which is the kind of statement that turns a paying
+customer into a refund; the page was corrected to match the recorded decision. Treat the plan's
+Apache-2.0 line as a proposal that still needs his yes.
 
 ## 3. Positioning (keep the plan's line)
 
@@ -69,8 +74,13 @@ category's 14-day money-back norm.
 
 ## 5. Unit economics
 
-Payment (recommend **Lemon Squeezy** over Gumroad — merchant-of-record VAT handling and
-5% + $0.50 vs Gumroad's flat 10%):
+Payment (**Stripe** is what the bench actually built: `scripts/setup_stripe_product.py` creates the
+product, price and payment link idempotently, and the success URL points at the custom domain; see
+`docs/handoffs/2026-10-19-stripe-product.md`). My earlier recommendation was Lemon Squeezy over
+Gumroad on fees — 5% + $0.50 against Gumroad's flat 10% — and Stripe beats both here, because the
+domain and a future webhook-issued licence key live in the same account. The table below still uses
+Lemon Squeezy's rate, so every margin shown is a **conservative floor**; Stripe's card rate
+(≈2.9% + $0.30) improves each row:
 
 | Sale | Gross | Fee | Net | Margin |
 | --- | --- | --- | --- | --- |
@@ -97,7 +107,7 @@ Order matters — do not open the lifetime sale before the gate is ready.
    this up" threads, Upwork/Fiverr as fallback. Goal: 3 sessions, 3 testimonials.
 2. **Gate, then launch founding lifetime.** Required before launch: signed installer,
    sub-5-minute onboarding (detect CLIs → import keys → first routed run), 3 demo videos,
-   honest limitations section. Sell on Lemon Squeezy; run Show HN + Product Hunt the same
+   honest limitations section. Sell through the Stripe link; run Show HN + Product Hunt the same
    week.
 3. **Support tier** after the first 20 licenses.
 4. **Team/audit tier** after the roadmap's cost ledger, durable jobs and escalation land
@@ -133,9 +143,13 @@ one-time revenue drying up, debt pressure causing bad deals, burnout. Add one:
 
 Open questions for Phil (blocking or near-blocking):
 
-1. **License switch**: the plan decides Apache-2.0 guts / proprietary polish, but
-   `README.md` and `LICENSE` still say proprietary. When does that land? Copy must match.
-2. **Storefront**: Gumroad or Lemon Squeezy account, and who owns it?
+1. **License**: still yours alone to call. `LICENSE` and `README.md` say proprietary and
+   `docs/DECISIONS.md` records your decision to keep it that way ("don't add an open-source license
+   or make the repo public without Phil"), while the business plan proposes an Apache-2.0 core.
+   Until you decide, nothing anywhere claims open source — the landing page has been corrected.
+2. **Storefront**: the bench went with Stripe (`scripts/setup_stripe_product.py`). It needs a
+   restricted key from you — Products, Prices and Payment Links only, never the full secret key —
+   before a checkout link can exist at all.
 3. **Setup services**: sell under Phil's name/calendar, or as an anonymous productized
    offer? Availability window (evenings only)?
 4. **Founding price**: $49 or $39 to match TypingMind Standard exactly?
