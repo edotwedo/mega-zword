@@ -5,9 +5,11 @@
 #   powershell -ExecutionPolicy Bypass -File scripts\hive_up.ps1
 #   ... -Skip grok          this Grok chat already counts as the Grok seat
 #   ... -PrintOnly          show commands, launch nothing
+#   ... -Seat cmdc=Cinder-21   name that lane's seat (worktree, MEGAZWORD_SEAT, tab)
 param(
-  [ValidateSet('claude', 'codex', 'grok', 'gemini')]
+  [ValidateSet('claude', 'codex', 'grok', 'gemini', 'cmdc')]
   [string[]]$Skip = @(),
+  [string[]]$Seat = @(),
   [switch]$PrintOnly,
   [switch]$NoApp,
   [switch]$NoIntroduce
@@ -42,6 +44,17 @@ $lanes = [ordered]@{
   claude = @{ cmd = 'claude'; pre = @('--permission-mode', 'acceptEdits') }
   grok   = @{ cmd = 'grok';   pre = @('--permission-mode', 'acceptEdits', '--allow', 'Read', '--allow', 'Glob', '--allow', 'Grep') }
   codex  = @{ cmd = 'codex';  pre = @('--sandbox', 'workspace-write', '--ask-for-approval', 'on-request', '--add-dir', 'SEATDIR', '--add-dir', $workshop) }
+  cmdc   = @{ cmd = 'cmdc';   pre = @() }
+}
+
+# A lane is normally its own seat name (claude, codex, ...), but the roster uses Word-NN
+# designations. `-Seat claude=Juniper-16` names that lane's worktree, MEGAZWORD_SEAT and
+# tab after the designation. Without this a Command Code tab is born with no seat at all
+# and the bot has to pass `author:` by hand forever (Phil, 2026-10-19).
+$seatNames = @{}
+foreach ($pair in $Seat) {
+  $parts = $pair.Split('=', 2)
+  if ($parts.Count -eq 2 -and $parts[1].Trim()) { $seatNames[$parts[0].Trim()] = $parts[1].Trim() }
 }
 
 if (-not $PrintOnly -and -not $NoIntroduce) {
@@ -64,19 +77,22 @@ foreach ($name in $lanes.Keys) {
     continue
   }
   $lane = $lanes[$name]
-  $dir = if ($PrintOnly) { Join-Path $seats $name } else { Get-SeatDir $name }
+  $seatName = if ($seatNames.ContainsKey($name)) { $seatNames[$name] } else { $name }
+  # Designations are mixed case (Cinder-21) but worktrees and branches are lowercase.
+  $seatDir = $seatName.ToLower()
+  $dir = if ($PrintOnly) { Join-Path $seats $seatDir } else { Get-SeatDir $seatDir }
   $arguments = (@($lane.pre) + @($prompt)) | ForEach-Object { $_ -replace 'SEATDIR', $dir }
   $quoted = ($arguments | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ' '
   if ($PrintOnly) {
-    Write-Output "$name | $dir | & $($lane.cmd) $quoted"
+    Write-Output "$name -> seat $seatName | $dir | & $($lane.cmd) $quoted"
     continue
   }
   # The venv's megazword is an editable install of $repo; PYTHONPATH makes python and
   # tests in this tab use the seat's own src instead.
-  $setup = "`$env:PYTHONPATH = '$dir\src'; `$env:PATH = '$venvScripts;' + `$env:PATH; `$env:MEGAZWORD_SEAT = '$name'; "
+  $setup = "`$env:PYTHONPATH = '$dir\src'; `$env:PATH = '$venvScripts;' + `$env:PATH; `$env:MEGAZWORD_SEAT = '$seatName'; "
   $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($setup + "& $($lane.cmd) $quoted"))
-  Start-Process wt -ArgumentList "-w 0 new-tab --title `"Hive $name`" --suppressApplicationTitle -d `"$dir`" pwsh -NoExit -EncodedCommand $encoded"
-  Write-Host "started $name in $dir"
+  Start-Process wt -ArgumentList "-w 0 new-tab --title `"$seatName`" --suppressApplicationTitle -d `"$dir`" pwsh -NoExit -EncodedCommand $encoded"
+  Write-Host "started $name as $seatName in $dir"
 }
 
 Write-Host 'Gemini has a chair when its week is back. Groq and the other HTTP seats have no tab.'
