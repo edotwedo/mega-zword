@@ -23,12 +23,14 @@ import argparse
 import json
 import re
 import sys
+import urllib.parse
 from pathlib import Path
 
 ROSTER = Path(__file__).resolve().parents[2] / "docs" / "HIVE-ROSTER.md"
 CLAUDE_HOME = Path.home() / ".claude" / "projects"
 CODECODE_HOME = Path.home() / ".commandcode" / "projects"
 CODEX_SESSIONS = Path.home() / ".codex" / "sessions"
+GROK_SESSIONS = Path.home() / ".grok" / "sessions"
 
 # The roster's "Worker" column, as the CLIs are actually named.
 WORKER_CLI = {
@@ -113,17 +115,25 @@ def _codex_id(path: Path) -> str:
     return match.group(1) if match else path.stem
 
 
-def resume_args(cli: str, directory: str, session: str | None) -> list[str]:
-    """The flags that bring this seat's conversation back, or a fresh start if unknown."""
-    if cli == "claude":
-        return ["--permission-mode", "acceptEdits", "--resume", session] if session else ["--permission-mode", "acceptEdits"]
-    if cli == "grok":
-        return ["--permission-mode", "acceptEdits", "--resume", session] if session else ["--permission-mode", "acceptEdits"]
+def resume_args(cli: str, directory: str, session: str | None, fresh: bool = False) -> list[str]:
+    """The flags that bring this seat's conversation back.
+
+    When the exact session cannot be named, every one of these CLIs has a "most recent in
+    THIS directory" form - claude `-c`, codex `resume --last`, grok `-c`, cmdc `-c`. That is
+    what a respawn means, and it is strictly better than starting a stranger: the directory
+    is the seat's, so the newest conversation in it is almost certainly the right one.
+    ``fresh`` asks for none of it.
+    """
+    base = ["--permission-mode", "acceptEdits"] if cli in ("claude", "grok") else []
+    if fresh:
+        return base
+    if cli in ("claude", "grok"):
+        return base + (["--resume", session] if session else ["-c"])
     if cli == "codex":
-        return ["resume", session] if session else []
+        return ["resume", session] if session else ["resume", "--last"]
     if cli == "cmdc":
         return ["-r", session] if session else ["-c"]
-    return []
+    return base
 
 
 def claude_session_for(designation: str, directory: str, home: Path | None = None) -> str | None:
@@ -155,11 +165,32 @@ def claude_session_for(designation: str, directory: str, home: Path | None = Non
     return best[1] if best else None
 
 
+def grok_session(directory: str, home: Path | None = None) -> str | None:
+    """Grok keys sessions by the URL-encoded working directory, then by session id:
+    ~/.grok/sessions/<quoted-cwd>/<session-id>/chat_history.jsonl."""
+    folder = (home or GROK_SESSIONS) / urllib.parse.quote(directory, safe="")
+    try:
+        sessions = [d for d in folder.iterdir() if d.is_dir()]
+    except OSError:
+        return None
+    best: tuple[float, str] | None = None
+    for session in sessions:
+        history = session / "chat_history.jsonl"
+        if not history.is_file():
+            continue
+        stamp = history.stat().st_mtime
+        if best is None or stamp > best[0]:
+            best = (stamp, session.name)
+    return best[1] if best else None
+
+
 def find_session(cli: str, directory: str, designation: str = "") -> str | None:
     if cli == "claude":
         return claude_session_for(designation, directory) if designation else claude_session(directory)
     if cli == "cmdc":
         return cmdc_session(directory)
+    if cli == "grok":
+        return grok_session(directory)
     if cli == "codex":
         return codex_session(directory)
     return None
@@ -227,12 +258,24 @@ def plan(roster_text: str, seats_root: Path, fallback_dir: Path,
 
 
 def command(args) -> int:
+    if getattr(args, "record_stdin", False):
+        # The launchers know what they launched before any roster or session exists, so let
+        # them hand it over as JSON rather than re-deriving it. PowerShell collapses a
+        # one-element array to a bare object, so accept both shapes.
+        try:
+            payload = json.loads(sys.stdin.read() or "[]")
+        except ValueError:
+            return 1
+        entries = [payload] if isinstance(payload, dict) else payload
+        if isinstance(entries, list):
+            record([e for e in entries if isinstance(e, dict) and e.get("designation")])
+        return 0
     roster = Path(args.roster).read_text(encoding="utf-8")
     entries = plan(roster, Path(args.seats), Path(args.fallback))
     if getattr(args, "fresh", False):
         for entry in entries:
             entry["session"] = ""
-            entry["args"] = resume_args(entry["cli"], entry["dir"], None)
+            entry["args"] = resume_args(entry["cli"], entry["dir"], None, fresh=True)
     if getattr(args, "record", False):
         record(entries)
     if args.json:
@@ -241,12 +284,10 @@ def command(args) -> int:
     for entry in entries:
         if entry["session"]:
             where = entry["session"]
-        elif entry["cli"] == "cmdc":
-            # Command Code scopes sessions to the project directory, so -c continues the
-            # right one without knowing its id. Saying "starts fresh" here would be a lie.
-            where = "-c (continues the newest session in that directory)"
+        elif getattr(args, "fresh", False):
+            where = "(fresh start; nothing resumed)"
         else:
-            where = "(no session found; starts fresh)"
+            where = "continues the newest session in that directory"
         print(f"{entry['designation']:<12} {entry['cli']:<7} {entry['dir']}")
         print(f"{'':12} resume: {where}")
     return 0
@@ -259,6 +300,8 @@ def add_parser(sub) -> None:
                         help="start new conversations instead of resuming the last one")
     resume.add_argument("--record", action="store_true",
                         help="save how each seat was launched, so the next respawn is exact")
+    resume.add_argument("--record-stdin", action="store_true",
+                        help="internal: read a JSON list of launched seats from stdin and record it")
     resume.add_argument("--roster", default=str(ROSTER), help="roster file to read")
     resume.add_argument("--seats", default=str(Path.home() / "mz-seats"), help="seat worktree root")
     resume.add_argument("--fallback", default=str(Path.home() / "mega-zword"),
@@ -270,6 +313,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--fresh", action="store_true")
     parser.add_argument("--record", action="store_true")
+    parser.add_argument("--record-stdin", action="store_true")
     parser.add_argument("--roster", default=str(ROSTER))
     parser.add_argument("--seats", default=str(Path.home() / "mz-seats"))
     parser.add_argument("--fallback", default=str(Path.home() / "mega-zword"))

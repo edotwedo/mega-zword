@@ -6,6 +6,7 @@ half neither launcher did. The real store layouts they read are verified against
 machine, so the fakes here mirror them exactly.
 """
 
+import io
 import json
 
 from megazword import config, resume
@@ -90,14 +91,60 @@ def test_claude_session_for_falls_back_to_a_folder_named_after_the_seat(tmp_path
         "aaaa1111-0000-4000-8000-000000000001"
 
 
-def test_resume_args_prefer_the_conversation_but_still_start_without_one():
+def test_resume_args_name_the_session_when_we_have_it():
     assert resume.resume_args("claude", "d", "abc") == ["--permission-mode", "acceptEdits", "--resume", "abc"]
-    assert resume.resume_args("claude", "d", None) == ["--permission-mode", "acceptEdits"]
+    assert resume.resume_args("grok", "d", "abc") == ["--permission-mode", "acceptEdits", "--resume", "abc"]
     assert resume.resume_args("cmdc", "d", "abc") == ["-r", "abc"]
-    # Command Code scopes sessions to the project directory, so -c continues the right one.
-    assert resume.resume_args("cmdc", "d", None) == ["-c"]
     assert resume.resume_args("codex", "d", "abc") == ["resume", "abc"]
-    assert resume.resume_args("codex", "d", None) == []
+
+
+def test_resume_args_fall_back_to_this_directory_not_a_stranger():
+    """Every CLI has a "most recent in THIS directory" form. Starting a stranger when the
+    seat's own directory has a conversation is the bug respawn was supposed to fix."""
+    assert resume.resume_args("claude", "d", None) == ["--permission-mode", "acceptEdits", "-c"]
+    assert resume.resume_args("grok", "d", None) == ["--permission-mode", "acceptEdits", "-c"]
+    assert resume.resume_args("cmdc", "d", None) == ["-c"]
+    assert resume.resume_args("codex", "d", None) == ["resume", "--last"]
+
+
+def test_resume_args_fresh_resumes_nothing():
+    assert resume.resume_args("claude", "d", "abc", fresh=True) == ["--permission-mode", "acceptEdits"]
+    assert resume.resume_args("codex", "d", "abc", fresh=True) == []
+
+
+def test_grok_session_is_keyed_by_the_url_encoded_directory(tmp_path):
+    """~/.grok/sessions/<quoted-cwd>/<session-id>/chat_history.jsonl"""
+    folder = tmp_path / resume.urllib.parse.quote(r"C:\Users\mrmar\mz-seats\gauge-18", safe="")
+    session = folder / "01a15240-1fc1-7de2-ad1a-0a92d6c45786"
+    session.mkdir(parents=True)
+    (session / "chat_history.jsonl").write_text("{}", encoding="utf-8")
+    assert resume.grok_session(r"C:\Users\mrmar\mz-seats\gauge-18", tmp_path) == \
+        "01a15240-1fc1-7de2-ad1a-0a92d6c45786"
+    assert resume.grok_session(r"C:\nobody", tmp_path) is None
+
+
+def test_record_stdin_takes_what_a_launcher_handed_over(tmp_path, monkeypatch):
+    """PowerShell collapses a one-element array to a bare object, so both shapes must work."""
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(
+        {"designation": "Gauge-18", "cli": "grok", "dir": r"C:\mz-seats\gauge-18"})))
+    assert resume.main(["--record-stdin"]) == 0
+    assert resume.read_recorded(tmp_path)["gauge-18"]["dir"] == r"C:\mz-seats\gauge-18"
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps([
+        {"designation": "Cinder-21", "cli": "cmdc", "dir": "d"},
+        {"designation": "", "cli": "x", "dir": "d"},
+    ])))
+    assert resume.main(["--record-stdin"]) == 0
+    recorded = resume.read_recorded(tmp_path)
+    assert recorded["cinder-21"]["cli"] == "cmdc"
+    assert "" not in recorded, "an entry with no designation must be dropped"
+
+
+def test_record_stdin_ignores_junk(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    monkeypatch.setattr("sys.stdin", io.StringIO("{ not json"))
+    assert resume.main(["--record-stdin"]) == 1
 
 
 def test_plan_prefers_a_seat_worktree_and_falls_back_to_the_repo(tmp_path):

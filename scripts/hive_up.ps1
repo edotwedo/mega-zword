@@ -71,6 +71,7 @@ if (-not $PrintOnly -and -not $NoApp) {
   Write-Host 'opened Mega Zword'
 }
 
+$launched = @()
 foreach ($name in $lanes.Keys) {
   if ($Skip -contains $name) {
     Write-Host "skip $name (already seated)"
@@ -93,6 +94,14 @@ foreach ($name in $lanes.Keys) {
   $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($setup + "& $($lane.cmd) $quoted"))
   Start-Process wt -ArgumentList "-w 0 new-tab --title `"$seatName`" --suppressApplicationTitle -d `"$dir`" pwsh -NoExit -EncodedCommand $encoded"
   Write-Host "started $name as $seatName in $dir"
+  $launched += [pscustomobject]@{ designation = $seatName; cli = $lane.cmd; dir = $dir }
+}
+
+# Record what we launched, so a later respawn knows this seat's directory instead of
+# guessing at it. Without this, two seats can fall out of one directory (2026-10-20).
+if ($launched.Count) {
+  $launched | ConvertTo-Json -Depth 3 | & $mz resume --record-stdin | Out-Null
+  Write-Host "recorded $($launched.Count) seat(s) for respawn"
 }
 
 Write-Host 'Gemini has a chair when its week is back. Groq and the other HTTP seats have no tab.'
