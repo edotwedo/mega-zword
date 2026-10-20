@@ -165,19 +165,63 @@ def find_session(cli: str, directory: str, designation: str = "") -> str | None:
     return None
 
 
-def plan(roster_text: str, seats_root: Path, fallback_dir: Path) -> list[dict]:
-    """One entry per seat: who it is, where it lives, and how to resume it."""
+def registry_path(home: Path | None = None) -> Path:
+    from . import config
+    return (home or config.HOME) / "hive_seats.json"
+
+
+def read_recorded(home: Path | None = None) -> dict:
+    """What we know about how each seat was last launched, keyed by lowercased name."""
+    try:
+        data = json.loads(registry_path(home).read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def record(entries: list[dict], home: Path | None = None) -> None:
+    """Remember how each seat was launched, so the NEXT respawn is exact.
+
+    Nothing recorded this before 2026-10-20, which is the whole reason respawn never
+    worked: a seat that ran from the shared repo or from home is indistinguishable from
+    any other, and two seats fall out of the same directory. Recording at launch is the
+    only thing that turns this from a guess into a fact.
+    """
+    known = read_recorded(home)
+    for entry in entries:
+        known[entry["designation"].lower()] = {
+            "designation": entry["designation"],
+            "cli": entry["cli"],
+            "dir": entry["dir"],
+        }
+    path = registry_path(home)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(known, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def plan(roster_text: str, seats_root: Path, fallback_dir: Path,
+         home: Path | None = None) -> list[dict]:
+    """One entry per seat: who it is, where it lives, and how to resume it.
+
+    A recorded launch beats a guess about the directory; the roster is only the fallback
+    for a seat we have never seen launched.
+    """
     entries = []
+    recorded = read_recorded(home)
     for designation, cli in seats(roster_text):
-        candidate = seats_root / designation.lower()
+        remembered = recorded.get(designation.lower(), {})
+        dirname = remembered.get("dir", "")
+        candidate = Path(dirname) if dirname else seats_root / designation.lower()
+        if not candidate.is_dir():
+            candidate = seats_root / designation.lower()
         directory = candidate if candidate.is_dir() else fallback_dir
-        session = find_session(cli, str(directory), designation)
+        session = find_session(remembered.get("cli") or cli, str(directory), designation)
         entries.append({
             "designation": designation,
-            "cli": cli,
+            "cli": remembered.get("cli") or cli,
             "dir": str(directory),
             "session": session or "",
-            "args": resume_args(cli, str(directory), session),
+            "args": resume_args(remembered.get("cli") or cli, str(directory), session),
         })
     return entries
 
@@ -189,6 +233,8 @@ def command(args) -> int:
         for entry in entries:
             entry["session"] = ""
             entry["args"] = resume_args(entry["cli"], entry["dir"], None)
+    if getattr(args, "record", False):
+        record(entries)
     if args.json:
         print(json.dumps(entries, indent=2))
         return 0
@@ -211,6 +257,8 @@ def add_parser(sub) -> None:
     resume.add_argument("--json", action="store_true", help="machine-readable plan for the launcher")
     resume.add_argument("--fresh", action="store_true",
                         help="start new conversations instead of resuming the last one")
+    resume.add_argument("--record", action="store_true",
+                        help="save how each seat was launched, so the next respawn is exact")
     resume.add_argument("--roster", default=str(ROSTER), help="roster file to read")
     resume.add_argument("--seats", default=str(Path.home() / "mz-seats"), help="seat worktree root")
     resume.add_argument("--fallback", default=str(Path.home() / "mega-zword"),
@@ -221,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--fresh", action="store_true")
+    parser.add_argument("--record", action="store_true")
     parser.add_argument("--roster", default=str(ROSTER))
     parser.add_argument("--seats", default=str(Path.home() / "mz-seats"))
     parser.add_argument("--fallback", default=str(Path.home() / "mega-zword"))

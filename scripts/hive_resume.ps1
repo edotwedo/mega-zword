@@ -23,6 +23,9 @@ $venvScripts = Join-Path $repo '.venv\Scripts'
 
 $extra = @()
 if ($Fresh) { $extra += '--fresh' }
+# Record what we launch, so the NEXT respawn is exact rather than a guess. Nothing
+# recorded this before 2026-10-20, which is why respawn could not tell two seats apart.
+if (-not $PrintOnly) { $extra += '--record' }
 $plan = @(& $mz resume --json @extra | ConvertFrom-Json)
 
 if (-not $plan.Count) { Write-Host 'resume: no seats found on the roster'; exit 1 }

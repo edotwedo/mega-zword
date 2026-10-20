@@ -8,7 +8,7 @@ machine, so the fakes here mirror them exactly.
 
 import json
 
-from megazword import resume
+from megazword import config, resume
 
 ROSTER = """
 # Hive roster
@@ -109,3 +109,34 @@ def test_plan_prefers_a_seat_worktree_and_falls_back_to_the_repo(tmp_path):
     # Juniper-16 has no worktree on this machine, so it must fall back rather than vanish.
     assert by_seat["Juniper-16"]["dir"] == str(tmp_path / "mega-zword")
     assert by_seat["Juniper-16"]["cli"] == "claude"
+
+
+def test_record_remembers_where_a_seat_was_launched(tmp_path, monkeypatch):
+    """The whole reason respawn never worked: nothing recorded which seat ran where."""
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    resume.record([{"designation": "Juniper-16", "cli": "claude", "dir": r"C:\somewhere\else"}],
+                  tmp_path)
+    assert resume.read_recorded(tmp_path)["juniper-16"]["dir"] == r"C:\somewhere\else"
+
+
+def test_a_recorded_launch_beats_the_directory_guess(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    seats = tmp_path / "mz-seats"
+    (seats / "cinder-21").mkdir(parents=True)
+    # Without a record, the guess is the worktree named after the seat.
+    guess = {e["designation"]: e for e in resume.plan(ROSTER, seats, tmp_path / "repo", home=tmp_path)}
+    assert guess["Cinder-21"]["dir"] == str(seats / "cinder-21")
+    # With one, the seat is resumed where it actually ran.
+    resume.record([{"designation": "Cinder-21", "cli": "cmdc",
+                    "dir": str(tmp_path / "elsewhere")}], tmp_path)
+    (tmp_path / "elsewhere").mkdir()
+    recorded = {e["designation"]: e for e in resume.plan(ROSTER, seats, tmp_path / "repo", home=tmp_path)}
+    assert recorded["Cinder-21"]["dir"] == str(tmp_path / "elsewhere")
+
+
+def test_record_survives_a_corrupt_registry(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    resume.registry_path(tmp_path).write_text("{ not json", encoding="utf-8")
+    assert resume.read_recorded(tmp_path) == {}
+    resume.record([{"designation": "Gauge-18", "cli": "grok", "dir": "d"}], tmp_path)
+    assert resume.read_recorded(tmp_path)["gauge-18"]["cli"] == "grok"
