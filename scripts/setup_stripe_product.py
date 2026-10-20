@@ -73,7 +73,8 @@ def main(argv: list[str] | None = None) -> int:
     if product is None:
         product = _call(key, "POST", "/products", {
             "name": args.name,
-            "description": "One-time lifetime license for Mega Zword (Apache-2.0 core).",
+            "description": "One-time lifetime license for Mega Zword. Proprietary "
+                           "software; all rights reserved.",
         })
     print(f"product: {product['id']}", file=sys.stderr)
 

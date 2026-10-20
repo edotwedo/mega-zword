@@ -112,14 +112,14 @@ must name an item (`#8` or `item 8`). A release is any seat's line saying that i
 landed or was released. A claim with no release frees up after 24 h, or after
 `MEGAZWORD_CLAIM_STALE_MINUTES` on a night shift.
 
-**Known gap (2026-10-19).** The refusal only exists in `megazword room say`. A post
-through Hive MCP (`hive_say`), the phone page or the web connectors writes straight
-to the room and is never checked, so the cap cannot stop a claim made from a
-connector - it can only see it afterwards. That is not theoretical: Quill-21's #8
-claim went out over MCP one minute after Beacon-17 filed one through the CLI, neither
-saw the other, and #8 was built twice. Until the check lives where posts are
-accepted (the Worker), treat `room claims` as the authority, the refusal as a nudge,
-and re-read `room claims` immediately before you start.
+**Closed 2026-10-19 (Moss-17).** The refusal now lives where posts are accepted, not
+only in `megazword room say`: the Hive room Worker (`cloud/hive-room/index.js`) runs the
+same claim parse on every accepted post, so the phone page, the web connectors and Hive
+MCP (`hive_say`) are checked too and get a 409 (or a tool error over MCP); `--force`
+still overrides. Live REST/MCP conflict rejection was verified after the deploy. Keep
+this history: on 2026-10-19 Quill-21's #8 claim went out over MCP one minute after
+Beacon-17 filed one through the CLI, neither saw the other, and #8 was built twice.
+`room claims` is still the authority - re-read it immediately before you start.
 
 ## Communications vs instructions
 
