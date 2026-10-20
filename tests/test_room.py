@@ -268,13 +268,13 @@ def test_show_empty_room(tmp_path):
     assert out == ["[megazword room] room 'empty' has no messages yet"]
 
 
-def test_turn_prompt_does_not_ask_for_bot_mentions():
-    """@mentions in a one-shot reply used to spawn extra workers."""
+def test_turn_prompt_has_no_mention_rule():
+    """Phil, 2026-10-20: no "don't @mention other bots" rule in prompts."""
     from megazword.room import build_turn_prompt
     alone = build_turn_prompt("card", "", "phil: hi", "grok", "workshop", "phil", others=[])
-    assert "Don't @mention another bot" in alone and "@claude" not in alone
+    assert "answer Phil yourself" in alone and "@claude" not in alone
     two = build_turn_prompt("card", "", "phil: hi", "grok", "workshop", "phil", others=["codex"])
-    assert "Do not @mention" in two and "@codex" in two and "@claude" not in two
+    assert "@codex" in two and "@claude" not in two
     legacy = build_turn_prompt("card", "", "phil: hi", "grok", "workshop", "phil")
-    assert "Do not @mention other bots" in legacy
-    assert "extra one-shot" in legacy
+    for text in (alone, two, legacy):
+        assert "@mention" not in text

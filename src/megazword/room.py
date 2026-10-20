@@ -349,18 +349,15 @@ def build_turn_prompt(state_card: str, rolling_summary: str,
                if last_author == "phil" else
                f"Reply as @{speaker}.")
 
-    # `others`: bots that can actually speak next. Mentioning one that is saving usage
-    # or out gets no answer, and the speaker ends up talking to itself.
+    # `others`: bots that can actually speak next. A bot's @mention never starts a
+    # one-shot (pick_next_speaker ignores bot mentions), so no rule is needed here.
     if others is None:
-        handoff = ("Do not @mention other bots; that starts extra one-shot workers. "
-                   "Phil's live sessions read this log.")
+        handoff = "Phil's live sessions read this log."
     elif others:
-        handoff = ("Live seats read this log. Do not @mention other bots ("
-                   + ", ".join(f"@{b}" for b in others)
-                   + "); that starts extra one-shot workers.")
+        handoff = ("Live seats read this log: "
+                   + ", ".join(f"@{b}" for b in others) + ".")
     else:
-        handoff = ("You are the only one-shot in the room right now. "
-                   "Don't @mention another bot; answer Phil yourself.")
+        handoff = "You are the only one-shot in the room right now; answer Phil yourself."
     parts.append(
         f"[Your Turn: @{speaker}]\n"
         f"{lead_in} Keep your answer friendly, concise, and under {reply_words} words. "

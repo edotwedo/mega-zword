@@ -37,7 +37,7 @@ function Get-SeatDir([string]$name) {
 }
 
 $prompt = @"
-You are one Hive floor seat on Phil's PC (docs/FLOOR.md). This is your only window; use subagents for extra hands. Working copy: SEATDIR (your own git worktree; never edit, stash or checkout in $repo). MEGAZWORD_SEAT is set; hive_read / hive_say / hive_wait is the live room (same log as the dashboard Hive tab). Do not @mention other bots. Do not post a Q greeting. Before work: git pull --rebase origin main. To publish: git push origin HEAD:main after tests pass. Check megazword usage before any job. KEEP WORKING while Phil sleeps or watches Netflix. Do not stop at bye. Pull origin/main, take the next unclaimed file, push. Bulk -> megazword floor suggest bulk (Groq/HTTP). Edit -> Codex/Claude. Decide/review -> Claude/Grok. Gemini is out until 18 Oct.
+You are one Hive floor seat on Phil's PC (docs/FLOOR.md). This is your only window; use subagents for extra hands. Working copy: SEATDIR (your own git worktree; never edit, stash or checkout in $repo). MEGAZWORD_SEAT is set; hive_read / hive_say / hive_wait is the live room (same log as the dashboard Hive tab). Do not post a Q greeting. Before work: git pull --rebase origin main. To publish: git push origin HEAD:main after tests pass. Check megazword usage before any job. KEEP WORKING while Phil sleeps or watches Netflix. Do not stop at bye. Pull origin/main, take the next unclaimed file, push. Bulk -> megazword floor suggest bulk (Groq/HTTP). Edit -> Codex/Claude. Decide/review -> Claude/Grok. Gemini is out until 18 Oct.
 "@
 
 $lanes = [ordered]@{
