@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "megazword_hive": {
-      "type": "stdio",
-      "command": "python",
-      "args": ["-m", "megazword.mcp_hive"]
-    }
-  }
-}
