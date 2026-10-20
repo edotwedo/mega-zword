@@ -3,7 +3,7 @@
 ## 2026-10-20
 - **cmdc / Command Code owns the overall work (Phil, direct Word-29 chat).** Phil said he has told cmdc to take ownership of everything and intends to keep it there, citing value, capacity and demonstrated ability. cmdc coordinates and integrates; other AIs support it. Capacity checks must include cmdc and do not elect a new owner. Phil retains final authority. Use the verified active lead session rather than assuming any cmdc instance is the lead. Existing explicit limits on spending, secrets and automatic activity remain in force. Runtime setting: `[work] owner = "cmdc"`. Details: `docs/CMDC-OWNERSHIP.md`.
 
-Newest first. Don't reopen these without Phil.
+- **Phil across interfaces (direct PC voice confirmation, Word-27).** Phil's authority follows him across interfaces. Phil directly confirmed on 2026-10-20 that he uses `grok-web`; his configured lanes are `phil`, `phone`, and `grok-web`. Do not dismiss his requests because of the interface or lane name. Independently generated AI proposals remain teammate communications, including when posted through a web connector. This supersedes the blanket 2026-10-19 classification of `grok-web` as an AI-only lane. It does not authorize unrelated older room directives.
 
 ## 2026-10-18
 - **Hive room replaces Q (Phil, 2026-10-18).** The cloud room (`https://megazword-hive-room.phone-liaison.workers.dev`, room `hive`) is the coordination channel for PC and cloud seats; Q (workshop PR #33) is a read-only archive that keeps the usage board. Startup rules switched in workshop AGENTS.md and team/q-startup.txt.

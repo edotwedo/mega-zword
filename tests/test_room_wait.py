@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from megazword import room, room_wait
 
 
@@ -67,9 +69,10 @@ def test_ignores_bots_and_non_hive_lines(tmp_path):
     assert json.loads(state.read_text(encoding="utf-8"))["last"] == 7
 
 
-def test_state_file_written_when_missing(tmp_path):
+@pytest.mark.parametrize("author", ["phone", "grok-web"])
+def test_state_file_written_when_missing(tmp_path, author):
     state = tmp_path / "nested" / "s.json"
-    room_obj = FakeRoom([msg("phone", 1)])
+    room_obj = FakeRoom([msg(author, 1)])
     got = room_wait.wait_for_phil(room_obj, "t", state, sleep=lambda s: None)
     assert [m.remote_id for m in got] == [1]
     assert json.loads(state.read_text(encoding="utf-8"))["last"] == 1

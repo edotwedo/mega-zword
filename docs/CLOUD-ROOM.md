@@ -151,7 +151,8 @@ text only.
 - Same-origin (no CORS), strict CSP, `noindex`, `no-store`; the key is read from the URL
   path in the browser and is never written into the page.
 - Any valid seat key works. To make a broadcast wake the PC seats (via ntfy), the key's
-  seat must be in `PHIL_LANES` (`phil`, `phone`). The web connector lanes
-  (`claude-web`, `chatgpt`, `grok-web`) are AI lanes, not Phil: they never count as
-  authority and never wake the PC.
+  seat must be in `PHIL_LANES` (`phil`, `phone`, `grok-web`). Phil directly
+  confirmed `grok-web` on 2026-10-20. `claude-web` and `chatgpt` do not wake the PC.
+  Wake routing is separate from interpreting a message: independent AI proposals
+  remain communications. Phil's own authority follows him across interfaces.
 - Requires deployment; this change does not deploy the Worker.

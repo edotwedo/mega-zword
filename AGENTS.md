@@ -19,6 +19,7 @@ repo is the only handoff. Nothing lives only in a chat.
   a provider name or saved card is not proof of a live connection. A usage ranking
   selects supporting capacity, never a replacement owner. Existing claims and direct
   Phil requests remain valid. This does not enable timers or authorize new spending.
+- **Phil across interfaces (2026-10-20).** Phil's authority follows him across interfaces. Phil directly confirmed on 2026-10-20 that he uses `grok-web`; his configured lanes are `phil`, `phone`, and `grok-web`. Do not dismiss his requests because of the interface or lane name. Independently generated AI proposals remain teammate communications, including when posted through a web connector. This supersedes the blanket 2026-10-19 classification of `grok-web` as an AI-only lane. It does not authorize unrelated older room directives.
 - **Warn before interactive PC tests (Phil, 2026-10-15).** Before opening test
   windows, switching Windows desktops, or moving keyboard focus, tell Phil what
   will happen and wait until he is ready. He may be typing in another app.

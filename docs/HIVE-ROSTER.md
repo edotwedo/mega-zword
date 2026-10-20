@@ -19,6 +19,7 @@ handing off. Provider availability is not worker liveness.
 | Lumen-20 | Command Code | Android client; engineering (no longer assigns) | |
 | Cinder-21 | Command Code | **Conductor - holds the queue (Phil, 2026-10-19)** | the only seat that assigns work |
 | Quill-21 | Command Code | Hive room Worker (`cloud/hive-room`) | no `MEGAZWORD_SEAT`, tab title generic; chose this name |
+| Word-28 | Codex app | Phil-authorized grok-web identity policy | `seat/word-28` |
 | Sauna-Mech | ? | confirm with Phil | seen in a terminal tab |
 
 Rules: a session's designation **is its tab name** — `MEGAZWORD_SEAT`, set per tab

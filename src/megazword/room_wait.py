@@ -18,9 +18,9 @@ from pathlib import Path
 from . import config
 from .room import DEFAULT_ROOM, RemoteRoom, room_dir
 
-# Phil's own clients post under these lanes, so all of them count as "Phil".
-# Only Phil's own lanes count as Phil. The web connector lanes are used by AIs.
-PHIL_AUTHORS = ("phil", "phone")
+# Phil confirmed grok-web as his lane in a direct PC chat (2026-10-20).
+# These lanes wake listeners; independently generated AI proposals remain communications.
+PHIL_AUTHORS = ("phil", "phone", "grok-web")
 STREAM = "https://ntfy.sh/{topic}/json"
 SIGNAL = re.compile(r"hive:\d+")
 FIRST_DELAY = 5

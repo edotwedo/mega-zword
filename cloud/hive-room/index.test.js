@@ -371,10 +371,10 @@ test('no topics configured means no pings, and a failing ntfy never fails the po
   assert.equal(res.status, 201);
 });
 
-test('web connector lanes are not Phil and never wake the PC', async () => {
+for (const lane of ['claude-web', 'chatgpt']) test(`${lane} does not wake the PC`, async () => {
   const webToken = crypto.randomUUID();
   const webEnv = {...env, NTFY_PC_TOPIC: 'pc-topic', NTFY_PHONE_TOPIC: 'phone-topic',
-    SEAT_TOKENS: JSON.stringify({...JSON.parse(env.SEAT_TOKENS), [await digest(webToken)]: 'claude-web'})};
+    SEAT_TOKENS: JSON.stringify({...JSON.parse(env.SEAT_TOKENS), [await digest(webToken)]: lane})};
   assert.equal((await post(webToken, 'routine note', webEnv)).status, 201);
   assert.equal(pings.length, 0);
 });
@@ -402,3 +402,17 @@ test('the phone app page is served only under a valid key', async () => {
   assert.equal((await call('GET', '/app/not-a-real-key')).status, 401);
   assert.equal((await call('POST', '/app/' + token)).status, 405);
 });
+
+for (const path of ['/rooms/hive/messages', '/mcp']) {
+  test(`Phil's grok-web lane wakes the PC through ${path} without exposing text`, async () => {
+    const grokToken = crypto.randomUUID();
+    const grokEnv = {...pingEnv, SEAT_TOKENS: JSON.stringify({
+      ...JSON.parse(pingEnv.SEAT_TOKENS), [await digest(grokToken)]: 'grok-web'})};
+    const res = await post(grokToken, 'private test content', grokEnv, path);
+    assert.equal(res.status, path === '/mcp' ? 200 : 201);
+    assert.equal(pings.length, 1);
+    assert.equal(pings[0].url, 'https://ntfy.sh/pc-topic');
+    assert.match(pings[0].body, /^hive:\d+$/);
+    assert.ok(!JSON.stringify(pings).includes('private test content'));
+  });
+}

@@ -63,7 +63,7 @@ def test_old_calls_never_escalate_so_a_first_run_cannot_flood_the_phone():
     assert len(watch.escalate(old, START + timedelta(minutes=60), ROSTER, {})) == 6
 
 
-@pytest.mark.parametrize("author", ["codex", "floor", "claude-web", "chatgpt", "grok-web"])
+@pytest.mark.parametrize("author", ["codex", "floor", "claude-web", "chatgpt"])
 def test_bot_posts_are_never_calls(author):
     assert watch.escalate([message(author)], START + timedelta(minutes=20), ROSTER, {}) == []
 
@@ -83,9 +83,10 @@ def test_only_later_answers_and_exact_call_ids_count():
     assert [(a.call_id, a.step) for a in actions] == [(1, 1)]
 
 
-def test_phone_lane_and_independent_calls():
+@pytest.mark.parametrize("author", ["phone", "grok-web"])
+def test_phone_and_grok_web_lanes_and_independent_calls(author):
     state = {}
-    messages = [message(), message("phone", minute=4, remote_id=2)]
+    messages = [message(), message(author, minute=4, remote_id=2)]
     assert [(a.call_id, a.step) for a in watch.escalate(
         messages, START + timedelta(minutes=10), ROSTER, state)] == [(1, 1), (1, 2), (2, 1)]
     assert watch.escalate(messages, START + timedelta(minutes=10), ROSTER, state) == []

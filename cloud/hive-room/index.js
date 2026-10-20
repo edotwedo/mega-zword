@@ -244,9 +244,9 @@ async function postMessage(store, identity, seat, room, body, key, now) {
   return message ? {message, status: 201} : {error: 'seat limit: 30 messages per minute', status: 429};
 }
 
-// Only Phil's own lanes carry authority and wake the PC. The web connector lanes
-// (claude-web, chatgpt, grok-web) are used by AIs, not by Phil (Phil, 2026-10-19).
-const PHIL_LANES = new Set(['phil', 'phone']);
+// Phil directly confirmed grok-web as his lane (2026-10-20), superseding its
+// AI-only classification. Wake routing does not turn independent AI proposals into orders.
+const PHIL_LANES = new Set(['phil', 'phone', 'grok-web']);
 
 // Fire an ntfy notification after a successful POST. Never includes message text.
 // Uses ctx.waitUntil when available so the response is not delayed; otherwise awaits.
