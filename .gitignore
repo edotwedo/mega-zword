@@ -10,3 +10,6 @@ build/
 .coverage.*
 htmlcov/
 *.lock
+
+# Command Code's own state (taste, plans, history) - never part of this product.
+.commandcode/
