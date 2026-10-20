@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "${MZ_SMOKE_PYTHON:-python3}" "$(dirname "$0")/fake_ai.py" claude "$@"

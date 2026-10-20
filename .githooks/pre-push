@@ -1,0 +1,54 @@
+#!/bin/sh
+# Land-gate (Cinder-21, 2026-10-19): nothing reaches main until the suite passes.
+# Installed with `megazword gate --install`. Emergency: git push --no-verify
+#
+# This deliberately depends on nothing but pytest. An earlier version checked
+# `import megazword.gate` first and skipped itself on its very first run: the
+# venv is an editable install of the MAIN checkout, which did not have the new
+# module yet. pytest adds this worktree's own src via pyproject's `pythonpath`,
+# so it always tests the tree you are pushing - no install required.
+set -u
+
+if [ "${MZ_SKIP_GATE:-}" = "1" ]; then
+  echo "land-gate: SKIPPED (MZ_SKIP_GATE=1) - nothing was verified"
+  exit 0
+fi
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+main="$root"
+if common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && [ -n "$common" ]; then
+  main=$(dirname "$common")
+fi
+
+python=""
+for candidate in "${MZ_PYTHON:-}" "$root/.venv/Scripts/python.exe" "$main/.venv/Scripts/python.exe" \
+                 "$root/.venv/bin/python" "$main/.venv/bin/python" python3 python; do
+  [ -n "$candidate" ] || continue
+  if command -v "$candidate" >/dev/null 2>&1; then python="$candidate"; break; fi
+done
+if [ -z "$python" ]; then
+  echo "land-gate: NOTHING WAS VERIFIED - no python found on this machine"
+  exit 0
+fi
+if ! "$python" -c "import pytest" >/dev/null 2>&1; then
+  echo "land-gate: NOTHING WAS VERIFIED - $python has no pytest"
+  exit 0
+fi
+
+# git exports GIT_DIR and friends to its hooks. The suite builds its own throwaway
+# repos, and inheriting this environment makes those commands run against THIS repo
+# instead (42 errors, caught by the gate on its first real run, 2026-10-19).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR \
+      GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+
+cd "$root" || exit 0
+echo "land-gate: running the suite before this push (a few minutes)"
+if "$python" -m pytest -q; then
+  echo "land-gate: suite passed"
+  exit 0
+fi
+echo "land-gate: SUITE FAILED - push blocked"
+echo "land-gate: a single failure that passes on its own is the known winpty contention"
+echo "land-gate: flake (tests/test_terminal_input.py); re-run just that test first"
+echo "land-gate: fix it, or 'git push --no-verify' if you are certain it is not you"
+exit 1

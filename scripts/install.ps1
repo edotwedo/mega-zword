@@ -1,0 +1,54 @@
+# Install Mega Zword for this Windows user from this checkout.
+#   -Shortcut  also add "Mega Zword" to your Desktop and Start Menu (this user
+#              only); it opens the dashboard in its own app window.
+param([switch]$Shortcut)
+$ErrorActionPreference = 'Stop'
+$repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+
+. (Join-Path $PSScriptRoot 'userpath.ps1')  # Add-UserPath
+
+$pipx = Get-Command pipx -ErrorAction SilentlyContinue
+if ($pipx) {
+    & $pipx.Source install --force -e $repo
+    if ($LASTEXITCODE -ne 0) { throw 'pipx install failed' }
+    $bin = if ($env:PIPX_BIN_DIR) { $env:PIPX_BIN_DIR } else { Join-Path $HOME '.local\bin' }
+    Add-UserPath $bin
+    $doctor = Join-Path $bin 'megazword.exe'
+    if (-not (Test-Path $doctor)) {
+        $command = Get-Command megazword -ErrorAction Stop
+        $doctor = $command.Source
+    }
+} else {
+    $venv = Join-Path $repo '.venv'
+    $python = Join-Path $venv 'Scripts\python.exe'
+    if (-not (Test-Path $python)) {
+        $basePython = (Get-Command python -ErrorAction Stop).Source
+        & $basePython -m venv $venv
+        if ($LASTEXITCODE -ne 0) { throw 'Could not create .venv' }
+    }
+    & $python -m pip install -e $repo
+    if ($LASTEXITCODE -ne 0) { throw 'pip install failed' }
+    $bin = Join-Path $venv 'Scripts'
+    Add-UserPath $bin
+    $doctor = Join-Path $bin 'megazword.exe'
+}
+
+if ($Shortcut) {
+    # Re-running overwrites the same two shortcuts, so this is safe to repeat.
+    $shell = New-Object -ComObject WScript.Shell
+    $places = @([Environment]::GetFolderPath('Desktop'),
+                [Environment]::GetFolderPath('Programs'))
+    foreach ($folder in $places) {
+        $link = $shell.CreateShortcut((Join-Path $folder 'Mega Zword.lnk'))
+        $link.TargetPath = $doctor
+        $link.Arguments = 'dashboard --app'
+        $link.WorkingDirectory = $HOME
+        $link.WindowStyle = 7  # start the server window minimized
+        $link.Description = 'Mega Zword dashboard'
+        $link.Save()
+        Write-Host "Shortcut: $(Join-Path $folder 'Mega Zword.lnk')"
+    }
+}
+
+& $doctor doctor
+exit $LASTEXITCODE

@@ -1,0 +1,7 @@
+scripts/fake_cli/claude text eol=lf
+scripts/fake_cli/codex text eol=lf
+scripts/fake_cli/grok text eol=lf
+*.cmd text eol=crlf
+scripts/fake_cli/gemini text eol=lf
+# Hooks run under sh, which chokes on a CRLF shebang.
+.githooks/* text eol=lf

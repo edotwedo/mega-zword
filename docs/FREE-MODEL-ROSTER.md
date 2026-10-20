@@ -1,0 +1,194 @@
+# Free model roster and quota plan
+
+Checked 2026-10-16. "Catalog" means a provider lists a model; "answered" means
+we sent a bounded request and got a response. Probe size and tool support are
+recorded per row. Rates change by plan, model and account, so account headers
+and provider dashboards take precedence over this snapshot.
+
+**Automatic priority:** the six verified Tencent TokenHub services lead each
+easy, medium and hard route, and lead free coding failover. Mega Zword rotates
+the primary choice toward the service with the fewest estimated tokens in its
+local run log, so one healthy model does not take every task while the others
+sit unused. Those estimates are approximate; Tencent's per-service quota page
+is the authority. On rate-limit or service failure, the remaining Tencent
+models are tried before the other free providers and plan-based CLI fallbacks.
+
+## Verified coding-capable API models
+
+| Provider / identity | Model | Result | Quota evidence and handling |
+| --- | --- | --- | --- |
+| Groq `groq` | `openai/gpt-oss-20b` | Answered; native tool use works | Groq Free: 30 RPM, 1,000 requests/day, 8K TPM, 200K TPD per model; response headers report remaining requests. |
+| Groq `groq-120b` | `openai/gpt-oss-120b` | Answered | Same published per-model limits; distinct model pool. |
+| Groq `groq-qwen` | `qwen/qwen3.8-27b` | Answered | Same published per-model limits; Chinese-origin Qwen retained. |
+| Groq `groq-allam` | `allam-2-7b` | Answered text. Oct 17 `scout --test`: "tool calling is not supported with this model"; off the coding failover. | Probe header showed 7,000 requests/day. |
+| Gemini API `gemini-api` | `gemini-3.5-flash-lite` | Answered; 5 output tokens | Free tier; RPM/TPM/RPD are project- and model-specific in AI Studio. This is separate from Gemini CLI. |
+| Gemini API `gemini-api-31-lite` | `gemini-3.1-flash-lite` | Answered; 5 output tokens | Independent per-model quota under the same Google AI project key; shared conservative request pace. |
+| Z.AI `zai` | `glm-4.5-flash` | Earlier coding probe passed; live health probe on Oct 15 answered in 12.3 seconds. | Z.AI's exact key/model allowance was not published in the checked docs; use the account console and response headers. Chinese-origin GLM retained. |
+| Z.AI `zai-47` | `glm-4.7-flash` | Oct 16: answered a native `finish` tool call in 14.0s with the existing key. | Z.ai's official pricing page lists GLM-4.7-Flash, GLM-4.5-Flash and GLM-4.6V-Flash as Free; third-party guides report one request at a time on free models, so `zai` and `zai-47` share one pace lock. |
+| Kilo gateway `kilo`, `kilo-cohere`, `kilo-nemotron` (keyless) | `kilo-auto/free`, `cohere/north-mini-code:free`, `nvidia/nemotron-3-super-120b-a12b:free` | Oct 17: all answered a native `finish` call with no key at https://ai-gateway.kilo.ai/api/v1 (1.2-3.3s). | Kilo's gateway docs: "unauthenticated access for free models only", 200 requests/hour per IP. One shared pace lock (18 s). kilo-auto/free picks its own free model (served by dots-3 in the probe). |
+| OVHcloud `ovh-120b`, `ovh-qwen` (keyless) | `gpt-oss-120b`, `Qwen3.8-27B` | Oct 17: both returned a native `finish` call with no key (14.5s, 15.5s). Llama 3.3 70B, Qwen3.6-27B and Mistral Small 3.2 also passed but aren't added. | Each model has its own anonymous 2 requests/min, so each is a separate free pool, paced 31 s. |
+| OVHcloud `ovh` (keyless) | `Qwen3.5-397B-A17B` | Oct 16: no key, no account; native `finish` tool call in 1.3s, 338 tokens. | Anonymous tier: 2 requests/min per IP and per model (official docs; response headers agree). Mega Zword never sends a key to it, because keyed calls are billed. Prompts are scrubbed since data terms weren't checked. |
+| Mistral `mistral` | `ministral-3b-2512` | Earlier free-mode coding check passed; live health probe on Oct 15 answered in 0.7 seconds. | Free mode includes monthly API usage; per-model request-per-second and token-per-minute limits are shown in the account's Limits page. They vary by organization/model, so there is no honest universal number to put here. |
+| Tencent TokenHub `tencent-glm-5.3-flash` | `glm-5.3-flash` | Oct 16: HTTP 200; completed a normal coding task and returned Mega Zword's native `finish` tool call in 45.9s. | Claimed 1M free-trial tokens; 99.7% remained after the test. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-glm-5.3` | `glm-5.3` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 45.7s on retry. The initial 75s probe limit was too short. | Claimed 1M free-trial tokens; 99.4% remained after tests. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-kimi-k2.7-code` | `kimi-k2.7-code` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 24.2s. | Claimed 1M free-trial tokens; 99.9% remained after the test. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-kimi-k3` | `kimi-k3` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 111.5s on retry. The initial 75s probe limit was too short. | Claimed 1M free-trial tokens; 99.7% remained after tests. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-deepseek-v4-pro` | `deepseek-v4-pro` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 14.8s. | Claimed 1M free-trial tokens; 99.8% remained after the test. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| Tencent TokenHub `tencent-deepseek-v4-flash-vision-exp` | `deepseek/deepseek-v4-flash-vision-exp` | Oct 16: HTTP 200; completed a normal coding task and returned `finish` in 11.1s. | Claimed 1M free-trial tokens; 99.8% remained after the test. Console lists 1,000,000 TPM and 60 RPM. Shares the Tencent key; separate per-service quota. |
+| NVIDIA NIM `nvidia` | `nvidia/nemotron-3-super-120b-a12b` in user config | Oct 15: live health answered; isolated `megazword run -e -m nvidia` coding job completed in 42.0 seconds using five requests; independent pytest: 7 passed. Direct DeepSeek V4.1 Flash previously timed out; DeepSeek Coder 6.7B returned 404. | NVIDIA Developer Program hosted API access is free for prototyping, development, and testing. The current published terms exclude serving real end users without NVIDIA AI Enterprise; no numeric hosted RPM quota was published in the checked docs. |
+| OpenRouter `openrouter` | `openrouter/free` dynamically selects a current free endpoint | Tool-call probe succeeded at $0; OpenRouter selected `nvidia/nemotron-3.5-lightning:free` and returned the expected `finish` tool call. Five fixed catalog models also passed the same tool probe. | The funded account reports $10 credits, $0 usage and is no longer on the free tier. OpenRouter documents 1,000 free-model requests/day at $10+ credits and 20 RPM. Failed attempts may still consume daily requests. |
+
+Tencent's Usage Statistics page logged successful responses for all six models
+and the Activation page showed each free-trial meter falling, with 99.4% or more
+remaining. The billing page showed $0.00 available credit and no current-month
+bill data yet; Tencent warns billing records can lag, so this is not a final
+settled-bill check. No billing switches were changed during testing.
+
+## OpenRouter exact free catalog: bounded tool-call sweep
+
+The live catalog listed 15 zero-priced, tool-parameter-capable entries. We
+tested each fixed ID once with one tiny required `finish` tool call (13 tests);
+Gemma 4 26B had already been probed once, and `openrouter/free` had its own
+successful tool-call test. Calls were paced below 20 RPM.
+
+| Exact ID / identity | Probe result | Roster treatment |
+| --- | --- | --- |
+| `dots-studio/dots-3-note-preview:free` / `openrouter-dots` | Tool call returned; cost $0 | Added to selectable roster. |
+| `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free` / `openrouter-nemotron-nano` | Tool call returned; cost $0 | Added to selectable roster. |
+| `nvidia/nemotron-3.5-lightning:free` / `openrouter-nemotron-lightning` | Tool call returned; cost $0 | Added to selectable roster; also selected successfully by dynamic router. |
+| `poolside/laguna-s-2.1:free` / `openrouter-laguna-s` | Tool call returned; cost $0 | Added to selectable roster. |
+| `poolside/laguna-xs-2.1:free` / `openrouter-laguna-xs` | Tool call returned; cost $0 | Added to selectable roster. |
+| `cohere/north-mini-code:free` | HTTP 200, but no required tool call | Not counted as coding worker. |
+| `google/gemma-4-26b-a4b-it:free` | HTTP 429 | Upstream endpoint currently unavailable. |
+| `google/gemma-4-31b-it:free` | HTTP 429 | Upstream endpoint currently unavailable. |
+| `liquid/lfm-2.5-2.6b:free` | HTTP 200, but no required tool call | Not counted as coding worker. |
+| `nvidia/nemotron-3-super-120b-a12b:free` | HTTP 200, but no required tool call | Not counted as coding worker. |
+| `nvidia/nemotron-3-ultra-550b-a55b:free` | HTTP 200 without usable choice/tool data | Not counted as working. |
+| `nvidia/nemotron-3.5-super-vl:free` | HTTP 200, but no required tool call | Not counted as coding worker. |
+| `thinkingmachines/inkling-small:free` | HTTP 403: only available on agentic harnesses | App-gated for this API client. |
+| `thinkingmachines/inkling:free` | HTTP 403: only available on agentic harnesses | App-gated for this API client. |
+| `openrouter/free` | Dynamic route returned a `finish` tool call via Nemotron 3.5 Lightning; cost $0 | Kept as first OpenRouter identity. |
+
+The five fixed OpenRouter identities share one API key, daily request pool and
+pacing lock. Automatic fallback tries them after independent provider pools so
+one shared OpenRouter allowance is not mistaken for six separate quotas.
+
+## Multilingual candidate checks
+
+| Model | Test | Result |
+| --- | --- | --- |
+| Groq Qwen 3.8 27B (`groq-qwen`) | Mega Zword created a small Python implementation and pytest file from an English coding request; an independent pytest run was executed in the temporary folder. | Passed; 1 test. |
+| Groq Qwen 3.8 27B (`groq-qwen`) | Short coding request written in Chinese; asked for `is_even`, Chinese explanation/docstring, and meaningful pytest cases. | Completed in 4.4 seconds using three requests; independent pytest: 5 passed. Chinese-language coding is verified for this small task. This does not establish broad Chinese code-review quality. |
+| NVIDIA DeepSeek V4.1 Flash | Tiny direct chat request, 40-second request cap. | Timed out; no result. |
+| NVIDIA DeepSeek Coder 6.7B Instruct | Tiny direct chat request. | HTTP 404 for the catalog-listed ID. |
+
+These Chinese-origin models remain in the candidate set. Qwen passed one
+English coding task and one short Chinese coding task; broader multilingual
+review quality still needs more examples before assigning language-critical
+work.
+
+Groq currently provides four separately metered, working model identities under
+one key. Google provides two working model identities under its Developer API
+key; `gemini` remains the separate Gemini CLI identity. OpenRouter provides one
+dynamic identity and five fixed tool-capable identities, but all six share the
+same account pool. Mega Zword reads provider request-limit headers and switches
+at 5% remaining. It persists a low-water mark across runs until the reported
+reset, or one hour if the provider omits a reset header. An HTTP 429 also
+triggers immediate failover. Groq aliases share a conservative two-second
+call-start pace; that does not merge their provider-reported daily per-model
+quotas. Usage from other apps becomes visible when the provider returns fresh
+headers.
+
+## Shared pools and candidates not yet usable today
+
+| Provider | Available pool / catalog | Current evidence | Plan |
+| --- | --- | --- | --- |
+| OpenRouter | 15 zero-priced, tool-capable catalog entries | Before the credit purchase, account meter showed 57/50 requests used and 0 remaining. After the user added $10, the account reports $10 credits, $0 usage, and `is_free_tier=false`. Five fixed IDs passed tool calls at $0; the dynamic router also succeeded. Two Gemma models returned 429 and two Inkling models are app-gated. | Use the free router or one of five verified fixed identities. The $10 purchase unlocks the higher free-request ceiling; it does not guarantee upstream capacity on every model. Check the selected model and returned usage cost. |
+| Cloudflare Workers AI | 29 catalog text models eligible for free plan | Oct 15 live health check returned the documented daily-allocation 429; provider Retry-After was 442 minutes to 00:00 UTC. No inference ran. This is one account-shared pool for all models. | Free allocation is 10,000 neurons/day, reset at 00:00 UTC. Do not call again until reset and the account plan/free boundary is confirmed; on Workers Paid, overage beyond the free allocation is billable. |
+| Gemini API | 46 `generateContent` catalog IDs | Two Flash-Lite models answered. A preview timed out; three older IDs returned 404 despite catalog metadata. | Keep the two proven models; treat timeout and 404 as unresolved model/API compatibility, not quota exhaustion. |
+| NVIDIA NIM | 81 model IDs in account catalog | The configured Nemotron 3 Super endpoint passed both health and isolated coding-plus-tests. | Additional IDs remain untested. The hosted Developer Program terms limit this to development/testing, not user-facing production; do not count catalog presence as a working route. |
+| Mistral | 45 model IDs listed | Ministral 3B has passed a coding run and a current health check. | Exact free allowance and per-model limits are account-specific and shown in the Mistral Limits page. |
+| Z.AI | 11 model IDs | GLM-4.5-Flash health/coding evidence remains positive; health check repeated Oct 15. | Exact account quota still needs the Z.AI console; retain the one verified identity and avoid catalog-wide probes. |
+| Tencent TokenHub | `deepseek-v4.1-flash` via International Singapore OpenAI-compatible API | Oct 15: free quota claimed, service is **Stopped**, and exact model request returned HTTP 402 / business code `401006` (“service ID does not exist, or the model does not match the service”). Other Tencent services work with the same key and endpoint. | Leave out of routing until the service starts and the exact endpoint succeeds. Keep postpaid disabled. |
+| Alibaba Cloud Model Studio | Qwen/Qwen-Coder and other compatible models | New-user free quota is typically 1,000,000 combined input/output tokens per eligible model for 90 days; eligible region and exact model quota vary. OpenAI-compatible Chat Completions supports tool calls. No account/key or live Mega Zword probe yet. | Viable second candidate. Use the general-purpose API key, enable **Free Quota Only** for each model before testing, and verify its remaining quota/expiry in the console. Some verified accounts otherwise continue into billable pay-as-you-go after quota exhaustion. |
+| Cerebras | Multiple open models, including Qwen | Current official offer is a one-time $5 promotional credit after adding a valid payment method; it expires in 30 days. It does not auto-enroll or charge, and calls pause when used/expired unless credits are purchased. | Not an ongoing free tier. A trial could be considered separately; current code keeps it out of automatic free routing. |
+| SambaNova Cloud | DeepSeek, Llama, Gemma, GPT-OSS, MiniMax | Current Free plan page says add a payment method and purchase credits before first requests; API is pay-as-you-go. | Not currently a no-cost API option; do not add to free failover. |
+| Hugging Face Inference Providers | 200+ routed models | Current official billing docs list no included credits for Free accounts; users must purchase credits or upgrade. Older references to $0.10 monthly free credits are stale. | Not a free API source under the current plan. |
+
+Other listed Groq models include Whisper transcription and Orpheus speech
+generation. They may be useful for voice features, but are not coding workers;
+prompt-guard/safeguard models are classifiers, not general coding agents.
+
+## Regional and other providers checked 2026-10-16 (Juniper-16)
+
+Credit-scout research (ROADMAP #4). "Official" means the provider's own docs or
+pricing page; "third-party" means aggregator sites, which often disagree. Nothing
+here is signed up or keyed yet except Z.ai. Signups, phone checks and payment
+methods are Phil's call.
+
+| Provider | Free offer | Evidence | Verdict |
+| --- | --- | --- | --- |
+| Z.ai GLM-4.7-Flash | Free model, existing key | Official pricing page + live probe | **Added** as `zai-47`. |
+| OVHcloud AI Endpoints | Anonymous use: 2 requests/min per IP and per model; keyed use is 400/min but billed | Official capabilities page; third-party agrees; live keyless call returned `x-ratelimit-limit-minute: 2`. | **Added** as keyless `ovh` (Qwen3.5-397B-A17B), paced 31 s per call. Other free-listed models there: gpt-oss-120b, Qwen3.8-27B, Llama 3.3 70B, Mistral Small 3.2 (each has its own 2/min). |
+| ModelScope API-Inference | 2,000 calls/day total, reset 00:00 UTC+8; reportedly 500/day per model | Cherry Studio docs + free-llm.com (both third-party; official page didn't render). Needs an Alibaba Cloud account with real-name/phone verification. | Big daily pool, but verification may block a non-China user. Phil to check signup. |
+| Scaleway Generative APIs | 1,000,000 free tokens for new customers, pooled across models, then billed | Official FAQ + official signup page | One-time grant; worth it only with a hard spend cap. Phil's call (needs a payment method). |
+| Volcano Engine Ark / BytePlus ModelArk | 500k free tokens per model; "Free Tokens Only Mode" suspends instead of billing | BytePlus official docs + older aibase article | Good shape (like Alibaba's Free Quota Only). BytePlus is the international version; Phil to check signup. |
+| Nebius Token Factory | Builder Program: $25 at signup + $25 after ~30 days, expire in 90 days; screened, work/school email preferred | Official builder terms; third-party says the normal trial is about $1 | Apply to the Builder Program if Phil wants; credits, not a lasting tier. |
+| SiliconFlow | Some free small models (Qwen3-8B etc.), list rotates; reportedly 100 requests/day plus small trial credit; excluded in EU/UK/CH | Third-party only, sources disagree | Unverified. Check the console before counting it. |
+| Upstage Solar | Reportedly $10 signup credit; usage continues and bills the card after credits run out | Upstage blog (AI-written) + official FAQ on billing | Risky: billing continues automatically. Skip unless a hard cap exists. |
+| Chutes | Was community-free; moved to capped subscriptions in early 2026 | Two third-party sources agree on subscriptions | Not a free source now. |
+| MiniMax | Trial credits at signup only; no lasting free API tier | Third-party only | Skip. |
+| Baidu Qianfan | Sources conflict: some say ERNIE Speed/Lite/Tiny are still free with a monthly quota (one says 100K tokens per model); others say they were replaced by Pro versions at about $0.03-0.04 per 1M input tokens. May need a mainland phone number. | Third-party only; official page unreachable | Maybe. Phil to try signup with a US number. Paid Pro models would need a payment method, which the billing block refuses unless Phil allows capped cheap sources. |
+| Sarvam | ₹100 signup credit (cut from ₹1,000 in May 2026); sarvam-m retired | Official docs and changelog | Too small to matter. |
+| SEA-LION | No official API free tier found; model is on Cloudflare Workers AI (`@cf/aisingapore/gemma-sea-lion-v4-27b-it`) | Third-party listing | Reachable through our Cloudflare key; no new source. |
+| GitHub Models | Retired July 30, 2026 | Official GitHub docs | Gone. Remove from future lists. |
+| LLM7.io | Free token (signup): 100,000 tokens/day, 60 requests/min, 250/hour; turbo models include DeepSeek V4 Flash, GLM-5.3 Flash, Codestral | Official limits page (docs.llm7.io/limits). Keyless calls also worked on Oct 17, but the docs don't describe keyless use, so it isn't relied on. | Phil: free signup worth doing (email only per third parties). Then add with the token. |
+| Pollinations | Anonymous tier serves only gpt-oss-20b, hosted on OVH | Its own models endpoint | Nothing new beyond our direct OVH access. |
+| Cohere (trial key) | 1,000 calls/month free; Chat about 10-20/min; not for production or commercial use | Cohere's Going Live docs; third parties agree on 1,000/month | Fits personal dev use. Phil: free signup at dashboard.cohere.com. Its code model is already reachable keyless through Kilo (`kilo-cohere`). |
+| Public AI (publicai.co) | Nonprofit inference utility (Apertus, SEA-LION), OpenAI-compatible; funded by donated GPU time | Its own utility page + Hugging Face provider docs; limits not published | Phil: check platform.publicai.co for a free key. Small models; low priority. |
+| StepFun | About ¥10 signup credit, 5 requests/min | Third-party only (yangmao.ai) | Small one-time credit; skip unless signup is trivial. |
+
+Scout leads still to check: AtlasCloud, Phala, Poolside, Liquid, Thinking Machines
+(they host OpenRouter free models; Kilo's keyless list also carries Liquid, Poolside and
+Thinking Machines models), gigachat.
+
+## Origin and evaluation policy
+
+Country of origin is not an exclusion criterion. Qwen (Alibaba), DeepSeek,
+Kimi/Moonshot and GLM/Z.AI remain candidates whenever the exact endpoint is
+available and its cost, terms, quota, privacy policy, tool support and measured
+quality fit the task. Cloudflare and NVIDIA catalogs can also surface these
+families. English prompts do not test multilingual ability; add Chinese and
+English coding/review examples to the quality evaluation before assigning
+language-specific work. A model’s national origin alone does not establish its
+privacy or data-handling policy; check the serving provider’s terms.
+
+## Usage plan
+
+1. Keep providers with independent per-model pools in the failover roster
+   (currently Groq's four, Google Gemini's two, and five OpenRouter tool-capable
+   identities; the OpenRouter identities share one quota).
+2. Read provider-supplied remaining/limit headers after each successful call;
+   persist low-water status and switch at 5% remaining and on 429. Keep reset
+   and backoff evidence per identity, not per unrelated provider.
+3. Treat account-shared allocations as a single pool. Do not multiply a shared
+   allowance by the number of model names or aliases.
+4. Before any expanded test, use a one-request prompt and record the model ID,
+   result, elapsed time, response quota headers and whether a request was
+   rejected before inference. Avoid blind catalog-wide probes.
+5. Keep paid fallback off. OpenRouter states that $10 or more in credits raises
+   its free-model ceiling to 1,000 requests/day (still 20 RPM); it is a
+   one-time credit purchase, not a subscription. Confirm the checkout total
+   including the platform purchase fee before deciding whether to fund it.
+
+Provider references: [Groq rate limits](https://console.groq.com/docs/rate-limits),
+[Google Gemini rate limits](https://ai.google.dev/gemini-api/docs/rate-limits),
+[Google Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing),
+[Cloudflare Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/),
+[Cloudflare Workers AI limits and errors](https://developers.cloudflare.com/workers-ai/platform/errors/),
+[Mistral usage and limits](https://docs.mistral.ai/admin/billing-usage/usage-limits),
+[Mistral rate-limit headers](https://docs.mistral.ai/resources/known-limitations),
+[OpenRouter free-model limits](https://openrouter.ai/blog/tutorials/how-to-get-the-lowest-cost-llm-inference-on-openrouter/),
+[NVIDIA NIM access](https://docs.api.nvidia.com/nim/docs/product).
+
+New-provider research (2026-10-15): [Tencent TokenHub free experience package](https://cloud.tencent.com/document/product/1823/130053), [Tencent TokenHub API quick start](https://cloud.tencent.com/document/product/1823/130058), [Tencent TokenHub Online Inference status and billing modes](https://intl.cloud.tencent.com/ind/document/product/1300/78946), [Tencent TokenHub activation management](https://cloud.tencent.com/document/product/1823/137795), [Tencent TokenHub function-calling guide](https://cloud.tencent.com/document/product/1823/132248), [Alibaba Model Studio free quota and Free Quota Only](https://help.aliyun.com/en/model-studio/new-free-quota), [Alibaba Qwen-Coder capabilities and tool calls](https://help.aliyun.com/en/model-studio/qwen-coder), [Cerebras pricing](https://www.cerebras.ai/pricing), [SambaNova plans](https://cloud.sambanova.ai/plans), and [Hugging Face Inference Provider pricing](https://huggingface.co/docs/inference-providers/en/pricing).
