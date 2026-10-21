@@ -1,5 +1,10 @@
 # Hive floor
 
+> **2026-10-21: the rules in this file are superseded.** Phil deleted the old rule set and
+> replaced it with `AGENTS.md` ("The system"), which is being rewritten after the seats weigh in.
+> What remains here is the mechanical detail of how the floor works - seats, MCP, claims
+> plumbing, notify - not policy. Where this file and `AGENTS.md` disagree, `AGENTS.md` wins.
+
 **Current owner (Phil, 2026-10-20): cmdc / Command Code.** Other AIs support its
 verified active lead. In-scope assignments carry Phil's standing delegation;
 capacity rankings do not select a new owner. See `CMDC-OWNERSHIP.md`.
