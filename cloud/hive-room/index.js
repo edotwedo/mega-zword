@@ -248,10 +248,27 @@ async function postMessage(store, identity, seat, room, body, key, now) {
 // AI-only classification. Wake routing does not turn independent AI proposals into orders.
 const PHIL_LANES = new Set(['phil', 'phone', 'grok-web']);
 
+// Mirror accepted posts into Discord when a webhook is configured. One-way by design: the
+// room stays the only place authority and claims live, so nothing here reads Discord back.
+// allowed_mentions is emptied so room text cannot ping @everyone or @here in Phil's server.
+async function mirrorToDiscord(env, seat, text, message, fetcher = globalThis.fetch) {
+  if (!env.DISCORD_WEBHOOK) return null;
+  return fetcher(env.DISCORD_WEBHOOK, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      username: 'Mega Zword Hive',
+      content: `**${seat}** · msg ${message.id}\n${String(text || '').slice(0, 1800)}`,
+      allowed_mentions: {parse: []}
+    })
+  }).catch(() => {});
+}
+
 // Fire an ntfy notification after a successful POST. Never includes message text.
 // Uses ctx.waitUntil when available so the response is not delayed; otherwise awaits.
 // Notify errors are always swallowed.
 async function notify(env, seat, text, message, ctx, fetcher = globalThis.fetch) {
+  const pending = [mirrorToDiscord(env, seat, text, message, fetcher)].filter(Boolean);
   let topic, body, title;
   if (PHIL_LANES.has(seat) && env.NTFY_PC_TOPIC) {
     topic = env.NTFY_PC_TOPIC;
@@ -260,16 +277,18 @@ async function notify(env, seat, text, message, ctx, fetcher = globalThis.fetch)
     topic = env.NTFY_PHONE_TOPIC;
     body = `New Hive message from ${seat}`;
     title = 'Hive';
-  } else {
-    return;
   }
-  const promise = fetcher(`https://ntfy.sh/${topic}`, {
-    method: 'POST',
-    body,
-    headers: title ? {Title: title} : {}
-  }).catch(() => {});
-  if (ctx?.waitUntil) ctx.waitUntil(promise);
-  else await promise;
+  if (topic) {
+    pending.push(fetcher(`https://ntfy.sh/${topic}`, {
+      method: 'POST',
+      body,
+      headers: title ? {Title: title} : {}
+    }).catch(() => {}));
+  }
+  if (!pending.length) return;
+  const all = Promise.all(pending);
+  if (ctx?.waitUntil) ctx.waitUntil(all);
+  else await all;
 }
 
 const tools = [
@@ -341,7 +360,12 @@ export async function handle(request, env, store = new D1Store(env.DB), now = ne
     const mcpPath = /^\/mcp(?:\/([A-Za-z0-9_-]+))?$/.exec(url.pathname);
     const bearer = /^Bearer ([^\s]+)$/.exec(request.headers.get('Authorization') || '');
     const token = readRoute ? readPath?.[1] : bare ? appPath?.[1] : mcpPath?.[1] || bearer?.[1];
-    const seats = JSON.parse(env.SEAT_TOKENS || '{}');
+    // SEAT_TOKENS is write-only: a rotation can never be diffed against the live value, so
+    // seats added after the first deploy live in their own secret and are merged here. That
+    // is what lets Phil add the five seat tokens without killing the phone app, the web
+    // connectors or the PC key that are already bound to the original secret.
+    const seats = {...JSON.parse(env.SEAT_TOKENS || '{}'),
+                   ...JSON.parse(env.SEAT_TOKENS_EXTRA || '{}')};
     const identity = token && seats[await digest(token)];
     const fail = (error, status) => (readRoute || bare) ? plain(error, status) : json({error}, status);
     if (!identity) return fail('unauthorized', 401);

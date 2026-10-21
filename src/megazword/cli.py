@@ -22,7 +22,7 @@ COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job"),
     "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "announce", "free", "map", "spot"),
-    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume"),
+    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat"),
     "Memory": ("note", "decide", "import-hive"),
 }
 
@@ -191,6 +191,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_gate_parser(sub)
     from .resume import add_parser as add_resume_parser
     add_resume_parser(sub)
+    from .seat import add_parser as add_seat_parser
+    add_seat_parser(sub)
 
     out = sub.add_parser("out", help="keep auto-picks and background jobs off an AI")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -504,6 +506,9 @@ def main(argv: list[str] | None = None,
     if args.command == "announce":
         from . import announce
         return announce.command(args, cfg)
+    if args.command == "seat":
+        from .seat import command
+        return command(args, cfg)
     if args.command in (None, "start"):
         from .start import render
         print(render(cfg))

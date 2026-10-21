@@ -416,3 +416,57 @@ for (const path of ['/rooms/hive/messages', '/mcp']) {
     assert.ok(!JSON.stringify(pings).includes('private test content'));
   });
 }
+
+// Discord mirror (2026-10-21): accepted posts go to a channel so Phil can watch the room
+// from his phone. Mentions are emptied because room text is teammate data, and a line that
+// says "@everyone" must not be able to ping his whole server.
+const MIRROR = 'https://discord.example/hook';
+const mirrored = () => pings.filter(p => p.url === MIRROR);
+
+for (const path of ['/rooms/hive/messages', '/mcp']) {
+  test(`every accepted post mirrors to Discord through ${path}`, async () => {
+    const mirrorEnv = {...pingEnv, DISCORD_WEBHOOK: MIRROR};
+    assert.equal((await post(token, 'Cinder-21: status - mirror test', mirrorEnv, path)).status,
+                 path === '/mcp' ? 200 : 201);
+    assert.equal(mirrored().length, 1);
+    const body = JSON.parse(mirrored()[0].body);
+    assert.match(body.content, /Cinder-21: status - mirror test/);
+    assert.match(body.content, /cirrus-17/, 'the room author is named');
+    assert.deepEqual(body.allowed_mentions, {parse: []});
+  });
+}
+
+test('room text cannot ping everyone through the mirror', async () => {
+  const mirrorEnv = {...pingEnv, DISCORD_WEBHOOK: MIRROR};
+  await post(token, '@everyone @here look at this', mirrorEnv);
+  const body = JSON.parse(mirrored()[0].body);
+  assert.deepEqual(body.allowed_mentions, {parse: []});
+});
+
+test('no webhook configured sends nothing to Discord', async () => {
+  await post(token, 'routine note');
+  assert.equal(mirrored().length, 0);
+});
+
+test('a seat token in SEAT_TOKENS_EXTRA authenticates alongside the original secret', async () => {
+  const seatToken = crypto.randomUUID();
+  const extraEnv = {...env, SEAT_TOKENS_EXTRA: JSON.stringify({[await digest(seatToken)]: 'harbor022'})};
+  assert.equal((await post(seatToken, 'harbor022: online - awaiting assignment', extraEnv)).status, 201);
+  // The same token is still unknown to the original secret, so the two maps are separate.
+  assert.equal((await post(seatToken, 'harbor022: not bound here', env)).status, 401);
+});
+
+test('a seat name with capitals fails closed, so tokens are minted lowercase', async () => {
+  // The roster calls this seat "Harbor022"; its room lane is "harbor022". Minting a token
+  // under the display form is refused here rather than posting under a lane no other client
+  // can match, which is the failure you would otherwise only notice at claim time.
+  const seatToken = crypto.randomUUID();
+  const badEnv = {...env, SEAT_TOKENS_EXTRA: JSON.stringify({[await digest(seatToken)]: 'Harbor022'})};
+  assert.equal((await post(seatToken, 'hello', badEnv)).status, 503);
+});
+
+test('SEAT_TOKENS_EXTRA can mark a seat read-only without disturbing the rest', async () => {
+  const viewToken = crypto.randomUUID();
+  const readEnv = {...env, SEAT_TOKENS_EXTRA: JSON.stringify({[await digest(viewToken)]: {seat: 'viewer2', readOnly: true}})};
+  assert.equal((await post(viewToken, 'should be refused', readEnv)).status, 403);
+});
