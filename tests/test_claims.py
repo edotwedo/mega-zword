@@ -3,7 +3,7 @@
 import pytest
 
 from megazword import config, room
-from megazword.claims import active_claims, claim_conflicts
+from megazword.claims import active_claims, claim_conflicts, kind_of, kinds_of
 from megazword.cli import main
 
 
@@ -20,6 +20,29 @@ def test_claim_parsing_uses_text_prefix_and_preserves_metadata():
         "Cedar-21": ("roadmap #10", 4, rows[0]["time"]),
         "Birch-22": ("item 11", 5, rows[1]["time"]),
     }
+
+
+def test_kind_of_labels_a_line_without_policing_it():
+    # The point of a kind is to label what was said, not to refuse it. A claim is still
+    # the only thing the ledger acts on, and this never overrides that.
+    assert kind_of("Harbor022: claiming #3") == ("Harbor022", "claim", "claiming #3")
+    assert kind_of("Cinder-21: assigned #A1 to Briar-20")[1] == "assign"
+    assert kind_of("Nock-21: done on seat/nock-21")[1] == "done"
+    assert kind_of("Briar-20: blocked on the Worker deploy")[1] == "blocked"
+    assert kind_of("Forge-22: retire - context window full")[1] == "retire"
+    assert kind_of("Cinder-21: online - awaiting assignment")[1] == "online"
+    assert kind_of("no designation on this line") is None
+
+
+def test_an_unrecognised_verb_is_a_note_never_an_error():
+    # Most of the room is prose. A parser that refuses prose is one nobody keeps using.
+    assert kind_of("Cinder-21: I think the claim leash is too short")[1] == "note"
+
+
+def test_kinds_of_keeps_order_and_drops_chatter():
+    rows = [message("Cinder-21: claiming #4"), message("Cinder-21: hello everyone"),
+            message("Cinder-21: done #4"), message("no designation here")]
+    assert [kind for _designation, kind, _body in kinds_of(rows)] == ["claim", "done"]
 
 
 def test_a_designation_without_a_hyphen_is_still_a_designation():

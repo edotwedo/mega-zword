@@ -29,6 +29,27 @@ ITEM = re.compile(r"#(\d+)\b|\bitem\s+(\d+)\b", re.IGNORECASE)
 # Work with no roadmap number is claimed by a quoted name: "claiming 'claim lock'".
 NAME = re.compile(r"'([^'\n]{2,60})'|\"([^\"\n]{2,60})\"|`([^`\n]{2,60})`")
 
+# What a room line IS, instead of a reader guessing from prose. Every post is written
+# "<Designation>: <kind> ..." and three consumers want the kind: the claim ledger, the
+# conductor's queue, and whoever is watching for a seat that went quiet holding an item.
+# An unrecognised verb is "note", never an error: a parser that refuses prose is a parser
+# nobody keeps using, and most of the room is prose.
+KIND_ALIASES = {
+    "claiming": "claim", "claim": "claim", "claims": "claim", "taking": "claim",
+    "reserving": "claim", "grabbing": "claim", "owning": "claim",
+    "assigned": "assign", "assigning": "assign", "assign": "assign",
+    "status": "status", "working": "status", "reporting": "status",
+    "done": "done", "landed": "done", "finished": "done", "complete": "done",
+    "completed": "done", "shipped": "done", "fixed": "done", "merged": "done",
+    "blocked": "blocked", "waiting": "blocked", "stuck": "blocked",
+    "handoff": "handoff", "handing": "handoff",
+    "retire": "retire", "retiring": "retire", "retired": "retire",
+    "online": "online", "here": "online",
+    "releasing": "release", "released": "release", "dropping": "release", "dropped": "release",
+}
+KINDS = tuple(sorted(set(KIND_ALIASES.values())))
+_FIRST_WORD = re.compile(r"^([A-Za-z]+)")
+
 
 def claim_from_text(text):
     """A claim is the FIRST LINE of a post and starts with an ownership verb.
@@ -56,6 +77,34 @@ def claim_from_text(text):
     if not item or not item_keys(item):
         return None
     return (prefix[1], item)
+
+
+def kind_of(text):
+    """(designation, kind, body) for one room line, or None if it has no designation.
+
+    This is deliberately softer than `claim_from_text`: a claim must name an item or it is
+    refused, but any seat line at all gets a kind, because the point is to label what was
+    said rather than to police it.
+    """
+    prefix = PREFIX.match(text or "")
+    if not prefix:
+        return None
+    designation = prefix[1]
+    body = prefix[2].strip()
+    first = body.splitlines()[0] if body else ""
+    match = _FIRST_WORD.match(first)
+    word = match[1].casefold() if match else ""
+    return (designation, KIND_ALIASES.get(word, "note"), body)
+
+
+def kinds_of(messages):
+    """designation -> list of (kind, body) in the order they were posted. Skips chatter."""
+    listing = []
+    for message in messages:
+        parsed = kind_of(_field(message, "text"))
+        if parsed and parsed[1] != "note":
+            listing.append(parsed)
+    return listing
 
 
 def unkeyed_claim(text):
