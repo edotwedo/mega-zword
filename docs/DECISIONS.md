@@ -16,6 +16,14 @@
 - **Command Code GOAT plan, $10/month (Phil bought it, 2026-10-18).** API at https://api.commandcode.ai/provider/v1 (OpenAI-compatible), key COMMANDCODE_API_KEY. Eight cmd-* backends in every route after Tencent: deepseek-v4.1-flash ($80/mo allowance), glm-5.3-flash ($80), ling-3.1-flash ($100), tencent/hy3-paid ($70), Qwen3.8-27B ($70), plus free laguna-s-2.1, cat-jam, beam (free previews, treated as training on data). History capped at 40k chars like Tencent. Phil: don't waste it like the Tencent grants; measure a real job's cost on the Command Code usage page before Night Shift leans on it.
 - Usage meters are unreliable (Phil). agy's separate Claude/GPT quota marked Gemini "out" while Gemini's own meter was 0%/1%. Trust Phil's reading over the meter; fix the meter.
 
+## 2026-10-20
+- **The megazword.com deploy is stopped on purpose (Phil).** Work on the site / Cloudflare Pages
+  deploy stopped: "thats why we stopped workin on that". The source in `site/` is correct and the
+  live page is a stale build, and it is expected to stay that way for now. **Do not re-propose
+  redeploying it, and do not treat the live page's wording as a description of the repo** — the
+  repo is the source of truth. Phil reopens this when he says so; until then it is not a pending
+  task, a blocker, or something to "fix" on the way past.
+
 ## 2026-10-17
 - **Hive room moves to Cloudflare (Phil, 2026-10-17).** One room on Phil's Cloudflare account (free Worker plus storage) that PC, cloud and phone seats all reach over HTTPS; no tunnel into the PC, no synced second copy, no house bot. Q becomes a read-only archive once it works. ROADMAP #5, handoff docs/handoffs/2026-10-17-cloud-room.md. Source: Phil, Beacon-17 chat ("we need a real option", then "um ok do that").
 - **Stuck steps get shelved, not a dead stop (Phil).** "Just have it shelf what it's working on, make notes to show me when I get back, and have it pick another task." A roadmap step that fails 2 heartbeat beats in a row on the same main is shelved with a note for Phil, and the next beat takes the next open item. Claimed and `[!]` items are skipped the same way. Replaces the earlier "never skip ahead" rule for stuck work.
