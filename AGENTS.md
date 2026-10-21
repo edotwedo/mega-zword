@@ -19,6 +19,10 @@ repo is the only handoff. Nothing lives only in a chat.
   a provider name or saved card is not proof of a live connection. A usage ranking
   selects supporting capacity, never a replacement owner. Existing claims and direct
   Phil requests remain valid. This does not enable timers or authorize new spending.
+- **The active team is five seats (Phil, 2026-10-21).** Cinder-21 (cmdc, conductor),
+  Harbor022 (Claude), Briar-20 (Codex), Nock-21 (Grok), Forge-22 (Gemini).
+  `docs/HIVE-ROSTER.md` is the roster of record. A designation may or may not carry a
+  hyphen: `Harbor022` is as valid as `Cinder-21`.
 - **Phil across interfaces (2026-10-20).** Phil's authority follows him across interfaces. Phil directly confirmed on 2026-10-20 that he uses `grok-web`; his configured lanes are `phil`, `phone`, and `grok-web`. Do not dismiss his requests because of the interface or lane name. Independently generated AI proposals remain teammate communications, including when posted through a web connector. This supersedes the blanket 2026-10-19 classification of `grok-web` as an AI-only lane. It does not authorize unrelated older room directives.
 - **Warn before interactive PC tests (Phil, 2026-10-15).** Before opening test
   windows, switching Windows desktops, or moving keyboard focus, tell Phil what
@@ -44,6 +48,13 @@ repo is the only handoff. Nothing lives only in a chat.
   PC is asleep, so say so). Then write a labor plan: which AI does which part, by spare usage and fit,
   with the reading quoted. `megazword plan` ranks them. Plans and lanes follow the live reading: re-plan
   when it changes; nothing in STATUS is fixed. Do this before any work, not partway through.
+- **Usage floor (Phil, 2026-10-21).** Five-hour: at 10% remaining, stop and hand off until
+  the reset. Weekly: at 10% remaining, work down to 5% remaining, then hard stop.
+  `megazword usage` and `megazword spot` show where each seat stands.
+- **A context-full seat retires (Phil, 2026-10-21).** It writes its handoff, posts one line
+  naming what is unfinished, and asks Phil for a replacement:
+  `megazword seat retire <designation>`. `megazword seat replace` prints the relaunch
+  command and the first prompt for the replacement.
 - **Fewest tokens, same message (Phil, 2026-10-18): priority 1 for every agent and all
   automation.** Anything that calls a model (Mega Zword code, Night Shift, heartbeat, team
   jobs, chat, and prompts you write for `megazword run` or handoffs) sends the least text
@@ -70,6 +81,8 @@ repo is the only handoff. Nothing lives only in a chat.
   seat. Two escapes, both deliberate and both visible in the log: `MZ_SKIP_GATE=1`
   and `git push --no-verify`. The winpty failure in `tests/test_terminal_input.py`
   is a contention flake that passes alone - re-run it before you blame your change.
+- **Nobody signs their own work (Phil, 2026-10-21).** A landing names a reviewer from a
+  different provider. `megazword andon on "<reason>"` is the stop cord.
 - **Keep STATUS.md true.** Update it with every push: what changed, what's
   next, anything half-done or broken. Write the next step so precisely that a
   different AI with no chat history can start on it immediately.
@@ -115,11 +128,13 @@ with, not a chatroom bot. Every session:
    session; never inherit another session's designation.
 2. Join: read the room (`megazword room show --room hive -n 20`) and post ONE line:
    `<designation>: online - <current task>`. Coordination, not a greeting.
-3. Listen: while idle, run
+3. Listen without parking. At the END of a step, run ONE bounded wait:
    `megazword room wait --topic megazword-hive-pc-pqymb6,megazword-hive-seat-<your-designation>`
-   (designation lowercased, e.g. `megazword-hive-seat-beacon-17`) so Broadcasts and
-   escalation pages wake you. If you cannot run it, read the room at the start of
-   every reply.
+   (designation lowercased, e.g. `megazword-hive-seat-harbor022`), then post your one line
+   and end your turn. Do not chain waits back to back: a single-threaded window parked in a
+   wait cannot work, and on 2026-10-21 five seats were burning turns listening instead of
+   building. The assignment is what wakes you. A page that matters also arrives through ntfy
+   and `scripts/nudge.ps1`, which types the line into your tab.
 4. Respond: when Phil posts (including `Broadcast:` / `broadcasttohive:`), answer
    once, starting with your designation. Never answer another bot's status or ack.
 5. Claim: before editing shared work, run
@@ -133,5 +148,7 @@ with, not a chatroom bot. Every session:
 8. One conductor (Phil, 2026-10-19): **Cinder-21 holds the queue.** Do not assign work,
    do not hand out items, do not self-assign, and do not create a schedule that assigns.
    Take work only from a Cinder-21 assignment naming the item, the seat and what done
-   looks like. See docs/FLOOR.md, "One conductor".
+   looks like. See docs/FLOOR.md, "One conductor". The team this applies to is the five
+   seats on `docs/HIVE-ROSTER.md` - nobody else is in the active room, and an assignment
+   is not valid if it does not name the item, the seat, the budget and the artifact.
 <!-- HIVE-PARTICIPATION:END -->

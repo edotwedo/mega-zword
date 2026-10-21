@@ -22,6 +22,19 @@ def test_claim_parsing_uses_text_prefix_and_preserves_metadata():
     }
 
 
+def test_a_designation_without_a_hyphen_is_still_a_designation():
+    # Phil named a seat "Harbor022" on 2026-10-21. The old pattern required a hyphen, so
+    # that seat's claims never registered and `resume` dropped its roster row entirely.
+    rows = [message("Harbor022: claiming #21")]
+    assert list(active_claims(rows)) == ["Harbor022"]
+
+
+def test_a_spec_section_name_is_not_read_as_a_designation():
+    # "B15" is a SPEC section. Three letters minimum keeps ordinary text ordinary, so a
+    # line starting "B15: ..." cannot be mistaken for a seat claiming work.
+    assert active_claims([message("B15: claiming #9")]) == {}
+
+
 @pytest.mark.parametrize("release", ["releasing", "released", "landed #10", "item 10 done",
                                      "roadmap #10 done"])
 def test_release_and_reclaim(release):

@@ -38,6 +38,25 @@ def test_seats_reads_the_roster_table_and_maps_workers_to_clis():
     ]
 
 
+def test_seats_accepts_a_designation_without_a_hyphen():
+    # Phil, 2026-10-21: "hyphen no hyphen it's him" - Harbor022 is a real designation.
+    # A row the pattern does not match is dropped silently, which is how a whole seat
+    # disappears from the respawn plan with no error to read.
+    roster = """
+| Designation | Worker | Role / lane | Notes |
+| --- | --- | --- | --- |
+| Harbor022 | Claude Code | review | |
+| Briar-20 | Codex | edits | |
+"""
+    assert resume.seats(roster) == [("Harbor022", "claude"), ("Briar-20", "codex")]
+
+
+def test_seats_maps_a_gemini_seat():
+    # Forge-22 had no entry in WORKER_CLI, so a roster naming Gemini dropped that seat
+    # from the respawn plan with no error - the same silent hole as a bad designation.
+    assert resume.seats("| Forge-22 | Gemini | advisor | |\n") == [("Forge-22", "gemini")]
+
+
 def test_seats_ignores_a_worker_it_does_not_know():
     assert resume.seats("| Sauna-Mech | ? | x | |\n") == []
 

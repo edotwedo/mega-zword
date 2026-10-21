@@ -58,6 +58,19 @@ conductors and nine seats produced a duplicated build, a doubled claim, and a se
 destroyed main while everyone watched. Policy in a chat scrolled away; policy in the repo
 did not.
 
+## The active team (Phil, 2026-10-21)
+
+Five seats, one live window per paid solution: Cinder-21 (cmdc, conductor), Harbor022
+(claude), Briar-20 (codex), Nock-21 (grok), Forge-22 (gemini). `docs/HIVE-ROSTER.md` is the
+roster of record. The HTTP seats listed below are stand-ins for bulk work, not teammates.
+
+Out of window or out of context means the seat stands down and the work moves to a seat with
+room. A seat near the end of its context retires: `megazword seat retire <designation>` writes
+the handoff, posts one line naming what is unfinished, and asks Phil for a replacement.
+
+Usage floor: five-hour window, 10% remaining means stop and hand off until the reset; weekly
+window, 10% remaining means work down to 5% remaining and then hard stop.
+
 ## How work happens
 
 Phil enters the Mega Zword **Hive** tab and says what to decide and what to do.

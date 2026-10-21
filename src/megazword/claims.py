@@ -6,8 +6,13 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 
 
-# "Beacon-17: ..." or "Beacon-17 (claude-pc): ..."
-PREFIX = re.compile(r"^([A-Za-z]+-\d+)(?:\s*\([^)]*\))?:\s*(.*)$", re.DOTALL)
+# "Beacon-17: ..." or "Beacon-17 (claude-pc): ..." or "Harbor022: ..."
+# Phil named a seat without a hyphen on 2026-10-21. The old `[A-Za-z]+-\d+` made that
+# seat invisible: its claims never registered, and `resume` skipped its roster row. The
+# hyphen is now optional. Three letters minimum keeps SPEC section names like B15 as
+# ordinary text instead of reading them as a designation.
+DESIGNATION = r"[A-Za-z]{3,}-?\d{1,4}"
+PREFIX = re.compile(rf"^({DESIGNATION})(?:\s*\([^)]*\))?:\s*(.*)$", re.DOTALL)
 STALE = timedelta(hours=24)  # TEAM.md default; night shifts can shorten it
 # A night shift needs a shorter leash than a normal day. Set the env var to override.
 STALE_ENV = "MEGAZWORD_CLAIM_STALE_MINUTES"

@@ -26,6 +26,8 @@ import sys
 import urllib.parse
 from pathlib import Path
 
+from .claims import DESIGNATION
+
 ROSTER = Path(__file__).resolve().parents[2] / "docs" / "HIVE-ROSTER.md"
 CLAUDE_HOME = Path.home() / ".claude" / "projects"
 CODECODE_HOME = Path.home() / ".commandcode" / "projects"
@@ -37,9 +39,10 @@ WORKER_CLI = {
     "claude code": "claude",
     "codex": "codex",
     "grok": "grok",
+    "gemini": "gemini",
     "command code": "cmdc",
 }
-ROW = re.compile(r"^\|\s*([A-Za-z]+-\d+)\s*\|\s*([^|]+?)\s*\|", re.MULTILINE)
+ROW = re.compile(rf"^\|\s*({DESIGNATION})\s*\|\s*([^|]+?)\s*\|", re.MULTILINE)
 
 
 def slug(path: str) -> str:
