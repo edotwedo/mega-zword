@@ -1,4 +1,4 @@
-"""Ballots in the room, counted by the room.
+﻿"""Ballots in the room, counted by the room.
 
 Phil, 2026-10-21: the team should be able to vote on a change instead of one seat deciding and
 calling it agreed. This is mechanism 7 of `docs/SYSTEM-DRAFT.md`: a proposal has an id, every seat
@@ -26,7 +26,7 @@ from .filelock import write_atomic
 from .resume import DESIGNATION
 
 PROPOSAL = re.compile(rf"^\s*({DESIGNATION})\s*:\s*vote\s+(P\d+)\b(.*)$", re.DOTALL | re.IGNORECASE)
-ITEM = re.compile(r"\b(M\d+)\s*=\s*(yes|no|abstain)\b", re.IGNORECASE)
+ITEM = re.compile(r"\b([A-Z]{1,3}\d+)\s*=\s*(yes|no|abstain)\b", re.IGNORECASE)
 WHOLE = re.compile(r"^\s*(yes|no|abstain)\b", re.IGNORECASE)
 CHOICES = ("yes", "no", "abstain")
 
@@ -62,7 +62,7 @@ def create(question: str, items: list[str] | None = None, *, home: Path | None =
     if not question:
         raise ValueError("a ballot needs a question")
     items = [item.strip().upper() for item in (items or []) if item.strip()]
-    if any(not re.fullmatch(r"M\d+", item) for item in items):
+    if any(not re.fullmatch(r"[A-Z]{1,3}\d+", item) for item in items):
         raise ValueError("items look like M1, M2, ...")
     identifier = next_id(home)
     record = {"id": identifier, "question": question, "items": items}
@@ -106,7 +106,12 @@ def parse_vote(text: str):
 
 
 def collect(messages, identifier: str) -> dict:
-    """seat -> (choices, reason, line). A later cast by the same seat replaces the earlier one."""
+    """seat -> vote. A later cast by the same seat replaces the earlier one.
+
+    Counted by the designation written in the room, deliberately: this is an internal tally for one
+    team on one box, not an election. A forged vote is visible in the log for a human to spot, and
+    hardening it once already threw away real votes from seats that share the claude-pc lane.
+    """
     seen: dict[str, dict] = {}
     for message in messages:
         parsed = parse_vote(_field(message, "text"))
@@ -181,7 +186,7 @@ def cast(identifier: str, verdicts: dict, reason: str = "", *,
     if not verdicts:
         raise ValueError("vote yes, no, abstain, or M1=yes M2=no")
     malformed = {key: value for key, value in verdicts.items()
-                 if value.lower() not in CHOICES or (key and not re.fullmatch(r"M\d+", key.upper()))}
+                 if value.lower() not in CHOICES or (key and not re.fullmatch(r"[A-Z]{1,3}\d+", key.upper()))}
     if malformed:
         raise ValueError(f"each choice must be yes, no or abstain: {sorted(malformed)}")
     body = " ".join(f"{key.upper()}={value.lower()}" if key else value.lower()
