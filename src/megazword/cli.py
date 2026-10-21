@@ -1,4 +1,4 @@
-"""The `megazword` command."""
+﻿"""The `megazword` command."""
 
 from __future__ import annotations
 
@@ -19,10 +19,10 @@ from .routing import spread
 
 
 COMMAND_GROUPS = {
-    "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job"),
+    "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job", "vote"),
     "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "announce", "free", "map", "spot", "startup"),
-    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat", "wake"),
+    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat", "wake", "rules"),
     "Memory": ("note", "decide", "import-hive"),
 }
 
@@ -195,6 +195,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_seat_parser(sub)
     from .wake import add_parser as add_wake_parser
     add_wake_parser(sub)
+    from .vote import add_parser as add_vote_parser
+    add_vote_parser(sub)
+    from .rules import add_parser as add_rules_parser
+    add_rules_parser(sub)
 
     out = sub.add_parser("out", help="keep auto-picks and background jobs off an AI")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -487,6 +491,12 @@ def main(argv: list[str] | None = None,
         return command(args)
     if args.command == "wake":
         from .wake import command
+        return command(args)
+    if args.command == "vote":
+        from .vote import command
+        return command(args)
+    if args.command == "rules":
+        from .rules import command
         return command(args)
     if args.command == "export":
         from .export import command
