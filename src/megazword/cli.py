@@ -202,6 +202,7 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--until", help="when it's back: 7d, 5h, 2026-10-17 or 2026-10-17T23:30")
     group.add_argument("--clear", action="store_true", help="it's back now")
     sub.add_parser("doctor", help="check local setup without running an AI prompt")
+    sub.add_parser("startup", help="bounded usage and floor readings; no model or browser")
     dash = sub.add_parser("dashboard", help="open a local web page with meters, runs and a run box")
     dash.add_argument("--port", type=int, default=8765)
     dash.add_argument("-p", "--project")
@@ -471,6 +472,9 @@ def main(argv: list[str] | None = None,
         return command(args)
     if args.command == "doctor":
         from .doctor import run
+        return run()
+    if args.command == "startup":
+        from .startup import run
         return run()
     if args.command == "tab":
         from .tab_title import command

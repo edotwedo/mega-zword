@@ -13,10 +13,10 @@ from pathlib import Path
 
 BOARD = "https://github.com/edotwedo/workshop/pull/33#issuecomment-6115098816"
 RULE = ("USAGE FIRST (Phil's standing rule): before starting, claiming or handing out any work, "
-        "read every AI's live usage and plan the labor from it: new work goes to whoever has the "
-        "most room now. Lanes in STATUS.md or handoffs are a starting point, not a rule; re-plan "
+        "read every AI's live usage and plan support from it; cmdc remains owner and assigns work. "
+        "Lanes in STATUS.md or handoffs are a starting point, not a rule; re-plan "
         "whenever the reading changes. Quote the reading in your plan. On Phil's PC: "
-        "`megazword plan` (ranking) and `megazword usage` (details). Elsewhere: the usage board "
+        "`megazword startup` once (bounded usage and floor readings). Elsewhere: the usage board "
         f"in Q ({BOARD}); over 30 minutes old means the PC is asleep, so say so.")
 
 
@@ -41,10 +41,9 @@ def reading() -> str:
     if not exe:
         return "megazword is not on PATH here, so read the usage board in Q now."
     try:
-        return ("Live `megazword plan`:\n" + run([exe, "plan"], 45)[:2000] +
-                "\n\nLive `megazword usage`:\n" + run([exe, "usage"], 45)[:2500])
+        return run([exe, "startup"], 35)[:9500]
     except (OSError, subprocess.SubprocessError) as exc:
-        return f"megazword failed ({type(exc).__name__}); read the usage board in Q."
+        return f"Startup reading unavailable ({type(exc).__name__}); do not retry or open a browser automatically."
 
 
 def already_said(session: str, event: str) -> bool:
@@ -75,7 +74,7 @@ def main() -> None:
         context = RULE + "\n\n" + reading()
     else:
         context = ("Reminder: if this message starts or assigns work, re-read live usage "
-                   "(`megazword plan`, or the board " + BOARD + ") and plan the labor from it first.")
+                   "(`megazword startup` once); reuse readings already in this turn. Do not repeat onboarding.")
     print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": context}}))
 
 

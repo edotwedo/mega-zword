@@ -4,10 +4,21 @@ This file is for Command Code (cmdc), Claude Code, Codex and Grok alike. Phil (t
 between them at any time, including mid-task when one runs out of usage. The
 repo is the only handoff. Nothing lives only in a chat.
 
-## Read first, in this order
-1. `docs/STATUS.md`: what's done, what's in progress, the exact next step.
-2. `docs/SPEC.md`: what we're building and the decisions behind it.
-3. `docs/DECISIONS.md`: dated log of choices; don't reopen these without Phil.
+## Bounded startup (Phil, #230 item 5)
+Reuse instructions and evidence already in this conversation; do not restart
+onboarding on replies. In the seat's own worktree, pull main, then run
+`megazword startup` once for usage, floor and the ten latest room messages.
+It shares one 10-second read deadline; timeout ends the batch without retry.
+Whole-process-tree cleanup has a further 20-second bound (30 seconds total).
+If a reading is unavailable, say so; do not silently retry an unbounded command.
+Do not run the full suite or open a browser for startup.
+Read only the top 30 lines of `docs/STATUS.md`. Search `docs/SPEC.md` and
+`docs/DECISIONS.md` for the assigned task, then read the matching sections.
+Follow cross-project reading references only when that task needs them.
+Keep tool output under 200 lines; narrow on truncation instead of dumping files.
+Start Phil's task or the verified conductor's assignment. If neither exists,
+report that once and wait; do not search for speculative jobs.
+This replaces older blanket full-document startup reading orders.
 
 ## Working rules
 - **Overall work owner: cmdc / Command Code (Phil, 2026-10-20).** Phil has delegated
@@ -42,7 +53,7 @@ repo is the only handoff. Nothing lives only in a chat.
   Tab) and never claim you did it. Keep the same designation for the whole session,
   including after a restart or summary. Never rename yourself to a different name than
   your designation: STATUS, handoffs and scheduled tasks refer to you by it.
-- **Usage first, every time (Phil).** Before you start, claim or hand out any work: run `megazword usage`
+- **Usage first, every time (Phil).** Before you start, claim or hand out any work: run `megazword startup` once
   (on Phil's PC) or read the usage board in Q
   (https://github.com/edotwedo/workshop/pull/33#issuecomment-6115098816; over 30 minutes old means the
   PC is asleep, so say so). Then write a labor plan: which AI does which part, by spare usage and fit,

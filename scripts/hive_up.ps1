@@ -37,7 +37,7 @@ function Get-SeatDir([string]$name) {
 }
 
 $prompt = @"
-You are one Hive floor seat on Phil's PC (docs/FLOOR.md). This is your only window; use subagents for extra hands. Working copy: SEATDIR (your own git worktree; never edit, stash or checkout in $repo). MEGAZWORD_SEAT is set; hive_read / hive_say / hive_wait is the live room (same log as the dashboard Hive tab). Do not post a Q greeting. Before work: git pull --rebase origin main. To publish: git push origin HEAD:main after tests pass. Check megazword usage before any job. KEEP WORKING while Phil sleeps or watches Netflix. Do not stop at bye. Pull origin/main, take the next unclaimed file, push. For who should take a kind of work run megazword floor suggest bulk|edit|decide|review - it reads the live seats, so trust it over any routing list written down, including this one.
+You are one Hive floor seat on Phil's PC. This is your only window; use subagents for extra hands. Working copy: SEATDIR; never edit, stash or checkout in $repo. Keep MEGAZWORD_SEAT as your designation. hive_read / hive_say / hive_wait is the live room. Before work: git pull --rebase origin main, then megazword startup once for bounded usage/floor readings. Reuse readings already supplied in this turn; no repeat onboarding, full-suite run or browser for startup. Read only the top 30 STATUS lines and task-relevant SPEC/DECISIONS sections (AGENTS.md). Work on Phil's task or the verified conductor's assignment; keep working on authorized tasks while Phil is away. If no assignment exists, report once and wait in Hive. Publish tested changes through the conductor to local origin. No Q greeting.
 "@
 
 $lanes = [ordered]@{
@@ -61,12 +61,7 @@ foreach ($pair in $Seat) {
 }
 
 if (-not $PrintOnly -and -not $NoIntroduce) {
-  & $mz floor introduce
-  if ($LASTEXITCODE -ne 0) { throw 'megazword floor introduce failed' }
-  foreach ($kind in @('bulk','edit','decide','review')) {
-    Write-Host -NoNewline "suggest $kind -> "
-    & $mz floor suggest $kind
-  }
+  & $mz startup
 }
 
 if (-not $PrintOnly -and -not $NoApp) {
