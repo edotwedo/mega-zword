@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import config
+from .filelock import locked, write_atomic
 
 # Phil's lanes. A message from here always wakes the conductor.
 PHIL_LANES = ("phil", "phone", "grok-web")
@@ -91,11 +92,12 @@ def last_seen(home: Path | None = None) -> int:
 
 def remember(identifier: int, home: Path | None = None) -> None:
     path = state_path(home)
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"seen": int(identifier)}) + "\n", encoding="utf-8")
-    except OSError:
-        pass
+    if identifier < 0:
+        raise ValueError("wake acknowledgement must be nonnegative")
+    with locked(path) as acquired:
+        if not acquired:
+            raise OSError("wake state is locked; acknowledgement was not saved")
+        write_atomic(path, json.dumps({"seen": max(last_seen(home), int(identifier))}) + "\n")
 
 
 def most_recent_id(messages) -> int:
@@ -106,7 +108,8 @@ def most_recent_id(messages) -> int:
 
 
 def once(*, home: Path | None = None, read: Callable | None = None,
-         write: Callable[[str], None] = print) -> int:
+         write: Callable[[str], None] = print, peek: bool = False,
+         as_json: bool = False) -> int:
     """One poll. Prints a wake line and advances the cursor when Phil is waiting.
 
     Returning 0 with no output is the normal idle case: no model call, no noise.
@@ -126,10 +129,12 @@ def once(*, home: Path | None = None, read: Callable | None = None,
     waiting = pending(messages, seen)
     newest = most_recent_id(messages)
     if waiting:
-        write(wake_line(waiting))
-        remember(newest or seen, home)
+        line = wake_line(waiting)
+        write(json.dumps({"through": newest or seen, "line": line}) if as_json else line)
+        if not peek:
+            remember(newest or seen, home)
         return 0
-    if newest > seen:
+    if newest > seen and not peek:
         remember(newest, home)  # nothing for the conductor, but do not re-scan next time
     return 0
 
@@ -140,15 +145,29 @@ def add_parser(sub) -> None:
         help="poll the room once and print a wake line if Phil is waiting; no AI calls",
     )
     wake.add_argument("--home", type=Path, help="megazword home (default: ~/.megazword)")
+    wake.add_argument("--peek", action="store_true", help="leave messages pending until acknowledged")
+    wake.add_argument("--json", action="store_true", help="print a wake line and captured cursor as JSON")
+    wake.add_argument("--ack", type=int, help="acknowledge through this captured message id after delivery")
 
 
 def command(args) -> int:
-    return once(home=getattr(args, "home", None))
+    try:
+        if getattr(args, "ack", None) is not None:
+            remember(args.ack, getattr(args, "home", None))
+            return 0
+        return once(home=getattr(args, "home", None), peek=getattr(args, "peek", False),
+                    as_json=getattr(args, "json", False))
+    except (OSError, ValueError) as exc:
+        print(f"[megazword wake] state not saved ({type(exc).__name__})", file=sys.stderr)
+        return 1
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--home", type=Path)
+    parser.add_argument("--peek", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--ack", type=int)
     return command(parser.parse_args(argv))
 
 

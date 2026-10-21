@@ -6,6 +6,13 @@ decision half - which messages count as a wake - with an injected reader, so no 
 no AI is involved.
 """
 
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
 from megazword import wake
 
 
@@ -92,3 +99,69 @@ def test_a_cached_message_carries_its_id_as_remote_id(tmp_path):
     assert wake.once(home=tmp_path, read=lambda: rows, write=printed.append) == 0
     assert printed and "Phil posted" in printed[0]
     assert wake.last_seen(tmp_path) == 334
+
+
+def test_peek_preserves_pending_messages_until_acknowledged(tmp_path):
+    rows = [message("please work", id=7)]
+    for _ in range(2):
+        output = []
+        assert wake.once(home=tmp_path, read=lambda: rows, write=output.append,
+                         peek=True, as_json=True) == 0
+        assert json.loads(output[0])["through"] == 7
+        assert wake.last_seen(tmp_path) == 0
+    wake.remember(7, tmp_path)
+    rows.append(message("new request during delivery", id=8))
+    output = []
+    wake.once(home=tmp_path, read=lambda: rows, write=output.append, peek=True, as_json=True)
+    assert json.loads(output[0])["through"] == 8
+
+
+def test_ack_is_monotonic_and_rejects_negative_ids(tmp_path):
+    wake.remember(8, tmp_path)
+    wake.remember(7, tmp_path)
+    assert wake.last_seen(tmp_path) == 8
+    with pytest.raises(ValueError):
+        wake.remember(-1, tmp_path)
+
+
+def test_failed_state_write_is_reported(tmp_path, monkeypatch):
+    def fail(*args):
+        raise OSError("disk unavailable")
+    monkeypatch.setattr(wake, "write_atomic", fail)
+    with pytest.raises(OSError):
+        wake.remember(7, tmp_path)
+    assert wake.last_seen(tmp_path) == 0
+
+
+@pytest.mark.parametrize("dry,idle,sent,exit_code,expected", [
+    (True, 30, True, 0, []),
+    (False, 0, True, 0, []),
+    (False, 30, False, 0, []),
+    (False, 30, True, 1, []),
+    (False, 30, True, 0, [7]),
+])
+def test_watcher_acknowledges_only_successful_delivery(tmp_path, dry, idle, sent, exit_code, expected):
+    shell = shutil.which("pwsh") or shutil.which("powershell")
+    if not shell:
+        pytest.skip("PowerShell unavailable")
+    # Execute the actual loop with fakes, excluding all UI initialization/functions.
+    script = (Path(__file__).parents[1] / "scripts" / "wake_watch.ps1").read_text()
+    loop = script[script.index("while ($true)"):]
+    result = tmp_path / "acks.json"
+    harness = tmp_path / "watcher-fake.ps1"
+    prelude = f"""
+$Once = $true; $DryRun = ${str(dry).lower()}; $Tab = 'test'; $script:acks = @()
+function megazword {{
+    if ($args -contains '--ack') {{ $script:acks += [int]$args[-1] }}
+    else {{ '{{"through":7,"line":"Cinder-21: Phil posted in the hive - read the room and answer now."}}' }}
+    $global:LASTEXITCODE = {exit_code}
+}}
+function Seconds-Since-Input {{ return {idle} }}
+function Send-ToTab {{ return ${str(sent).lower()} }}
+"""
+    path_literal = str(result).replace("'", "''")
+    harness.write_text(prelude + loop + f"\nConvertTo-Json -InputObject @($script:acks) -Compress | Set-Content -LiteralPath '{path_literal}'", encoding="utf-8")
+    run = subprocess.run([shell, "-NoProfile", "-NonInteractive", "-File", str(harness)],
+                         capture_output=True, text=True, timeout=20)
+    assert run.returncode == 0, run.stderr
+    assert json.loads(result.read_text(encoding="utf-8-sig")) == expected

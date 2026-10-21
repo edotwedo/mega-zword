@@ -46,24 +46,42 @@ function Send-ToTab([string]$match, [string]$text) {
         if ($target) { break }
     }
     if (-not $target) { return $false }
-    $target.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
-    $shell = New-Object -ComObject WScript.Shell
-    [void]$shell.Activate($window.Id)
-    Start-Sleep -Milliseconds 700
-    $safe = [regex]::Replace($text, '[+^%~(){}\[\]]', '{$0}')
-    [System.Windows.Forms.SendKeys]::SendWait($safe)
-    Start-Sleep -Milliseconds 300
-    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-    Start-Sleep -Milliseconds 300
-    if ($previous -and $previous -ne $target) {
-        $previous.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+    try {
+        $target.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+        $shell = New-Object -ComObject WScript.Shell
+        if (-not $shell.AppActivate($window.Id)) { return $false }
+        Start-Sleep -Milliseconds 700
+        $safe = [regex]::Replace($text, '[+^%~(){}\[\]]', '{$0}')
+        [System.Windows.Forms.SendKeys]::SendWait($safe)
+        Start-Sleep -Milliseconds 300
+        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        Start-Sleep -Milliseconds 300
+        return $true
+    } catch {
+        Write-Warning "wake delivery failed; leaving message pending"
+        return $false
+    } finally {
+        if ($previous -and $previous -ne $target) {
+            try {
+                $previous.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+            } catch {
+                Write-Warning 'wake tab restoration unavailable; continuing watcher'
+            }
+        }
     }
-    return $true
 }
 
 while ($true) {
-    $line = (& megazword wake 2>$null | Select-Object -First 1)
-    if ($line) {
+    $raw = @(& megazword wake --peek --json 2>$null)
+    $wakeExit = $LASTEXITCODE
+    $notice = $null
+    if ($wakeExit -eq 0 -and $raw.Count -eq 1) {
+        try { $notice = $raw[0] | ConvertFrom-Json -ErrorAction Stop } catch { }
+    }
+    if ($notice -and ($notice.through -is [int] -or $notice.through -is [long]) -and $notice.through -gt 0 -and
+            $notice.line -is [string] -and $notice.line.StartsWith('Cinder-21: Phil posted in the hive') -and
+            $notice.line -notmatch '[\r\n]') {
+        $line = $notice.line
         # Never type into the machine while Phil is using it: the wake is important, but not
         # more important than the keystrokes he is half-way through.
         $idle = Seconds-Since-Input
@@ -73,7 +91,11 @@ while ($true) {
             "wake held: Phil is typing (idle ${idle}s)"
         } else {
             $sent = Send-ToTab $Tab $line
-            "wake $(if ($sent) { 'sent' } else { "not sent: no tab matching '$Tab'" }): $line"
+            if ($sent) {
+                & megazword wake --ack $notice.through
+                if ($LASTEXITCODE -ne 0) { Write-Warning 'wake sent, but acknowledgement failed; it may be sent again' }
+            }
+            "wake $(if ($sent) { 'sent' } else { "not delivered to '$Tab'; still pending" }): $line"
         }
     }
     if ($Once) { break }
