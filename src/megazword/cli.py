@@ -22,7 +22,7 @@ COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job"),
     "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "announce", "free", "map", "spot"),
-    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat"),
+    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat", "wake"),
     "Memory": ("note", "decide", "import-hive"),
 }
 
@@ -193,6 +193,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_resume_parser(sub)
     from .seat import add_parser as add_seat_parser
     add_seat_parser(sub)
+    from .wake import add_parser as add_wake_parser
+    add_wake_parser(sub)
 
     out = sub.add_parser("out", help="keep auto-picks and background jobs off an AI")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -478,6 +480,9 @@ def main(argv: list[str] | None = None,
         return command(args)
     if args.command == "resume":
         from .resume import command
+        return command(args)
+    if args.command == "wake":
+        from .wake import command
         return command(args)
     if args.command == "export":
         from .export import command

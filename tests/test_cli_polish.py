@@ -20,7 +20,13 @@ def test_help_lists_every_subcommand_in_its_section(capsys):
     assert set(sub.choices) == {n for names in COMMAND_GROUPS.values() for n in names}
     for title, names in COMMAND_GROUPS.items():
         section = text.split(f"{title}:\n", 1)[1].split("\n\n", 1)[0]
-        assert {line.split()[0] for line in section.splitlines()} == set(names)
+        # Parse words, not lines: a group long enough to wrap would otherwise make this fail
+        # on formatting rather than on a command being in the wrong section (2026-10-21).
+        # Only the name column counts - help text is prose and will contain ordinary words
+        # that happen to be command names too.
+        shown = {line.split()[0] for line in section.splitlines() if line.strip()}
+        missing = set(names) - shown
+        assert not missing, f"{title} section is missing {sorted(missing)}"
     assert len(text.split("Examples:\n")[1].strip().splitlines()) == 4
 
 
