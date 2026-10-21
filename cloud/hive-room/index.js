@@ -189,11 +189,27 @@ async function readBody(request) {
 }
 
 // Port of claims.py: designation comes from text, never the authenticated lane.
-const claimPrefix = /^([A-Za-z]+-\d+)(?:\s*\([^)]*\))?:\s*([\s\S]*)$/;
+// KEEP THE TWO IN STEP. This copy drifted from the Python one on 2026-10-21 and cost real
+// protection: it still required a hyphen in the designation, so "harbor022: claiming X" was
+// not a claim, and it returned null unless the item contained #N, so a quoted-name claim
+// like "claiming 'seat watch'" - which is how the team actually claims unnumbered work -
+// was never registered here at all. A live probe proved both: a second seat claimed a held
+// item and the Worker answered 201 instead of 409.
+const claimPrefix = /^([A-Za-z]{3,}-?\d{2,4})(?:\s*\([^)]*\))?:\s*([\s\S]*)$/;
 const claimVerb = /^(?:claim(?:ing)?|tak(?:e|ing)|reserv(?:e|ing)|grab(?:bing)?|owning)\b[\s:,-]*(.*)$/i;
 const releaseVerb = /\b(releasing|released|dropping|dropped|landed|merged|shipped|pushed|fixed|done|complete|completed|reassigned|took over)\b/i;
-const itemNumbers = text => new Set([...text.matchAll(/#(\d+)\b|\bitem\s+(\d+)\b/gi)].map(m => Number(m[1] || m[2])));
-const overlaps = (a, b) => [...itemNumbers(a)].some(n => itemNumbers(b).has(n));
+const itemNumbers = text => new Set([...String(text || '').matchAll(/#(\d+)\b|\bitem\s+(\d+)\b/gi)].map(m => Number(m[1] || m[2])));
+// A claim may name work by a quoted label instead of a number: claiming 'seat watch'.
+// Only a LEADING quote names the item, because a quote further in is usually a quotation.
+const quotedName = text => {
+  const match = /^\s*['"`]([^'"`\n]{2,60})['"`]/.exec(String(text || ''));
+  return match ? match[1].trim().toLowerCase().replace(/\s+/g, ' ') : null;
+};
+const overlaps = (a, b) => {
+  const nameA = quotedName(a), nameB = quotedName(b);
+  if (nameA && nameB) return nameA === nameB;
+  return [...itemNumbers(a)].some(n => itemNumbers(b).has(n));
+};
 const released = body => releaseVerb.test(body.replace(/\b(?:not|never|no|isn't|isnt|hasn't|hasnt|won't|wont)\s+(?:yet\s+)?\w+/gi, ' '));
 
 function claimFromText(text) {
@@ -201,7 +217,8 @@ function claimFromText(text) {
   const match = prefix && claimVerb.exec(prefix[2].trim().split(/\r\n|[\n\r\v\f\x85\u2028\u2029]/)[0]);
   if (!match) return null;
   const item = match[1].split(/\.\s/, 1)[0].trim();
-  return item && itemNumbers(item).size ? {designation: prefix[1], item} : null;
+  if (!item) return null;
+  return (itemNumbers(item).size || quotedName(item)) ? {designation: prefix[1], item} : null;
 }
 
 function activeClaims(messages, now) {

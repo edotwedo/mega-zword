@@ -482,3 +482,35 @@ test('a malformed SEAT_TOKENS falls back instead of taking the room down', async
   // The same guard on the original secret: unknown tokens get a clean 401, not a 503.
   assert.equal((await post(token, 'nope', {SEAT_TOKENS: 'not json at all'})).status, 401);
 });
+
+// The Worker's claim guard is a port of claims.py and drifted from it on 2026-10-21: it
+// required a hyphen in the designation, and it ignored quoted-name items, so a second seat
+// claimed a held item and got 201 from the live Worker. Both are proved here, and a live
+// probe is what found them.
+const seatsEnv = async pairs => ({...env, SEAT_TOKENS_EXTRA: JSON.stringify(
+  Object.fromEntries(await Promise.all(pairs.map(async ([t, s]) => [await digest(t), s]))))});
+
+test('a designation without a hyphen can claim, and a second seat is refused', async () => {
+  const a = crypto.randomUUID(), b = crypto.randomUUID();
+  const e = await seatsEnv([[a, 'cinder-21'], [b, 'harbor022']]);
+  assert.equal((await post(a, 'cinder-21: claiming #7', e)).status, 201);
+  assert.equal((await post(b, 'harbor022: claiming #7', e)).status, 409);
+});
+
+test('a quoted-name claim is registered and blocks a second seat', async () => {
+  const a = crypto.randomUUID(), b = crypto.randomUUID();
+  const e = await seatsEnv([[a, 'briar-20'], [b, 'nock-21']]);
+  assert.equal((await post(a, "briar-20: claiming 'seat watch'", e)).status, 201);
+  assert.equal((await post(b, "nock-21: claiming 'seat watch'", e)).status, 409);
+  // A different piece of unnumbered work is still free to claim.
+  assert.equal((await post(b, "nock-21: claiming 'floor numbers'", e)).status, 201);
+});
+
+test('one open claim per seat is still the cap', async () => {
+  const a = crypto.randomUUID();
+  const e = await seatsEnv([[a, 'cinder-21']]);
+  assert.equal((await post(a, 'cinder-21: claiming #1', e)).status, 201);
+  assert.equal((await post(a, 'cinder-21: claiming #2', e)).status, 409);
+  assert.equal((await post(a, 'cinder-21: releasing #1', e)).status, 201);
+  assert.equal((await post(a, 'cinder-21: claiming #2', e)).status, 201);
+});
