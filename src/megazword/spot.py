@@ -1,4 +1,8 @@
-"""Spot warning: tell a seat to hand off before a plan hits the 20% floor."""
+"""Spot warning: the 2026-10-21 reserve, one rule per window.
+
+Five-hour window: at 10% remaining, stop and hand off until the reset.
+Weekly window: at 10% remaining, keep working, and hard-stop at 5%.
+"""
 
 from __future__ import annotations
 
@@ -7,8 +11,9 @@ from datetime import datetime, timezone
 
 from . import config
 
-FLOOR = 20  # hard floor: never start heavy work below this
-WARN = 25   # hand off before spending the last slice
+FIVE_HOUR_STOP = 10  # percent remaining: hand off until the 5-hour reset
+WEEKLY_KEEP = 10     # percent remaining: still take work
+WEEKLY_STOP = 5      # percent remaining: hard stop
 
 
 def remaining(usage) -> float:
@@ -23,13 +28,30 @@ def remaining(usage) -> float:
     return max(0.0, 100.0 - used)
 
 
+def _window_line(service: str, name: str, used: float) -> str | None:
+    left = max(0.0, 100.0 - float(used or 0.0))
+    if name == "5-hour":
+        if left <= FIVE_HOUR_STOP:
+            return f"{service}: 5-hour {left:.0f}% left - STOP (hand off until reset)"
+        return None
+    if name == "weekly" or str(name).startswith("weekly"):
+        if left <= WEEKLY_STOP:
+            return f"{service}: weekly {left:.0f}% left - STOP (at floor)"
+        if left <= WEEKLY_KEEP:
+            return f"{service}: weekly {left:.0f}% left - KEEP WORKING (down to 5%)"
+    return None
+
+
 def warnings(usages) -> list[str]:
     lines = []
     for usage in usages:
-        left = remaining(usage)
-        if left <= WARN:
-            state = "STOP (at floor)" if left <= FLOOR else "HAND OFF SOON"
-            lines.append(f"{usage.service}: {left:.0f}% left - {state}")
+        for window in getattr(usage, "windows", []) or []:
+            name = getattr(window, "name", "")
+            if name not in ("5-hour", "weekly") and not str(name).startswith("weekly"):
+                continue
+            line = _window_line(usage.service, name, getattr(window, "used_percent", 0.0))
+            if line:
+                lines.append(line)
     return lines
 
 
@@ -42,7 +64,7 @@ def command(args=None, write=print) -> int:
         return 2
     lines = warnings(usages)
     if not lines:
-        write(f"[spot] every AI is above the {WARN}% warn line")
+        write("[spot] every recognized window is above its reserve")
         return 0
     for line in lines:
         write(line)

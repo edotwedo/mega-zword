@@ -10,12 +10,20 @@ def usage(service, used, name="weekly"):
 
 
 def test_only_the_tight_plans_warn():
-    lines = spot.warnings([usage("grok", 72), usage("claude", 78), usage("codex", 40)])
-    assert lines == ["claude: 22% left - HAND OFF SOON"]
+    lines = spot.warnings([usage("grok", 72), usage("claude", 91), usage("codex", 40)])
+    assert lines == ["claude: weekly 9% left - KEEP WORKING (down to 5%)"]
 
 
-def test_floor_is_a_stop():
-    assert spot.warnings([usage("claude", 85)]) == ["claude: 15% left - STOP (at floor)"]
+def test_five_hour_stops_at_ten_percent_remaining():
+    assert spot.warnings([usage("claude", 90, "5-hour")]) == [
+        "claude: 5-hour 10% left - STOP (hand off until reset)"
+    ]
+
+
+def test_weekly_hard_stop_is_five_percent_remaining():
+    assert spot.warnings([usage("claude", 96)]) == [
+        "claude: weekly 4% left - STOP (at floor)"
+    ]
 
 
 def test_remaining_uses_the_tightest_recognized_window():
@@ -36,8 +44,8 @@ def test_unknown_buckets_never_block():
 def test_command_writes_a_handoff_note(tmp_path, monkeypatch):
     import megazword.usage_sources as sources
     monkeypatch.setattr(spot.config, "HOME", tmp_path)
-    monkeypatch.setattr(sources, "all_usage", lambda *a, **k: [usage("claude", 80)])
+    monkeypatch.setattr(sources, "all_usage", lambda *a, **k: [usage("claude", 90, "5-hour")])
     out = []
     assert spot.command(write=out.append) == 0
-    assert "claude: 20% left - STOP (at floor)" in out
+    assert "claude: 5-hour 10% left - STOP (hand off until reset)" in out
     assert (tmp_path / "spot-handoff.json").exists()

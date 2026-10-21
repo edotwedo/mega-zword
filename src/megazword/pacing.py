@@ -12,11 +12,13 @@ WINDOW_LENGTHS = {
     "weekly": timedelta(days=7),
 }
 HARD_ONLY_THRESHOLD = 10.0
-OUT_THRESHOLD = 95.0
-# "Use it or lose it": a window this close to its reset with at least
-# LEFTOVER_MIN percent unused gets spent first, even on easy tasks.
+# 2026-10-21 reserve, percent remaining. Five-hour stops at 10 and waits
+# for the reset. Weekly keeps working through 10 and hard-stops at 5.
+FIVE_HOUR_STOP = 10.0
+WEEKLY_STOP = 5.0
+# "Use it or lose it": a window this close to its reset, still above its
+# own reserve, gets spent first, even on easy tasks.
 BURN_BEFORE_RESET = {"5-hour": timedelta(hours=1), "weekly": timedelta(hours=24)}
-LEFTOVER_MIN = 20.0
 
 
 @dataclass
@@ -64,7 +66,7 @@ def status(usage: PlanUsage, now: datetime | None = None) -> PlanStatus:
         return PlanStatus(usage.service, 0.0, 0.0, "unknown", unknown)
     paces = [pace(window, now) for window in known]
     maximum = max(float(window.used_percent) for window in known)
-    if maximum >= OUT_THRESHOLD:
+    if any(_at_reserve(window) for window in known):
         verdict = "out"
     elif max(paces) > HARD_ONLY_THRESHOLD:
         verdict = "hard-only"
@@ -87,8 +89,17 @@ def _after_reset(window: Window, now: datetime | None = None) -> Window:
     return window
 
 
+def _reserve_remaining(name: str) -> float:
+    return FIVE_HOUR_STOP if name == "5-hour" else WEEKLY_STOP
+
+
+def _at_reserve(window: Window) -> bool:
+    """True when this window must refuse new work."""
+    return 100.0 - float(window.used_percent) <= _reserve_remaining(window.name)
+
+
 def _near_reset(window: Window, now: datetime | None = None) -> bool:
-    if window.resets_at is None or 100.0 - window.used_percent < LEFTOVER_MIN:
+    if window.resets_at is None or _at_reserve(window):
         return False
     now = now or datetime.now(timezone.utc)
     reset = _aware(window.resets_at)

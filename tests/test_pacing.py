@@ -98,10 +98,19 @@ def test_rank_filters_and_keeps_cheapest_first():
 def test_burn_only_near_reset_with_leftover():
     soon = usage("a", window("5-hour", 30, NOW + timedelta(minutes=30)))
     later = usage("b", window("5-hour", 30, NOW + timedelta(hours=3)))
-    spent = usage("c", window("5-hour", 85, NOW + timedelta(minutes=30)))
+    at_reserve = usage("c", window("5-hour", 91, NOW + timedelta(minutes=30)))
     assert status(soon, NOW).burn
     assert not status(later, NOW).burn
-    assert not status(spent, NOW).burn
+    assert not status(at_reserve, NOW).burn
+
+
+def test_reserve_depends_on_the_window():
+    five = status(usage("a", window("5-hour", 90, NOW + timedelta(hours=2))), NOW)
+    weekly_keep = status(usage("b", window("weekly", 90, NOW + timedelta(days=3))), NOW)
+    weekly_stop = status(usage("c", window("weekly", 95, NOW + timedelta(days=3))), NOW)
+    assert five.verdict == "out"
+    assert weekly_keep.verdict != "out"
+    assert weekly_stop.verdict == "out"
 
 
 def test_rank_preserves_candidate_order_for_equal_pace():
