@@ -3,6 +3,25 @@
 Owner: **Codex** (primary) or **Gauge-18** (backup). Conductor: Lumen-20.
 Date: 2026-10-19.
 
+> **BLOCKED 2026-10-20 — do not re-run this as if it were unblocked.** Phil's Stripe
+> account has a passkey registered as its only two-step method, and the credential is on
+> no device he has: the dashboard offers only "phone" or "USB security key", the phone QR
+> answers **"No keys were found"**, Chrome in his profile is not signed into any Google
+> account, and no FIDO key has ever been seen on this PC. Every action that needs step-up
+> is therefore locked. Only **Stripe support can remove that second factor** (email
+> identity check). Until they do, there is no key, so this script cannot run.
+>
+> Consequence for the plan: the payment rail is not the product. The landing page takes any
+> checkout URL through the single `var BUY` constant in `site/index.html`, and the script's
+> only job was a product named "Mega Zword - Founding License" at $49.00 with a hosted
+> checkout — the same thing a Gumroad or Lemon Squeezy product does from a form, with no
+> API key and no step-up. Route around the lock; do not wait on it.
+>
+> **Status 2026-10-20: the support ticket has been SENT by Phil.** So this is waiting on
+> Stripe, not on him. Do not ask him to raise it again, and do not treat the missing key as
+> his outstanding action. Interim rail: Gumroad (a product form, no API key, no step-up);
+> note Lemon Squeezy is Stripe-owned, so its onboarding runs into the same account wall.
+
 ## Goal
 
 A working **Stripe hosted checkout link** for `Mega Zword - Founding License`, $49
@@ -12,9 +31,17 @@ can wire the landing-page CTA and redeploy.
 ## Input Phil provides (once)
 
 A Stripe key for the live account, set as the environment variable
-`STRIPE_SECRET_KEY` (or in Keymaster: `megazword keys set STRIPE_SECRET_KEY`).
+`STRIPE_SECRET_KEY` in the shell that runs the script.
+
+**Environment variable only.** `megazword keys` takes `show` and `move`, not `set`, and
+Stripe is not one of its known providers, so there is no Keymaster path today. (This
+handoff previously said `megazword keys set STRIPE_SECRET_KEY`; that command does not
+exist, and running it just errors.) The key is read from `os.environ` at line 34.
+
 Use a **restricted key**: write access to Products, Prices and Payment Links only.
-Never the full secret key, never a key with charge/payout scope.
+Never the full secret key, never a key with charge/payout scope. In the current Stripe
+UI these live under API keys -> the **Access policies** tab; "restricted" no longer
+appears as a label, and "Create a secret key" makes the broad key instead.
 
 **Never print, log, post or commit the key.** It must not appear in the room, a repo,
 a commit message, or a screenshot.
