@@ -7,8 +7,11 @@ from .keys import get_key
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import quote, urlsplit
 
 from . import __version__, config, ollama, usage_sources
 
@@ -50,7 +53,77 @@ def install_check(module_file: Path | None = None) -> Check:
                  "a non-editable install hides committed work; run pip install -e .")
 
 
-def checks(home: Path | None = None) -> list[Check]:
+class _RoomNoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None  # Never forward a seat credential to another origin.
+
+
+def room_checks(cfg: config.Config, *, live: bool = True) -> list[Check]:
+    """Presence checks plus one bounded metadata GET; no tokens or response text.
+
+    Set MEGAZWORD_OFFLINE=1 (or pass live=False) to skip the auth probe. The smoke
+    harness's MZ_SMOKE_PYTHON marker also disables it, even with inherited keys.
+    """
+    url = (os.environ.get("HIVE_ROOM_URL") or cfg.room_url or "").strip().rstrip("/")
+    valid_url = False
+    if url:
+        try:
+            parsed = urlsplit(url)
+            valid_url = bool(parsed.scheme == "https" and parsed.hostname
+                             and not (parsed.username or parsed.password or parsed.query or parsed.fragment)
+                             and parsed.path == "")
+            parsed.port  # Reject malformed port numbers before attempting a request.
+        except ValueError:
+            valid_url = False
+    found = [Check("OK" if valid_url else "FAIL" if url else "WARN", "room URL",
+                   "configured" if valid_url else "invalid HTTPS origin" if url else "not configured",
+                   "" if valid_url else "set HIVE_ROOM_URL or [room].url to an HTTPS origin")]
+
+    seat = (os.environ.get("MEGAZWORD_SEAT") or "").strip()
+    key = get_key("HIVE_ROOM_KEY_" + seat.replace("-", "_").upper()) if seat else None
+    present = bool(key and key.strip())
+    found.append(Check("OK" if present else "FAIL" if seat else "WARN", "room seat key",
+                       "per-seat key present" if present else "per-seat key missing" if seat else "seat not set",
+                       "" if present else "set MEGAZWORD_SEAT and its HIVE_ROOM_KEY_<SEAT> credential"))
+
+    skip = (not live or os.environ.get("MEGAZWORD_OFFLINE") == "1"
+            or bool(os.environ.get("MZ_SMOKE_PYTHON")))
+    if skip:
+        found.append(Check("WARN", "room authentication", "skipped (offline/fake mode)"))
+    elif not valid_url or not present:
+        found.append(Check("WARN", "room authentication", "skipped (room URL or per-seat key unavailable)"))
+    else:
+        try:
+            endpoint = f"{url}/rooms/{quote(cfg.room_name, safe='')}/messages?limit=1"
+            request = urllib.request.Request(endpoint, headers={
+                "Authorization": "Bearer " + key, "User-Agent": "megazword-room/1"}, method="GET")
+            with urllib.request.build_opener(_RoomNoRedirect()).open(request, timeout=3) as response:
+                status = response.status
+            found.append(Check("OK" if status == 200 else "FAIL", "room authentication",
+                               "seat token accepted" if status == 200 else f"HTTP {status}"))
+        except urllib.error.HTTPError as exc:
+            code = exc.code
+            exc.close()
+            found.append(Check("FAIL", "room authentication", f"HTTP {code}",
+                               "check this seat's room credential and access"))
+        except Exception:
+            # Exception strings, request URLs, webhook URLs and headers may contain secrets.
+            found.append(Check("FAIL", "room authentication", "probe failed or timed out",
+                               "check room connectivity; probe timeout is 3s"))
+
+    for label, value in (("PC", os.environ.get("MEGAZWORD_NTFY_PC_TOPIC") or cfg.room_ntfy_pc_topic),
+                         ("phone", cfg.room_ntfy_phone_topic)):
+        configured = bool(value and value.strip())
+        found.append(Check("OK" if configured else "WARN", f"room NTFY {label}",
+                           "topic set" if configured else "topic not set",
+                           "" if configured else f"set [room].ntfy_{label.lower()}_topic"))
+    webhook = get_key("DISCORD_WEBHOOK")
+    found.append(Check("OK" if webhook and webhook.strip() else "WARN", "DISCORD_WEBHOOK",
+                       "configured (not tested)" if webhook and webhook.strip() else "not configured"))
+    return found
+
+
+def checks(home: Path | None = None, *, live_room: bool = True) -> list[Check]:
     home = home or config.HOME
     found: list[Check] = []
     if sys.version_info >= (3, 11):
@@ -111,6 +184,7 @@ def checks(home: Path | None = None) -> list[Check]:
             cfg = config.Config()
             found.append(Check("FAIL", "config", type(exc).__name__,
                                "fix config.toml syntax and values"))
+    found.extend(room_checks(cfg, live=live_room))
     active = cfg.out_now()
     found.append(Check("WARN" if active else "OK", "out marks",
                        ", ".join(sorted(active)) if active else "none active",
