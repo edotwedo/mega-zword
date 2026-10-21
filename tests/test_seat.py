@@ -5,10 +5,12 @@ to the need for a replacement." Local files only, and the room post and the page
 injected, so these tests touch no network and no AI.
 """
 
-from datetime import datetime, timezone
+import argparse
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from megazword import seat
+from megazword.room import RoomMessage
 
 NOW = datetime(2026, 10, 21, 4, 30, tzinfo=timezone.utc)
 
@@ -83,3 +85,104 @@ def test_replace_prints_the_relaunch_line_and_the_first_prompt(tmp_path, monkeyp
     assert "hive_resume.ps1 -Only Harbor022" in text
     assert "You are Harbor022" in text
     assert "retired-harbor022.md" in text
+
+
+def message(text, minutes_ago=0, id=1):
+    return {"text": text, "time": (NOW - timedelta(minutes=minutes_ago)).isoformat(), "id": id}
+
+
+def test_watch_reports_expired_but_unreleased_claims(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEGAZWORD_CLAIM_STALE_MINUTES", "45")
+    calls = []
+
+    def read(room, home):
+        calls.append((room, home))
+        return [message("Briar-20: claiming #8", 100)]
+
+    rows = seat.watch(home=tmp_path, now=NOW, read=read)
+    assert calls == [("hive", tmp_path)]
+    assert rows == [{"designation": "Briar-20", "item": "#8", "claim_id": 1,
+                     "last_seen": (NOW - timedelta(minutes=100)).isoformat(),
+                     "silent_minutes": 100, "leash_minutes": 45}]
+
+
+def test_watch_uses_latest_seat_update_not_claim_age_or_shared_lane(monkeypatch):
+    monkeypatch.setenv("MEGAZWORD_CLAIM_STALE_MINUTES", "45")
+    rows = [message("Briar-20: claiming #8", 150),
+            message("Harbor022: claiming #9", 100),
+            message("briar-20: tests are running", 5),
+            message("Cinder-21: keeping the queue moving", 1)]
+    for row in rows:
+        row["author"] = "claude-pc"  # Shared transport does not prove a holder spoke.
+    overdue = seat.watch(now=NOW, read=lambda *_: rows)
+    assert [r["designation"] for r in overdue] == ["Harbor022"]
+    assert overdue[0]["silent_minutes"] == 100
+
+
+def test_watch_excludes_released_claims_and_non_claiming_seats(monkeypatch):
+    monkeypatch.setenv("MEGAZWORD_CLAIM_STALE_MINUTES", "45")
+    rows = [message("Briar-20: claiming #8", 100),
+            message("Cinder-21: landed #8", 90),
+            message("Harbor022: available for review", 100)]
+    assert seat.watch(now=NOW, read=lambda *_: rows) == []
+
+
+def test_watch_leash_boundary_and_future_messages(monkeypatch):
+    monkeypatch.setenv("MEGAZWORD_CLAIM_STALE_MINUTES", "45")
+    rows = [message("Briar-20: claiming #8", 45),
+            message("Harbor022: claiming #9", 46),
+            message("Forge-22: claiming #10", -5)]
+    overdue = seat.watch(now=NOW, read=lambda *_: rows)
+    assert [r["designation"] for r in overdue] == ["Harbor022"]
+
+
+def test_watch_handles_dataclasses_naive_times_and_bad_timestamps(monkeypatch):
+    monkeypatch.setenv("MEGAZWORD_CLAIM_STALE_MINUTES", "45")
+    rows = [RoomMessage(time="2026-10-21T03:00:00", author="briar-20",
+                        text="Briar-20: claiming 'seat watch'", remote_id=4),
+            {"text": "Harbor022: claiming #9", "time": "unknown"},
+            {"text": "Briar-20: still working", "time": "bad"}]
+    overdue = seat.watch(now=NOW.replace(tzinfo=None), read=lambda *_: rows)
+    assert len(overdue) == 1
+    assert overdue[0]["designation"] == "Briar-20"
+    assert overdue[0]["claim_id"] == 4
+    assert overdue[0]["silent_minutes"] == 90
+
+
+def test_watch_defaults_to_the_claims_leash_and_reads_floor_once(monkeypatch, tmp_path):
+    from megazword import floor
+    monkeypatch.delenv("MEGAZWORD_CLAIM_STALE_MINUTES", raising=False)
+    calls = []
+
+    def read(room, home):
+        calls.append((room, home))
+        return [message("Briar-20: claiming #8", 1441)]
+
+    monkeypatch.setattr(floor, "room_messages", read)
+    overdue = seat.watch("work", now=NOW, home=tmp_path)
+    assert calls == [("work", tmp_path)]
+    assert overdue[0]["leash_minutes"] == 1440
+
+
+def test_watch_subcommand_prints_overdue_claim_without_retiring(monkeypatch):
+    monkeypatch.setenv("MEGAZWORD_CLAIM_STALE_MINUTES", "45")
+    from megazword import floor
+    monkeypatch.setattr(floor, "room_messages", lambda *_: [
+        message("Briar-20: claiming #8", 100)])
+    real_watch = seat.watch
+    monkeypatch.setattr(seat, "watch", lambda room: real_watch(room, now=NOW))
+    parser = argparse.ArgumentParser()
+    seat.add_parser(parser.add_subparsers(dest="command"))
+    output = []
+    assert seat.command(parser.parse_args(["seat", "watch", "--room", "work"]),
+                        write=output.append) == 0
+    assert len(output) == 1
+    assert "Briar-20" in output[0] and "100m" in output[0] and "45m" in output[0]
+    assert "#8" in output[0]
+
+
+def test_watch_module_cli_reports_when_nobody_is_overdue(monkeypatch, capsys):
+    from megazword import floor
+    monkeypatch.setattr(floor, "room_messages", lambda *_: [])
+    assert seat.main(["watch"]) == 0
+    assert "no open claim holders" in capsys.readouterr().out

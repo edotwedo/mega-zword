@@ -4,6 +4,7 @@ Phil, 2026-10-21: "if a user's context window get full, they are to retire and a
 to the need for a replacement. If you are able to do this on your own, even better."
 
     megazword seat status          the roster, joined with saved session cards and worktrees
+    megazword seat watch           report open claims whose holders have gone silent
     megazword seat retire X        write the handoff, post one line, page Phil
     megazword seat replace X       the relaunch line and the first prompt for the replacement
 
@@ -15,11 +16,13 @@ dropped connection is worse than a noisy line in the output.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
 from .briefing import publish, snapshot
+from . import claims
 from .filelock import write_atomic
 from .guard import scrub
 from .resume import ROSTER, read_recorded, seats
@@ -78,6 +81,50 @@ def render_status(rows: list[dict]) -> str:
             lines.append(f"      next: {row['next'][:100]}")
     lines.append("  usage and floor state: run `megazword usage`")
     return "\n".join(lines)
+
+
+def watch(room_name: str = "hive", *, home: Path | None = None,
+          now: datetime | None = None, read: Callable | None = None) -> list[dict]:
+    """One read-only pass: open claims silent longer than the configured leash.
+
+    Read and clock are injectable so callers can inspect a snapshot offline. Do not
+    pass ``now`` to active_claims: its age filter hides precisely the old claims we
+    need to check. A holder's later room update resets silence, not claim age.
+    """
+    if read is None:
+        from .floor import room_messages
+        read = room_messages
+    messages = list(read(room_name, home))
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    leash = claims.stale_window()
+    last_seen = {}
+    for message in messages:
+        def field(name):
+            return message.get(name, "") if isinstance(message, Mapping) else getattr(message, name, "")
+
+        prefix = claims.PREFIX.match(str(field("text")))
+        if not prefix:
+            continue
+        try:
+            stamp = datetime.fromisoformat(str(field("time")).replace("Z", "+00:00"))
+        except ValueError:
+            continue  # Missing timestamps cannot establish silence.
+        stamp = stamp if stamp.tzinfo else stamp.replace(tzinfo=timezone.utc)
+        key = prefix[1].casefold()
+        if key not in last_seen or stamp > last_seen[key]:
+            last_seen[key] = stamp
+
+    overdue = []
+    for designation, (item, claim_id, _stamp) in sorted(claims.active_claims(messages).items()):
+        stamp = last_seen.get(designation.casefold())
+        if stamp is not None and now - stamp > leash:
+            overdue.append({"designation": designation, "item": item, "claim_id": claim_id,
+                            "last_seen": stamp.isoformat(),
+                            "silent_minutes": int((now - stamp).total_seconds() // 60),
+                            "leash_minutes": int(leash.total_seconds() // 60)})
+    return overdue
 
 
 def handoff_path(designation: str, now: datetime) -> Path:
@@ -174,6 +221,14 @@ def command(args, cfg=None, write: Callable[[str], None] = print) -> int:
     if action == "status":
         write(render_status(status_rows()))
         return 0
+    if action == "watch":
+        overdue = watch(getattr(args, "room", "hive"))
+        for row in overdue:
+            write(f"[seat watch] {row['designation']}: silent {row['silent_minutes']}m "
+                  f"(claim leash {row['leash_minutes']}m) | {row['item']}")
+        if not overdue:
+            write("[seat watch] no open claim holders past the silence leash")
+        return 0
     designation = getattr(args, "designation", None)
     if not designation:
         write(f"[megazword seat] {action} needs a designation, e.g. `megazword seat {action} Harbor022`")
@@ -196,7 +251,8 @@ def add_parser(sub) -> None:
         help="who is seated, and how a spent seat retires and is replaced",
     )
     seat.add_argument("action", nargs="?", default="status",
-                      choices=("status", "retire", "replace"))
+                      choices=("status", "watch", "retire", "replace"))
+    seat.add_argument("--room", default="hive", help="room to check with watch (default: hive)")
     seat.add_argument("designation", nargs="?", help="the seat to retire or replace")
     seat.add_argument("--next", default="", help="the exact next step for the replacement")
     seat.add_argument("--reason", default="", help="why it stopped (default: context window full)")
@@ -205,7 +261,8 @@ def add_parser(sub) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("action", nargs="?", default="status",
-                        choices=("status", "retire", "replace"))
+                        choices=("status", "watch", "retire", "replace"))
+    parser.add_argument("--room", default="hive")
     parser.add_argument("designation", nargs="?")
     parser.add_argument("--next", default="")
     parser.add_argument("--reason", default="")
