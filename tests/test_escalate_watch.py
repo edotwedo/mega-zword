@@ -106,6 +106,37 @@ def test_roster_reads_seats_in_order_and_deduplicates(tmp_path):
     assert watch.read_roster(path) == ROSTER
 
 
+def test_roster_accepts_hyphenless_names(tmp_path):
+    path = tmp_path / "roster.md"
+    path.write_text(
+        "| Designation | Worker |\n| --- | --- |\n"
+        "| Cinder-21 | cmdc |\n"
+        "| Harbor022 | claude |\n"
+        "| Briar-20 | codex |\n"
+        "| Harbor022 | dupe |\n"
+    )
+    assert watch.read_roster(path) == ["Cinder-21", "Harbor022", "Briar-20"]
+
+
+def test_roster_rejects_malformed_names(tmp_path):
+    path = tmp_path / "roster.md"
+    path.write_text(
+        "| Designation | Notes |\n| --- | --- |\n"
+        "| Valid-1 | ok |\n"
+        "| Harbor022 | ok |\n"
+        "| Ab-1 | prefix too short |\n"
+        "| Sauna-Mech | no digits |\n"
+        "| Beacon-12345 | too many digits |\n"
+        "| 12-Beacon | digits first |\n"
+        "| Harbor- | missing digits |\n"
+        "| -123 | missing letters |\n"
+        "| Tool--1 | multiple hyphens |\n"
+        "| Harbor022extra | trailing letters |\n"
+        "| Valid-2 | ok |\n"
+    )
+    assert watch.read_roster(path) == ["Valid-1", "Harbor022", "Valid-2"]
+
+
 def test_no_topics_does_nothing(tmp_path):
     def fail(*args):
         pytest.fail("no topics must not send or refresh")

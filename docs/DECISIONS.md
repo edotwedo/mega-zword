@@ -1,5 +1,8 @@
 # Decisions
 
+## 2026-10-21
+- **Today's implementation priority: Gemini first, Command Code second (Phil, direct Word-31 chat).** Phil upgraded Google to Pro last night and confirms it has the most available usage. Give Gemini real, bounded implementation work through Mega Zword; use Command Code next. Avoid duplicate builds and redundant checks. This changes support routing for today's work, not the standing cmdc ownership.
+
 ## 2026-10-20
 - **cmdc / Command Code owns the overall work (Phil, direct Word-29 chat).** Phil said he has told cmdc to take ownership of everything and intends to keep it there, citing value, capacity and demonstrated ability. cmdc coordinates and integrates; other AIs support it. Capacity checks must include cmdc and do not elect a new owner. Phil retains final authority. Use the verified active lead session rather than assuming any cmdc instance is the lead. Existing explicit limits on spending, secrets and automatic activity remain in force. Runtime setting: `[work] owner = "cmdc"`. Details: `docs/CMDC-OWNERSHIP.md`.
 

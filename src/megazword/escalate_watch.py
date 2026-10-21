@@ -92,7 +92,7 @@ def read_roster(path: Path | None = None) -> list[str]:
     except (OSError, UnicodeError):
         return []
     # Both tables contain seats; preserve first appearance, without duplicates.
-    return list(dict.fromkeys(re.findall(r"^\|\s*([A-Za-z]+-\d+)\s*\|", text, re.M)))
+    return list(dict.fromkeys(re.findall(r"^\|\s*([A-Za-z]{3,}-?\d{1,4})\s*\|", text, re.M)))
 
 
 def topics(cfg) -> tuple[str, str]:
