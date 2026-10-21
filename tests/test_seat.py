@@ -201,3 +201,20 @@ def test_a_seat_name_is_matched_whatever_case_the_caller_typed(tmp_path, monkeyp
                          say=lambda *args: None, ping=lambda body: None)
     written = Path(result["handoff"]).read_text(encoding="utf-8")
     assert "(claude)" in written, "the handoff must name the CLI even when the case differs"
+
+
+def test_status_shows_what_a_seat_last_said_when_it_has_no_card(tmp_path, monkeypatch):
+    # No seat publishes a briefing card yet, so a card-only status called every seat "no card"
+    # while three of them had been posting all night. The room already knows better.
+    monkeypatch.setattr(seat, "roster", roster_rows)
+    monkeypatch.setattr(seat, "directory", lambda name: tmp_path / name.lower())
+    monkeypatch.setattr(seat, "room_summary", lambda home=None: {
+        "harbor022": {"designation": "Harbor022", "counts": {"status": 1},
+                      "last_kind": "status", "last": "reviewing the mirror"},
+    })
+    rows = {row["designation"]: row for row in seat.status_rows(tmp_path)}
+    assert rows["Harbor022"]["state"] == "status"
+    assert rows["Harbor022"]["from_room"] is True
+    assert "reviewing the mirror" in seat.render_status(seat.status_rows(tmp_path))
+    # A seat that has said nothing at all still reads honestly.
+    assert rows["Cinder-21"]["state"] == ""

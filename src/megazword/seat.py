@@ -50,20 +50,41 @@ def cards(home: Path | None = None) -> dict:
     return {c["seat"]: c for c in snapshot(home)["cards"]}
 
 
+def room_summary(home: Path | None = None) -> dict:
+    """Per seat: its last room line and its kind counts, from the LOCAL cache only.
+
+    No seat on the team publishes a briefing card yet, so a status built from cards alone
+    says "no card" for everyone, including seats that have been posting all night. The room
+    already knows what each seat is doing. This stays local on purpose: `status` must remain
+    safe to run from a seat that is nearly out of room, and a network read can hang.
+    """
+    from . import room as room_module
+    try:
+        messages = room_module.read_messages("hive", home)
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+    return {row["designation"].casefold(): row for row in claims.summarize_kinds(messages)}
+
+
 def status_rows(home: Path | None = None) -> list[dict]:
     saved = cards(home)
+    spoken = room_summary(home)
     rows = []
     for designation, cli in roster():
-        card = saved.get(designation.lower(), {})
+        card = saved.get(designation.casefold(), {})
+        said = spoken.get(designation.casefold(), {})
         where = directory(designation)
         rows.append({
             "designation": designation,
             "cli": cli,
             "dir": str(where),
             "worktree": where.is_dir(),
-            "state": card.get("state", ""),
+            # A card is the seat's own report; the room is what it actually said out loud.
+            "state": card.get("state", "") or said.get("last_kind", ""),
             "age_minutes": (card.get("age_seconds", 0) // 60) if card else None,
             "next": card.get("next", ""),
+            "last": said.get("last", ""),
+            "from_room": not card and bool(said),
         })
     return rows
 
@@ -71,14 +92,19 @@ def status_rows(home: Path | None = None) -> list[dict]:
 def render_status(rows: list[dict]) -> str:
     if not rows:
         return "seat: no roster rows found in docs/HIVE-ROSTER.md"
-    lines = ["Seats on the roster (a card means the seat has reported since it started)"]
+    lines = ["Seats on the roster (a card is the seat's own report; otherwise what it last said in the room)"]
     for row in rows:
-        age = "never" if row["age_minutes"] is None else f"{row['age_minutes']}m ago"
+        if row["age_minutes"] is None:
+            age = "room" if row.get("from_room") else "never"
+        else:
+            age = f"{row['age_minutes']}m ago"
         lines.append(f"  {row['designation']:12} {row['cli']:7} "
                      f"{'worktree' if row['worktree'] else 'NO WORKTREE':12} "
-                     f"{(row['state'] or 'no card'):8} {age:>8}")
+                     f"{(row['state'] or 'silent'):8} {age:>8}")
         if row["next"]:
             lines.append(f"      next: {row['next'][:100]}")
+        elif row.get("last"):
+            lines.append(f"      said: {row['last'][:100]}")
     lines.append("  usage and floor state: run `megazword usage`")
     return "\n".join(lines)
 
