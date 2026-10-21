@@ -137,6 +137,25 @@ def test_roster_rejects_malformed_names(tmp_path):
     assert watch.read_roster(path) == ["Valid-1", "Harbor022", "Valid-2"]
 
 
+@pytest.mark.parametrize("text", ["Harbor022: answering", "Harbor022 answering"])
+def test_hyphenless_reply_is_recognised(text):
+    messages = [message(), message("claude", text, 7, 2)]
+    assert watch.escalate(messages, START + timedelta(minutes=15),
+                          ["Harbor022", "Briar-20"], {}) == []
+
+
+@pytest.mark.parametrize("text", [
+    "Ab-1: answering",
+    "Sauna-Mech: on it",
+    "Beacon-12345: here",
+    "Harbor022extra: here",
+])
+def test_malformed_reply_name_is_still_rejected(text):
+    messages = [message(), message("claude", text, 7, 2)]
+    actions = watch.escalate(messages, START + timedelta(minutes=15), ROSTER, {})
+    assert [(a.step, a.seat) for a in actions] == [(1, ROSTER[0]), (2, ROSTER[1]), (3, None)]
+
+
 def test_no_topics_does_nothing(tmp_path):
     def fail(*args):
         pytest.fail("no topics must not send or refresh")

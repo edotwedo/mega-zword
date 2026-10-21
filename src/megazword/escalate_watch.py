@@ -17,7 +17,9 @@ from .filelock import locked, write_atomic
 from .room import DEFAULT_ROOM, RemoteRoom, room_dir
 from .room_wait import PHIL_AUTHORS, seat_topic
 
-DESIGNATION = re.compile(r"^[A-Za-z]+-\d+\b")
+# One shape for the roster table and a reply line: 3+ letters, optional hyphen, 1-4 digits.
+SEAT_NAME = r"[A-Za-z]{3,}-?\d{1,4}"
+DESIGNATION = re.compile(rf"^{SEAT_NAME}\b")
 ROSTER = Path(__file__).resolve().parents[2] / "docs" / "HIVE-ROSTER.md"
 PHONE_BODY = "Nobody picked up Phil's Hive message"
 MAX_AGE = 60 * 60  # older calls are history, not emergencies: never escalate them
@@ -92,7 +94,7 @@ def read_roster(path: Path | None = None) -> list[str]:
     except (OSError, UnicodeError):
         return []
     # Both tables contain seats; preserve first appearance, without duplicates.
-    return list(dict.fromkeys(re.findall(r"^\|\s*([A-Za-z]{3,}-?\d{1,4})\s*\|", text, re.M)))
+    return list(dict.fromkeys(re.findall(rf"^\|\s*({SEAT_NAME})\s*\|", text, re.M)))
 
 
 def topics(cfg) -> tuple[str, str]:
