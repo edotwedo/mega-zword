@@ -62,6 +62,14 @@ def test_seats_ignores_a_worker_it_does_not_know():
     assert resume.seats("| Sauna-Mech | ? | x | |\n") == []
 
 
+def test_agy_is_not_promised_a_resume_it_cannot_do():
+    # Harbor022's audit, 2026-10-21: `resume` printed "continues the newest session" for agy,
+    # which has no such form, so that seat came back blank while the plan claimed otherwise.
+    assert "agy" not in resume.HAS_RECENT_FORM
+    assert resume.resume_args("agy", "C:/x", None) == []
+    assert resume.resume_args("claude", "C:/x", None) == ["--permission-mode", "acceptEdits", "-c"]
+
+
 def test_claude_session_is_the_newest_transcript_for_that_directory(tmp_path):
     folder = tmp_path / resume.slug(r"C:\Users\mrmar\mz-seats\beacon-17")
     folder.mkdir(parents=True)

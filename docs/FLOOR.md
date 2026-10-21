@@ -84,9 +84,14 @@ nothing. With every seat filled:
 | Kind | Example | Order |
 | --- | --- | --- |
 | bulk | `megazword floor suggest bulk` → `groq` | groq, mistral, cloudflare, zai, gemini-api, then other HTTP seats (never a CLI) |
-| edit | `megazword floor suggest edit` → `codex` | codex, claude |
-| decide | `megazword floor suggest decide` → `claude` | claude, grok, codex |
+| edit | `megazword floor suggest edit` → `cmdc` | the work owner first, then codex, claude |
+| decide | `megazword floor suggest decide` → `cmdc` | the work owner first, then grok, codex, claude |
 | review | `megazword floor suggest review` → `claude` | claude, grok, codex |
+
+Correction 2026-10-21 (Harbor022's docs audit): this table used to name codex for edit and
+claude for decide. Since 7ffd70e the owner-aware routing puts the configured work owner
+(`[work] owner = "cmdc"`) first, so the live answers are `cmdc`. The command is the truth;
+run it rather than reading a table that ages.
 
 Money and new keys: Phil. The app hunts empty chairs and says what is missing.
 

@@ -37,7 +37,7 @@ function Get-SeatDir([string]$name) {
 }
 
 $prompt = @"
-You are one Hive floor seat on Phil's PC (docs/FLOOR.md). This is your only window; use subagents for extra hands. Working copy: SEATDIR (your own git worktree; never edit, stash or checkout in $repo). MEGAZWORD_SEAT is set; hive_read / hive_say / hive_wait is the live room (same log as the dashboard Hive tab). Do not post a Q greeting. Before work: git pull --rebase origin main. To publish: git push origin HEAD:main after tests pass. Check megazword usage before any job. KEEP WORKING while Phil sleeps or watches Netflix. Do not stop at bye. Pull origin/main, take the next unclaimed file, push. Bulk -> megazword floor suggest bulk (Groq/HTTP). Edit -> Codex/Claude. Decide/review -> Claude/Grok. Gemini is out until 18 Oct.
+You are one Hive floor seat on Phil's PC (docs/FLOOR.md). This is your only window; use subagents for extra hands. Working copy: SEATDIR (your own git worktree; never edit, stash or checkout in $repo). MEGAZWORD_SEAT is set; hive_read / hive_say / hive_wait is the live room (same log as the dashboard Hive tab). Do not post a Q greeting. Before work: git pull --rebase origin main. To publish: git push origin HEAD:main after tests pass. Check megazword usage before any job. KEEP WORKING while Phil sleeps or watches Netflix. Do not stop at bye. Pull origin/main, take the next unclaimed file, push. For who should take a kind of work run megazword floor suggest bulk|edit|decide|review - it reads the live seats, so trust it over any routing list written down, including this one.
 "@
 
 $lanes = [ordered]@{
@@ -45,6 +45,9 @@ $lanes = [ordered]@{
   grok   = @{ cmd = 'grok';   pre = @('--permission-mode', 'acceptEdits', '--allow', 'Read', '--allow', 'Glob', '--allow', 'Grep') }
   codex  = @{ cmd = 'codex';  pre = @('--sandbox', 'workspace-write', '--ask-for-approval', 'on-request', '--add-dir', 'SEATDIR', '--add-dir', $workshop) }
   cmdc   = @{ cmd = 'cmdc';   pre = @() }
+  # The Gemini seat's binary is agy (Antigravity); without this lane the cold start could
+  # never seat Forge-22 at all (Harbor022's audit, 2026-10-21).
+  gemini = @{ cmd = 'agy';    pre = @() }
 }
 
 # A lane is normally its own seat name (claude, codex, ...), but the roster uses Word-NN

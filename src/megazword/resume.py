@@ -47,6 +47,12 @@ WORKER_CLI = {
 }
 ROW = re.compile(rf"^\|\s*({DESIGNATION})\s*\|\s*([^|]+?)\s*\|", re.MULTILINE)
 
+# CLIs that can be told "bring back the newest conversation in THIS directory". agy
+# (Antigravity, the Gemini seat) has no such form, so the plan must not claim a resume for
+# it - Harbor022's audit found `resume` printing "continues the newest session" for a seat
+# that actually starts blank (2026-10-21).
+HAS_RECENT_FORM = ("claude", "grok", "codex", "cmdc")
+
 
 def slug(path: str) -> str:
     """A directory path as the CLIs key their project folders: every non-alphanumeric
@@ -292,6 +298,8 @@ def command(args) -> int:
             where = entry["session"]
         elif getattr(args, "fresh", False):
             where = "(fresh start; nothing resumed)"
+        elif entry["cli"] not in HAS_RECENT_FORM:
+            where = "starts fresh (this CLI has no resume-the-newest form)"
         else:
             where = "continues the newest session in that directory"
         print(f"{entry['designation']:<12} {entry['cli']:<7} {entry['dir']}")
