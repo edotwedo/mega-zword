@@ -349,6 +349,20 @@ async function mcp(request, store, identity, seat, now, env, ctx, fetcher) {
   }
 }
 
+// Each secret is parsed on its own, and a malformed one costs only its own seats. Parsing
+// both inside the handler meant one typo in SEAT_TOKENS_EXTRA threw, hit the catch at the
+// bottom of handle(), and answered 503 to EVERY request - the phone app, the web connectors
+// and the PC key included. That is the exact outage the separate secret existed to avoid
+// (Harbor022's review, 2026-10-21).
+function parseSeats(raw) {
+  try {
+    const parsed = JSON.parse(raw || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function handle(request, env, store = new D1Store(env.DB), now = new Date(), ctx, fetcher = globalThis.fetch) {
   let readRoute = false, bare = false;
   try {
@@ -364,8 +378,7 @@ export async function handle(request, env, store = new D1Store(env.DB), now = ne
     // seats added after the first deploy live in their own secret and are merged here. That
     // is what lets Phil add the five seat tokens without killing the phone app, the web
     // connectors or the PC key that are already bound to the original secret.
-    const seats = {...JSON.parse(env.SEAT_TOKENS || '{}'),
-                   ...JSON.parse(env.SEAT_TOKENS_EXTRA || '{}')};
+    const seats = {...parseSeats(env.SEAT_TOKENS), ...parseSeats(env.SEAT_TOKENS_EXTRA)};
     const identity = token && seats[await digest(token)];
     const fail = (error, status) => (readRoute || bare) ? plain(error, status) : json({error}, status);
     if (!identity) return fail('unauthorized', 401);

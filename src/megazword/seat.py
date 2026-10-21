@@ -127,6 +127,19 @@ def watch(room_name: str = "hive", *, home: Path | None = None,
     return overdue
 
 
+def _by_designation() -> dict:
+    """The roster keyed casefold, because a seat types its own name however it likes.
+
+    Harbor022's review (2026-10-21): `seat retire harbor022` matched nothing, so the handoff
+    said "unknown CLI" and `replace` printed no CLI at all. The roster row says Harbor022.
+    """
+    return {designation.casefold(): cli for designation, cli in roster()}
+
+
+def cli_for(designation: str) -> str:
+    return _by_designation().get(designation.casefold(), "")
+
+
 def handoff_path(designation: str, now: datetime) -> Path:
     return HANDOFFS / f"{now:%Y-%m-%d}-retired-{designation.lower()}.md"
 
@@ -157,7 +170,7 @@ def retire(designation: str, *, next_step: str = "", reason: str = "",
            cfg=None, room_name: str = "hive") -> dict:
     """Hand the seat off: card, handoff file, one room line, one page to Phil."""
     now = now or datetime.now(timezone.utc)
-    cli = dict(roster()).get(designation, "")
+    cli = cli_for(designation)
     reason = scrub(reason or "")[:200]
     next_step = scrub(next_step or "")[:600]
 
@@ -198,8 +211,8 @@ def retire(designation: str, *, next_step: str = "", reason: str = "",
 
 
 def replace_text(designation: str) -> str:
-    rows = {row["designation"]: row for row in status_rows()}
-    row = rows.get(designation, {})
+    rows = {row["designation"].casefold(): row for row in status_rows()}
+    row = rows.get(designation.casefold(), {})
     where = row.get("dir") or str(SEATS_ROOT / designation.lower())
     lines = [f"Replace {designation}"
              + (f" ({row['cli']})" if row.get("cli") else ""),

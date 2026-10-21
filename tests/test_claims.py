@@ -3,7 +3,8 @@
 import pytest
 
 from megazword import config, room
-from megazword.claims import active_claims, claim_conflicts, kind_of, kinds_of
+from megazword.claims import (active_claims, claim_conflicts, kind_of, kinds_of,
+                             render_kinds, summarize_kinds)
 from megazword.cli import main
 
 
@@ -20,6 +21,28 @@ def test_claim_parsing_uses_text_prefix_and_preserves_metadata():
         "Cedar-21": ("roadmap #10", 4, rows[0]["time"]),
         "Birch-22": ("item 11", 5, rows[1]["time"]),
     }
+
+
+def test_summarize_kinds_counts_what_each_seat_is_on():
+    # One screen instead of 200 lines: who claimed, who finished, who is blocked.
+    rows = [message("Cinder-21: claiming #4"), message("Briar-20: claiming #5"),
+            message("Cinder-21: status - halfway"), message("Cinder-21: done #4"),
+            message("Briar-20: blocked on the Worker deploy"), message("chatter with no seat")]
+    summary = {row["designation"]: row for row in summarize_kinds(rows)}
+    assert summary["Cinder-21"]["counts"] == {"claim": 1, "status": 1, "done": 1}
+    assert summary["Cinder-21"]["last_kind"] == "done"
+    assert summary["Briar-20"]["last_kind"] == "blocked"
+    assert "chatter" not in " ".join(row["last"] for row in summary.values())
+
+
+def test_render_kinds_says_so_when_there_is_nothing():
+    assert render_kinds([]) == "[megazword room] no seat lines in this window"
+
+
+def test_render_kinds_names_the_last_line_for_each_seat():
+    rendered = render_kinds(summarize_kinds([message("Nock-21: done on seat/nock-21")]))
+    assert "Nock-21" in rendered
+    assert "last [done]" in rendered
 
 
 def test_kind_of_labels_a_line_without_policing_it():
@@ -56,6 +79,14 @@ def test_a_spec_section_name_is_not_read_as_a_designation():
     # "B15" is a SPEC section. Three letters minimum keeps ordinary text ordinary, so a
     # line starting "B15: ..." cannot be mistaken for a seat claiming work.
     assert active_claims([message("B15: claiming #9")]) == {}
+
+
+def test_ordinary_prose_with_one_digit_is_not_a_designation():
+    # Harbor022's review, 2026-10-21: with the hyphen optional, "Phase2:" looked like a seat.
+    # Two digits minimum keeps that out while every real designation still parses.
+    assert kind_of("Phase2: claiming #9") is None
+    assert active_claims([message("Phase2: claiming #9")]) == {}
+    assert kind_of("Cinder-21: claiming #9")[1] == "claim"
 
 
 @pytest.mark.parametrize("release", ["releasing", "released", "landed #10", "item 10 done",

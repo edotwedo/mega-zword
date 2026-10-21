@@ -9,9 +9,11 @@ from datetime import datetime, timedelta, timezone
 # "Beacon-17: ..." or "Beacon-17 (claude-pc): ..." or "Harbor022: ..."
 # Phil named a seat without a hyphen on 2026-10-21. The old `[A-Za-z]+-\d+` made that
 # seat invisible: its claims never registered, and `resume` skipped its roster row. The
-# hyphen is now optional. Three letters minimum keeps SPEC section names like B15 as
-# ordinary text instead of reading them as a designation.
-DESIGNATION = r"[A-Za-z]{3,}-?\d{1,4}"
+# hyphen is now optional. Three letters AND two digits minimum: three letters keeps a SPEC
+# section name like B15 out, and two digits keeps ordinary prose like "Phase2:" out now
+# that the hyphen is gone (Harbor022's review, 2026-10-21). Every real designation - Cinder-21,
+# Harbor022, Briar-20, Nock-21, Forge-22, Word-28 - still matches.
+DESIGNATION = r"[A-Za-z]{3,}-?\d{2,4}"
 PREFIX = re.compile(rf"^({DESIGNATION})(?:\s*\([^)]*\))?:\s*(.*)$", re.DOTALL)
 STALE = timedelta(hours=24)  # TEAM.md default; night shifts can shorten it
 # A night shift needs a shorter leash than a normal day. Set the env var to override.
@@ -105,6 +107,40 @@ def kinds_of(messages):
         if parsed and parsed[1] != "note":
             listing.append(parsed)
     return listing
+
+
+def summarize_kinds(messages):
+    """Per designation: how many lines of each kind, and its most recent one.
+
+    A seat waking up, or the conductor between assignments, wants one screen: who claimed
+    what, who finished, who is blocked. Counting kinds gets there with no model call.
+    Chatter is not counted - kind_of already drops anything it cannot label.
+    """
+    seen = {}
+    for message in messages:
+        parsed = kind_of(_field(message, "text"))
+        if not parsed:
+            continue
+        designation, kind, body = parsed
+        row = seen.setdefault(designation.casefold(), {"designation": designation,
+                                                       "counts": {}, "last": "", "last_kind": ""})
+        row["counts"][kind] = row["counts"].get(kind, 0) + 1
+        row["last"] = (body.splitlines()[0] if body else "")[:160]
+        row["last_kind"] = kind
+    return sorted(seen.values(), key=lambda row: row["designation"].casefold())
+
+
+def render_kinds(rows):
+    """One readable block per seat, in roster-ish order."""
+    if not rows:
+        return "[megazword room] no seat lines in this window"
+    width = max(len(row["designation"]) for row in rows)
+    lines = []
+    for row in rows:
+        counts = "  ".join(f"{kind}={row['counts'][kind]}" for kind in KINDS if kind in row["counts"])
+        lines.append(f"{row['designation']:<{width}}  {counts}")
+        lines.append(f"{'':<{width}}  last [{row['last_kind']}]: {row['last']}")
+    return "\n".join(lines)
 
 
 def unkeyed_claim(text):

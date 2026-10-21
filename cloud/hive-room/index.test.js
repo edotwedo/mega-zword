@@ -470,3 +470,15 @@ test('SEAT_TOKENS_EXTRA can mark a seat read-only without disturbing the rest', 
   const readEnv = {...env, SEAT_TOKENS_EXTRA: JSON.stringify({[await digest(viewToken)]: {seat: 'viewer2', readOnly: true}})};
   assert.equal((await post(viewToken, 'should be refused', readEnv)).status, 403);
 });
+
+test('a malformed SEAT_TOKENS_EXTRA costs only its own seats, not the whole room', async () => {
+  // Harbor022's review, 2026-10-21: parsing both secrets inside the handler meant one typo
+  // answered 503 to every request - the phone app, the web connectors and the PC key too.
+  const broken = {...env, SEAT_TOKENS_EXTRA: '{ this is not json'};
+  assert.equal((await post(token, 'still authorized', broken)).status, 201);
+});
+
+test('a malformed SEAT_TOKENS falls back instead of taking the room down', async () => {
+  // The same guard on the original secret: unknown tokens get a clean 401, not a 503.
+  assert.equal((await post(token, 'nope', {SEAT_TOKENS: 'not json at all'})).status, 401);
+});

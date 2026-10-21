@@ -186,3 +186,18 @@ def test_watch_module_cli_reports_when_nobody_is_overdue(monkeypatch, capsys):
     monkeypatch.setattr(floor, "room_messages", lambda *_: [])
     assert seat.main(["watch"]) == 0
     assert "no open claim holders" in capsys.readouterr().out
+
+
+def test_a_seat_name_is_matched_whatever_case_the_caller_typed(tmp_path, monkeypatch):
+    # Harbor022's review, 2026-10-21: `seat retire harbor022` matched nothing, so the handoff
+    # said "unknown CLI" and replace printed no CLI at all. The roster row says Harbor022.
+    monkeypatch.setattr(seat, "roster", roster_rows)
+    assert seat.cli_for("harbor022") == "claude"
+    assert seat.cli_for("Harbor022") == "claude"
+    assert seat.cli_for("nobody-99") == ""
+
+    monkeypatch.setattr(seat, "HANDOFFS", tmp_path / "handoffs")
+    result = seat.retire("harbor022", next_step="x", home=tmp_path, now=NOW,
+                         say=lambda *args: None, ping=lambda body: None)
+    written = Path(result["handoff"]).read_text(encoding="utf-8")
+    assert "(claude)" in written, "the handoff must name the CLI even when the case differs"

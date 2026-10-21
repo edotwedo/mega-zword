@@ -51,10 +51,11 @@ def test_seats_accepts_a_designation_without_a_hyphen():
     assert resume.seats(roster) == [("Harbor022", "claude"), ("Briar-20", "codex")]
 
 
-def test_seats_maps_a_gemini_seat():
-    # Forge-22 had no entry in WORKER_CLI, so a roster naming Gemini dropped that seat
-    # from the respawn plan with no error - the same silent hole as a bad designation.
-    assert resume.seats("| Forge-22 | Gemini | advisor | |\n") == [("Forge-22", "gemini")]
+def test_seats_maps_a_gemini_seat_to_the_binary_that_exists():
+    # The roster word is "Gemini" but the binary on this PC is agy (Antigravity). Mapping it
+    # to `gemini` made hive_resume.ps1 run a command that is not on PATH, so Forge-22's tab
+    # died on open. Harbor022 caught it reviewing the first version, 2026-10-21.
+    assert resume.seats("| Forge-22 | Gemini | advisor | |\n") == [("Forge-22", "agy")]
 
 
 def test_seats_ignores_a_worker_it_does_not_know():

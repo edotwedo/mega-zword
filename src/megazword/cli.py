@@ -241,6 +241,10 @@ def build_parser() -> argparse.ArgumentParser:
     room_claims = room_sub.add_parser("claims", help="show active claims and conflicts")
     room_claims.add_argument("--room", default="hive", help="room name (default: hive)")
 
+    room_kinds = room_sub.add_parser("kinds", help="one block per seat: claimed, done or blocked")
+    room_kinds.add_argument("--room", default="hive", help="room name (default: hive)")
+    room_kinds.add_argument("-n", type=int, default=50, help="how many recent messages to read")
+
     room_show = room_sub.add_parser("show", help="show recent room messages")
     room_show.add_argument("--room", default="hive", help="room name (default: hive)")
     room_show.add_argument("-n", type=int, default=20, help="number of messages to show")
@@ -702,6 +706,12 @@ def main(argv: list[str] | None = None,
                 return 2
         if action == "claims":
             return room.show_claims(args.room, cfg=cfg)
+        if action == "kinds":
+            try:
+                return room.show_kinds(args.room, n=getattr(args, "n", 50), cfg=cfg)
+            except (OSError, ValueError) as e:
+                print(f"[megazword room] {e}", file=sys.stderr)
+                return 2
         if action == "show":
             try:
                 return room.show(args.room, n=args.n, cfg=cfg)

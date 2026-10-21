@@ -35,11 +35,14 @@ CODEX_SESSIONS = Path.home() / ".codex" / "sessions"
 GROK_SESSIONS = Path.home() / ".grok" / "sessions"
 
 # The roster's "Worker" column, as the CLIs are actually named.
+# Gemini's binary on this box is `agy` (Antigravity). Mapping the roster word to `gemini`
+# made hive_resume.ps1 run a command that is not on PATH, so Forge-22's tab died with
+# "command not found" - found by Harbor022's review of the first version, 2026-10-21.
 WORKER_CLI = {
     "claude code": "claude",
     "codex": "codex",
     "grok": "grok",
-    "gemini": "gemini",
+    "gemini": "agy",
     "command code": "cmdc",
 }
 ROW = re.compile(rf"^\|\s*({DESIGNATION})\s*\|\s*([^|]+?)\s*\|", re.MULTILINE)

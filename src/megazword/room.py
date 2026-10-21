@@ -656,6 +656,24 @@ def show_claims(room: str, home: Path | None = None,
     return 0
 
 
+def show_kinds(room: str, n: int = 50, home: Path | None = None,
+               write: Callable[[str], None] = print, cfg: config.Config | None = None) -> int:
+    """One block per seat: what it claimed, finished, or is blocked on.
+
+    This is the reader's view of the room. Reading the raw log means scrolling 200 lines to
+    learn that one seat is blocked; this says it in one line. No model call, no judgement -
+    the labels come from the text the seats already write.
+    """
+    from .claims import render_kinds, summarize_kinds
+    try:
+        messages = claim_messages(room, cfg or config.load(), home)
+    except (OSError, ValueError, KeyError, TypeError):
+        safe_write(write, "[megazword room] kinds unavailable; room could not be read")
+        return 1
+    safe_write(write, render_kinds(summarize_kinds(messages[-n:] if n > 0 else messages)))
+    return 0
+
+
 def show(room: str, n: int = 20, home: Path | None = None,
          write: Callable[[str], None] = print, cfg: config.Config | None = None) -> int:
     """Show recent messages from the room."""
