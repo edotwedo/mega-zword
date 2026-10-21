@@ -21,7 +21,7 @@ from .routing import spread
 COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job"),
     "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
-            "sentinel", "floor", "brief", "announce", "free", "map", "spot"),
+            "sentinel", "floor", "brief", "announce", "free", "map", "spot", "startup"),
     "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat", "wake"),
     "Memory": ("note", "decide", "import-hive"),
 }
