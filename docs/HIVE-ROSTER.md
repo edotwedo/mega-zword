@@ -20,11 +20,7 @@ One live window per paid solution. This is the entire team; there is no second s
 | Harbor022 | Claude Code | `claude` | Design, decisions, review | **OUT until Fri 01:00 (Phil, 2026-10-21)** - he stopped Claude early at 75% weekly. Finishing its in-flight audits, then no further assignments |
 | Briar-20 | Codex | `codex` | Mechanical edits, tests, docs, sandboxed runs | 83% left (5h 15% used, week 17% used) |
 | Nock-21 | Grok | `grok` | Breadth, critique, benchmarks, cheap volume | 71% left (week 29% used) |
-| Forge-22 | Gemini | `agy` | Second opinion | **OUT (Phil, 2026-10-22): Google weekly 100% used** - it spent the week on its own run; resets Wed 02:27. No assignments |
-
-Fresh readings 2026-10-22 13:07, dated observations not balances: Cinder-21 63% left (week 37% used),
-Briar-20 100% left (fresh week), Nock-21 60% left (week 40% used), Forge-22 out. Run `megazword
-usage` - the command is the truth, not this table.
+| Forge-22 | Gemini | `agy` | Second opinion; access moves to the Discord mirror when its window resets | run `megazword usage` before assigning |
 
 Assign to the strength. Every weakness below is a real, dated incident, not a feeling.
 
