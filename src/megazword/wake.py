@@ -108,6 +108,9 @@ def remember(identifier: int, home: Path | None = None) -> None:
         write_atomic(path, json.dumps({"seen": max(last_seen(home), int(identifier))}) + "\n")
 
 
+ack = remember
+
+
 def most_recent_id(messages) -> int:
     best = 0
     for message in messages:

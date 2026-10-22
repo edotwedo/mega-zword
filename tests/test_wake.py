@@ -116,6 +116,29 @@ def test_peek_preserves_pending_messages_until_acknowledged(tmp_path):
     assert json.loads(output[0])["through"] == 8
 
 
+def test_ack_captured_id_does_not_consume_newer_phil_message(tmp_path):
+    rows = [message("first request", id=7)]
+    output = []
+    assert wake.once(home=tmp_path, read=lambda: rows, write=output.append,
+                     peek=True, as_json=True) == 0
+    captured_id = json.loads(output[0])["through"]
+    assert captured_id == 7
+
+    # Newer Phil message arrives while delivery is in-flight
+    rows.append(message("newer urgent request", id=8))
+
+    # Acknowledge only the captured ID
+    wake.ack(captured_id, tmp_path)
+    assert wake.last_seen(tmp_path) == 7
+
+    # Next peek must still see message 8
+    output = []
+    assert wake.once(home=tmp_path, read=lambda: rows, write=output.append,
+                     peek=True, as_json=True) == 0
+    assert json.loads(output[0])["through"] == 8
+    assert "Phil posted" in json.loads(output[0])["line"]
+
+
 def test_ack_is_monotonic_and_rejects_negative_ids(tmp_path):
     wake.remember(8, tmp_path)
     wake.remember(7, tmp_path)
