@@ -23,7 +23,7 @@ COMMAND_GROUPS = {
     "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "announce", "free", "map", "spot", "startup"),
     "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat", "wake", "rules"),
-    "Memory": ("note", "decide", "import-hive"),
+    "Memory": ("note", "decide", "import-hive", "index"),
 }
 
 
@@ -207,6 +207,9 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--clear", action="store_true", help="it's back now")
     sub.add_parser("doctor", help="check local setup without running an AI prompt")
     sub.add_parser("startup", help="bounded usage and floor readings; no model or browser")
+    idx = sub.add_parser("index", help="memory index: what is in docs/, and when to load it")
+    idx.add_argument("--write", action="store_true", help="regenerate docs/MEMORY-INDEX.md")
+    idx.add_argument("--path", type=Path, help="a docs directory to index instead")
     dash = sub.add_parser("dashboard", help="open a local web page with meters, runs and a run box")
     dash.add_argument("--port", type=int, default=8765)
     dash.add_argument("-p", "--project")
@@ -480,6 +483,9 @@ def main(argv: list[str] | None = None,
     if args.command == "startup":
         from .startup import run
         return run()
+    if args.command == "index":
+        from .memory_index import command
+        return command(args)
     if args.command == "tab":
         from .tab_title import command
         return command(args)

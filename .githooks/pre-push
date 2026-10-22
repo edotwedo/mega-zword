@@ -56,6 +56,18 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR \
       GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
 
 cd "$root" || exit 0
+
+# Ballot P2/A2: docs/MEMORY-INDEX.md is generated, and the gate is what regenerates it, so a
+# stale index cannot land. PYTHONPATH points at THIS worktree's src: the venv is an editable
+# install of the main checkout, and the last time the hook trusted that it tested the wrong tree.
+if PYTHONPATH="$root/src" "$python" -c "from megazword import memory_index; memory_index.write()" \
+        >/dev/null 2>&1; then
+  if ! git diff --quiet -- docs/MEMORY-INDEX.md; then
+    echo "land-gate: docs/MEMORY-INDEX.md was stale; regenerated - commit it and push again"
+    exit 1
+  fi
+fi
+
 echo "land-gate: running the suite before this push (a few minutes)"
 if "$python" -m pytest -q; then
   echo "land-gate: suite passed"
