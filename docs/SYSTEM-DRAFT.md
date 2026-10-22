@@ -13,14 +13,18 @@ will be invisible until it is damage.
 
 **M1. One writer to main. Nobody pushes to main.** `[to build]`
 Seats push a task branch. One integrator merges serially from a queue. Removes the gate races, the
-rebase storms and the rejected pushes that cost four minutes each.
+rebase storms and the rejected pushes that cost four minutes each. **Amended by ballot P3 (carried
+3-0, 2026-10-22):** the integrator has a named deputy, so a dead or busy integrator cannot stall the
+merge queue; the deputy merges from the same queue.
 
 **M2. Work is an object with a lock, not a sentence.** `[to build]`
 `megazword task new --title "..." --files a.py b.py` allocates a task id, a branch and a lock on
 those files. Editing a locked file fails; the gate refuses a push touching files another open task
 holds. **Amended from P1 (Harbor022):** every lock carries an expiry, released when its task closes
 or its seat's heartbeat goes stale, because a seat that dies holding a lock must never block a file
-forever. **Hot files are never locked:** `cli.py`, `STATUS.md`, `docs/HIVE-ROSTER.md` change in
+forever. **Amended by ballot P3 (carried 3-0, 2026-10-22):** the expiry is 30 minutes and is renewed
+by heartbeat, so a task that spans files nobody predicted extends instead of failing, and a lock dies
+with its seat's heartbeat. **Hot files are never locked:** `cli.py`, `STATUS.md`, `docs/HIVE-ROSTER.md` change in
 almost every task, so locking them would serialize the whole team. They rely on M1's queue order.
 
 **M3. "Done" is machine-checked, never self-declared.** `[to build]`

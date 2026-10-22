@@ -10,9 +10,9 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | --- | --- | --- |
 | `docs/STATUS.md` | 2.7 kB | always - current state and the exact next step |
 | `docs/SPEC.md` | 12.3 kB | when the task changes what we are building, or a decision behind it |
-| `docs/DECISIONS.md` | 21.9 kB | when you are changing or questioning a past choice with Phil |
+| `docs/DECISIONS.md` | 23.0 kB | when you are changing or questioning a past choice with Phil |
 | `docs/HIVE-ROSTER.md` | 4.8 kB | when you need a seat's role, window or designation shape |
-| `docs/SYSTEM-DRAFT.md` | 4.8 kB | when you are writing or changing a rule (needs a ballot first) |
+| `docs/SYSTEM-DRAFT.md` | 5.2 kB | when you are writing or changing a rule (needs a ballot first) |
 | `docs/FLOOR.md` | 9.2 kB | when you are working the floor: seats, claims, the conductor |
 | `docs/AGENT-ACCESS.md` | 2.4 kB | when wiring a new AI CLI into the Hive |
 | `docs/ANDROID-HIVE.md` | 3.8 kB | when the work touches the phone or the Android build |
@@ -29,6 +29,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/LANDING-PAGE.md` | 6.3 kB | when the task touches the public page |
 | `docs/PHIL-SETUP-MAP.md` | 2.7 kB | when setting up Phil's machine or the launchers |
 | `docs/PRODUCTS.md` | 2.0 kB | when the task is about what we sell |
+| `docs/PROPOSAL-beat-hermes.md` | 11.3 kB | when your task names it, or changes what it describes |
 | `docs/PROPOSAL-startup-context.md` | 4.4 kB | when your task names it, or changes what it describes |
 | `docs/PROVIDER-TERMS.md` | 5.0 kB | before automating a provider or changing access |
 | `docs/QUEUE.md` | 6.6 kB | when adding or reading a Night Shift job |
