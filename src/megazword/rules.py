@@ -1,4 +1,4 @@
-"""No rule is added or changed without a passing ballot.
+﻿"""No rule is added or changed without a passing ballot.
 
 Phil, 2026-10-21: *"DO NOT ALLOW ANY RULE ADDITION OR CHANGES WITHOUT ANOTHER VOTE."* A rule saying
 so would be worth nothing, so this is a hash: `approve` records the digest of the rules file only
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -26,6 +27,26 @@ RULES_FILE = REPO / "docs" / "SYSTEM-DRAFT.md"
 def hash_of(path: Path | None = None) -> str:
     target = path or RULES_FILE
     return hashlib.sha256(target.read_bytes()).hexdigest()
+
+
+def approved_hash(path: Path | None = None) -> str:
+    """The hash of the rules file AS COMMITTED ON origin/main.
+
+    Hashing each worktree's copy made every seat that was behind main fail a test about a file it
+    never touched - Quill-21 and Nock-21 both hit it on 2026-10-21 and could not land work. Comparing
+    against main instead means a stale checkout passes and a genuinely unvoted change still fails,
+    because it has to reach main to matter.
+    """
+    target = path or RULES_FILE
+    try:
+        shown = str(target.relative_to(REPO)).replace("\\", "/")
+    except ValueError:
+        return hash_of(target)  # a test path outside the repo has no main to ask
+    proc = subprocess.run(["git", "show", f"origin/main:{shown}"], cwd=str(REPO),
+                          capture_output=True)
+    if proc.returncode != 0 or not proc.stdout:
+        return hash_of(target)  # no origin/main yet (fresh clone), fall back to the file
+    return hashlib.sha256(proc.stdout).hexdigest()
 
 
 def approval_path(home: Path | None = None) -> Path:
@@ -45,7 +66,7 @@ def check(home: Path | None = None, path: Path | None = None) -> tuple[bool, str
     if not recorded.get("sha256"):
         return False, ("the rules have no recorded ballot: run `megazword rules approve <ballot>` "
                        "after a vote, or the suite will keep failing")
-    current = hash_of(path)
+    current = approved_hash(path)
     if current != recorded["sha256"]:
         return False, (f"the rules changed without a vote (approved {recorded['ballot']} at "
                        f"{recorded.get('approved', '?')}); hold a ballot and run "
