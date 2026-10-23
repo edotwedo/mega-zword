@@ -81,7 +81,9 @@ def _line(state: dict) -> str:
     for plan in state.get("plans", []):
         if plan["gap_days"] > 0:
             window = plan["gap_windows"][0] if plan["gap_windows"] else "monthly"
-            bits.append(f"{plan['service']} over pace - dry in ~{plan['gap_days']:g}d ({window})")
+            # Whole days on purpose: the projection drifts a few tenths on every run, and a
+            # line that changed every 30 minutes would be noise, not a state change.
+            bits.append(f"{plan['service']} over pace - dry in ~{round(plan['gap_days'])}d ({window})")
         elif plan["verdict"] == "out":
             bits.append(f"{plan['service']} at reserve")
     if not bits:

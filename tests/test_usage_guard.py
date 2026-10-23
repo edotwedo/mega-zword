@@ -42,6 +42,20 @@ def test_run_posts_once_and_only_when_the_state_changes(monkeypatch):
     assert json.loads(usage_guard.state_path().read_text())["throttled"] == ["cmdc"]
 
 
+def test_a_drifting_projection_does_not_repost(monkeypatch):
+    # The dry-in figure moves a few tenths every run; whole-day rounding means a drift of
+    # 0.3 days is not a state change, or the guard would post on every tick.
+    readings = iter([[_cmdc(monthly=19, days_left=27)], [_cmdc(monthly=19.3, days_left=27)]])
+    monkeypatch.setattr("megazword.usage_sources.all_usage", lambda log=None: next(readings))
+    sent = []
+    monkeypatch.setattr("megazword.room.say",
+                        lambda *a, **k: sent.append(a[1] if len(a) > 1 else k.get("text")))
+    assert usage_guard.run(post=True, home_dir=config.HOME, now=NOW, write=lambda *_: None) == 0
+    assert len(sent) == 1
+    assert usage_guard.run(post=True, home_dir=config.HOME, now=NOW, write=lambda *_: None) == 0
+    assert len(sent) == 1  # the rounded line is unchanged, so nothing new is posted
+
+
 def test_guard_stop_file_halts_runs(monkeypatch):
     stop = usage_guard.stop_path()
     stop.parent.mkdir(parents=True, exist_ok=True)
