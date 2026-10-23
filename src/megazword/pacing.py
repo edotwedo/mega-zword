@@ -107,10 +107,14 @@ def status(usage: PlanUsage, now: datetime | None = None) -> PlanStatus:
         return PlanStatus(usage.service, 0.0, 0.0, "unknown", unknown)
     paces = [pace(window, now) for window in known]
     maximum = max(float(window.used_percent) for window in known)
+    # The acute hard-only guard belongs to the short windows. The long monthly budget only
+    # ever softens a plan to "throttle": a hot month should deprioritise work, not block it
+    # from easy tasks for weeks, and a monthly day of drift is cheap where a 5-hour one is not.
+    short_paces = [pace(w, now) for w in known if not str(w.name).startswith("monthly")]
     monthly = [w for w in known if str(w.name).startswith("monthly")]
     if any(_at_reserve(window) for window in known):
         verdict = "out"
-    elif max(paces) > HARD_ONLY_THRESHOLD:
+    elif short_paces and max(short_paces) > HARD_ONLY_THRESHOLD:
         verdict = "hard-only"
     elif any(pace(w, now) > MONTHLY_PACE_MARGIN for w in monthly):
         verdict = "throttle"

@@ -10,7 +10,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | --- | --- | --- |
 | `docs/STATUS.md` | 3.5 kB | always - current state and the exact next step |
 | `docs/SPEC.md` | 12.3 kB | when the task changes what we are building, or a decision behind it |
-| `docs/DECISIONS.md` | 22.1 kB | when you are changing or questioning a past choice with Phil |
+| `docs/DECISIONS.md` | 23.3 kB | when you are changing or questioning a past choice with Phil |
 | `docs/HIVE-ROSTER.md` | 4.5 kB | when you need a seat's role, window or designation shape |
 | `docs/SYSTEM-DRAFT.md` | 5.7 kB | when you are writing or changing a rule (needs a ballot first) |
 | `docs/FLOOR.md` | 9.9 kB | when you are working the floor: seats, claims, the conductor |

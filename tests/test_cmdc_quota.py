@@ -135,3 +135,54 @@ def test_private_terminal_sends_only_fixed_usage_and_always_terminates(monkeypat
             cmdc_quota._capture(["fake"])
         assert terminal.writes == []  # never send slash input to a login prompt
     assert not terminal.running
+
+
+def _api_responses():
+    return {
+        "/alpha/billing/credits": {
+            "credits": {"monthlyCredits": 50.0},
+            "windowLimits": {"fiveHour": {"used": 1.0, "cap": 10.0, "resetAt": 1000 * 1000},
+                             "weekly": {"used": 20.0, "cap": 40.0, "resetAt": 2000 * 1000}},
+        },
+        "/alpha/usage/summary": {"totalMonthlyCredits": 12.5},
+        "/alpha/billing/subscriptions": {"data": {
+            "planId": "individual-goat", "currentPeriodEnd": "2026-11-19T02:20:08.000Z"}},
+    }
+
+
+def test_read_api_maps_the_vendor_windows_without_a_terminal(tmp_path, monkeypatch):
+    monkeypatch.delenv("MEGAZWORD_NO_CMDC_METER", raising=False)
+    monkeypatch.setattr(cmdc_quota, "_auth_file", lambda: tmp_path / "auth.json")
+    (tmp_path / "auth.json").write_text(json.dumps({"apiKey": "not-a-real-key"}))
+    responses = _api_responses()
+    monkeypatch.setattr(cmdc_quota, "_api_json", lambda path, key: responses[path])
+
+    plan = cmdc_quota.read_api(NOW)
+    assert plan.source == "cmdc api"
+    assert [(w.name, round(w.used_percent, 1)) for w in plan.windows] == [
+        ("5-hour", 10.0), ("weekly", 50.0), ("monthly", 25.0)]
+    assert plan.windows[0].resets_at == datetime.fromtimestamp(1000, tz=timezone.utc)
+    assert plan.windows[2].resets_at == datetime(2026, 11, 19, 2, 20, 8, tzinfo=timezone.utc)
+    assert "individual-goat" in plan.note
+
+
+def test_read_api_is_off_for_the_env_switches_and_on_failure(tmp_path, monkeypatch):
+    monkeypatch.setenv("MEGAZWORD_NO_CMDC_METER", "1")
+    assert cmdc_quota.read_api(NOW) is None
+    monkeypatch.delenv("MEGAZWORD_NO_CMDC_METER")
+    monkeypatch.setenv("MEGAZWORD_NO_CMDC_API", "1")
+    assert cmdc_quota.read_api(NOW) is None
+    monkeypatch.delenv("MEGAZWORD_NO_CMDC_API")
+    monkeypatch.setattr(cmdc_quota, "_auth_file", lambda: tmp_path / "missing.json")
+    assert cmdc_quota.read_api(NOW) is None  # no key on disk: fall back, never raise
+
+
+def test_command_code_prefers_the_api_meter(tmp_path, monkeypatch):
+    monkeypatch.delenv("MEGAZWORD_NO_CMDC_METER", raising=False)
+    api_plan = usage_sources.PlanUsage(
+        "cmdc", [usage_sources.Window("monthly", 25.0, None)], "cmdc api", note="individual-goat")
+    monkeypatch.setattr(cmdc_quota, "read_api", lambda now=None: api_plan)
+    monkeypatch.setattr(cmdc_quota, "read_quota",
+                        lambda now=None: pytest.fail("the panel must not be scraped when the API works"))
+    monkeypatch.setattr(usage_sources, "COMMAND_CODE_ROOT", tmp_path)
+    assert usage_sources.command_code().source == "cmdc api"

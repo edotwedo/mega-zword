@@ -411,14 +411,14 @@ def command_code(projects_dir: Path | None = None,
     the dollars are already on disk. Same trick the Codex fallback uses on
     ~/.codex/sessions: read the tool's own log, spend nothing to read it.
 
-    Read supported /usage in a private terminal when available. Its quota fields
-    are separate from transcript dollar totals: dollars are not plan credits.
-    Explicit projects_dir calls only inspect those transcripts (offline use).
+    Plan windows come from Command Code's own API first, then the /usage panel in a
+    private terminal. Either is separate from transcript dollar totals: dollars are not
+    plan credits. Explicit projects_dir calls only inspect those transcripts (offline use).
     """
     root = COMMAND_CODE_ROOT if projects_dir is None else projects_dir
     now = now or datetime.now(timezone.utc)
-    from .cmdc_quota import read_quota
-    quota = read_quota(now) if projects_dir is None else None
+    from .cmdc_quota import read_api, read_quota
+    quota = (read_api(now) or read_quota(now)) if projects_dir is None else None
     calls, cost, tokens = _cmdc_spend(root, now - CMDC_WEEK)
     if quota:
         if calls:

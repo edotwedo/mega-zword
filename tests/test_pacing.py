@@ -140,6 +140,13 @@ def test_project_dates_the_dry_out_and_clamps_when_it_outlasts_the_reset():
     assert project(window("weekly", 0, NOW + timedelta(days=3)), NOW) is None  # no usage yet
 
 
+def test_a_hot_monthly_budget_throttles_but_never_hard_blocks():
+    # 40% used, 2 of 30 days gone: far over the weekly threshold, but a month is not a 5-hour.
+    result = status(usage("cmdc", window("monthly", 40, NOW + timedelta(days=28))), NOW)
+    assert result.verdict == "throttle"
+    assert allowed(result, "easy") and allowed(result, "hard")
+
+
 def test_rank_sinks_a_throttled_plan_below_roomier_ones():
     statuses = {
         "cmdc": PlanStatus("cmdc", 6, 19, "throttle", []),

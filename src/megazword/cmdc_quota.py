@@ -1,7 +1,11 @@
-"""Read Command Code's supported /usage panel in a private Windows terminal.
+"""Command Code plan quota, from the vendor's own API first, the /usage panel as fallback.
 
-No model prompt, credential parsing, provider HTTP requests, visible window, or
-session transcript. Only parsed quota fields are cached, never terminal output.
+`read_api` calls the same endpoints the CLI's /usage overlay renders from (billing/credits
+carries the fiveHour/weekly windows; usage/summary and billing/subscriptions give the monthly
+allowance and its renewal) using the local apiKey - a JSON read, not a terminal scrape.
+`read_quota` still scrapes the /usage panel in a private Windows terminal when the API is off
+or unavailable. Either way only parsed quota fields are cached, never raw output, and the key
+is never logged. The API path is off under MEGAZWORD_NO_CMDC_METER or MEGAZWORD_NO_CMDC_API.
 """
 from __future__ import annotations
 
@@ -193,3 +197,86 @@ def read_quota(now: datetime | None = None) -> PlanUsage | None:
         if cached:
             cached.note += "; refresh unavailable, last CLI reading"
         return cached
+
+
+API_BASE = "https://api.commandcode.ai"
+
+
+def _auth_file() -> Path:
+    return Path.home() / ".commandcode" / "auth.json"
+
+
+def _api_json(path: str, key: str) -> dict:
+    import urllib.request
+    request = urllib.request.Request(
+        API_BASE + path,
+        headers={"Authorization": f"Bearer {key}", "Accept": "application/json",
+                 "User-Agent": "megazword-meter"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _from_ms(value) -> datetime | None:
+    """The API hands back epoch milliseconds."""
+    try:
+        return datetime.fromtimestamp(float(value) / 1000.0, tz=timezone.utc)
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def _from_iso(value) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+
+def read_api(now: datetime | None = None) -> PlanUsage | None:
+    """Command Code's plan windows, read from the vendor's API instead of the panel.
+
+    The CLI renders /usage from these endpoints, so this is the same numbers without a
+    terminal scrape: `windowLimits` carries fiveHour and weekly as used/cap/resetAt, the
+    monthly allowance is `credits.monthlyCredits` measured against `usage/summary` and reset
+    by the subscription's currentPeriodEnd. Reads the local apiKey and never logs it. Returns
+    None on any failure, or when disabled, so the caller can fall back to the panel scrape.
+    """
+    if os.environ.get("MEGAZWORD_NO_CMDC_METER") == "1" or os.environ.get("MEGAZWORD_NO_CMDC_API") == "1":
+        return None
+    now = now or datetime.now(timezone.utc)
+    try:
+        key = json.loads(_auth_file().read_text(encoding="utf-8"))["apiKey"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    try:
+        credits = _api_json("/alpha/billing/credits", key)
+    except Exception:
+        return None
+    limits = credits.get("windowLimits") or {}
+    windows: list[Window] = []
+    for name, field in (("5-hour", "fiveHour"), ("weekly", "weekly")):
+        item = limits.get(field) or {}
+        cap = float(item.get("cap") or 0)
+        if cap <= 0:
+            continue
+        used = float(item.get("used") or 0)
+        windows.append(Window(name, min(100.0, used / cap * 100.0), _from_ms(item.get("resetAt"))))
+    notes: list[str] = []
+    monthly_cap = float((credits.get("credits") or {}).get("monthlyCredits") or 0)
+    if monthly_cap > 0:
+        used, reset = 0.0, None
+        try:
+            used = float((_api_json("/alpha/usage/summary", key) or {}).get("totalMonthlyCredits") or 0)
+        except Exception:
+            pass
+        try:
+            data = (_api_json("/alpha/billing/subscriptions", key) or {}).get("data") or {}
+            reset = _from_iso(data.get("currentPeriodEnd"))
+            if data.get("planId"):
+                notes.append(str(data["planId"]))
+        except Exception:
+            pass
+        windows.append(Window("monthly", min(100.0, used / monthly_cap * 100.0), reset))
+        notes.append(f"monthly {used / monthly_cap * 100.0:.0f}% used")
+    if not windows:
+        return None
+    return PlanUsage("cmdc", windows, "cmdc api", note="; ".join(notes), as_of=now)
