@@ -22,7 +22,7 @@ COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job", "vote"),
     "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "announce", "free", "map", "spot", "startup"),
-    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat", "wake", "rules"),
+    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat", "wake", "rules", "guard"),
     "Memory": ("note", "decide", "import-hive", "index"),
 }
 
@@ -199,6 +199,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_vote_parser(sub)
     from .rules import add_parser as add_rules_parser
     add_rules_parser(sub)
+    from .usage_guard import add_parser as add_guard_parser
+    add_guard_parser(sub)
 
     out = sub.add_parser("out", help="keep auto-picks and background jobs off an AI")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -468,6 +470,9 @@ def main(argv: list[str] | None = None,
     if args.command == "spot":
         from .spot import command as spot_command
         return spot_command(args)
+    if args.command == "guard":
+        from .usage_guard import command as guard_command
+        return guard_command(args, cfg)
     if args.command == "andon":
         from .andon import command
         return command(args.state, " ".join(args.reason))

@@ -10,12 +10,22 @@ from .usage_sources import PlanUsage, Window
 WINDOW_LENGTHS = {
     "5-hour": timedelta(hours=5),
     "weekly": timedelta(days=7),
+    "monthly": timedelta(days=30),
 }
 HARD_ONLY_THRESHOLD = 10.0
 # 2026-10-21 reserve, percent remaining. Five-hour stops at 10 and waits
 # for the reset. Weekly keeps working through 10 and hard-stops at 5.
 FIVE_HOUR_STOP = 10.0
 WEEKLY_STOP = 5.0
+# The monthly cap is the long window: budget to the renewal, not to the wall.
+# At 10% left it stops, so the last 10% is a backstop, not the working budget.
+MONTHLY_STOP = 10.0
+# A monthly window this many points ahead of its own clock is over pace: it still runs,
+# but routing sends new work to anything roomier (the soft "throttle" verdict). Only the
+# monthly budget is judged this way - a few points of weekly lead is under the hard-only
+# guard and costs hours, while a few points of monthly lead costs days, and that is the gap
+# the guard exists to close. Short windows keep their existing free/hard-only meaning.
+MONTHLY_PACE_MARGIN = 5.0
 # "Use it or lose it": a window this close to its reset, still above its
 # own reserve, gets spent first, even on easy tasks.
 BURN_BEFORE_RESET = {"5-hour": timedelta(hours=1), "weekly": timedelta(hours=24)}
@@ -37,6 +47,8 @@ def window_length(name: str) -> tuple[timedelta, bool]:
         return WINDOW_LENGTHS["5-hour"], True
     if name == "weekly" or name.startswith("weekly"):
         return WINDOW_LENGTHS["weekly"], True
+    if name == "monthly" or name.startswith("monthly"):
+        return WINDOW_LENGTHS["monthly"], True
     return timedelta(days=7), False
 
 
@@ -54,6 +66,35 @@ def pace(window: Window, now: datetime | None = None) -> float:
     return float(window.used_percent) - elapsed_percent
 
 
+def project(window: Window, now: datetime | None = None) -> float | None:
+    """Days until this window runs dry at its observed burn rate.
+
+    `pace` says how far ahead of its own clock a window is today; this says when it hits
+    100% if nothing changes. None means it cannot be projected - no reset, an unknown
+    window, a fresh cycle (reset exactly one window away), or no usage yet. The value is
+    clamped at 0: a window that outlasts its reset has no gap.
+    """
+    now = now or datetime.now(timezone.utc)
+    if window.resets_at is None:
+        return None
+    length, known = window_length(window.name)
+    if not known:
+        return None
+    reset = window.resets_at
+    if reset.tzinfo is None:
+        reset = reset.replace(tzinfo=timezone.utc)
+    elapsed_fraction = 1.0 - (reset - now).total_seconds() / length.total_seconds()
+    used = float(window.used_percent)
+    if elapsed_fraction <= 0 or used <= 0:
+        return None
+    rate = used / elapsed_fraction  # percent used per whole-window fraction
+    remaining_fraction = 1.0 - elapsed_fraction
+    gap_fraction = remaining_fraction - (100.0 - used) / rate
+    if gap_fraction <= 0:
+        return 0.0
+    return gap_fraction * length.total_seconds() / 86400.0
+
+
 def status(usage: PlanUsage, now: datetime | None = None) -> PlanStatus:
     """Summarize the most restrictive usage window for a service."""
     if not usage.windows:
@@ -66,10 +107,13 @@ def status(usage: PlanUsage, now: datetime | None = None) -> PlanStatus:
         return PlanStatus(usage.service, 0.0, 0.0, "unknown", unknown)
     paces = [pace(window, now) for window in known]
     maximum = max(float(window.used_percent) for window in known)
+    monthly = [w for w in known if str(w.name).startswith("monthly")]
     if any(_at_reserve(window) for window in known):
         verdict = "out"
     elif max(paces) > HARD_ONLY_THRESHOLD:
         verdict = "hard-only"
+    elif any(pace(w, now) > MONTHLY_PACE_MARGIN for w in monthly):
+        verdict = "throttle"
     else:
         verdict = "free"
     return PlanStatus(usage.service, max(paces), maximum, verdict, unknown,
@@ -90,7 +134,11 @@ def _after_reset(window: Window, now: datetime | None = None) -> Window:
 
 
 def _reserve_remaining(name: str) -> float:
-    return FIVE_HOUR_STOP if name == "5-hour" else WEEKLY_STOP
+    if name == "5-hour":
+        return FIVE_HOUR_STOP
+    if name == "monthly" or name.startswith("monthly"):
+        return MONTHLY_STOP
+    return WEEKLY_STOP
 
 
 def _at_reserve(window: Window) -> bool:
@@ -113,7 +161,8 @@ def allowed(service_status: PlanStatus, rating: str) -> bool:
         return False
     if service_status.verdict == "hard-only":
         return rating == "hard"
-    return service_status.verdict in {"free", "unknown"}
+    # "throttle" is soft: over pace, but never a hard block on pace alone.
+    return service_status.verdict in {"free", "unknown", "throttle"}
 
 
 def rank(statuses: dict[str, PlanStatus], candidates: list[str], rating: str,
@@ -128,7 +177,11 @@ def rank(statuses: dict[str, PlanStatus], candidates: list[str], rating: str,
                 for name in candidates}
     eligible = [name for name in candidates if allowed(statuses[name], rating)]
     order = {name: index for index, name in enumerate(candidates)}
+    # Over-pace plans ("throttle") keep their slot only after roomier ones, so a
+    # monthly budget that is running hot stops being handed work well before the wall.
     return sorted(
         eligible,
-        key=lambda name: (not statuses[name].burn, order[name]),
+        key=lambda name: (not statuses[name].burn,
+                          statuses[name].verdict == "throttle",
+                          order[name]),
     )

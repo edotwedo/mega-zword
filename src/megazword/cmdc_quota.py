@@ -45,14 +45,24 @@ def parse_screen(screen: str, now: datetime) -> PlanUsage:
     if set(found) != {"5-hour", "weekly"}:
         raise ValueError("cmdc /usage did not show both quota windows")
     labels = re.findall(r"\b([A-Za-z0-9 +×-]{1,35} Plan)\s*[·|]", text)
-    monthly = re.findall(r"\b(\d+(?:\.\d+)?)%\s+used\b", text.rsplit("Usage limits", 1)[0])
+    head = text.rsplit("Usage limits", 1)[0]
+    monthly = re.findall(r"\b(\d+(?:\.\d+)?)%\s+used\b", head)
     notes = [re.sub(r"^USAGE\s+", "", labels[-1].strip())] if labels else []
+    windows = [found["5-hour"], found["weekly"]]
+    # The monthly window is a real budget, not just a note: the guard paces the renewal
+    # off it. Its reset comes from "N days to renew" (None when the panel omits it).
     if monthly and 0 <= float(monthly[-1]) <= 100:
-        notes.append(f"monthly {float(monthly[-1]):g}% used")
+        used = float(monthly[-1])
+        # The panel phrases this two ways; accept both, and leave the reset unknown
+        # (rather than guessed) when neither matches.
+        renew = (re.search(r"(\d+)\s*days?\s+to\s+renew(?:al)?", head, re.I)
+                 or re.search(r"renew(?:al|s)?\s+in\s+(\d+)\s*days?", head, re.I))
+        reset = now + timedelta(days=int(renew.group(1))) if renew else None
+        windows.append(Window("monthly", used, reset))
+        notes.append(f"monthly {used:g}% used")
     if rounded:
         notes.append("reset times rounded by CLI")
-    return PlanUsage("cmdc", [found["5-hour"], found["weekly"]], "cmdc /usage",
-                     note="; ".join(notes), as_of=now)
+    return PlanUsage("cmdc", windows, "cmdc /usage", note="; ".join(notes), as_of=now)
 
 
 def _command() -> list[str] | None:
@@ -141,7 +151,8 @@ def _cached(path: Path, now: datetime) -> PlanUsage | None:
         windows = [Window(w["name"], float(w["used_percent"]),
                           datetime.fromisoformat(w["resets_at"]) if w["resets_at"] else None)
                    for w in data["windows"]]
-        if {w.name for w in windows} != {"5-hour", "weekly"} or any(
+        if {w.name for w in windows} not in ({"5-hour", "weekly"},
+                                             {"5-hour", "weekly", "monthly"}) or any(
                 not 0 <= w.used_percent <= 100 or (w.resets_at and w.resets_at <= now)
                 for w in windows):
             return None

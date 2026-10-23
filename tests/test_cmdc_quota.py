@@ -21,14 +21,23 @@ Press Esc to close
 """
 
 
-def test_vendor_windows_are_separate_from_monthly_usage_and_dollars():
+def test_panel_yields_the_two_vendor_windows_and_a_paced_monthly_budget():
     plan = cmdc_quota.parse_screen("\x1b[32m" + SCREEN + "\x1b[0m", NOW)
-    assert [(w.name, w.used_percent) for w in plan.windows] == [("5-hour", 0), ("weekly", 18)]
+    assert [(w.name, w.used_percent) for w in plan.windows] == [
+        ("5-hour", 0), ("weekly", 18), ("monthly", 9)]
     assert plan.windows[0].resets_at is None  # inactive window, not a guessed reset
     assert plan.windows[1].resets_at == NOW + timedelta(days=5, hours=7)
+    assert plan.windows[2].resets_at == NOW + timedelta(days=30)  # "30 days to renew"
     assert "monthly 9% used" in plan.note and "GOAT Plan" in plan.note
     assert plan.as_of == NOW and plan.source == "cmdc /usage"
     assert "example" not in plan.note and "requests" not in plan.note
+
+
+def test_monthly_renewal_is_read_from_either_phrasing():
+    alt = cmdc_quota.parse_screen(SCREEN.replace("30 days to renew", "renewal in 27 days"), NOW)
+    monthly = next(w for w in alt.windows if w.name == "monthly")
+    assert monthly.used_percent == 9
+    assert monthly.resets_at == NOW + timedelta(days=27)
 
 
 @pytest.mark.parametrize("screen", ["Sign in", "Weekly  18%", SCREEN.replace("18%", "118%")])

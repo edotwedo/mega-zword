@@ -76,6 +76,15 @@ the handoff, posts one line naming what is unfinished, and asks Phil for a repla
 Usage floor: five-hour window, 10% remaining means stop and hand off until the reset; weekly
 window, 10% remaining means work down to 5% remaining and then hard stop.
 
+The monthly budget is guarded one step earlier. `megazword guard` reads the live meters on a
+schedule (`megazword guard install`, every 30 minutes) and projects each window's burn rate.
+When a plan's monthly window is running ahead of its own clock it is marked **throttle**: it
+still runs, but routing sends new work to roomier plans and free sources, so the budget
+stretches to the renewal instead of running out two weeks early. `spot` warns at the reserve;
+the guard looks at the rate that leads there. It hard-stops a plan at 90% monthly used, writes
+`~/.megazword/guard.json`, posts one room line only when the state changes, and keeps its own
+STOP file (`megazword guard stop`).
+
 ## How work happens
 
 Phil enters the Mega Zword **Hive** tab and says what to decide and what to do.

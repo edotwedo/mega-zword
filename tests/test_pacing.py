@@ -5,6 +5,7 @@ from megazword.pacing import (
     PlanStatus,
     allowed,
     pace,
+    project,
     rank,
     status,
     window_length,
@@ -116,6 +117,36 @@ def test_reserve_depends_on_the_window():
 def test_rank_preserves_candidate_order_for_equal_pace():
     same = PlanStatus("same", -5, 40, "free", [])
     assert rank({"a": same, "b": same}, ["b", "a"], "medium") == ["b", "a"]
+
+
+def test_monthly_is_a_known_window_with_a_ten_percent_reserve():
+    assert window_length("monthly") == (timedelta(days=30), True)
+    assert status(usage("cmdc", window("monthly", 85, NOW + timedelta(days=20))), NOW).verdict != "out"
+    assert status(usage("cmdc", window("monthly", 91, NOW + timedelta(days=20))), NOW).verdict == "out"
+
+
+def test_over_pace_but_not_at_reserve_is_a_soft_throttle():
+    # 19% used, 27 of 30 days left: ahead of the clock, far from the floor.
+    result = status(usage("cmdc", window("monthly", 19, NOW + timedelta(days=27))), NOW)
+    assert result.verdict == "throttle"
+    assert allowed(result, "easy") and allowed(result, "hard")  # never a hard block
+
+
+def test_project_dates_the_dry_out_and_clamps_when_it_outlasts_the_reset():
+    gap = project(window("monthly", 19, NOW + timedelta(days=27)), NOW)
+    assert gap is not None and 13 <= gap <= 15
+    assert project(window("5-hour", 2, NOW + timedelta(hours=3, minutes=18)), NOW) == 0
+    assert project(window("monthly", 19, NOW + timedelta(days=30)), NOW) is None  # fresh cycle
+    assert project(window("weekly", 0, NOW + timedelta(days=3)), NOW) is None  # no usage yet
+
+
+def test_rank_sinks_a_throttled_plan_below_roomier_ones():
+    statuses = {
+        "cmdc": PlanStatus("cmdc", 6, 19, "throttle", []),
+        "ovh": PlanStatus("ovh", -5, 30, "free", []),
+        "claude": PlanStatus("claude", -10, 20, "free", []),
+    }
+    assert rank(statuses, ["cmdc", "claude", "ovh"], "easy", NOW) == ["claude", "ovh", "cmdc"]
 
 
 def test_a_reading_from_before_the_reset_no_longer_blocks():

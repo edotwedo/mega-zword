@@ -15,15 +15,17 @@ which hashes the file as committed on `origin/main` so a stale worktree cannot f
 **Ballots.** P1 rules carried. P2 startup cost carried 5-0 and both parts are built: A1 split this
 file (capped by `tests/test_status_size.py`), A2 generates `docs/MEMORY-INDEX.md` - with the condition
 three seats insisted on, that the gate itself rebuild it, because a stale index is worse than none.
-P3 integrator amendments (B1 named deputy for M1, B2 30-minute renewable lock) open, not carried:
-0 votes, no quorum - do not build either.
+P3 integrator amendments (B1 named deputy for M1, B2 30-minute renewable lock) carried 3-0 and are in
+the rules. P4 adopted `docs/PROPOSAL-beat-hermes.md`. P6 carried 3-0: a second-vendor review is
+required for code only; docs, config and data are exempt (rescopes P5, which is superseded).
 
 **Live mechanisms.** `vote` (new/cast/tally), `rules` (hash gate), `seat` (status/watch/retire/
 replace), `wake` (scheduled listener types into the conductor's tab within a minute of a Phil post),
 room `kinds`, `doctor` room health, `startup` (one bounded 10s read), `index` (generated memory
 index; the pre-push gate regenerates it and refuses a stale one), Discord mirror, per-seat room
-tokens, fixed Worker claim guard. Still `[to build]`: M1 merge queue, M2 file locks, M3
-machine-checked review, M6 command grammar.
+tokens, fixed Worker claim guard, `guard` (monthly pace guard: projects each window's burn rate,
+throttles a plan running ahead of its monthly clock, posts one line when the state changes).
+Still `[to build]`: M1 merge queue, M2 file locks, M3 machine-checked review, M6 command grammar.
 
 **Team.** Cinder-21 (conductor), Harbor022 (out until Fri 01:00), Briar-20, Nock-21, Forge-22.
 Forge-22 runs in its real conversation `3bc1d242`, but Windows Terminal is elevated, so SendKeys
@@ -31,11 +33,11 @@ cannot reach it - Phil can type there, the supervisor cannot.
 
 ## Next, in order
 
-1. P3 - re-cast against its own id (0 votes so far); the items were first announced under P2 and the
-   seats refused to let two questions share one id. Build B1/B2 only if it carries.
-2. Convene - `docs/FEATURES.md`: agents argue assigned stances, structured on the wire, English on
+1. M1, M2, M3, M6 - the choke points, in that order. M2 is built and accepted on `seat/briar-20`
+   (`ee42241`); it needs a rebase onto main before it lands.
+2. The Hermes execution plan - `docs/PLAN-hermes-execution.md`, Wave 1 (F1 + M2) first.
+3. Convene - `docs/FEATURES.md`: agents argue assigned stances, structured on the wire, English on
    screen.
-3. M1, M2, M3, M6 - the choke points, in that order.
 
 ## Standing facts
 
