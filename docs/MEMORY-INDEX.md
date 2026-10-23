@@ -8,38 +8,38 @@ task - loading everything is what this index exists to stop. Archives are greppe
 
 | File | Size | Load when |
 | --- | --- | --- |
-| `docs/STATUS.md` | 3.9 kB | always - current state and the exact next step |
-| `docs/SPEC.md` | 12.3 kB | when the task changes what we are building, or a decision behind it |
-| `docs/DECISIONS.md` | 23.3 kB | when you are changing or questioning a past choice with Phil |
-| `docs/HIVE-ROSTER.md` | 4.6 kB | when you need a seat's role, window or designation shape |
-| `docs/SYSTEM-DRAFT.md` | 5.7 kB | when you are writing or changing a rule (needs a ballot first) |
-| `docs/FLOOR.md` | 9.9 kB | when you are working the floor: seats, claims, the conductor |
+| `docs/STATUS.md` | 3.8 kB | always - current state and the exact next step |
+| `docs/SPEC.md` | 12.1 kB | when the task changes what we are building, or a decision behind it |
+| `docs/DECISIONS.md` | 23.2 kB | when you are changing or questioning a past choice with Phil |
+| `docs/HIVE-ROSTER.md` | 4.5 kB | when you need a seat's role, window or designation shape |
+| `docs/SYSTEM-DRAFT.md` | 5.6 kB | when you are writing or changing a rule (needs a ballot first) |
+| `docs/FLOOR.md` | 9.7 kB | when you are working the floor: seats, claims, the conductor |
 | `docs/AGENT-ACCESS.md` | 2.4 kB | when wiring a new AI CLI into the Hive |
 | `docs/ANDROID-HIVE.md` | 3.8 kB | when the work touches the phone or the Android build |
-| `docs/BUSINESS-MODEL.md` | 11.8 kB | when the task is pricing or how the product earns |
-| `docs/BUSINESS-PLAN.md` | 7.6 kB | when the task is the plan to make money |
-| `docs/CLOUD-ROOM.md` | 8.2 kB | when the task touches the Worker, the room protocol or Discord |
-| `docs/CMDC-OWNERSHIP.md` | 4.1 kB | when ownership or the usage meter is in question |
-| `docs/FEATURES.md` | 4.8 kB | when you are adding a user-facing feature |
-| `docs/FREE-MODEL-ROSTER.md` | 24.6 kB | when picking a free model or provider |
-| `docs/GUIDE.md` | 49.7 kB | when writing user-facing documentation |
-| `docs/HIVE-RECOVERY.md` | 5.3 kB | when a seat is dead, wedged or needs respawning |
-| `docs/INSPIRATION-ROADMAP.md` | 6.3 kB | when sequencing ideas into work |
-| `docs/INSPIRATION.md` | 8.0 kB | when you need direction on what this is for |
-| `docs/LANDING-PAGE.md` | 6.3 kB | when the task touches the public page |
-| `docs/OPEN-BRANCHES.md` | 3.9 kB | when your task names it, or changes what it describes |
-| `docs/PHIL-SETUP-MAP.md` | 2.7 kB | when setting up Phil's machine or the launchers |
-| `docs/PLAN-hermes-execution.md` | 15.9 kB | when your task names it, or changes what it describes |
-| `docs/PRODUCTS.md` | 2.1 kB | when the task is about what we sell |
-| `docs/PROPOSAL-beat-hermes.md` | 11.3 kB | when your task names it, or changes what it describes |
-| `docs/PROPOSAL-startup-context.md` | 4.4 kB | when your task names it, or changes what it describes |
+| `docs/BUSINESS-MODEL.md` | 11.6 kB | when the task is pricing or how the product earns |
+| `docs/BUSINESS-PLAN.md` | 7.5 kB | when the task is the plan to make money |
+| `docs/CLOUD-ROOM.md` | 8.1 kB | when the task touches the Worker, the room protocol or Discord |
+| `docs/CMDC-OWNERSHIP.md` | 4.0 kB | when ownership or the usage meter is in question |
+| `docs/FEATURES.md` | 4.7 kB | when you are adding a user-facing feature |
+| `docs/FREE-MODEL-ROSTER.md` | 24.4 kB | when picking a free model or provider |
+| `docs/GUIDE.md` | 48.8 kB | when writing user-facing documentation |
+| `docs/HIVE-RECOVERY.md` | 5.2 kB | when a seat is dead, wedged or needs respawning |
+| `docs/INSPIRATION-ROADMAP.md` | 6.2 kB | when sequencing ideas into work |
+| `docs/INSPIRATION.md` | 7.9 kB | when you need direction on what this is for |
+| `docs/LANDING-PAGE.md` | 6.1 kB | when the task touches the public page |
+| `docs/OPEN-BRANCHES.md` | 3.8 kB | when your task names it, or changes what it describes |
+| `docs/PHIL-SETUP-MAP.md` | 2.6 kB | when setting up Phil's machine or the launchers |
+| `docs/PLAN-hermes-execution.md` | 15.7 kB | when your task names it, or changes what it describes |
+| `docs/PRODUCTS.md` | 2.0 kB | when the task is about what we sell |
+| `docs/PROPOSAL-beat-hermes.md` | 11.1 kB | when your task names it, or changes what it describes |
+| `docs/PROPOSAL-startup-context.md` | 4.3 kB | when your task names it, or changes what it describes |
 | `docs/PROVIDER-TERMS.md` | 5.0 kB | before automating a provider or changing access |
-| `docs/QUEUE.md` | 6.6 kB | when adding or reading a Night Shift job |
-| `docs/RELEASE-NOTES.md` | 7.8 kB | when preparing a release |
-| `docs/REPO-MAP.md` | 1.7 kB | when you need to find code without reading all of it |
-| `docs/REVENUE-OS.md` | 3.8 kB | when the task is the revenue operating system |
-| `docs/ROADMAP-model-switching-facts.md` | 9.2 kB | when your task names it, or changes what it describes |
-| `docs/ROADMAP-model-switching.md` | 9.5 kB | when your task names it, or changes what it describes |
-| `docs/ROADMAP.md` | 7.9 kB | when choosing what to build next |
-| `docs/ROUTING_RESEARCH.md` | 9.0 kB | when the task is model routing |
+| `docs/QUEUE.md` | 6.5 kB | when adding or reading a Night Shift job |
+| `docs/RELEASE-NOTES.md` | 7.6 kB | when preparing a release |
+| `docs/REPO-MAP.md` | 1.6 kB | when you need to find code without reading all of it |
+| `docs/REVENUE-OS.md` | 3.7 kB | when the task is the revenue operating system |
+| `docs/ROADMAP-model-switching-facts.md` | 9.0 kB | when your task names it, or changes what it describes |
+| `docs/ROADMAP-model-switching.md` | 9.4 kB | when your task names it, or changes what it describes |
+| `docs/ROADMAP.md` | 7.8 kB | when choosing what to build next |
+| `docs/ROUTING_RESEARCH.md` | 8.9 kB | when the task is model routing |
 | `docs/TASKS.md` | 1.9 kB | when your task names it, or changes what it describes |

@@ -78,7 +78,10 @@ def files(docs: Path | None = None) -> list[Path]:
 
 
 def _size(path: Path) -> str:
-    return f"{path.stat().st_size / 1024:.1f} kB"
+    # Size with line endings normalised to LF, so a CRLF (Windows) checkout and an LF
+    # checkout produce the same index. stat().st_size made the index flip between seats.
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    return f"{len(data) / 1024:.1f} kB"
 
 
 def render(docs: Path | None = None) -> str:
