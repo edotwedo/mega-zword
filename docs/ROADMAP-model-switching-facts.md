@@ -82,3 +82,57 @@ The plan stands, with three changes to carry into Phase 1+:
 - Run `agy -p "/usage"` once in a scratch folder and see if it prints the numbers.
 - Start a throwaway seat via `workspace_terminal` and type `/model <id>` into it.
 - Try `agy --conversation <id> --model <other-id> -p "say ok"` to see if history survives.
+
+## ADDENDUM 2026-10-22 22:05: probes run (VERIFIED; supersedes the "reported" and "untested" notes above)
+
+Run in a scratch folder (`%TEMP%\agy-probe`), cost a few thousand tokens total.
+
+**Probe 1: `agy -p "/usage"` is the machine-readable usage source.** It returns tab-separated lines in
+about 6 seconds, with no model reply needed:
+
+```
+Gemini Models           Weekly Limit Remaining     82%  2026-10-28T04:55:54Z
+Gemini Models           Five Hour Limit Remaining  75%  2026-10-23T06:03:58Z
+Claude and GPT models   Weekly Limit Remaining     32%  2026-10-28T04:54:20Z
+Claude and GPT models   Five Hour Limit Remaining  47%  2026-10-23T07:55:16Z
+Gemini 4 Argon          Gemini 4 Argon Weekly Limit  1%  2026-10-28T21:27:01Z
+```
+
+- This **closes the Phase 3 gap**: no TUI scraping needed. The CLI itself reports, as Phil required.
+- **Real pools, from the CLI itself:** (a) **Gemini Models**, weekly and five-hour; (b) **Claude and GPT
+  models**, weekly and five-hour (Claude and GPT-OSS share one pool); (c) **Gemini 4 Argon has its own
+  extra weekly limit** on top of the Gemini pool. Argon at 1% means Argon is nearly walled while
+  Gemini Flash still has headroom in the shared pool.
+- A model is usable only if **every limit that applies to it** has room. Rank by the minimum remaining
+  across its applicable limits, not by one number.
+- Each limit has a reset time, so the supervisor can also report "back at HH:MM".
+
+**Probe 2: `agy -p ... --output-format json` returns per-call usage.** Example:
+`{"conversation_id":"...","status":"SUCCESS","response":"ok","num_turns":1,"usage":{"input_tokens":7006,"output_tokens":1,...}}`.
+Note a one-word call to a fresh conversation cost **7,006 input tokens**: that is the CLI's fixed
+overhead per fresh conversation (confirms the earlier 8-25k estimate for hello).
+
+**Probe 3: switching model on a live conversation works, across pools.** Started a conversation on
+`gemini-3.8-flash-low` ("remember PINEAPPLE"), then resumed the same conversation id with
+`--conversation <id> --model claude-sonnet-5-5-low` and asked for the word: it answered `PINEAPPLE`,
+`num_turns: 2`, same `conversation_id`. History survived the switch from the Gemini pool to the
+Claude/GPT pool. The Claude/GPT meter then dropped (five-hour 47% to 45%, weekly 32% to 31%), so the
+usage readout reflects the switch.
+
+**Probe 4 (not run, no longer needed): typing `/model` into a live elevated TUI.** Path B above
+(resume with `--conversation <id> --model <name>`) achieves the switch without typing, so the
+elevated-terminal limit does not block the plan.
+
+### Revised verdict
+Phase 3 and Phase 4 are now **buildable with documented flags only**:
+1. **Read usage:** `agy -p "/usage"` parsed into pool rows (weekly, five-hour, plus any per-model row).
+2. **Choose:** rank pools by the minimum remaining across applicable limits; exclude any model whose
+   own limit is spent (Argon) even if its pool has room.
+3. **Switch:** end the seat's current agy process and start `agy --conversation <id> --model <chosen>`
+   in the same tab with the same designation; the next `/usage` read must show the new pool draining.
+4. **Open detail:** how the seat's running TUI is closed and relaunched in the same tab without SendKeys
+   (owned relay via `workspace_terminal.py`, or launching seats through a wrapper that can restart agy).
+   Needs a design decision in Phase 1/4, not more facts.
+5. **Interactive TUI vs print mode:** these probes used print mode. A seat in the interactive TUI
+   resuming a conversation by id with `--model` should behave the same, but that exact path is not yet
+   run.
