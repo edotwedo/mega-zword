@@ -12,6 +12,8 @@ Update it whenever a branch is landed, archived or opened; do not let it become 
 - Forge-22's model-switching docs -> **landed** (`docs/ROADMAP-model-switching.md`,
   `docs/ROADMAP-model-switching-facts.md`; Phase 0 proved `agy -p /usage` is machine-readable and
   `--conversation <id> --model <name>` switches across pools, which unblocks Phase 3).
+- `task/word31-wake-delivery` -> **landed** on main: the `wake.ack` alias plus tests pinning that
+  acknowledging a message does not consume in-flight newer ones.
 - The Forge-22 Dualtooth/Spanda handoff note -> **committed** (was untracked).
 - `seat/codex` and `seat/grok` worktrees -> **committed and pushed** (uncommitted edits from
   2026-10-20 that would otherwise have been lost).
@@ -22,7 +24,6 @@ Update it whenever a branch is landed, archived or opened; do not let it become 
 
 | Branch | Ahead | Files | Last | Recommendation |
 | --- | ---: | ---: | --- | --- |
-| `task/word31-wake-delivery` | 1 | 2 | 2026-10-22 | **check and land** - wake ack alias |
 | `seat/cinder-21` | 1 | 1 | 2026-10-22 | archive - the handoff doc is on main |
 | `harbor022/hermes-plan` | 2 | 1 | 2026-10-22 | archive - adopted by P4, doc is on main |
 | `harbor022/outbox-jam` | 3 | 3 | 2026-10-22 | archive - landed as `6cd909c` |
