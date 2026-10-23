@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -49,6 +51,43 @@ def test_append_and_read_messages(tmp_path):
     assert len(messages) == 2
     assert messages[0].text == msg1.text
     assert messages[1].prompt_chars == 1200
+
+
+def test_cache_only_read_flags_stale_when_remote_configured(tmp_path, monkeypatch):
+    """F1c: a cloud cache not refreshed in N minutes must say so, not look current."""
+    monkeypatch.setenv("HIVE_ROOM_URL", "https://room.example")
+    room.append_message("hive", "phil", "posted from the cloud", home=tmp_path)
+    path = room.room_path("hive", tmp_path)
+    old = time.time() - 3 * 3600
+    os.utime(path, (old, old))
+
+    messages = room.read_messages("hive", tmp_path)
+    assert messages.source == "remote"
+    assert messages.stale is True
+    assert messages.age_minutes >= 170
+    assert "cache-only" in messages.notice and "minutes old" in messages.notice
+
+    os.utime(path, None)  # a cache just written is not stale...
+    fresh = room.read_messages("hive", tmp_path)
+    assert fresh.stale is False and fresh.notice is None
+    assert [m.text for m in fresh] == ["posted from the cloud"]  # ...and still a list
+
+
+def test_local_room_read_never_flags_stale(tmp_path, monkeypatch):
+    """With no room URL the local log IS the source of truth, not a cache."""
+    monkeypatch.delenv("HIVE_ROOM_URL", raising=False)
+    room.append_message("hive", "phil", "offline note", home=tmp_path)
+    path = room.room_path("hive", tmp_path)
+    old = time.time() - 3 * 3600
+    os.utime(path, (old, old))
+    messages = room.read_messages("hive", tmp_path)
+    assert messages.source == "local"
+    assert messages.stale is False and messages.notice is None
+
+
+def test_read_messages_stays_a_plain_list(tmp_path):
+    messages = room.read_messages("nosuchroom", tmp_path)
+    assert messages == [] and messages.stale is False and messages.notice is None
 
 
 def test_state_card_under_300_words(tmp_path):

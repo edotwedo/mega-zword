@@ -1,7 +1,9 @@
 """Cloud room behavior without a real token, network or Cloudflare account."""
 import io
 import json
+import os
 import sqlite3
+import time
 import uuid
 from pathlib import Path
 
@@ -119,6 +121,35 @@ def test_offline_show_labels_cache_and_pending(remote, tmp_path):
     assert any("local cache" in line for line in out)
     assert any("1 messages still queued" in line for line in out)
     assert "cached" in out[-1]
+
+
+def test_show_says_when_the_cache_is_stale(remote, tmp_path):
+    """F1c: when the refresh fails, `room show` must admit the cache may be old."""
+    cfg, rows, calls, state = remote
+    room.say("hive", "cached", cfg=cfg, home=tmp_path, write=lambda _: None)
+    path = room.room_path("hive", tmp_path)
+    old = time.time() - 45 * 60
+    os.utime(path, (old, old))
+    state["offline"] = True
+    out = []
+    room.show("hive", cfg=cfg, home=tmp_path, write=out.append)
+    assert any("cache-only" in line for line in out)
+    assert room.read_messages("hive", tmp_path).stale is True
+
+
+def test_show_refreshes_and_is_never_the_stale_read(remote, tmp_path):
+    """F1c: a configured room's `show` refreshes, so it never trusts an old cache."""
+    cfg, rows, calls, state = remote
+    room.say("hive", "first", cfg=cfg, home=tmp_path, write=lambda _: None)
+    room.say("hive", "second", cfg=cfg, home=tmp_path, write=lambda _: None)
+    path = room.room_path("hive", tmp_path)
+    old = time.time() - 90 * 60
+    os.utime(path, (old, old))  # an old cache...
+    out = []
+    room.show("hive", cfg=cfg, home=tmp_path, write=out.append)  # ...show refreshes it
+    assert not any("cache-only" in line for line in out)
+    assert room.read_messages("hive", tmp_path).stale is False
+    assert any("second" in line for line in out)
 
 
 def test_post_does_not_skip_intervening_history_and_pages(remote, tmp_path):

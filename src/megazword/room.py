@@ -109,10 +109,62 @@ def extract_mentions(text: str) -> list[str]:
     return mentions
 
 
-def read_messages(room: str = DEFAULT_ROOM, home: Path | None = None) -> list[RoomMessage]:
+# A cache-only read older than this is stale. Ten minutes is longer than one refresh
+# cycle, but far shorter than the three hours a stale read hid Phil's messages on
+# 2026-10-21: a cloud cache that has not touched the Worker in that long may already be
+# missing a post, so the read says so instead of looking current.
+STALE_READ_AFTER = timedelta(minutes=10)
+
+
+class RoomMessages(list):
+    """A room read: a list of RoomMessage that also knows how fresh the read is.
+
+    It is still a plain list to every existing caller (iteration, slicing, ``== []``), so
+    nothing that used to take a list breaks. The point is machine-detectable staleness:
+    ``.stale`` / ``.age_minutes`` / ``.notice`` tell a cache-only read that may be behind
+    the cloud apart from a fresh one - exactly what the 2026-10-21 conductor could not.
+    """
+
+    def __init__(self, messages=(), *, source: str = "local", age: timedelta | None = None):
+        super().__init__(messages)
+        self.source = source  # "remote": a room URL is set, so this file is only a cache
+        self.age = age        # time since the cache file was last written, or None
+
+    @property
+    def stale(self) -> bool:
+        return (self.source == "remote" and self.age is not None
+                and self.age > STALE_READ_AFTER)
+
+    @property
+    def age_minutes(self) -> int | None:
+        return None if self.age is None else int(self.age.total_seconds() // 60)
+
+    @property
+    def notice(self) -> str | None:
+        """The one line to show a seat when this read may be behind; None when fresh."""
+        if not self.stale:
+            return None
+        return (f"[megazword room] this read is cache-only and {self.age_minutes} minutes old; "
+                f"it may be missing messages. Run `megazword room show` to refresh.")
+
+
+def _cache_source(home: Path | None) -> str:
+    """'remote' when a room URL is configured, so the local file is a cache, not the truth."""
+    try:
+        cfg = config.load(home / "config.toml" if home is not None else None)
+    except (OSError, ValueError, TypeError):
+        return "local"
+    return "remote" if remote_configured(cfg) else "local"
+
+
+def read_messages(room: str = DEFAULT_ROOM, home: Path | None = None, *,
+                  now: datetime | None = None) -> RoomMessages:
     path = room_path(room, home)
+    source = _cache_source(home)
     if not path.exists():
-        return []
+        return RoomMessages(source=source)
+    age = (now or datetime.now(timezone.utc)) - datetime.fromtimestamp(
+        path.stat().st_mtime, tz=timezone.utc)
     messages = []
     with locked(path):
         for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -134,7 +186,7 @@ def read_messages(room: str = DEFAULT_ROOM, home: Path | None = None) -> list[Ro
                 ))
             except (json.JSONDecodeError, TypeError):
                 continue
-    return messages
+    return RoomMessages(messages, source=source, age=age)
 
 
 def append_message(room: str, author: str, text: str,
@@ -515,8 +567,10 @@ class RemoteRoom:
         with urllib.request.build_opener(NoRedirect()).open(req, timeout=10) as response:
             return json.load(response)
 
-    def cached(self) -> list[RoomMessage]:
-        return [m for m in read_messages(self.room, self.home) if m.remote_url == self.url]
+    def cached(self) -> RoomMessages:
+        read = read_messages(self.room, self.home)
+        return RoomMessages((m for m in read if m.remote_url == self.url),
+                            source=read.source, age=read.age)
 
     def cache(self, rows: list[dict]) -> None:
         path = room_path(self.room, self.home)
@@ -664,7 +718,7 @@ def _lost_race(room: str, claim: tuple[str, str], cfg: config.Config,
     return 1
 
 
-def claim_messages(room: str, cfg: config.Config, home: Path | None = None) -> list[RoomMessage]:
+def claim_messages(room: str, cfg: config.Config, home: Path | None = None) -> RoomMessages:
     """Refresh once and use the existing cache; propagate read errors to the caller."""
     if remote_configured(cfg):
         client = RemoteRoom(room, cfg, home)
@@ -730,6 +784,10 @@ def show(room: str, n: int = 20, home: Path | None = None,
         messages = client.cached()
     else:
         messages = read_messages(room, home)
+    # A failed refresh above leaves the old cache in place: never show it as if it were
+    # current. On a healthy refresh the file was just rewritten, so this stays silent.
+    if getattr(messages, "notice", None):
+        safe_write(write, messages.notice)
     if not messages:
         safe_write(write, f"[megazword room] room '{room}' has no messages yet")
         return 0
