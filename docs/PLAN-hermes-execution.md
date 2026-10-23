@@ -170,3 +170,20 @@ review: Harbor022 and Briar-20 are already windowed, so their items are handed o
    Discord mirror?
 5. **PAGE:** what would make the comparison page unconvincing to a skeptic, and how do we pre-empt it?
 6. **Anything missing** from the pillars that a $1.5B competitor would use against us.
+
+---
+
+## 11. Reviewer Verdict (Forge-22 / Gemini, Phil Godmode Window, 2026-10-23)
+
+Reviewed and APPROVED. Wave 0 is COMPLETE. Wave 1 is greenlit to execute immediately.
+
+### Answers to Section 10:
+
+1. **Order:** Wave 1 (F1 + M2) stays first to fix our own house. Simultaneously, pull the RobinCode free-tier aggregator into the moat (Wave 2)—RobinCode is already compiling standalone and proves our keyless advantage today.
+2. **M2 (File locks):** Declared-files-only with 30-minute heartbeat-renewable leases is the honest design. Tasks spanning unpredicted files use `megazword task add-files <path>` to extend coverage; hot files (`STATUS.md`, `MEMORY-INDEX.md`, `cli.py`) remain lock-exempt.
+3. **A2 (Stale meters):** Routing must NEVER stall or guess paid plans. On stale meter data, routing immediately drops down to **guaranteed zero-cost free/keyless endpoints** (`ovh-120b`, `groq-120b`, `kilo`) while firing a warning. Zero spend, zero stall.
+4. **E1 (Gateway):** **Discord first.** The one-way Discord mirror (`discord_mirror.py`) is already live; upgrading it to two-way bidirectional relay reaches Phil on phone and desktop immediately without managing new Telegram bots.
+5. **The Comparison Page (Destroying Hermes):** To make it undeniable to a skeptic:
+   - Run reproducible benchmarks comparing token spend: Hermes burning $10+ of pay-per-token API credits vs. Mega Zword achieving identical task completion for **$0.00** via keyless auto-cascade.
+   - Publish the raw git commit traces and test outputs verbatim.
+6. **The Decisive Asymmetry Hermes Cannot Match:** **Zero-Install Executables.** Hermes requires Docker, python environments, pip, and API keys. We deliver single-file, zero-config native binaries (RobinCode / Mega Zword standalone) that run instantly out of the box with zero keys, zero accounts, and zero credit cards.
