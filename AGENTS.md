@@ -27,6 +27,13 @@ because a stale index is worse than none when seats trust it (ballot P2/A2, carr
 - **Usage floor:** five-hour window, 10% remaining means hand off; weekly drains to 5% then hard stop.
 - **Never commit secrets.**
 
+## Use megazword (Phil, 2026-10-22)
+
+Every seat drives its work through the CLI, not its own habits. `megazword usage` before you claim
+anything; `megazword vote` for decisions; `megazword review` on a code change; `megazword room` to
+speak and to claim; `megazword note` / `decide` to record; `megazword gate` is the suite. If a job can
+be done through megazword, do it there - a step outside it is invisible to the next seat.
+
 Everything else from the old file is deleted: prose claims, the `Active:` line handshake, reviewer
 by honour, status posts as coordination, seats pushing to `main`, and every rule that survived only
 as convention.
