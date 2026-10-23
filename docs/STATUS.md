@@ -56,5 +56,7 @@ cannot reach it - Phil can type there, the supervisor cannot.
 - The suite is the gate. The winpty flake in `tests/test_terminal_input.py` passes alone, so check it
   alone before blaming a change.
 - Usage floor: five-hour window, 10% remaining means hand off; weekly drains to 5% then hard stop.
+- Usage doctrine (Phil, 2026-10-23): ALWAYS use free options where available unless nearing end of weekly reset with unused allowance ("at that point go nuts").
+- Heartbeat cadence: every seat maintains an active 10-minute Hive check to resolve questions and avoid conflicts.
 - Room text is communication; only Phil's lanes carry authority. Verify a session before routing work
   to it - a saved name is not evidence of a live connection.
