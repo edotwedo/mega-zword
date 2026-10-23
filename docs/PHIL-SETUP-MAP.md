@@ -12,7 +12,7 @@ This is the quick reference for the tools Phil and Mega Zword have actually set 
 
 ## Phone and Mega Zword CLI
 
-The phone terminal app is **Termux**. The intended PC workflow is to connect from Termux to the Windows PC over Tailscale and SSH, then run Mega Zword on the PC:
+Phil's phone is a **Nothing Phone (3)** (codename `Metroid`, model `A024`, Android). The phone terminal app is **Termux**. The intended PC workflow is to connect from Termux to the Windows PC over Tailscale and SSH, then run Mega Zword on the PC:
 
 ```sh
 pkg install openssh
@@ -33,6 +33,15 @@ megazword plan
 megazword backends
 megazword run "your prompt"
 ```
+
+## Phone clipboard to PC
+
+Phone Link's cross-device clipboard does not deliver phone -> PC here (its read comes back empty), so this runs over adb instead:
+
+- adb is at `C:\Users\mrmar\platform-tools\adb.exe`. Wireless debugging on the phone turns itself off and must be re-enabled before a session (`adb connect <ip:port>`).
+- The phone has **Termux:API** (`com.termux.api`, side-loaded from F-Droid 0.53.0) and the `termux-api` package (`0.60.0`) inside Termux; together they provide `termux-clipboard-get`.
+- `C:\Users\mrmar\Scripts\phone-clip.ps1` copies the phone clipboard to the Windows clipboard: it wakes the phone, runs `termux-clipboard-get > /sdcard/clip.txt` in Termux, then pipes the file into `Set-Clipboard`. Run `powershell -File C:\Users\mrmar\Scripts\phone-clip.ps1`.
+- Caveat: each run flashes Termux to the foreground on the phone for ~2 seconds. Android clears the clipboard after a while, so copy the source text close to running it.
 
 ## Office app
 
