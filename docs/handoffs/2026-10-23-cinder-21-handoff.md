@@ -62,10 +62,11 @@ Waves 2-5 (M1 merge queue, M6 grammar, F3 status page, A1-A3, C/D/E items, bench
 - `tests/test_terminal_input.py` has a known winpty flake - run it alone before blaming a change.
 - **Never edit `docs/SYSTEM-DRAFT.md` without a ballot**; it is hash-locked (M8). Rule changes go
   through `megazword vote` then `megazword rules approve <ballot>`.
-- **The npm install of `command-code` is half-swapped**: `node_modules/command-code/dist/` holds
-  only `bundled/`; the real bundle sits un-renamed in `node_modules/.command-code-ANXWRD9O/`, and
-  there is no `cmdc.cmd` shim. Repair with `npm i -g command-code`. The API meter does not depend
-  on it; the panel-scrape fallback does.
+- **`command-code` was repaired on 2026-10-23.** An interrupted update had left
+  `node_modules/command-code/dist/` holding only `bundled/` - no `index.mjs`/`cli.mjs`, no
+  `cmdc.cmd` shim - so the CLI could not launch at all. Fixed with `npm i -g command-code`; now
+  on 1.88.0 and verified with `cmdc --version`. If it breaks the same way, that command is the
+  fix. The API meter does not depend on the CLI; the panel-scrape fallback does.
 - A room post does **not** wake a seat. Delivery is typing into the window or an ntfy page; Windows
   Terminal runs elevated, so the supervisor cannot SendKeys into it.
 - Windows `core.autocrlf=true`: markdown files carry CRLF in the working tree.
