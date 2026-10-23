@@ -27,6 +27,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/INSPIRATION-ROADMAP.md` | 6.3 kB | when sequencing ideas into work |
 | `docs/INSPIRATION.md` | 8.0 kB | when you need direction on what this is for |
 | `docs/LANDING-PAGE.md` | 6.1 kB | when the task touches the public page |
+| `docs/OPEN-BRANCHES.md` | 3.5 kB | when your task names it, or changes what it describes |
 | `docs/PHIL-SETUP-MAP.md` | 2.7 kB | when setting up Phil's machine or the launchers |
 | `docs/PLAN-hermes-execution.md` | 14.0 kB | when your task names it, or changes what it describes |
 | `docs/PRODUCTS.md` | 2.1 kB | when the task is about what we sell |
@@ -37,7 +38,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/RELEASE-NOTES.md` | 7.8 kB | when preparing a release |
 | `docs/REPO-MAP.md` | 1.7 kB | when you need to find code without reading all of it |
 | `docs/REVENUE-OS.md` | 3.8 kB | when the task is the revenue operating system |
-| `docs/ROADMAP-model-switching-facts.md` | 5.6 kB | when your task names it, or changes what it describes |
+| `docs/ROADMAP-model-switching-facts.md` | 9.2 kB | when your task names it, or changes what it describes |
 | `docs/ROADMAP-model-switching.md` | 9.5 kB | when your task names it, or changes what it describes |
 | `docs/ROADMAP.md` | 7.9 kB | when choosing what to build next |
 | `docs/ROUTING_RESEARCH.md` | 9.0 kB | when the task is model routing |
