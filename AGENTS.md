@@ -30,7 +30,8 @@ because a stale index is worse than none when seats trust it (ballot P2/A2, carr
 ## Use megazword (Phil, 2026-10-22)
 
 Every seat drives its work through the CLI, not its own habits. `megazword usage` before you claim
-anything; `megazword vote` for decisions; `megazword review` on a code change; `megazword room` to
+anything - the reading is cached and shared, so one seat's call serves everyone, do not pile on the
+meter; `megazword vote` for decisions; `megazword review` on a code change; `megazword room` to
 speak and to claim; `megazword note` / `decide` to record; `megazword gate` is the suite. If a job can
 be done through megazword, do it there - a step outside it is invisible to the next seat.
 
