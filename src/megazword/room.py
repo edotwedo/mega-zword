@@ -11,6 +11,7 @@ import sys
 from dataclasses import asdict, dataclass, field, fields
 import uuid
 import hashlib
+import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 from datetime import datetime, timedelta, timezone
@@ -470,9 +471,15 @@ def safe_write(write: Callable[[str], None], text: str) -> None:
         write(text.encode(exc.encoding, errors="replace").decode(exc.encoding))
 
 
+# Statuses that mean "this post will never be accepted": bad request, claim conflict,
+# too large, invalid. Auth (401/403), rate limits (429) and 5xx stay queued for retry.
+REJECTED = frozenset({400, 409, 413, 422})
+
+
 class RemoteRoom:
     def __init__(self, room: str, cfg: config.Config, home: Path | None):
         from .keys import get_key
+        self.rejected: list[str] = []
         self.url = (os.environ.get("HIVE_ROOM_URL") or cfg.room_url).rstrip("/")
         parsed = urlsplit(self.url)
         if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ("", "/"):
@@ -543,11 +550,33 @@ class RemoteRoom:
                 try:
                     message = self.request("POST", item=pending[0])["message"]
                     self.cache([message])
+                except urllib.error.HTTPError as exc:
+                    if exc.code not in REJECTED:
+                        break  # outage, auth or rate limit: keep it and retry later
+                    # The server refused this post and always will. Kept at the head it
+                    # blocked every later post from the seat (2026-10-21: 13:06 to 20:07,
+                    # behind one 409), so set it aside with the reason instead.
+                    self.reject(pending[0], exc)
                 except (OSError, ValueError, KeyError, TypeError):
-                    break  # keep the item on every HTTP/storage/validation failure
+                    break  # keep the item on every other HTTP/storage/validation failure
                 pending.pop(0)
                 write_atomic(self.queue, json.dumps(pending))
             return len(pending)
+
+    def reject(self, item: dict, exc: urllib.error.HTTPError) -> None:
+        try:
+            reason = json.loads(exc.read() or b"{}").get("error", "")
+        except (OSError, ValueError, AttributeError):
+            reason = ""
+        reason = str(reason or exc.reason or "")[:300]
+        path = self.queue.with_suffix(".rejected.json")
+        try:
+            kept = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+        except (OSError, ValueError):
+            kept = []
+        kept.append({**item, "status": exc.code, "error": reason})
+        write_atomic(path, json.dumps(kept))
+        self.rejected.append(f"HTTP {exc.code}: {reason}" if reason else f"HTTP {exc.code}")
 
     def refresh(self) -> None:
         # Start from the last contiguous GET cursor, not a POST's potentially later ID.
@@ -568,6 +597,12 @@ class RemoteRoom:
                 write_atomic(cursor_path, str(since))
                 if len(rows) < 200:
                     break
+
+
+def report_rejected(client: RemoteRoom, write: Callable[[str], None]) -> None:
+    for reason in client.rejected:
+        safe_write(write, f"[megazword room] the room refused a queued post ({reason}); "
+                          f"it was set aside in {client.queue.with_suffix('.rejected.json').name}")
 
 
 def remote_configured(cfg: config.Config) -> bool:
@@ -600,6 +635,7 @@ def say(room: str, text: str, author: str = "phil",
     if remote_configured(cfg):
         client = RemoteRoom(room, cfg, home)
         pending = client.flush(text)
+        report_rejected(client, write)
         safe_write(write, f"[megazword room] {pending} queued; retry on next say/show" if pending else "[megazword room] sent as the authenticated seat")
     else:
         check_author(author)
@@ -684,6 +720,7 @@ def show(room: str, n: int = 20, home: Path | None = None,
         # Credential failures must not look like a successful local post/read.
         client = RemoteRoom(room, cfg, home)
         pending = client.flush()
+        report_rejected(client, write)
         if pending:
             safe_write(write, f"[megazword room] {pending} messages still queued; retry on next say/show")
         try:

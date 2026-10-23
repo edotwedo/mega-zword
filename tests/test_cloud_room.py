@@ -56,6 +56,49 @@ def test_queue_survives_outage_and_replays_next_show(remote, tmp_path):
     assert len(rows) == 1 and "[cirrus-17]" in out[-1]
 
 
+def _refuse(monkeypatch, refuse_text, status):
+    """Make the fake server permanently refuse one post text with an HTTP status."""
+    import urllib.error
+    real = room.RemoteRoom.request
+
+    def request(self, method, suffix="", item=None):
+        if method == "POST" and item["text"] == refuse_text:
+            body = io.BytesIO(json.dumps({"error": "harbor022 has open claim 'probe'"}).encode())
+            raise urllib.error.HTTPError("https://room.example", status, "Conflict", {}, body)
+        return real(self, method, suffix, item)
+
+    monkeypatch.setattr(room.RemoteRoom, "request", request)
+
+
+def test_a_refused_post_does_not_block_the_outbox(remote, tmp_path, monkeypatch):
+    # 2026-10-21: one 409 at the head of the queue held every later post for seven hours.
+    cfg, rows, calls, state = remote
+    state["offline"] = True
+    room.say("hive", "refused", cfg=cfg, home=tmp_path, write=lambda _: None)
+    room.say("hive", "after", cfg=cfg, home=tmp_path, write=lambda _: None)
+    state["offline"] = False
+    _refuse(monkeypatch, "refused", 409)
+    out = []
+    room.show("hive", cfg=cfg, home=tmp_path, write=out.append)
+    assert [r["text"] for r in rows] == ["after"]
+    assert any("refused a queued post (HTTP 409: harbor022 has open claim 'probe')" in line
+               for line in out)
+    queue = next(room.room_dir(tmp_path).glob("*.queue.json"))
+    assert json.loads(queue.read_text()) == []
+    rejected = json.loads(queue.with_suffix(".rejected.json").read_text())
+    assert [(r["text"], r["status"]) for r in rejected] == [("refused", 409)]
+
+
+@pytest.mark.parametrize("status", [401, 403, 429, 503])
+def test_a_temporary_refusal_stays_queued(remote, tmp_path, monkeypatch, status):
+    cfg, rows, calls, state = remote
+    _refuse(monkeypatch, "later", status)
+    out = []
+    room.say("hive", "later", cfg=cfg, home=tmp_path, write=out.append)
+    assert "1 queued" in out[-1] and rows == []
+    assert not list(room.room_dir(tmp_path).glob("*.rejected.json"))
+
+
 def test_lost_response_deduplicates_after_retry(remote, tmp_path):
     cfg, rows, calls, state = remote
     state["lose_response"] = True
