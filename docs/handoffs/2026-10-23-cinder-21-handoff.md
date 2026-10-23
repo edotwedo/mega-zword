@@ -88,3 +88,27 @@ Waves 2-5 (M1 merge queue, M6 grammar, F3 status page, A1-A3, C/D/E items, bench
 - Suite runner: `.venv\Scripts\python.exe -m pytest -q`. Shell is PowerShell (`Select-Object`, not
   `head`).
 - `MEGAZWORD_CMDC_METER`/`MEGAZWORD_NO_CMDC_METER` disable cmdc metering (tests set it).
+
+## 7. UPDATE, later on 2026-10-23 (this supersedes the stale bits above)
+
+**Read `docs/OPEN-BRANCHES.md` too - it is the live answer to "what is unfinished?".**
+
+- **main is now the commit this file sits in** (was wrongly quoted as `50d6fcd` in section 2).
+- **F1c is LANDED** (section 3 said "in flight"). Room reads now carry their own freshness.
+- Also landed: Forge-22's model-switching docs (unblocks Phase 3), the `task/word31-wake-delivery`
+  fix, and the Forge-22 Dualtooth/Spanda note.
+- **Branch cleanup done:** the 2026-10-21 archive list had never actually been deleted - dead
+  worktrees blocked `git branch -D`. Those worktrees were removed and the branches deleted; ~40
+  branches are now 11. Every archived branch is tagged `archive/<branch>` so its tip survives
+  `git gc`. See `docs/ARCHIVE.md`, section "2026-10-23 (second pass)".
+- **The guard changed since section 2 was written.** It now reports a spent plan as **OUT** (it
+  used to bury it as "over pace - dry in ~Nd", which is exactly how Gemini's weekly limit was
+  missed), words a gap correctly ("would run dry ~Nd before its <window> reset"), and posts under
+  `guard` instead of `cinder-21`. A guard post also **pushes an ntfy + Windows toast** via
+  `announce.ping`, because a room line is passive - Phil does not see it unless he looks.
+- **Phil's standing asks that are still unbuilt** (both recorded in `docs/OPEN-BRANCHES.md`):
+  1. an alert that repeats while a plan stays at its floor (the push currently fires once, on the
+     line changing);
+  2. the approvals ledger, `megazword approve ask|list|check`, so a yes is recorded once and never
+     re-asked.
+- **Still unopened:** the Phase 1 ballot for model-switching (Forge-22 supplied the wording).

@@ -76,19 +76,31 @@ def evaluate(home_dir: Path | None = None, now: datetime | None = None) -> dict:
 
 
 def _line(state: dict) -> str:
-    """One room line, or '' when nothing is wrong."""
-    bits = []
+    """One room line, or '' when nothing is wrong.
+
+    A plan at its floor is the loudest thing this can say, so it goes first and says OUT - a
+    spent plan with a gap used to be reported only as "over pace - dry in ~Nd", which is how
+    Gemini's weekly limit was missed on 2026-10-23. A gap is a warning, not a spent plan, and
+    is worded as the gap it is: days before its own reset that the window would run dry.
+    """
+    spent, gaps = [], []
     for plan in state.get("plans", []):
-        if plan["gap_days"] > 0:
+        if plan["verdict"] == "out":
+            spent.append(f"{plan['service']} OUT ({plan['max_used_percent']:.0f}% used)")
+        elif plan["gap_days"] > 0:
             window = plan["gap_windows"][0] if plan["gap_windows"] else "monthly"
             # Whole days on purpose: the projection drifts a few tenths on every run, and a
             # line that changed every 30 minutes would be noise, not a state change.
-            bits.append(f"{plan['service']} over pace - dry in ~{round(plan['gap_days'])}d ({window})")
-        elif plan["verdict"] == "out":
-            bits.append(f"{plan['service']} at reserve")
-    if not bits:
+            gaps.append(f"{plan['service']} would run dry ~{round(plan['gap_days'])}d before "
+                        f"its {window} reset")
+    if not spent and not gaps:
         return ""
-    return "guard: " + "; ".join(bits) + f" - routing {state.get('suggested_bias', 'as-configured')}"
+    parts = []
+    if spent:
+        parts.append("STOP - " + ", ".join(spent))
+    if gaps:
+        parts.append("over pace: " + "; ".join(gaps))
+    return "guard: " + " | ".join(parts)
 
 
 def run(post: bool = False, home_dir: Path | None = None, now: datetime | None = None,
@@ -111,7 +123,7 @@ def run(post: bool = False, home_dir: Path | None = None, now: datetime | None =
     path.write_text(json.dumps(state, indent=2), encoding="utf-8")
     for plan in state["plans"]:
         write(f"  {plan['service']:8} {plan['verdict']:9} pace {plan['worst_pace']:+5.1f} "
-              f"max {plan['max_used_percent']:3.0f}%  dry in ~{plan['gap_days']:g}d")
+              f"max {plan['max_used_percent']:3.0f}%  gap ~{plan['gap_days']:g}d")
     line = _line(state)
     if not line:
         write("[guard] every plan is within its own pace")
@@ -119,16 +131,33 @@ def run(post: bool = False, home_dir: Path | None = None, now: datetime | None =
     write(line)
     if post and (previous is None or _line(previous) != line):
         _say(line, write)
+        _push(line, write)
     return 0
 
 
 def _say(line: str, write: Callable[[str], None]) -> None:
     from . import room
-    seat = os.environ.get("MEGAZWORD_SEAT") or "cinder-21"
+    # Never post under a seat's name. The scheduled task has no MEGAZWORD_SEAT, and a guard line
+    # signed "cinder-21" reads as the conductor talking (Harbor022, 2026-10-23).
+    seat = os.environ.get("MEGAZWORD_SEAT") or "guard"
     try:
         room.say("hive", line, author=seat, cfg=config.load())
     except (OSError, ValueError, KeyError, TypeError) as exc:
         write(f"[guard] room post failed: {exc}")
+
+
+def _push(line: str, write: Callable[[str], None]) -> None:
+    """Buzz the phone as well as the room.
+
+    A room line is passive: Phil has to remember to look, and on 2026-10-23 he did not, so a
+    plan hit its weekly limit unannounced. `announce.ping` is an ntfy push plus a Windows
+    toast, so a guard post actually reaches him. Best-effort; it never fails the tick.
+    """
+    from . import announce
+    try:
+        announce.ping(line, config.load())
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        write(f"[guard] alert failed: {exc}")
 
 
 def status(write: Callable[[str], None] = print) -> int:
@@ -141,7 +170,7 @@ def status(write: Callable[[str], None] = print) -> int:
     write(f"guard reading {state.get('as_of', '?')} ({path})")
     for plan in state.get("plans", []):
         write(f"  {plan['service']:8} {plan['verdict']:9} pace {plan['worst_pace']:+5.1f} "
-              f"max {plan['max_used_percent']:3.0f}%  dry in ~{plan['gap_days']:g}d")
+              f"max {plan['max_used_percent']:3.0f}%  gap ~{plan['gap_days']:g}d")
     line = _line(state)
     write(line or "[guard] every plan is within its own pace")
     return 0

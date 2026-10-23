@@ -192,3 +192,16 @@ reachable. No files, builds or worktrees were touched.
 | `task/word31-wake-delivery` | `8da4eb2` | Acknowledge wake messages only after terminal delivery |
 
 157 branches.
+
+## 2026-10-23 (second pass)
+
+Most of the 2026-10-21 list above had never actually been deleted - the branches were still
+checked out in dead worktrees, so `git branch -D` refused them. Those worktrees were removed and
+the branches deleted. Each is now ALSO tagged `archive/<branch>`, so the tip stays reachable even
+if `git gc` runs (the "reachable by sha" promise above was fragile on its own).
+
+| Branch | Tip | Subject | Why it was dropped |
+| --- | --- | --- | --- |
+| `harbor022/hermes-plan` | `62a990d` | docs: Hermes plan - rally car positioning, no security build (Phil) | adopted by ballot P4; the doc is on main |
+| `seat/quill-21` | `918f5df` | usage: Command Code meter, read from its own transcripts (spend, not credits) | superseded by the cmdc vendor-API meter |
+| `cinder/guard`, `cinder/f1c-stale-reads`, `m2-integration`, `forge22-facts`, `word31-wake` | - | integration scaffolding | each was fast-forwarded into main; nothing unique |
