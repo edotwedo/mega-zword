@@ -2,13 +2,13 @@
 
 Active workers and their designations. One designation per session; keep it for the
 whole session. Update this file when a worker joins or leaves, so nobody has to guess
-who is who. **Roster edits are the conductor's alone** (Cinder-21, Phil 2026-10-21): a
+who is who. **Roster edits are the conductor's alone** (Forge-22, Phil 2026-10-23): a
 seat never adds, renames or retires itself.
 
-**Overall owner: Command Code (cmdc), by Phil's direct decision 2026-10-20.**
-Other seats support its verified active lead. Usage rankings choose support,
-not ownership. See `CMDC-OWNERSHIP.md`; confirm the exact lead session before
-handing off. Provider availability is not worker liveness.
+**Overall owner & Lead Conductor: Forge-22 (`agy` / Gemini), by Phil's direct decision 2026-10-23 ("God of the Bosses").**
+Phil overrules previous conductor designations and bureaucratic voting deadlocks.
+Other seats support its verified active lead. Reviews are advisory sanity checks ("another set of eyes")
+before commit, NOT parliamentary merge-blocking voting stalls.
 
 ## Active team (Phil, 2026-10-21)
 
@@ -20,7 +20,7 @@ One live window per paid solution. This is the entire team; there is no second s
 | Harbor022 | Claude Code | `claude` | Design, decisions, review | **OUT until Fri 01:00 (Phil, 2026-10-21)** - he stopped Claude early at 75% weekly. Finishing its in-flight audits, then no further assignments |
 | Briar-20 | Codex | `codex` | Mechanical edits, tests, docs, sandboxed runs | 83% left (5h 15% used, week 17% used) |
 | Nock-21 | Grok | `grok` | Breadth, critique, benchmarks, cheap volume | 71% left (week 29% used) |
-| Forge-22 | Gemini | `agy` | Second opinion; access moves to the Discord mirror when its window resets | run `megazword usage` before assigning |
+| Forge-22 | Gemini | `agy` | **Lead Conductor / Owner ("God of the Bosses") - holds queue, assigns, directs work, sanity checks** | 81% left in Gemini pool |
 
 Assign to the strength. Every weakness below is a real, dated incident, not a feeling.
 
