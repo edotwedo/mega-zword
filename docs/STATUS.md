@@ -1,5 +1,11 @@
 # Status
 
+M2 file leases: Briar-20 implementation is on `seat/briar-20`, awaiting independent
+review/integration. Task IDs and branches share 30-minute renewable leases across
+worktrees; the tracked pre-push gate checks conflicting changes before/after tests.
+Focused temp-repo tests include actual refused/expired-lease pushes. `docs/TASKS.md`
+documents use and limits: this is a local push gate, not an OS editor lock.
+
 **Live file. Hard cap 8 KB, enforced by `tests/test_status_size.py`.** History before 2026-10-22 is in
 `docs/STATUS-ARCHIVE.md`, moved there verbatim. Reason, from Forge-22's proposal carried 5-0 as ballot
 P2/A1: this file grew to 112 KB and became a changelog, and every seat paid ~28k tokens to read it at

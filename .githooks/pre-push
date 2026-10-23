@@ -18,9 +18,12 @@ fi
 # and running it anyway cost a four-minute push for nothing (2026-10-19).
 saw_any=0
 deletes_only=1
+push_refs=""
 while read -r local_ref _local_sha _remote_ref _remote_sha; do
   [ -n "${local_ref:-}" ] || continue
   saw_any=1
+  push_refs="${push_refs}${local_ref} ${_local_sha} ${_remote_ref} ${_remote_sha}
+"
   [ "$local_ref" = "(delete)" ] || deletes_only=0
 done
 if [ "$saw_any" = "1" ] && [ "$deletes_only" = "1" ]; then
@@ -57,6 +60,14 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR \
 
 cd "$root" || exit 0
 
+# M2/P3: use THIS worktree's task gate; another checkout's installed code may be old.
+# Check before spending the suite, then again after it (leases may change meanwhile).
+task_gate() {
+  printf '%s' "$push_refs" | PYTHONPATH="$root/src" "$python" -c \
+    'from megazword.task import pre_push; raise SystemExit(pre_push())'
+}
+if ! task_gate; then exit 1; fi
+
 # Ballot P2/A2: docs/MEMORY-INDEX.md is generated, and the gate is what regenerates it, so a
 # stale index cannot land. PYTHONPATH points at THIS worktree's src: the venv is an editable
 # install of the main checkout, and the last time the hook trusted that it tested the wrong tree.
@@ -70,6 +81,7 @@ fi
 
 echo "land-gate: running the suite before this push (a few minutes)"
 if "$python" -m pytest -q; then
+  if ! task_gate; then exit 1; fi
   echo "land-gate: suite passed"
   exit 0
 fi

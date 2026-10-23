@@ -22,7 +22,7 @@ COMMAND_GROUPS = {
     "Ask": ("run", "review", "chat", "retry", "room", "night", "heartbeat", "job", "vote"),
     "See": ("start", "usage", "credits", "scout", "plan", "route-lab", "stats", "advise", "dashboard", "projects", "history", "export",
             "sentinel", "floor", "brief", "announce", "free", "map", "spot", "startup"),
-    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat", "wake", "rules", "guard"),
+    "Set up": ("init", "doctor", "keys", "out", "backends", "app", "mcp", "tab", "andon", "gate", "resume", "seat", "wake", "rules", "guard", "task"),
     "Memory": ("note", "decide", "import-hive", "index"),
 }
 
@@ -201,6 +201,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_rules_parser(sub)
     from .usage_guard import add_parser as add_guard_parser
     add_guard_parser(sub)
+    from .task import add_parser as add_task_parser
+    add_task_parser(sub)
 
     out = sub.add_parser("out", help="keep auto-picks and background jobs off an AI")
     out.add_argument("ai", nargs="?", help="which AI; leave out to list current marks")
@@ -464,6 +466,9 @@ def main(argv: list[str] | None = None,
     if argv is None:  # real CLI run, not a test calling main([...])
         config.load_user_env()
     args = build_parser().parse_args(argv)
+    if args.command == "task":
+        from .task import command
+        return command(args)
     if args.command == "route-lab":
         from .router_lab import command as route_lab_command
         return route_lab_command(args)
