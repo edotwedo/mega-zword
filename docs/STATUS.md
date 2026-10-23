@@ -33,7 +33,7 @@ tokens, fixed Worker claim guard, `guard` (monthly pace guard: projects each win
 throttles a plan running ahead of its monthly clock, posts one line when the state changes).
 Still `[to build]`: M1 merge queue, M2 file locks, M3 machine-checked review, M6 command grammar.
 
-**Team.** Cinder-21 (conductor), Harbor022 (out until Fri 01:00), Briar-20, Nock-21, Forge-22.
+**Team.** Forge-22 (Lead Conductor / Owner, Phil 2026-10-23), Cinder-21 (cmdc, rotated), Harbor022, Briar-20/22, Nock-21.
 Forge-22 runs in its real conversation `3bc1d242`, but Windows Terminal is elevated, so SendKeys
 cannot reach it - Phil can type there, the supervisor cannot.
 
