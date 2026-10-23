@@ -22,11 +22,19 @@ from typing import Callable
 from . import config
 from .filelock import locked, write_atomic
 
-# Phil's lanes. A message from here always wakes the conductor.
+# Phil's lanes. A message from here always wakes the conductor. Editable: `[phil] authors`
+# in config.toml overrides it, so a new instance of his is recognised without a code change.
 PHIL_LANES = ("phil", "phone", "grok-web")
 # A web lane may only wake when it names Phil as the source; on its own it is teammate data.
 WEB_LANES = ("claude-web", "chatgpt", "gemini-web")
 RELAY = re.compile(r"\b(relay|relaying|from phil|phil (?:says|asks|wants|directly))\b", re.IGNORECASE)
+
+
+def _phil_lanes() -> tuple[str, ...]:
+    try:
+        return tuple(config.phil_authors())
+    except (OSError, ValueError, TypeError):
+        return PHIL_LANES
 
 
 def _field(message, name, default=""):
@@ -53,7 +61,7 @@ def _identifier(message) -> int:
 def is_wake(text: str, author: str) -> bool:
     """Whether this message should start the conductor's turn."""
     lane = (author or "").strip().lower()
-    if lane in PHIL_LANES:
+    if lane in _phil_lanes():
         return True
     if lane in WEB_LANES:
         return bool(RELAY.search(text or ""))

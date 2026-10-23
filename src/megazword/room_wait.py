@@ -18,9 +18,16 @@ from pathlib import Path
 from . import config
 from .room import DEFAULT_ROOM, RemoteRoom, room_dir
 
-# Phil confirmed grok-web as his lane in a direct PC chat (2026-10-20).
-# These lanes wake listeners; independently generated AI proposals remain communications.
+# Phil confirmed grok-web as his lane in a direct PC chat (2026-10-20). Editable since
+# 2026-10-23: `[phil] authors` in config.toml overrides it, so a new instance of his is
+# recognised without a code change.
 PHIL_AUTHORS = ("phil", "phone", "grok-web")
+
+
+def phil_authors() -> tuple[str, ...]:
+    return config.phil_authors()
+
+
 STREAM = "https://ntfy.sh/{topic}/json"
 SIGNAL = re.compile(r"hive:\d+")
 FIRST_DELAY = 5
@@ -43,7 +50,7 @@ def _unseen(room_obj, last: int):
     """Only Phil's lanes are actionable, including ANNOUNCE lines."""
     return [m for m in room_obj.cached()
             if m.remote_id > last
-            and m.author in PHIL_AUTHORS]
+            and m.author in phil_authors()]
 
 
 def _event(line) -> dict:
