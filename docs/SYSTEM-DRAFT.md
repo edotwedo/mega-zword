@@ -28,10 +28,12 @@ with its seat's heartbeat. **Hot files are never locked:** `cli.py`, `STATUS.md`
 almost every task, so locking them would serialize the whole team. They rely on M1's queue order.
 
 **M3. "Done" is machine-checked, never self-declared.** `[to build]`
-A task closes only when its branch exists, its tests pass in a clean checkout, a review verdict is
-posted against that task id by **any provider other than the author**, and the integrator merged it.
-**Amended from P1:** not one designated reviewer - any non-author will do, because one spent
-reviewer must never block every merge.
+A task closes only when its branch exists, its tests pass in a clean checkout, and the integrator
+merged it. **Amended from P1:** not one designated reviewer - any non-author provider will do, because
+one spent reviewer must never block every merge. **Amended by ballot P6 (carried 3-0, 2026-10-22):**
+the second-vendor review is required **only for code** - `src/`, `tests/`, `.githooks/`, `cloud/` -
+and docs, config and data land without that wait. "Code" is defined by path so the rule is
+machine-checkable, and a review has a **bounded window** so one spent reviewer cannot block a merge.
 
 **M4. Liveness is observed, never asserted.** `[partly live]`
 Each agent writes its own heartbeat: monotonic tick, last room id read, timestamp. The watchdog fires
@@ -61,7 +63,8 @@ order created this mechanism, and it now applies to itself: the next change here
 ## Guarantees
 
 1. No file is edited by two tasks at once - lock with expiry, enforced at push.
-2. Nothing lands unreviewed - a review by any non-author is required to merge.
+2. No **code** lands unreviewed - a second-vendor review is required for `src/`, `tests/`,
+   `.githooks/` and `cloud/`; docs, config and data are exempt (P6).
 3. Nothing dies silently - watchdog on a monotonic heartbeat plus a daily synthetic probe.
 4. No instruction is lost or invented - append-only ingress with ids and acknowledgement states.
 5. No rule changes without a vote - `megazword rules check` fails the suite, and the suite is the gate.
