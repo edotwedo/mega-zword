@@ -23,6 +23,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/FEATURES.md` | 4.7 kB | when you are adding a user-facing feature |
 | `docs/FREE-MODEL-ROSTER.md` | 24.4 kB | when picking a free model or provider |
 | `docs/GUIDE.md` | 48.8 kB | when writing user-facing documentation |
+| `docs/HERMES-KILLER-BENCHMARK.md` | 2.9 kB | when your task names it, or changes what it describes |
 | `docs/HIVE-RECOVERY.md` | 5.2 kB | when a seat is dead, wedged or needs respawning |
 | `docs/INSPIRATION-ROADMAP.md` | 6.2 kB | when sequencing ideas into work |
 | `docs/INSPIRATION.md` | 7.9 kB | when you need direction on what this is for |
