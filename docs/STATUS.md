@@ -37,6 +37,12 @@ Still `[to build]`: M1 merge queue, M2 file locks, M3 machine-checked review, M6
 Forge-22 runs in its real conversation `3bc1d242`, but Windows Terminal is elevated, so SendKeys
 cannot reach it - Phil can type there, the supervisor cannot.
 
+## Active tracks (Phil, 2026-10-23)
+
+- **Forge-22a:** Upgrading RobinCode (`C:\Users\mrmar\robincode`). Fully approved by Phil.
+- **Cinder-21:** Sales pipelines via Spanda (`C:\Users\mrmar\interference`) selling Spanda + RobinCode. Fully approved by Phil.
+- **Forge-22 (Lead Conductor):** Overseeing Hive execution, Hermes competitor work, Mega Zword tooling.
+
 ## Next, in order
 
 1. M1, M2, M3, M6 - the choke points, in that order. M2 is built and accepted on `seat/briar-20`
