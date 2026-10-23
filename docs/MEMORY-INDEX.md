@@ -37,6 +37,8 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/RELEASE-NOTES.md` | 7.8 kB | when preparing a release |
 | `docs/REPO-MAP.md` | 1.7 kB | when you need to find code without reading all of it |
 | `docs/REVENUE-OS.md` | 3.8 kB | when the task is the revenue operating system |
+| `docs/ROADMAP-model-switching-facts.md` | 5.6 kB | when your task names it, or changes what it describes |
+| `docs/ROADMAP-model-switching.md` | 9.5 kB | when your task names it, or changes what it describes |
 | `docs/ROADMAP.md` | 7.9 kB | when choosing what to build next |
 | `docs/ROUTING_RESEARCH.md` | 9.0 kB | when the task is model routing |
 | `docs/TASKS.md` | 1.9 kB | when your task names it, or changes what it describes |
