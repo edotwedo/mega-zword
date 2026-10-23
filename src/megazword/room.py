@@ -600,7 +600,7 @@ class RemoteRoom:
 
 
 def report_rejected(client: RemoteRoom, write: Callable[[str], None]) -> None:
-    for reason in client.rejected:
+    for reason in getattr(client, "rejected", ()):
         safe_write(write, f"[megazword room] the room refused a queued post ({reason}); "
                           f"it was set aside in {client.queue.with_suffix('.rejected.json').name}")
 
