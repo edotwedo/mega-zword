@@ -20,6 +20,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/BUSINESS-PLAN.md` | 7.5 kB | when the task is the plan to make money |
 | `docs/CLOUD-ROOM.md` | 8.1 kB | when the task touches the Worker, the room protocol or Discord |
 | `docs/CMDC-OWNERSHIP.md` | 4.0 kB | when ownership or the usage meter is in question |
+| `docs/EXTRACT-freebuff.md` | 11.6 kB | when your task names it, or changes what it describes |
 | `docs/FEATURES.md` | 4.7 kB | when you are adding a user-facing feature |
 | `docs/FREE-MODEL-ROSTER.md` | 24.4 kB | when picking a free model or provider |
 | `docs/GUIDE.md` | 48.8 kB | when writing user-facing documentation |
