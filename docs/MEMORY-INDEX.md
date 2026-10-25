@@ -8,7 +8,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 
 | File | Size | Load when |
 | --- | --- | --- |
-| `docs/STATUS.md` | 4.3 kB | always - current state and the exact next step |
+| `docs/STATUS.md` | 4.2 kB | always - current state and the exact next step |
 | `docs/SPEC.md` | 12.1 kB | when the task changes what we are building, or a decision behind it |
 | `docs/DECISIONS.md` | 23.2 kB | when you are changing or questioning a past choice with Phil |
 | `docs/HIVE-ROSTER.md` | 4.6 kB | when you need a seat's role, window or designation shape |
