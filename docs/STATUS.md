@@ -1,5 +1,7 @@
 # Status
 
+**Active: Nock-21 (Grok), 2026-10-25.** F1b Worker claim guard. Blank quoted claims register nothing. `releasing 'item'` clears a held quoted name, including another seat's release. Phil deploys the Worker. Not deployed here.
+
 M2 file leases: Briar-20 implementation is on `seat/briar-20`, awaiting independent
 review/integration. Task IDs and branches share 30-minute renewable leases across
 worktrees; the tracked pre-push gate checks conflicting changes before/after tests.

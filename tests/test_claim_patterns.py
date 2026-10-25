@@ -35,6 +35,7 @@ BODIES = [
     ("claiming seat watch", None), ("claiming", None),
     ("claiming work about 'seat watch'", None),
     ("claiming 'x'", None), ("claiming ''", None),
+    ("claiming '   '", None), ('claiming "  "', None),
     ("status - working on #21", None), ("not claiming #21", None),
     ("releasing 'seat watch'", None),
 ]

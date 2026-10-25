@@ -506,6 +506,27 @@ test('a quoted-name claim is registered and blocks a second seat', async () => {
   assert.equal((await post(b, "nock-21: claiming 'floor numbers'", e)).status, 201);
 });
 
+test('a blank quoted claim registers nothing', async () => {
+  const a = crypto.randomUUID();
+  const e = await seatsEnv([[a, 'nock-21']]);
+  for (const text of ["nock-21: claiming ''", 'nock-21: claiming "   "', "nock-21: claiming '  '"]) {
+    assert.equal((await post(a, text, e)).status, 201, text);
+  }
+  // The seat still has its one claim free, so none of those posts registered.
+  assert.equal((await post(a, "nock-21: claiming 'real work'", e)).status, 201);
+});
+
+test('releasing a quoted item clears it', async () => {
+  const a = crypto.randomUUID(), b = crypto.randomUUID();
+  const e = await seatsEnv([[a, 'briar-20'], [b, 'harbor022']]);
+  assert.equal((await post(a, "briar-20: claiming 'seat watch'", e)).status, 201);
+  assert.equal((await post(a, "briar-20: releasing 'seat watch'", e)).status, 201);
+  assert.equal((await post(b, "harbor022: claiming 'seat watch'", e)).status, 201);
+  // Another seat's release must clear a quoted hold the same way it clears #N.
+  assert.equal((await post(a, "briar-20: releasing 'seat watch'", e)).status, 201);
+  assert.equal((await post(a, "briar-20: claiming 'seat watch'", e)).status, 201);
+});
+
 test('one open claim per seat is still the cap', async () => {
   const a = crypto.randomUUID();
   const e = await seatsEnv([[a, 'cinder-21']]);

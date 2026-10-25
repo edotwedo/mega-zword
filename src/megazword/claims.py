@@ -165,7 +165,14 @@ def item_keys(text):
     Only a leading quote names the item: "conductor ... Phil's words, "conduct ..."" is
     a quotation, and counting it made a phantom claim that blocked its seat."""
     named = NAME.match(text.lstrip())
-    return item_numbers(text) | ({_name(next(g for g in named.groups() if g))} if named else set())
+    keys = set(item_numbers(text))
+    if named:
+        # Whitespace-only quotes are not a name. An empty key is true for every
+        # `in` check, so it would register a phantom claim and match every release.
+        name = _name(next(g for g in named.groups() if g))
+        if name:
+            keys.add(name)
+    return keys
 
 
 def mentions(body, keys):

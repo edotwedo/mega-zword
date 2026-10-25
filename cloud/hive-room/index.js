@@ -203,12 +203,24 @@ const itemNumbers = text => new Set([...String(text || '').matchAll(/#(\d+)\b|\b
 // Only a LEADING quote names the item, because a quote further in is usually a quotation.
 const quotedName = text => {
   const match = /^\s*['"`]([^'"`\n]{2,60})['"`]/.exec(String(text || ''));
-  return match ? match[1].trim().toLowerCase().replace(/\s+/g, ' ') : null;
+  if (!match) return null;
+  // Empty or whitespace after unquoting is not an item. Returning "" would make
+  // "".includes match every release and turn a blank claim into a phantom hold.
+  const name = match[1].trim().toLowerCase().replace(/\s+/g, ' ');
+  return name || null;
 };
 const overlaps = (a, b) => {
   const nameA = quotedName(a), nameB = quotedName(b);
   if (nameA && nameB) return nameA === nameB;
   return [...itemNumbers(a)].some(n => itemNumbers(b).has(n));
+};
+// A release names a quoted item in the sentence ("releasing 'seat watch'"), not as
+// a leading quote. Numbers already match anywhere. A blank name must not.
+const mentionsItem = (heldItem, body) => {
+  if (overlaps(heldItem, body)) return true;
+  const name = quotedName(heldItem);
+  if (!name) return false;
+  return String(body || '').toLowerCase().replace(/\s+/g, ' ').includes(name);
 };
 const released = body => releaseVerb.test(body.replace(/\b(?:not|never|no|isn't|isnt|hasn't|hasnt|won't|wont)\s+(?:yet\s+)?\w+/gi, ' '));
 
@@ -234,7 +246,7 @@ function activeClaims(messages, now) {
       continue;
     }
     for (const [holder, held] of active) {
-      if ((overlaps(held.item, body) && released(body)) ||
+      if ((mentionsItem(held.item, body) && released(body)) ||
           (holder === key && /\b(releasing|released|dropping|dropped)\b/i.test(body)))
         active.delete(holder);
     }
