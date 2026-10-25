@@ -8,7 +8,7 @@
 # It is deliberately quiet: no output unless it actually wakes someone, so a scheduled task
 # leaves no log noise.
 param(
-    [int]$Interval = 30,
+    [int]$Interval = 60,
     [string]$Tab = 'cinder-21',
     [switch]$Once,
     [switch]$DryRun
