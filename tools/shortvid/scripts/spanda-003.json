@@ -1,0 +1,13 @@
+{
+  "id": "spanda-003",
+  "brand": "Spanda",
+  "highlight": ["five", "one", "tone"],
+  "scenes": [
+    {"kicker": "Pick your voice", "text": "Five tones. One knob."},
+    {"text": "Helpful Nerd. Chill Neighbor.", "sub": "Friendly and useful."},
+    {"text": "Savage Poacher. Unapologetic Ad. Midnight Hacker.", "sub": "When you want an edge."},
+    {"text": "Spanda drafts it in your tone. You approve it."}
+  ],
+  "caption": "Spanda's tone knob: five voices for every reply it drafts. You approve before anything posts.",
+  "hashtags": ["leadgen", "copywriting", "startup", "smallbusiness"]
+}

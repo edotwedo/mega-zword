@@ -1,0 +1,14 @@
+{
+  "id": "spanda-002",
+  "brand": "Spanda",
+  "highlight": ["don't", "helpful", "approve"],
+  "scenes": [
+    {"kicker": "Reddit tip", "text": "New accounts that drop links get removed."},
+    {"text": "So don't lead with a link. Lead with an answer."},
+    {"kicker": "How Spanda works", "text": "It finds the question and drafts a helpful answer first."},
+    {"text": "Paced posting. You approve every reply.", "sub": "No spam blasts."},
+    {"text": "Help first. Sell second. Spanda."}
+  ],
+  "caption": "Fresh Reddit accounts that post links get filtered. Answer the question first. Spanda finds the questions and drafts the answer; you approve it.",
+  "hashtags": ["reddit", "marketing", "indiehacker", "leadgen"]
+}
