@@ -288,7 +288,7 @@ def parse_agy_usage(data: dict) -> list[Window]:
         if not isinstance(group, dict):
             continue
         gname = str(group.get("name") or "")
-        is_gemini = "gemini" in gname.lower()
+        is_gemini = gname.strip().lower() == "gemini models"
         for bucket in group.get("buckets") or []:
             if not isinstance(bucket, dict) or bucket.get("remaining_fraction") is None:
                 continue
