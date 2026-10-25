@@ -25,27 +25,51 @@ RULES_FILE = REPO / "docs" / "SYSTEM-DRAFT.md"
 
 
 def hash_of(path: Path | None = None) -> str:
+    """The digest of a file's contents, line endings normalised to LF.
+
+    Git stores LF and Windows checks the file out as CRLF, so hashing the raw bytes made the
+    working-tree copy and the committed copy of the SAME revision disagree: `approve` (working
+    tree) could never satisfy `check` (git blob) on Windows. Normalising first makes the two agree.
+    """
     target = path or RULES_FILE
-    return hashlib.sha256(target.read_bytes()).hexdigest()
+    return hashlib.sha256(target.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
-def approved_hash(path: Path | None = None) -> str:
-    """The hash of the rules file AS COMMITTED ON origin/main.
+def head_hash(path: Path | None = None) -> str:
+    """The hash of the rules file AS COMMITTED IN HEAD - the copy a push would actually land.
 
-    Hashing each worktree's copy made every seat that was behind main fail a test about a file it
-    never touched - Quill-21 and Nock-21 both hit it on 2026-10-21 and could not land work. Comparing
-    against main instead means a stale checkout passes and a genuinely unvoted change still fails,
-    because it has to reach main to matter.
+    `check` runs in the worktree, so HEAD is what a pre-push run is about to send. Comparing the
+    committed revision is what catches an unvoted edit that has been committed; asking only about
+    origin/main let such an edit through untouched.
     """
     target = path or RULES_FILE
     try:
         shown = str(target.relative_to(REPO)).replace("\\", "/")
     except ValueError:
-        return hash_of(target)  # a test path outside the repo has no main to ask
+        return hash_of(target)  # a test path outside the repo has no HEAD blob to ask
+    proc = subprocess.run(["git", "show", f"HEAD:{shown}"], cwd=str(REPO), capture_output=True)
+    if proc.returncode != 0 or not proc.stdout:
+        return hash_of(target)  # no HEAD yet (fresh repo), fall back to the file
+    return hashlib.sha256(proc.stdout).hexdigest()
+
+
+def approved_hash(path: Path | None = None) -> str | None:
+    """The hash of the rules file AS COMMITTED ON origin/main, or None when there is no main.
+
+    Comparing against main means a stale checkout is not mistaken for an unvoted change: a seat
+    that is simply behind main has not altered the rules, so `check` allows it (Quill-21 and
+    Nock-21 hit the opposite in 2026-10-21 and could not land work). When there is nothing to ask
+    there is no allowance to grant, so this returns None rather than a hash of the local copy.
+    """
+    target = path or RULES_FILE
+    try:
+        shown = str(target.relative_to(REPO)).replace("\\", "/")
+    except ValueError:
+        return None  # a test path outside the repo has no main to ask
     proc = subprocess.run(["git", "show", f"origin/main:{shown}"], cwd=str(REPO),
                           capture_output=True)
     if proc.returncode != 0 or not proc.stdout:
-        return hash_of(target)  # no origin/main yet (fresh clone), fall back to the file
+        return None  # no origin/main yet (fresh clone) or the file is not on main
     return hashlib.sha256(proc.stdout).hexdigest()
 
 
@@ -66,12 +90,13 @@ def check(home: Path | None = None, path: Path | None = None) -> tuple[bool, str
     if not recorded.get("sha256"):
         return False, ("the rules have no recorded ballot: run `megazword rules approve <ballot>` "
                        "after a vote, or the suite will keep failing")
-    current = approved_hash(path)
-    if current != recorded["sha256"]:
-        return False, (f"the rules changed without a vote (approved {recorded['ballot']} at "
-                       f"{recorded.get('approved', '?')}); hold a ballot and run "
-                       f"`megazword rules approve <ballot>`")
-    return True, f"rules approved by {recorded['ballot']} at {recorded.get('approved', '?')}"
+    candidate = head_hash(path)  # the copy this push would actually land
+    behind = approved_hash(path)  # origin/main's copy, or None when there is no main to ask
+    if candidate == recorded["sha256"] or (behind is not None and candidate == behind):
+        return True, f"rules approved by {recorded['ballot']} at {recorded.get('approved', '?')}"
+    return False, (f"the rules changed without a vote (approved {recorded['ballot']} at "
+                   f"{recorded.get('approved', '?')}); hold a ballot and run "
+                   f"`megazword rules approve <ballot>`")
 
 
 def approve(ballot: str, *, home: Path | None = None, path: Path | None = None,
@@ -85,6 +110,10 @@ def approve(ballot: str, *, home: Path | None = None, path: Path | None = None,
     if not result["reached"]:
         raise ValueError(f"{ballot.upper()} has not reached quorum ({len(result['cast'])} of "
                          f"{result['quorum']}) - no approval recorded")
+    if not result["items"]:
+        # With no items there are no counts to reject against, so three "no" votes on a whole-
+        # proposal ballot would sail through the filter below. An empty ballot approves nothing.
+        raise ValueError("ballot has no items - refusing to record an approval")
     rejected = [item for item, counts in result["counts"].items() if counts["no"] >= counts["yes"]]
     if rejected:
         raise ValueError(f"{ballot.upper()} did not carry {', '.join(rejected)} - no approval recorded")
