@@ -1,0 +1,15 @@
+{
+  "id": "spanda-001",
+  "brand": "Spanda",
+  "highlight": ["asking", "you", "approve", "$29.99"],
+  "scenes": [
+    {"kicker": "Stop cold DMing", "text": "Your next customer is asking for help right now."},
+    {"text": "On Reddit. Hacker News. Stack Exchange. Forums.", "sub": "Not in your inbox."},
+    {"kicker": "Spanda", "text": "Spanda finds the people asking for what you sell."},
+    {"text": "It scores every lead and drafts a helpful reply.", "sub": "You pick the tone."},
+    {"text": "You approve every reply before it goes out."},
+    {"kicker": "One price", "text": "$29.99. Find your first customers this week."}
+  ],
+  "caption": "Your customers are already asking for help in public. Spanda finds them, scores them, and drafts a reply you approve. $29.99.",
+  "hashtags": ["leadgen", "indiehacker", "smallbusiness", "reddit", "startup"]
+}
