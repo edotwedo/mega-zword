@@ -12,13 +12,22 @@ from pathlib import Path
 
 DEFAULT_CHARS = 6000  # ~1.5k tokens
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
-             ".expo", ".next", "coverage", ".mypy_cache", ".pytest_cache"}
+             ".expo", ".next", "coverage", ".mypy_cache", ".pytest_cache", "bin", "obj"}
 MAX_FILE = 400_000
 PY = re.compile(r"^( {0,4})(?:async\s+)?(class|def)\s+([A-Za-z]\w*)\s*(\([^)]*\)?)?")
 JS = re.compile(r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?"
                 r"(function\*?|class|interface|type|enum|const)\s+([A-Za-z]\w*)")
+# C#: types at any indent (they sit inside namespaces), and methods/constructors that carry
+# an access modifier. private members are skipped, like _names in Python.
+CS_MODS = r"(?:(?:public|internal|protected|private|static|sealed|abstract|partial|readonly|unsafe|new|ref)\s+)*"
+CS_TYPE = re.compile(r"^\s*" + CS_MODS + r"(class|interface|struct|enum|record(?:\s+struct|\s+class)?)\s+([A-Za-z_]\w*)")
+CS_METHOD = re.compile(r"^\s*((?:(?:public|internal|protected|private|static|async|override|virtual|abstract"
+                       r"|sealed|extern|unsafe|new|partial)\s+)+)(?:[\w<>\[\],.?]+(?:\s*<[^()]*?>)?\s+)?"
+                       r"([A-Za-z_]\w*)\s*(?:<[^()]*>)?\s*(\([^)]*\)?)")
+CS_KEYWORDS = {"if", "for", "foreach", "while", "switch", "using", "lock", "catch", "return",
+               "new", "await", "throw", "get", "set", "event", "delegate", "operator"}
 WORD = re.compile(r"[A-Za-z_]\w{3,}")
-LANGS = {".py": "py", ".ts": "js", ".tsx": "js", ".js": "js", ".jsx": "js", ".mjs": "js"}
+LANGS = {".py": "py", ".ts": "js", ".tsx": "js", ".js": "js", ".jsx": "js", ".mjs": "js", ".cs": "cs"}
 
 
 def _files(root: Path):
@@ -46,6 +55,17 @@ def symbols(text: str, lang: str) -> list[tuple[int, str, str]]:
                 continue
             indent = "  " if m.group(1) else ""
             found.append((number, m.group(3), f"{indent}{m.group(2)} {m.group(3)}{m.group(4) or ''}"))
+        elif lang == "cs":
+            m = CS_TYPE.match(line)
+            if m:
+                if "private" not in line.split(m.group(1))[0].split():
+                    found.append((number, m.group(2), f"{m.group(1)} {m.group(2)}"))
+                continue
+            m = CS_METHOD.match(line)
+            if not m or "private" in m.group(1).split() or m.group(2) in CS_KEYWORDS:
+                continue
+            sig = " ".join(line.strip().split())
+            found.append((number, m.group(2), "  " + sig.split(")")[0] + (")" if ")" in sig else "")))
         else:
             m = JS.match(line)
             if not m or (m.group(1) == "const" and not line.startswith("export")):

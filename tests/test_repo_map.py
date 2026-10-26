@@ -53,3 +53,47 @@ def test_map_command_prints(tmp_path, capsys):
     args = build_parser().parse_args(["map", "--root", str(tmp_path), "engine"])
     assert repo_map.command(args) == 0
     assert capsys.readouterr().out.startswith("core.py:")
+
+
+CS = """namespace RobinCode
+{
+    public sealed partial class RobinForm : Form
+    {
+        public RobinForm()
+        {
+            if (ready) { Start(); }
+        }
+        public async Task<string> RunPromptStreamAsync(string prompt, CancellationToken ct)
+        {
+            return await Send(prompt);
+        }
+        private void Hidden() { }
+        internal static int Count<T>(List<T> items) => items.Count;
+    }
+    private class Secret { }
+    public interface IClient { }
+    public record Reply(string Text);
+}
+"""
+
+
+def test_symbols_reads_csharp_types_and_non_private_methods():
+    names = [name for _, name, _ in repo_map.symbols(CS, "cs")]
+    assert names == ["RobinForm", "RobinForm", "RunPromptStreamAsync", "Count", "IClient", "Reply"]
+
+
+def test_csharp_signature_keeps_parameters():
+    sigs = {name: sig for _, name, sig in repo_map.symbols(CS, "cs")}
+    assert sigs["RunPromptStreamAsync"].endswith("RunPromptStreamAsync(string prompt, CancellationToken ct)")
+
+
+def test_build_maps_csharp_and_skips_bin_obj(tmp_path):
+    (tmp_path / "RobinForm.cs").write_text(CS, encoding="utf-8")
+    (tmp_path / "Program.cs").write_text(
+        "static class Program {\n    static void Main() { new RobinForm(); }\n}\n", encoding="utf-8")
+    for d in ("bin", "obj"):
+        (tmp_path / d).mkdir()
+        (tmp_path / d / "Gen.cs").write_text("public class Generated { }\n", encoding="utf-8")
+    text = repo_map.build(tmp_path)
+    assert "RobinForm.cs:" in text and "RunPromptStreamAsync" in text
+    assert "Generated" not in text and "Hidden" not in text and "Secret" not in text
