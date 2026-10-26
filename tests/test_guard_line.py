@@ -36,3 +36,17 @@ def test_out_and_gap_plans_both_appear():
 
 def test_nothing_wrong_is_a_silent_line():
     assert usage_guard._line({"plans": [_plan("claude", "free", 10.0, 0.0)]}) == ""
+
+
+def test_the_line_names_the_window_the_gap_belongs_to_and_its_usage():
+    # gap_windows sorts "5-hour" first; the old line labelled a weekly gap as a 5-hour one.
+    plan = _plan("codex", "free", 40.0, 3.0, ["5-hour", "weekly"])
+    plan.update(gap_window="weekly", gap_used_percent=40.0)
+    line = usage_guard._line({"plans": [plan]})
+    assert "codex weekly 40% used, would run dry ~3d before its weekly reset" in line
+    assert "5-hour reset" not in line
+
+
+def test_a_gap_under_half_a_day_is_not_posted():
+    # "~0d" read as "empty now" while the plan sat at 30%.
+    assert usage_guard._line({"plans": [_plan("claude", "free", 30.0, 0.4, ["weekly"])]}) == ""

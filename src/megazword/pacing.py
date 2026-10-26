@@ -29,6 +29,12 @@ MONTHLY_PACE_MARGIN = 5.0
 # "Use it or lose it": a window this close to its reset, still above its
 # own reserve, gets spent first, even on easy tasks.
 BURN_BEFORE_RESET = {"5-hour": timedelta(hours=1), "weekly": timedelta(hours=24)}
+# A projection is a straight line from the window's start. Too early in a window, or on too
+# little usage, one burst (a night shift, a big first job) projects a dry-out that never comes:
+# 2026-10-24/25 the guard said claude and codex "would run dry ~0-7d" early, while Phil's own
+# apps showed claude at 30% weekly "on track" and codex at 100% weekly left. Below these, no gap.
+MIN_ELAPSED_FRACTION = 0.08   # ~24 min of a 5-hour, ~13 h of a week, ~2.4 days of a month
+MIN_USED_PERCENT = 10.0
 
 
 @dataclass
@@ -71,7 +77,8 @@ def project(window: Window, now: datetime | None = None) -> float | None:
 
     `pace` says how far ahead of its own clock a window is today; this says when it hits
     100% if nothing changes. None means it cannot be projected - no reset, an unknown
-    window, a fresh cycle (reset exactly one window away), or no usage yet. The value is
+    window, too early in the cycle (under MIN_ELAPSED_FRACTION), or too little usage
+    (under MIN_USED_PERCENT) for a straight line to mean anything. The value is
     clamped at 0: a window that outlasts its reset has no gap.
     """
     now = now or datetime.now(timezone.utc)
@@ -85,7 +92,7 @@ def project(window: Window, now: datetime | None = None) -> float | None:
         reset = reset.replace(tzinfo=timezone.utc)
     elapsed_fraction = 1.0 - (reset - now).total_seconds() / length.total_seconds()
     used = float(window.used_percent)
-    if elapsed_fraction <= 0 or used <= 0:
+    if elapsed_fraction < MIN_ELAPSED_FRACTION or used < MIN_USED_PERCENT:
         return None
     rate = used / elapsed_fraction  # percent used per whole-window fraction
     remaining_fraction = 1.0 - elapsed_fraction
