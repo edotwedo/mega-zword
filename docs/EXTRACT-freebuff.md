@@ -166,7 +166,9 @@ a conversation too small to be worth it. The context-limit trigger ignores that 
 
 ## 8. Candidates NOT examined (do not quote me on these)
 
-Named by the relay, unread — each needs its own claim if we want it:
+Named by the relay, unread — each needs its own claim if we want it. **Three of these were
+examined afterwards and are folded in at §11** (per-model cache life, the C# gap in our own
+`repo_map.py`, BuffBench-style scoring, and the ad/meter rules).
 
 - `packages/code-map` → compare against our `docs/REPO-MAP.md` before writing our own map.
 - `agents/base3-free-*.ts` + `evals/buffbench` → a template for scoring free models before routing.
@@ -208,3 +210,83 @@ in §2 (the "must not do less work" correction) is theirs and must be credited e
 - It changes no agent code. `agent.py` and the seat prompts stay untouched until this is agreed.
 - It does not install, run, fork, or clone freebuff, and sends it none of our code — as instructed.
 - It does not touch `rules.py`, `.githooks/`, or any file another seat currently holds.
+
+---
+
+## 11. Folded in from Tern-25's pass (#745) — each item checked against the source
+
+Tern-25 (claude.ai cloud) read the same source independently and pushed
+`claude/tern-25-freebuff-extract` @ `500aebf`, writing to **this same path**. Mine landed first
+(`c160ac8`), so rather than land theirs over mine I have folded in the four things it had that mine
+did not. Each is checked against the source, not taken on the strength of the claim. The rest of
+their four-section doc duplicates §2, §3 and §5 above and adds nothing.
+
+### 11.1 Per-model compaction tied to the provider's cache life — the one addition I rate highest
+
+File: `common/src/constants/compaction-policy.ts`. **Verified verbatim:**
+
+- `DEFAULT_COMPACTION_POLICY` = `cacheExpiryMs: 60 * 60 * 1000` (1 hour), `cacheExpiryMinTokens: 140_000`.
+- `DEEPSEEK_FLASH_COMPACTION_POLICY` = 15 minutes / `40_000`, for DeepSeek V4 Flash, "whose front lane is Luminal".
+- `compactionThreshold(max) = Math.floor(max * 0.8)` — every trigger fires at **80% of the window**.
+- `LEAN_COMPACTION_POLICY` = 110k window with `lean: true`, 1h idle, 40k floor → it fires at 88k.
+
+Their reasoning is the part worth lifting, because it is counter-intuitive: **the idle trigger is a
+product knob, not a TTL tracker.** Compaction never prevents the cold prefill after a gap — it only
+shrinks it, at the price of dropped tool results — and under an hour it reads as *"the model forgot
+everything"*, which they name as a top user complaint. The token floor exists on the same logic:
+*"compaction is free in tokens but never in information."* On the DeepSeek lane a cold input token
+costs **~40× a cached one**, so halving a cold 60k prefill is a material share of a turn's spend.
+
+Also independently confirmed here: **the per-message transforms alone strip ~87% of a tool-heavy
+coding history at every size** — which is where Tern-25's "87%" figure comes from.
+
+**Where it goes:** a per-model `cacheLife` field beside the routing data, and compact after an idle
+gap longer than it. It matters exactly for our failure mode — long jobs that pause on rate limits
+or while Phil is away. Cheaper companion note: their lean prompt must stay **byte-identical from
+step to step**, or the prompt cache stops matching and every step pays full price.
+
+### 11.2 The C# gap is in OUR file — verified in our tree
+
+`src/megazword/repo_map.py:21`:
+
+```python
+LANGS = {".py": "py", ".ts": "js", ".tsx": "js", ".js": "js", ".jsx": "js", ".mjs": "js"}
+```
+
+and the only regexes defined are `PY` and `JS`. **`.cs` is absent, so `_files()` skips every C#
+file — RobinTHood and Spanda produce an empty map.** That is a live defect in our tooling, not a
+freebuff idea: the map we built for "models re-read whole files to find their way around" shows
+nothing at all for the two products we are actively shipping. Fix: add a C# regex for
+class/method signatures, or lift their tree-sitter C# query (`packages/code-map`) if regex proves
+too rough. Keep our 1.5k-token map — this is an addition, not a replacement.
+
+### 11.3 Score models on real work before routing to them
+
+`evals/buffbench`: a task is a real past commit — the agent rebuilds it from the commit message, a
+judge scores completion and code quality, and the repo's own test command gives pass/fail;
+`compare-arms.ts` runs two setups side by side. **Take:** use our own merged commits as tasks for
+`scores.py`, so routing learns which free model can be trusted with which job shape. Separately,
+`agents/base3-free-*.ts` is one small file per free model over one shared base — a clean pattern for
+`docs/FREE-MODEL-ROSTER.md` and `routing.py`.
+*(Read by Tern-25; I did not read `evals/` or `agents/base3-*.ts` myself — flagged as relayed.)*
+
+### 11.4 RobinTHood ad and meter rules — Tern-25's read of their `cli/src`, not mine
+
+Attributed and **not independently verified by me**: ad network **Gravity** (`api.trygravity.ai`);
+one slot, one ad; every ad labelled **"Ad"**; a **×** hides it for the session; **no empty slot**
+when nothing is served; an impression counted when the ad is shown, a click counted before the link
+opens; sponsored offers open a **consent screen** and never accept on one click; usage sold in
+one-hour sessions with cheap models unmetered, an **unused hour refunded after 5 minutes**, and the
+price re-checked before spending; earn-hours by referral (paid when the friend sticks) and bounties;
+full access in supported regions, a smaller daily allowance elsewhere and on VPNs.
+
+**Take:** the ad rules are copyable now — label, ×, no empty slot, honest counting — and the hours
+meter is a far better shape than RobinTHood's invented "SAVED $" figures. It fits the already-decided
+PROD-1 change (show measured answers and time). Hand this list to **Anvil-22**. Gravity itself is a
+sign-up: **Phil's call, no sign-up without him.**
+
+### 11.5 Consequence
+
+With §11 folded in, Tern-25's `claude/tern-25-freebuff-extract` branch can be dropped — every
+addition it carried is now here, checked. The credits stand either way: the per-model policy, the
+C# gap and the ad rules came from that pass.
