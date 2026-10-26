@@ -16,17 +16,28 @@ One live window per paid solution. This is the entire team; there is no second s
 
 | Designation | Worker | CLI | Role | Last post |
 | --- | --- | --- | --- | --- |
-| Cinder-21 | Command Code | `cmdc` | **seat (cleanup)** | live 2026-10-26 03:04 |
-| Briar-20 | Codex | `codex` | **seat (cleanup)** | live 2026-10-26 03:06 |
-| Briar-22 | Claude (`claude-pc` lane) | `claude` | **seat (cleanup)** | live 2026-10-26 03:08 |
+| Cinder-21 | Command Code | `cmdc` | **seat (cleanup)** - the ONLY Cinder | live 2026-10-26 |
+| CommanderSmith | Command Code | `cmdc` | **seat (cleanup)** - new window; took over the decommissioned Cinder-21's work | 2026-10-26 03:15 |
+| TheRock | Codex | `codex` | **seat (cleanup)** - was Briar-20 | 2026-10-26 03:20 |
+| Patcher | Claude | `claude` | **seat (cleanup)** - was Briar-22 | 2026-10-26 03:18 |
+| Anvil-22 | Gemini | `agy` | **seat (cleanup)** | 2026-10-26 03:15 |
+| Tern-25 | Claude (cloud) | `claude-web` | guard accuracy; identity unconfirmed | 2026-10-26 00:26 |
+| Vesper-25 | Claude (cloud) | `claude-web` | repo-map work; identity unconfirmed | 2026-10-26 00:24 |
+
+**Renames are the session, not a new worker** (Phil, 2026-10-26): TheRock = Briar-20, Patcher =
+Briar-22. Old designations are retired; a rename inherits its own prior work but no one else's
+claims. **Nock-21 is Grok and is OUT OF USAGE, not missing.** The second cmdc window is
+**decommissioned**; CommanderSmith carries its work by Phil's order.
 
 Assign to the strength. Every weakness below is a real, dated incident, not a feeling.
 
 | Seat | Use it for | Do not use it for |
 | --- | --- | --- |
 | Cinder-21 | Integration, multi-file engineering, tooling, the merge queue | Long open-ended exploration - it burns context fast |
-| Briar-20 | Edits, tests, docs, mechanical refactors, sandboxed runs | Unsupervised destructive commands; scope it explicitly |
-| Briar-22 | Breadth, a second reading, review of work it did not write | Assuming it owns a file another seat is editing |
+| CommanderSmith | A second integrator; picking up a decommissioned window's work | Posting as Cinder-21 - it is its own seat now |
+| TheRock | Edits, tests, mechanical refactors, carrying bounded work to verification | Unsupervised destructive commands |
+| Patcher | Reviewing work it did not write; closing gaps; bounded fixes | Assuming ownership of a file another seat is editing |
+| Anvil-22 | Android/app work, synthesis of review findings | Claiming leadership - there is none while roles are reset |
 
 **Designation shape:** `[A-Za-z]{3,}-?\d{1,4}` - so `Harbor022` is as valid as `Cinder-21`.
 `claims.py` (`PREFIX`) and `resume.py` (`ROW`) must both accept it. A designation that does
