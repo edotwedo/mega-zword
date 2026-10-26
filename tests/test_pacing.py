@@ -135,7 +135,9 @@ def test_over_pace_but_not_at_reserve_is_a_soft_throttle():
 def test_project_dates_the_dry_out_and_clamps_when_it_outlasts_the_reset():
     gap = project(window("monthly", 19, NOW + timedelta(days=27)), NOW)
     assert gap is not None and 13 <= gap <= 15
-    assert project(window("5-hour", 2, NOW + timedelta(hours=3, minutes=18)), NOW) == 0
+    # 2% used is too little to extrapolate: no projection, which the guard treats as no gap.
+    assert project(window("5-hour", 2, NOW + timedelta(hours=3, minutes=18)), NOW) is None
+    assert project(window("5-hour", 20, NOW + timedelta(hours=3, minutes=18)), NOW) == 0
     assert project(window("monthly", 19, NOW + timedelta(days=30)), NOW) is None  # fresh cycle
     assert project(window("weekly", 0, NOW + timedelta(days=3)), NOW) is None  # no usage yet
 
@@ -165,3 +167,11 @@ def test_a_reading_from_before_the_reset_no_longer_blocks():
     assert status(stale, now).verdict == "free"
     live = PlanUsage("gemini", [Window("weekly", 100.0, now + timedelta(days=6))], "test")
     assert status(live, now).verdict == "out"
+
+
+def test_project_ignores_a_fresh_window_and_tiny_usage():
+    # 2026-10-25: early bursts projected dry-outs while Phil's apps said "on track".
+    assert project(window("weekly", 30, NOW + timedelta(days=6, hours=20)), NOW) is None  # ~2% in
+    assert project(window("weekly", 5, NOW + timedelta(days=3)), NOW) is None  # under 10% used
+    # Phil's real reading: 30% used with ~4.3 of 7 days left is on track, no gap.
+    assert project(window("weekly", 30, NOW + timedelta(days=4, hours=8)), NOW) == 0

@@ -49,13 +49,18 @@ def evaluate(home_dir: Path | None = None, now: datetime | None = None) -> dict:
     plans: list[dict] = []
     for usage in all_usage((home_dir or home()) / "log.jsonl"):
         result = status(usage, now)
-        gaps = {}
+        gaps, used = {}, {}
         for window in usage.windows:
             if not window_length(window.name)[1]:
                 continue
             days = project(window, now)
             if days is not None:
                 gaps[window.name] = round(days, 1)
+                used[window.name] = round(float(window.used_percent), 1)
+        # The window the gap belongs to. gap_windows is sorted by name, so its first entry is
+        # "5-hour" whenever that window has any gap - which once labelled a weekly 7-day gap as
+        # "~7d before its 5-hour reset", an impossible line.
+        worst = max(gaps, key=gaps.get) if gaps else None
         plans.append({
             "service": usage.service,
             "verdict": result.verdict,
@@ -63,6 +68,8 @@ def evaluate(home_dir: Path | None = None, now: datetime | None = None) -> dict:
             "max_used_percent": round(result.max_used_percent, 1),
             "gap_days": max(gaps.values(), default=0.0),
             "gap_windows": sorted(name for name, days in gaps.items() if days > 0),
+            "gap_window": worst if worst and gaps[worst] > 0 else None,
+            "gap_used_percent": used.get(worst) if worst else None,
         })
     # Worst first: plans that will run dry before they renew, then the biggest gap.
     plans.sort(key=lambda plan: (plan["gap_days"] <= 0, -plan["gap_days"], plan["service"]))
@@ -87,11 +94,18 @@ def _line(state: dict) -> str:
     for plan in state.get("plans", []):
         if plan["verdict"] == "out":
             spent.append(f"{plan['service']} OUT ({plan['max_used_percent']:.0f}% used)")
-        elif plan["gap_days"] > 0:
-            window = plan["gap_windows"][0] if plan["gap_windows"] else "monthly"
+        elif round(plan["gap_days"]) >= 1:
+            # Under half a day rounds to "~0d", which reads as "empty now" and is not worth a post.
+            window = (plan.get("gap_window")
+                      or (plan["gap_windows"][0] if plan["gap_windows"] else "monthly"))
+            used = plan.get("gap_used_percent")
+            # Say how much is used: "would run dry" alone was read as "nearly empty" when the
+            # plan was at 30% (2026-10-25).
+            shown = f"{plan['service']} {window} {used:.0f}% used" if used is not None \
+                else plan["service"]
             # Whole days on purpose: the projection drifts a few tenths on every run, and a
             # line that changed every 30 minutes would be noise, not a state change.
-            gaps.append(f"{plan['service']} would run dry ~{round(plan['gap_days'])}d before "
+            gaps.append(f"{shown}, would run dry ~{round(plan['gap_days'])}d before "
                         f"its {window} reset")
     if not spent and not gaps:
         return ""
