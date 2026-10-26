@@ -66,3 +66,13 @@ def test_dashboard_state_has_trend(tmp_path):
     from megazword.dashboard import App
     app = App(config.Config(log_path=tmp_path / "log.jsonl"), "p", backends={})
     assert len(app.state()["trend"]) == 7
+
+
+def test_cli_stats_free(tmp_path, capsys):
+    cfg = config.Config(log_path=tmp_path / "log.jsonl")
+    sample(tmp_path / "log.jsonl")
+    assert main(["stats", "--days", "30", "--free"], {}, cfg) == 0
+    out = capsys.readouterr().out
+    assert "FREE MODELS TOTAL" in out
+    assert "SUB/PAID TOTAL" in out
+    assert "claude" in out

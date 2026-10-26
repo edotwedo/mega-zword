@@ -153,6 +153,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("advise", help="suggest a route order from stats and votes (changes nothing)")
     st = sub.add_parser("stats", help="per-day, per-AI table from the run log")
     st.add_argument("--days", type=int, default=7)
+    st.add_argument("--free", action="store_true", help="show free vs paid/subscription scorecard and effectiveness")
     sent = sub.add_parser("sentinel", help="uptime and security log (reboots, logins, network)")
     sent.add_argument("action", nargs="?", choices=("status", "log", "check", "install"),
                       default="status")
@@ -642,8 +643,11 @@ def main(argv: list[str] | None = None,
         return ledger.command(args, log_path=cfg.log_path)
 
     if args.command == "stats":
-        from .stats import daily, table
-        print(table(daily(cfg.log_path, max(1, args.days))))
+        from .stats import daily, free_table, table
+        if getattr(args, "free", False):
+            print(free_table(cfg.log_path, max(1, args.days)))
+        else:
+            print(table(daily(cfg.log_path, max(1, args.days))))
         return 0
 
     if args.command == "sentinel":
