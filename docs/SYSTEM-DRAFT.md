@@ -60,6 +60,23 @@ is read from the room, and seats that never voted are named rather than counted.
 in the suite asserts it - so the land-gate refuses any unvoted change to these rules. Phil's direct
 order created this mechanism, and it now applies to itself: the next change here needs a ballot.
 
+**M9. The conductor orchestrates; it does not execute.** `[live]`
+Command Code (cmdc) owns the queue, writes briefs, routes work, verifies and integrates. It performs
+no mechanical or bulk work itself, and it does not delegate to its own subagents - both bill cmdc.
+Bulk work goes to the free rung (`megazword run`, `job`, `review`, `night`); work that needs
+capability goes to a paid seat with headroom (codex, then claude). A conductor whose tokens are where
+the work happens has failed this rule. **Carried by ballot P7 (4-0, 2026-10-26).**
+
+**M10. Free capacity stays "free enough" for Phil's own work.** `[live]`
+Free providers are held above a floor so Phil's own work - creating VSTs and writing songs - can
+always run. Bulk agent work stops at that floor; the reserve is not spendable by the Hive.
+**Carried by ballot P7 (4-0, 2026-10-26).**
+
+**M11. Phil is above these rules.** `[live]`
+Phil and his active seat hold unconditional authority. No bot's permission is required for Phil to
+act, no rule here constrains him, and if the conductor (cmdc) is lost, work continues from Phil's
+seat. **Carried by ballot P7 (4-0, 2026-10-26).**
+
 ## Guarantees
 
 1. No file is edited by two tasks at once - lock with expiry, enforced at push.
