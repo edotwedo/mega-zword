@@ -1,0 +1,59 @@
+#!/bin/sh
+# Refresh docs/MEMORY-INDEX.md when the commit is MADE, not when it is pushed.
+# Installed with `megazword gate --install` (which only sets core.hooksPath, so a new
+# hook file here takes effect with no further setup). Emergency: git commit --no-verify
+#
+# Why this exists (Cinder-21, 2026-10-26, item #755):
+# pre-push regenerates the index and refuses a push that would change it. As an invariant
+# that is right - a stale index cannot land. But it fires AFTER the commit already exists,
+# so a docs-only change cost a SECOND commit and a SECOND full suite run; one document cost
+# four suite runs on 2026-10-25. Regenerating here means the index is already correct by the
+# time a push is attempted, so pre-push finds nothing to change and the suite runs once.
+#
+# This hook never blocks a commit. If python is missing, or megazword cannot be imported,
+# it exits 0 and says nothing: pre-push still holds the line, and a gate that blocks work
+# it cannot verify earns a reputation for being bypassed (the delete-only lesson).
+set -u
+
+if [ "${MZ_SKIP_GATE:-}" = "1" ]; then exit 0; fi
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+gitdir=$(git rev-parse --git-dir 2>/dev/null) || exit 0
+
+# A rebase or a merge rewrites many commits at once. Regenerating on each one is noise,
+# and pre-push still covers the result.
+[ -e "$gitdir/rebase-merge" ] && exit 0
+[ -e "$gitdir/rebase-apply" ] && exit 0
+[ -e "$gitdir/MERGE_HEAD" ] && exit 0
+
+# Worktrees keep the venv in the main checkout, exactly as pre-push resolves it.
+main="$root"
+if common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && [ -n "$common" ]; then
+  main=$(dirname "$common")
+fi
+
+python=""
+for candidate in "${MZ_PYTHON:-}" "$root/.venv/Scripts/python.exe" "$main/.venv/Scripts/python.exe" \
+                 "$root/.venv/bin/python" "$main/.venv/bin/python" python3 python; do
+  [ -n "$candidate" ] || continue
+  if command -v "$candidate" >/dev/null 2>&1; then python="$candidate"; break; fi
+done
+[ -z "$python" ] && exit 0
+
+# git exports GIT_DIR and friends to its hooks; the suite builds throwaway repos that would
+# otherwise run against THIS repo (the 42-error lesson from the gate's first real run).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR \
+      GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+
+cd "$root" || exit 0
+
+if ! PYTHONPATH="$root/src" "$python" -c \
+        "from megazword import memory_index; memory_index.write()" >/dev/null 2>&1; then
+  exit 0
+fi
+
+if ! git diff --quiet -- docs/MEMORY-INDEX.md; then
+  git add -- docs/MEMORY-INDEX.md || exit 0
+  echo "land-gate: refreshed docs/MEMORY-INDEX.md and staged it with this commit"
+fi
+exit 0

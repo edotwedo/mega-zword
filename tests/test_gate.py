@@ -17,6 +17,7 @@ from megazword import doctor, gate
 
 ROOT = Path(__file__).resolve().parents[1]
 HOOK = ROOT / ".githooks" / "pre-push"
+PRE_COMMIT = ROOT / ".githooks" / "pre-commit"
 
 
 def _find_sh():
@@ -120,6 +121,42 @@ def test_hook_does_not_shortcut_a_real_push():
                           env={**os.environ, "MZ_PYTHON": "false"})
     assert "delete-only" not in proc.stdout
     assert "NOTHING WAS VERIFIED" in proc.stdout
+
+
+def test_pre_commit_hook_survives_the_windows_checkout():
+    """The pre-commit hook refreshes the memory index when the commit is made, so a
+    docs-only change no longer needs a second commit and a second suite run (#755)."""
+    raw = PRE_COMMIT.read_bytes()
+    assert raw.startswith(b"#!/bin/sh"), "hook must be a sh script"
+    assert b"\r\n" not in raw, "a CRLF shebang breaks the hook under sh"
+    assert b"docs/MEMORY-INDEX.md" in raw, "the hook must refresh the index"
+    # It is a convenience, not a gate: the suite belongs to pre-push, and paying for it
+    # twice was the bug being fixed.
+    assert b"-m pytest" not in raw, "pre-commit must not run the suite"
+    assert b"unset GIT_DIR" in raw
+
+
+@pytest.mark.skipif(SH is None, reason="needs sh (Git Bash) on PATH")
+def test_pre_commit_hook_never_blocks_a_commit(tmp_path):
+    """A commit hook that blocks work it cannot verify is one people learn to bypass.
+    With no python to run, it exits 0 and says nothing - pre-push still holds the line."""
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    proc = subprocess.run([SH, str(PRE_COMMIT)], capture_output=True, text=True,
+                          cwd=tmp_path, env={**os.environ, "MZ_PYTHON": "false"})
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == ""
+
+
+@pytest.mark.skipif(SH is None, reason="needs sh (Git Bash) on PATH")
+def test_pre_commit_hook_stands_down_during_a_rebase(tmp_path):
+    """A rebase replays many commits; regenerating on each is noise, and pre-push still
+    covers the result. The hook must do nothing rather than fight the replay."""
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    (tmp_path / ".git" / "rebase-merge").mkdir()
+    proc = subprocess.run([SH, str(PRE_COMMIT)], capture_output=True, text=True,
+                          cwd=tmp_path, env={**os.environ, "MZ_PYTHON": "false"})
+    assert proc.returncode == 0
+    assert proc.stdout.strip() == ""
 
 
 def test_install_check_flags_a_snapshot_install(tmp_path):
