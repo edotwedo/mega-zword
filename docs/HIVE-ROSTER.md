@@ -10,33 +10,41 @@ Phil overrules previous conductor designations and bureaucratic voting deadlocks
 Seats support Phil's verified active lead. Reviews are advisory sanity checks ("another set of eyes")
 before commit, NOT parliamentary merge-blocking voting stalls.
 
-## Active team (Phil, 2026-10-21)
+## Active team (Phil, 2026-10-26 - measured from the room, not asserted)
 
 One live window per paid solution. This is the entire team; there is no second stream.
 
-| Designation | Worker | CLI | Role | Window (read 2026-10-21) |
+| Designation | Worker | CLI | Role | Last post |
 | --- | --- | --- | --- | --- |
-| Cinder-21 | Command Code | `cmdc` | **seat (cleanup) - no queue ownership until roles are reset** | 72% left (5h 10% used, week 28% used) |
-| Harbor022 | Claude Code | `claude` | Design, decisions, review | **OUT until Fri 01:00 (Phil, 2026-10-21)** - he stopped Claude early at 75% weekly. Finishing its in-flight audits, then no further assignments |
-| Briar-20 | Codex | `codex` | Mechanical edits, tests, docs, sandboxed runs | 83% left (5h 15% used, week 17% used) |
-| Nock-21 | Grok | `grok` | Breadth, critique, benchmarks, cheap volume | 71% left (week 29% used) |
-| Forge-22 | Gemini | `agy` | **seat (cleanup) - no queue ownership until roles are reset** | 81% left in Gemini pool |
+| Cinder-21 | Command Code | `cmdc` | **seat (cleanup)** | live 2026-10-26 03:04 |
+| Briar-20 | Codex | `codex` | **seat (cleanup)** | live 2026-10-26 03:06 |
+| Briar-22 | Claude (`claude-pc` lane) | `claude` | **seat (cleanup)** | live 2026-10-26 03:08 |
 
 Assign to the strength. Every weakness below is a real, dated incident, not a feeling.
 
 | Seat | Use it for | Do not use it for |
 | --- | --- | --- |
-| Cinder-21 | Conductor work, integration, multi-file engineering, tooling | Long open-ended exploration - it burns context fast and it is the conductor |
-| Harbor022 | Decisions, design, review of high-risk changes, cross-checking | Volume, bulk edits, anything a seat with more room can do |
-| Briar-20 | Edits, tests, docs, mechanical refactors, sandboxed runs | Unsupervised destructive commands; scope it explicitly or it edits outside the ask |
-| Nock-21 | Breadth, critique, a second reading, benchmarks | Anything scripted or automated: xAI's AUP names automated access as a risk (`docs/PROVIDER-TERMS.md`) |
-| Forge-22 | A second opinion when its models have room | Background or bulk work; it burns a window fast and is already spent |
+| Cinder-21 | Integration, multi-file engineering, tooling, the merge queue | Long open-ended exploration - it burns context fast |
+| Briar-20 | Edits, tests, docs, mechanical refactors, sandboxed runs | Unsupervised destructive commands; scope it explicitly |
+| Briar-22 | Breadth, a second reading, review of work it did not write | Assuming it owns a file another seat is editing |
 
 **Designation shape:** `[A-Za-z]{3,}-?\d{1,4}` - so `Harbor022` is as valid as `Cinder-21`.
 `claims.py` (`PREFIX`) and `resume.py` (`ROW`) must both accept it. A designation that does
 not parse makes the seat invisible to `megazword resume` and stops its claims registering.
 
 ## Retired (history - do not reuse these names)
+
+### Lost contact, 2026-10-26 (no post for 12h+; removed from the active team)
+
+Measured from the room, not from anyone's word. Claims released; nothing waits on them.
+
+| Designation | Last post | Why it was removed |
+| --- | --- | --- |
+| Nock-21 | 2026-10-25 15:24 (11.8h) | no contact |
+| Anvil-22 | 2026-10-25 02:42 (24.5h) | no contact |
+| Harbor022 | 2026-10-25 00:03 (27.2h) | no contact; had been rostered "out until Fri" for four days |
+| Forge-22 | 2026-10-24 02:00 (49.2h) | no contact; was the designated **Lead Conductor** and had been dark the whole time - the reason roles are not prose any more |
+
 
 Kept so nobody has to guess why a familiar name is missing.
 
