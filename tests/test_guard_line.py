@@ -4,7 +4,10 @@ Gemini's weekly limit was missed on 2026-10-23 because a spent plan that also ha
 reported only as "over pace - dry in ~5d"; nothing in the line said the plan was gone.
 """
 
-from megazword import usage_guard
+from datetime import datetime, timedelta, timezone
+
+from megazword import usage_guard, usage_sources
+from megazword.usage_sources import PlanUsage, Window
 
 
 def _plan(service, verdict, used, gap, windows=()):
@@ -50,3 +53,26 @@ def test_the_line_names_the_window_the_gap_belongs_to_and_its_usage():
 def test_a_gap_under_half_a_day_is_not_posted():
     # "~0d" read as "empty now" while the plan sat at 30%.
     assert usage_guard._line({"plans": [_plan("claude", "free", 30.0, 0.4, ["weekly"])]}) == ""
+
+
+def test_evaluate_names_the_window_that_actually_holds_the_gap(monkeypatch):
+    """The fix for "a weekly gap printed as a 5-hour reset" lives in evaluate(), not in
+    _line(), and the test above cannot catch a regression there: it injects gap_window
+    directly, so it still passes if evaluate() goes back to gap_windows[0].
+
+    gap_windows is sorted by NAME, so "5-hour" wins the list whenever it has any gap at all.
+    Here the weekly window holds the far larger gap, so the 5-hour name must not be used.
+    """
+    now = datetime(2026, 10, 26, 0, 0, tzinfo=timezone.utc)
+    usage = [PlanUsage("codex", [
+        Window("5-hour", 85.0, now + timedelta(hours=2)),  # over pace: a small gap (~0.1d)
+        Window("weekly", 60.0, now + timedelta(days=5)),   # over pace: a much bigger one (~3.7d)
+    ], "test")]
+    monkeypatch.setattr(usage_sources, "all_usage", lambda *a, **k: usage)
+
+    plan = next(p for p in usage_guard.evaluate(now=now)["plans"] if p["service"] == "codex")
+    # The trap is still in the data, which is exactly why the field exists.
+    assert plan["gap_windows"] == ["5-hour", "weekly"]
+    # The named window follows the largest gap, not the alphabetically first one.
+    assert plan["gap_window"] == "weekly"
+    assert plan["gap_used_percent"] == 60.0
