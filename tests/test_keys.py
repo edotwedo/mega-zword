@@ -1,5 +1,6 @@
 import io
 import json
+import sys
 import urllib.error
 
 import pytest
@@ -64,6 +65,7 @@ def test_show_deduplicates_providers_and_never_prints_values(store, monkeypatch,
 
 
 def test_move_user_registry_verify_and_no_automatic_delete(store, monkeypatch, capsys):
+    monkeypatch.setattr(keys, "_ON_WINDOWS", True)
     saved = {"GROQ_API_KEY": "fake-registry-value"}
     monkeypatch.setattr(config, "_windows_user_env", saved.get)
     assert cli.main(["keys", "move"]) == 0
@@ -88,13 +90,26 @@ def test_move_conflict_and_failed_verification_emit_no_clear_command(store, monk
     assert keys.os.environ["GROQ_API_KEY"] == "fake-process"
 
 
-def test_nonwindows_fallback_and_move_refused(monkeypatch, capsys):
-    assert vault.read("GROQ_API_KEY") is None
-    assert not vault.available()
+def test_move_refused_when_store_unavailable(monkeypatch, capsys):
+    monkeypatch.setattr(vault, "available", lambda: False)
     assert keys.move() == 1
     assert "unavailable" in capsys.readouterr().out
     with pytest.raises(vault.VaultError):
         vault.write("GROQ_API_KEY", "fake")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX secret file")
+def test_posix_move_copies_env_into_secret_file(monkeypatch, capsys):
+    monkeypatch.setattr(keys, "_ON_WINDOWS", False)
+    for name in keys.key_names():
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "fake-env-value")
+    assert keys.move() == 0
+    assert vault.read("GROQ_API_KEY") == "fake-env-value"
+    assert keys.get_key("GROQ_API_KEY") == "fake-env-value"
+    output = capsys.readouterr().out
+    assert "fake-env-value" not in output
+    assert "SetEnvironmentVariable" not in output and "shell profile" in output
 
 
 @pytest.mark.parametrize("code, expected", [(401, "rejected (401)"), (403, "rejected (403)"),

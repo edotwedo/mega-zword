@@ -4,10 +4,13 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 import urllib.error
 import urllib.request
 
 from . import credential_store as vault
+
+_ON_WINDOWS = sys.platform == "win32"
 
 
 def key_names() -> tuple[str, ...]:
@@ -162,11 +165,14 @@ def move() -> int:
             continue
         moved = True
         print(f"{name}: copied and verified; environment copy unchanged.")
-        # setx NAME "" is unreliable for deleting variables; print an exact
-        # PowerShell command instead. Names are a fixed application allowlist.
-        print(f"[Environment]::SetEnvironmentVariable('{name}', $null, 'User')")
-    if moved:
+        if _ON_WINDOWS:
+            # setx NAME "" is unreliable for deleting variables; print an exact
+            # PowerShell command instead. Names are a fixed application allowlist.
+            print(f"[Environment]::SetEnvironmentVariable('{name}', $null, 'User')")
+    if moved and _ON_WINDOWS:
         print("Optional: run the printed PowerShell lines, then restart apps/shells to drop inherited copies.")
+    elif moved:
+        print("Optional: delete these keys' export lines from your shell profile, then restart apps/shells to drop inherited copies.")
     elif not failed:
         print("No environment keys to move.")
     return 1 if failed else 0

@@ -1,4 +1,8 @@
 import ctypes
+import json
+import os
+import stat
+import sys
 
 import pytest
 
@@ -50,8 +54,13 @@ class FakeAPI:
         return True
 
 
+windows_only = pytest.mark.skipif(sys.platform != "win32", reason="Windows Credential Manager")
+
+
 @pytest.fixture
 def api(monkeypatch):
+    if sys.platform != "win32":
+        pytest.skip("Windows Credential Manager")
     fake = FakeAPI()
     monkeypatch.setattr(vault, "_api", lambda: fake)
     monkeypatch.setattr(ctypes, "get_last_error", lambda: fake.error, raising=False)
@@ -108,6 +117,7 @@ def test_max_blob_size(api):
     assert vault.read("GROQ_API_KEY") == "é" * 1280
 
 
+@windows_only
 def test_prototypes_use_pointer_to_pointer_and_free():
     class Fn:
         pass
@@ -117,3 +127,62 @@ def test_prototypes_use_pointer_to_pointer_and_free():
     assert api.CredWriteW.argtypes[0] == ctypes.POINTER(vault.CREDENTIALW)
     assert api.CredFree.argtypes == [ctypes.c_void_p]
     assert api.CredFree.restype is None
+
+
+posix_only = pytest.mark.skipif(sys.platform == "win32", reason="POSIX secret file")
+
+
+@posix_only
+def test_posix_file_roundtrip_is_0600_and_atomic():
+    assert vault.available()
+    assert vault.read("GROQ_API_KEY") is None
+    vault.write("GROQ_API_KEY", "fake-é")
+    vault.write("MISTRAL_API_KEY", "fake-m")
+    path = vault._store_path()
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert vault.read("GROQ_API_KEY") == "fake-é"
+    assert json.loads(path.read_text(encoding="utf-8")) == {"GROQ_API_KEY": "fake-é", "MISTRAL_API_KEY": "fake-m"}
+    assert [p.name for p in path.parent.iterdir()] == ["secrets.json"]  # no temp file left
+    vault.delete("GROQ_API_KEY")
+    vault.delete("GROQ_API_KEY")  # deleting a missing key is not an error
+    assert vault.read("GROQ_API_KEY") is None
+    assert vault.read("MISTRAL_API_KEY") == "fake-m"
+
+
+@posix_only
+def test_posix_file_open_to_others_is_refused_without_echo():
+    vault.write("GROQ_API_KEY", "fake-secret")
+    os.chmod(vault._store_path(), 0o644)
+    for fn, args in ((vault.read, ("GROQ_API_KEY",)), (vault.write, ("GROQ_API_KEY", "x")),
+                     (vault.delete, ("GROQ_API_KEY",))):
+        with pytest.raises(vault.VaultError, match="chmod 600") as exc:
+            fn(*args)
+        assert "fake-secret" not in str(exc.value)
+
+
+@posix_only
+@pytest.mark.parametrize("body", ["not json", "[]", '{"GROQ_API_KEY": 5}'])
+def test_posix_corrupt_file_raises(body):
+    path = vault._store_path()
+    path.parent.mkdir(parents=True)
+    path.write_text(body, encoding="utf-8")
+    os.chmod(path, 0o600)
+    with pytest.raises(vault.VaultError):
+        vault.read("GROQ_API_KEY")
+
+
+@posix_only
+@pytest.mark.parametrize("name", ["BAD\n", "bad", "../private", "A" * 129, "", None])
+def test_posix_invalid_names_are_rejected(name):
+    for fn, args in ((vault.read, (name,)), (vault.write, (name, "fake")), (vault.delete, (name,))):
+        with pytest.raises(vault.VaultError):
+            fn(*args)
+    assert not vault._store_path().exists()
+
+
+@posix_only
+@pytest.mark.parametrize("value", ["", "é" * 1281, "\ud800", None])
+def test_posix_invalid_values_are_rejected(value):
+    with pytest.raises(vault.VaultError):
+        vault.write("GROQ_API_KEY", value)
+    assert not vault._store_path().exists()
