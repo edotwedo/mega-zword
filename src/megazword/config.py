@@ -103,7 +103,7 @@ DEFAULT_FREE = {
     "openrouter-nemotron-lightning": "nvidia/nemotron-3.5-lightning:free",
     "openrouter-laguna-s": "poolside/laguna-s-2.1:free",
     "openrouter-laguna-xs": "poolside/laguna-xs-2.1:free",
-    "ollama": "qwen2.5-coder:7b",
+    "ollama": "qwen2.5-coder:3b",
     "openrouter": "openrouter/free",
     "groq": "openai/gpt-oss-20b",
     # Groq quotas are per model; these identities share one key and RPM pace.
