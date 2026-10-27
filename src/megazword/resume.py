@@ -377,6 +377,17 @@ def command(args) -> int:
     return 0
 
 
+def _add_directory_arguments(parser: argparse.ArgumentParser) -> None:
+    windows = sys.platform == "win32"
+    seats_root = Path.home() / "mz-seats" if windows else Path.home() / "workspace" / "mz-seats"
+    fallback = Path.home() / "mega-zword" if windows else ROSTER.parent.parent
+    parser.add_argument("--seats", default=str(seats_root),
+                        help="seat worktree root (default: %(default)s)")
+    parser.add_argument("--fallback", default=str(fallback),
+                        help="directory to use when a seat has no worktree of its own "
+                             "(default: %(default)s)")
+
+
 def add_parser(sub) -> None:
     resume = sub.add_parser("resume", help="respawn each seat with its name")
     resume.add_argument("--json", action="store_true", help="machine-readable plan for the launcher")
@@ -387,9 +398,7 @@ def add_parser(sub) -> None:
     resume.add_argument("--record-stdin", action="store_true",
                         help="internal: read a JSON list of launched seats from stdin and record it")
     resume.add_argument("--roster", default=str(ROSTER), help="roster file to read")
-    resume.add_argument("--seats", default=str(Path.home() / "mz-seats"), help="seat worktree root")
-    resume.add_argument("--fallback", default=str(Path.home() / "mega-zword"),
-                        help="directory to use when a seat has no worktree of its own")
+    _add_directory_arguments(resume)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -399,8 +408,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--record", action="store_true")
     parser.add_argument("--record-stdin", action="store_true")
     parser.add_argument("--roster", default=str(ROSTER))
-    parser.add_argument("--seats", default=str(Path.home() / "mz-seats"))
-    parser.add_argument("--fallback", default=str(Path.home() / "mega-zword"))
+    _add_directory_arguments(parser)
     return command(parser.parse_args(argv))
 
 
