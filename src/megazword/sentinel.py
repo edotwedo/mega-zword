@@ -1,4 +1,4 @@
-"""Sentinel collector: Windows reboots, logins and network changes.
+"""Sentinel collector: Windows and Linux reboots, logins and network changes.
 
 Writes ~/.megazword/sentinel.jsonl. Tests inject a fake reader so they never
 need admin or a real event log. Production URL checks are B9.
@@ -180,14 +180,86 @@ def windows_reader(channel: str, ids: tuple[int, ...], since: dict | None) -> li
     return out
 
 
+# Journal matches use '+' for OR across different fields.
+LINUX_SOURCES = (
+    ("journal:boot", (6005,)),
+    ("journal:login", (4624, 4625, 4634)),
+    ("journal:network", (10000, 10001)),
+)
+JOURNAL_FILTERS = {
+    "journal:boot": ["_COMM=systemd", "_PID=1"],
+    "journal:login": ["_COMM=systemd-logind", "+", "_COMM=sshd", "+", "_COMM=login"],
+    "journal:network": ["_SYSTEMD_UNIT=NetworkManager.service", "+",
+                        "_SYSTEMD_UNIT=systemd-networkd.service", "+", "_COMM=NetworkManager"],
+}
+
+
+def linux_reader(channel: str, ids: tuple[int, ...], since: dict | None) -> list[dict]:
+    """Read a bounded slice of the current boot without a shell or extra packages."""
+    import hashlib
+    import re
+    args = ["journalctl", "-b", "-o", "short-iso", "--no-pager", "-n", "200",
+            *JOURNAL_FILTERS[channel]]
+    if channel == "journal:boot":
+        args += ["--grep=running in system mode|Startup finished"]
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8",
+                                errors="replace", timeout=30)
+    except subprocess.TimeoutExpired:
+        raise OSError("reading the journal took over 30s") from None
+    if result.returncode:
+        raise OSError((result.stderr or result.stdout or "journalctl failed").strip()[:300])
+    out = []
+    for line in result.stdout.splitlines():
+        match = re.match(r"^(\S+) \S+ ([^:]+): (.*)$", line)
+        if not match:
+            continue
+        stamp, provider, message = match.groups()
+        try:
+            stamp = datetime.fromisoformat(stamp).astimezone(timezone.utc).isoformat()
+        except ValueError:
+            continue
+        lower = message.lower()
+        event_id = None
+        if channel == "journal:boot":
+            if "running in system mode" in lower or "startup finished" in lower:
+                event_id = 6005
+        elif channel == "journal:login":
+            if "failed password" in lower or "authentication failure" in lower:
+                event_id = 4625
+            elif "new session" in lower or "session opened" in lower or "accepted " in lower:
+                event_id = 4624
+            elif "removed session" in lower or "session closed" in lower:
+                event_id = 4634
+        else:
+            if any(word in lower for word in ("disconnected", "deactivated", "link down", "lost carrier")):
+                event_id = 10001
+            elif any(word in lower for word in ("connected", "activated", "link up", "gained carrier", "dhcp", "configured")):
+                event_id = 10000
+        if event_id not in ids:
+            continue
+        record_id = int.from_bytes(hashlib.sha256(line.encode()).digest()[:8], "big")
+        rec = _record({"time": stamp, "id": event_id, "provider": provider,
+                       "message": message, "record_id": record_id}, channel)
+        # short-iso has second precision. Keep all fingerprints at the boundary
+        # rather than imposing an arbitrary order on events within that second.
+        if since and (stamp < since["time"] or
+                      (stamp == since["time"] and record_id in since.get("seen", []))):
+            continue
+        out.append(rec)
+    out.sort(key=lambda r: (r["time"], r["record_id"]))
+    return out
+
+
 def collect(reader=None) -> list[dict]:
     """Append new events to sentinel.jsonl. `reader(channel, ids, since)`
     is injected in tests."""
-    reader = reader or windows_reader
+    linux = reader is None and not _is_windows()
+    reader = reader or (linux_reader if linux else windows_reader)
     cursor = _load_cursor()
     added: list[dict] = []
     security_ok = cursor.get("security_readable", True)
-    for channel, ids in SOURCES:
+    for channel, ids in (LINUX_SOURCES if linux else SOURCES):
         since = cursor.get(channel) if isinstance(cursor.get(channel), dict) else None
         try:
             events = reader(channel, ids, since)
@@ -204,7 +276,13 @@ def collect(reader=None) -> list[dict]:
         added.extend(events)
         last = events[-1]
         cursor[channel] = {"time": last["time"], "record_id": last["record_id"]}
+        if linux:
+            seen = since.get("seen", []) if since and since["time"] == last["time"] else []
+            cursor[channel]["seen"] = seen + [e["record_id"] for e in events
+                                               if e["time"] == last["time"]]
     cursor["security_readable"] = security_ok
+    if linux:
+        added.sort(key=lambda r: (r["time"], r["record_id"]))
     if added:
         p = path()
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -393,6 +471,36 @@ def format_check(result: dict) -> str:
     return "\n".join(lines)
 
 
+def _install_linux(yes: bool) -> int:
+    import sys
+    directory = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd/user"
+    print(f"[megazword] user timer: {directory / 'megazword-sentinel.timer'} (every 5 minutes)")
+    if not yes:
+        print("[megazword] run `megazword sentinel install --yes` to create and enable the timer")
+        return 0
+    def quote(value):
+        return '"' + str(value).replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%") + '"'
+    service = ("[Unit]\nDescription=Mega Zword sentinel\n\n[Service]\nType=oneshot\n"
+               f"ExecStart={quote(sys.executable)} -m megazword.cli sentinel check\n"
+               f"WorkingDirectory={quote(Path(__file__).resolve().parents[2])}\n")
+    timer = ("[Unit]\nDescription=Collect sentinel events every five minutes\n\n[Timer]\n"
+             "OnStartupSec=1min\nOnUnitActiveSec=5min\n\n[Install]\nWantedBy=timers.target\n")
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        write_atomic(directory / "megazword-sentinel.service", service)
+        write_atomic(directory / "megazword-sentinel.timer", timer)
+        for args in (["systemctl", "--user", "daemon-reload"],
+                     ["systemctl", "--user", "enable", "--now", "megazword-sentinel.timer"]):
+            result = subprocess.run(args, capture_output=True, text=True, timeout=30)
+            if result.returncode:
+                raise OSError((result.stderr or result.stdout).strip()[:300])
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"[megazword] user timer install failed: {exc}", file=sys.stderr)
+        return 1
+    print("[megazword] enabled megazword-sentinel.timer every 5 minutes and at user startup")
+    return 0
+
+
 def install(yes: bool = False) -> int:
     """Register a 5-minute scheduled task. Prints the plan; `--yes` creates it.
     Phil approves by passing --yes."""
@@ -412,13 +520,12 @@ def install(yes: bool = False) -> int:
         print(f"[megazword] ntfy topic already set in {path}")
     print("[megazword] subscribe to that topic in the ntfy app (no account).")
     print("[megazword] optional: set [sentinel] healthchecks_url to a healthchecks.io ping URL")
+    if not _is_windows():
+        return _install_linux(yes)
     # pythonw: no console window flashing up every 5 minutes.
     from .desktop import launcher_python
     cmd = f'"{launcher_python()}" -m megazword.cli sentinel check'
     print(f"[megazword] task command: {cmd}")
-    if not _is_windows():
-        print("[megazword] scheduled tasks are Windows-only; run `megazword sentinel check` from cron")
-        return 0 if not yes else 2
     if not yes:
         print("[megazword] run `megazword sentinel install --yes` to create the 5-minute task (Phil's call)")
         return 0
