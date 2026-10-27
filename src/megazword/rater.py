@@ -67,17 +67,8 @@ def rate(prompt: str, model: str = DEFAULT_RATER_MODEL) -> Rating:
     decision = pick()
     if isinstance(decision, JevDecision):
         try:
-            answers = decision.choose(prompt[:4000], {
-                "difficulty": {
-                    "type": "choice",
-                    "instructions": "How hard is this request for a coding assistant?",
-                    "criteria": {
-                        "easy": "quick fact or one-step",
-                        "medium": "normal coding/writing/small bug",
-                        "hard": "multi-step, design, large or tricky change, unknown debugging",
-                    },
-                },
-            })
+            from .decision import DIFFICULTY_QUESTION
+            answers = decision.choose(prompt[:4000], {"difficulty": DIFFICULTY_QUESTION})
             return _from_jev(prompt, answers)
         except Exception as exc:
             fallback = rule_rate(prompt)

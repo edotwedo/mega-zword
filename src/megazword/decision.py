@@ -7,14 +7,36 @@ text. Without TYPESAFE_API_KEY the seam is LocalDecision and never calls out.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import random
 import time
 import urllib.error
 import urllib.request
 
+log = logging.getLogger("megazword.decision")
+
 DEFAULT_BASE = "https://api.typesafe.ai"
 _BACKOFF = (1.0, 2.0, 4.0)
+
+# Every Jev question lives here. Wording is a question, not a prompt.
+DIFFICULTY_QUESTION = {
+    "type": "choice",
+    "instructions": "How hard is this request for a coding assistant?",
+    "criteria": {
+        "easy": "quick fact or one-step",
+        "medium": "normal coding, writing, or a small bug",
+        "hard": "multi-step, design, a large or tricky change, or unknown debugging",
+    },
+}
+DODGE_QUESTION = {
+    "type": "noul",
+    "instructions": "Does the answer dodge the request?",
+    "criteria": {
+        "true": "the answer is about something else, only promises later work, or has no real content",
+        "false": "the answer addresses the request",
+    },
+}
 
 
 class DecisionError(RuntimeError):
@@ -35,13 +57,17 @@ class JevDecision:
         self.opener = opener or urllib.request.urlopen
         self.sleep = sleep
         self.rng = rng
+        self.last_request = None
+        self.last_usage = None
 
     def choose(self, state, questions: dict) -> dict:
-        body = json.dumps({"model": "jev-latest", "state": state, "questions": questions}).encode()
+        body = {"model": "jev-latest", "state": state, "questions": questions}
+        self.last_request = body
+        raw_body = json.dumps(body).encode()
         attempt = 0
         while True:
             request = urllib.request.Request(
-                self.url, data=body, method="POST",
+                self.url, data=raw_body, method="POST",
                 headers={
                     "Authorization": "Bearer " + self.key,
                     "Content-Type": "application/json",
@@ -61,6 +87,10 @@ class JevDecision:
             answers = payload.get("answers")
             if not isinstance(answers, dict):
                 raise DecisionError("jev response has no answers")
+            usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
+            self.last_usage = usage
+            log.info("jev input_tokens=%s request=%s response=%s",
+                     usage.get("input_tokens"), body, payload)
             return answers
 
     def _post(self, request) -> tuple[int, bytes]:
@@ -75,6 +105,10 @@ class LocalDecision:
     """Today's rater: qwen2.5:1.5b through Ollama, shaped as a choice answer."""
 
     def choose(self, state, questions: dict) -> dict:
+        unsupported = [name for name, question in questions.items()
+                       if question.get("type") != "choice" or name != "difficulty"]
+        if unsupported:
+            raise DecisionError("local decision cannot answer " + ", ".join(unsupported))
         from . import ollama
         from .rater import DEFAULT_RATER_MODEL, RATER_PROMPT
         prompt = state if isinstance(state, str) else json.dumps(state)
@@ -98,6 +132,9 @@ def noul_probability(answer: dict) -> float | None:
     """Boolean probability from a noul answer. These answers have no confidence."""
     if not isinstance(answer, dict):
         return None
+    # Official shape: {"type": "noul", "noul": 0.91}. The other keys are compat only.
+    if "noul" in answer:
+        return float(answer["noul"])
     if "probability" in answer:
         return float(answer["probability"])
     probs = answer.get("probabilities")

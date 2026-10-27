@@ -6,7 +6,8 @@ import urllib.error
 
 import pytest
 
-from megazword.decision import DecisionError, JevDecision, LocalDecision, noul_probability, pick
+from megazword.decision import DODGE_QUESTION, DecisionError, JevDecision, LocalDecision, noul_probability, pick
+from megazword.quality import jev_check
 from megazword.rater import rate
 
 
@@ -35,7 +36,7 @@ class _Transport:
                 "probabilities": {"easy": 0.1, "medium": 0.8, "hard": 0.1},
                 "confidence": 0.7,
             }},
-            "usage": {},
+            "usage": {"input_tokens": 12},
         }).encode()
         self.calls = 0
         self.urls = []
@@ -66,10 +67,43 @@ def test_choice_parse_uses_choice_and_rule_floor(monkeypatch):
     assert raised.level == "hard" and raised.source == "jev+rule"
 
 
-def test_noul_parse_has_no_confidence():
-    assert noul_probability({"type": "noul", "probability": 0.91}) == 0.91
+def test_docs_noul_shape():
+    """The live API puts the probability on "noul". The old reader missed it."""
+    answer = {"asks_refund": {"type": "noul", "noul": 0.91}}["asks_refund"]
+    assert noul_probability(answer) == 0.91
+    assert "probability" not in answer
+
+
+def test_noul_compat_keys_still_parse():
+    assert noul_probability({"type": "noul", "probability": 0.4}) == 0.4
     assert noul_probability({"type": "noul", "probabilities": {"true": 0.2}}) == 0.2
-    assert "confidence" not in {"type": "noul", "probability": 0.91}
+
+
+def test_choose_logs_input_tokens():
+    transport = _Transport([200])
+    decision = JevDecision("k", opener=transport, sleep=lambda _s: None, rng=lambda: 0)
+    decision.choose("x", {"difficulty": {"type": "choice"}})
+    assert decision.last_usage["input_tokens"] == 12
+    assert decision.last_request["model"] == "jev-latest"
+
+
+def test_mid_noul_is_not_a_dodge():
+    class Fake:
+        def choose(self, state, questions):
+            assert questions["dodge"] is DODGE_QUESTION
+            assert questions["dodge"]["criteria"]["false"] == "the answer addresses the request"
+            return {"dodge": {"type": "noul", "noul": self.p}}
+
+    fake = Fake()
+    fake.p = 0.5
+    assert jev_check("sum 2+2", "4", fake) is None
+    fake.p = 0.91
+    assert jev_check("sum 2+2", "later", fake) == "quality check: answer does not address the request"
+
+
+def test_local_decision_refuses_a_noul():
+    with pytest.raises(DecisionError, match="cannot answer"):
+        LocalDecision().choose("hello", {"dodge": {"type": "noul"}})
 
 
 def test_429_backs_off_then_succeeds():

@@ -53,20 +53,21 @@ def check(prompt: str, answer: str, model: str,
 
 
 def jev_check(prompt: str, answer: str, decision) -> str | None:
-    """A dodge reason from a noul question. Errors keep the answer."""
-    from .decision import noul_probability
+    """A dodge reason from a noul question. Errors, and an unsettled call, keep the answer.
+
+    Above 0.7 is a dodge. Below 0.3 is not. The band between is not settled,
+    so it is not treated as yes.
+    """
+    from .decision import DODGE_QUESTION, noul_probability
     try:
         answers = decision.choose(
             {"request": prompt[:PROMPT_CHARS], "answer": answer[:ANSWER_CHARS]},
-            {"dodge": {"type": "noul", "instructions": (
-                "Does this answer fail to address the request? "
-                "True only for a clear dodge: wrong topic, only a promise, or no real content. "
-                "Short correct answers are not dodges.")}},
+            {"dodge": DODGE_QUESTION},
         )
         probability = noul_probability(answers.get("dodge"))
     except Exception:
         return None
-    if probability is None or probability < 0.5:
+    if probability is None or probability <= 0.7:
         return None
     return "quality check: answer does not address the request"
 
