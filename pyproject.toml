@@ -17,8 +17,10 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
-# B6b: the desktop window (WebView2 on Windows). Without it, an Edge/Chrome app window.
+# B6b: the desktop window (WebView2 on Windows, WebKit2GTK on Linux). Without it, an Edge/Chrome app window.
 app = ["pywebview>=5"]
+# Optional Secret Service / OS keyring support for Linux/macOS
+secrets = ["keyring>=24"]
 # Local face presence only; no model service or camera-image uploads.
 camera = ["opencv-python>=4.8,<5"]
 # Native Windows Terminal relay, process inventory and local owner matching.
@@ -31,7 +33,7 @@ megazword = "megazword.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-megazword = ["dashboard.html", "mz.ico"]
+megazword = ["dashboard.html", "mz.ico", "mz.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
