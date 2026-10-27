@@ -1,8 +1,15 @@
 """Keyboard events and buffered VT protocol for the owned Windows console only."""
 import ctypes
-from ctypes import wintypes as wt
+import os
 import re
 import time
+
+
+def _wintypes():
+    if os.name != "nt":
+        raise OSError("Windows console input is unavailable")
+    from ctypes import wintypes
+    return wintypes
 
 
 def key_text(vk, char='', state=0, repeat=1):
@@ -142,6 +149,7 @@ class OutputFilter:
 class ConsoleInput:
     """Raw events from this process's console; no global hooks or synthetic input."""
     def __enter__(self):
+        wt = _wintypes()
         class Key(ctypes.Structure):
             _fields_ = [('down', wt.BOOL), ('repeat', wt.WORD), ('vk', wt.WORD),
                         ('scan', wt.WORD), ('char', wt.WCHAR), ('state', wt.DWORD)]
@@ -174,12 +182,14 @@ class ConsoleInput:
         return self
 
     def pending(self):
+        wt = _wintypes()
         count = wt.DWORD()
         if not self.api.GetNumberOfConsoleInputEvents(self.input, ctypes.byref(count)):
             raise ctypes.WinError(ctypes.get_last_error())
         return count.value
 
     def read(self):
+        wt = _wintypes()
         count = min(self.pending(), 256)
         if not count:
             return ''
@@ -204,6 +214,7 @@ class ConsoleInput:
         return ''.join(text)
 
     def cursor(self):
+        wt = _wintypes()
         class Coord(ctypes.Structure):
             _fields_ = [('x', wt.SHORT), ('y', wt.SHORT)]
         class Rect(ctypes.Structure):

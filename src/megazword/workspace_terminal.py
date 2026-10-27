@@ -57,6 +57,8 @@ class ReturnQueue:
 
 
 def run_tab(index, root, manifest=None):
+    if os.name != "nt":
+        raise OSError("The Windows console relay is unavailable")
     from winpty import PtyProcess
     tabs = ws.load(manifest or root / 'snapshot.json').get('tabs', [])
     if index is None or not 0 <= index < len(tabs):

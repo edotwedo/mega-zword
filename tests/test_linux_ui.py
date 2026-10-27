@@ -47,3 +47,20 @@ assert cmdc_quota.read_quota() is None
 app.shutdown()
 '''], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="non-Windows startup contract")
+def test_windows_ui_entry_points_refuse():
+    from pathlib import Path
+    from megazword.face_identity import user_protect
+    from megazword.terminal_input import ConsoleInput
+    from megazword.workspace import desktop
+    from megazword.workspace_terminal import run_tab
+    with pytest.raises(OSError, match="Windows DPAPI"):
+        user_protect(b"template")
+    with pytest.raises(OSError, match="Windows console input"):
+        ConsoleInput().__enter__()
+    with pytest.raises(OSError, match="virtual desktops"):
+        desktop(Path("/unused"))
+    with pytest.raises(OSError, match="console relay"):
+        run_tab(0, Path("/unused"))

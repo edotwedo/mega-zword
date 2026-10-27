@@ -114,6 +114,7 @@ def test_missing_seat_does_not_prevent_other_saved_seats_restoring(tmp_path, mon
 
 
 def test_dedicated_desktop_does_not_reuse_ai_workshop(tmp_path, monkeypatch):
+    monkeypatch.setattr(w.os, "name", "nt")
     class Function:
         def __init__(self, fn):
             self.fn = fn

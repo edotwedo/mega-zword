@@ -1,6 +1,4 @@
 """Opt-in, local-only owner matching with OpenCV YuNet and SFace."""
-import ctypes
-from ctypes import wintypes
 import json
 import os
 import subprocess
@@ -12,6 +10,10 @@ from .presence import ReturnGate
 
 def user_protect(data, decrypt=False):
     """Windows DPAPI binds the face template to the current Windows account."""
+    if sys.platform != "win32":
+        raise OSError("Windows DPAPI is unavailable")
+    import ctypes
+    from ctypes import wintypes
     class Blob(ctypes.Structure):
         _fields_ = [('size', wintypes.DWORD), ('data', ctypes.POINTER(ctypes.c_ubyte))]
     buf = ctypes.create_string_buffer(data)

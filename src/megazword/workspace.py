@@ -247,6 +247,8 @@ def native_idle(tab):
 
 def desktop(root):
     """Use the local, pinned VirtualDesktopAccessor helper; never download at launch."""
+    if os.name != "nt":
+        raise OSError("Hive virtual desktops are a Windows feature")
     dll = ctypes.CDLL(str(root / 'VirtualDesktopAccessor.dll'))
     dll.GetDesktopCount.restype = ctypes.c_int
     dll.GetDesktopName.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t]
