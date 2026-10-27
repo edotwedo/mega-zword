@@ -5,19 +5,18 @@ console, so a bot that runs in a hidden console cannot see or change the tab
 Phil is looking at. This works around it: walk up the process tree to the shell
 that Windows Terminal is hosting for this tab, attach to that console, and set
 its title. Because Command Code keeps re-asserting its own title, a short keeper
-process re-applies the wanted name until the tab closes.
+process re-applies the wanted name until the tab closes. On POSIX, use kitty
+remote control when available, otherwise write OSC 2 to the controlling tty.
 """
 
 from __future__ import annotations
 
 import argparse
-import ctypes
 import json
 import os
 import subprocess
 import sys
 import time
-from ctypes import wintypes
 from pathlib import Path
 
 from . import config
@@ -34,6 +33,9 @@ def state_path() -> Path:
 
 
 def _k32():
+    import ctypes
+    from ctypes import wintypes
+
     k = ctypes.WinDLL("kernel32", use_last_error=True)
     k.FreeConsole.argtypes = []
     k.FreeConsole.restype = wintypes.BOOL
@@ -57,7 +59,11 @@ def tab_pid(process=None) -> int:
     AttachConsole(ATTACH_PARENT_PROCESS) lands on a hidden console, not the tab.
     """
     if os.name != "nt":
-        return 0
+        try:
+            with open("/dev/tty") as tty:
+                return os.getsid(os.tcgetpgrp(tty.fileno()))
+        except OSError:
+            return os.getppid()
     if process is None:
         try:
             import psutil
@@ -102,7 +108,7 @@ def _restore_std(saved: dict) -> None:
 
 def _attach(pid: int) -> bool:
     if os.name != "nt":
-        return False
+        return True
     k = _k32()
     k.FreeConsole()
     target = ATTACH_PARENT_PROCESS if not pid else int(pid)
@@ -111,13 +117,37 @@ def _attach(pid: int) -> bool:
 
 def _set_title(title: str) -> bool:
     if os.name != "nt":
-        return False
+        if os.environ.get("KITTY_LISTEN_ON"):
+            try:
+                result = subprocess.run(
+                    ["kitten", "@", "set-tab-title", title],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=3,
+                )
+                if result.returncode == 0:
+                    return True
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+        sequence = f"\033]2;{title}\007"
+        try:
+            with open("/dev/tty", "w", encoding="utf-8") as tty:
+                tty.write(sequence)
+                tty.flush()
+            return True
+        except OSError:
+            try:
+                sys.stdout.write(sequence)
+                sys.stdout.flush()
+                return True
+            except (OSError, ValueError):
+                return False
     return bool(_k32().SetConsoleTitleW(title))
 
 
 def read_title(pid: int = 0) -> str:
     if os.name != "nt":
         return ""
+    import ctypes
+
     k = _k32()
     buf = ctypes.create_unicode_buffer(512)
     if not k.GetConsoleTitleW(buf, 512):
@@ -203,6 +233,11 @@ def keep(title: str, tab: int, interval: float = DEFAULT_INTERVAL,
 def _spawn_keeper(title: str, tab: int, interval: float) -> int:
     cmd = [sys.executable, "-m", "megazword.tab_title",
            "--keep", title, "--tab-pid", str(tab), "--interval", str(interval)]
+    if os.name != "nt":
+        # Keep the controlling tty: a new session would lose /dev/tty.
+        proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, close_fds=True)
+        return proc.pid
     flags = subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -253,6 +288,9 @@ def command(args) -> int:
         print(f"tab title is {args.title}; keeper already running (pid {state['keeper_pid']})")
         return 0
     stop_keeper()
+    # Clear the previous stop flag before the new process can read it.
+    write_state(title=args.title, tab_pid=tab, keeper_pid=None, stop=False,
+                seat=os.environ.get("MEGAZWORD_SEAT", ""))
     keeper = _spawn_keeper(args.title, tab, args.interval)
     write_state(title=args.title, tab_pid=tab, keeper_pid=keeper, stop=False,
                 seat=os.environ.get("MEGAZWORD_SEAT", ""))
