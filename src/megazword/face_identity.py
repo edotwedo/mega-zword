@@ -8,7 +8,6 @@ import sys
 import time
 
 from .presence import ReturnGate
-from .workspace import load, save
 
 
 def user_protect(data, decrypt=False):
@@ -37,6 +36,10 @@ def matches(scores, threshold=.50):
 
 class OwnerCamera:
     def __init__(self, root, enrolled=True):
+        self.capture = None
+        self.references = []
+        if sys.platform != "win32":
+            return
         import cv2
         import numpy as np
         self.cv, self.np = cv2, np
@@ -56,6 +59,8 @@ class OwnerCamera:
             raise ValueError('Cannot open the webcam; close another camera app and retry')
 
     def frame(self):
+        if self.capture is None:
+            return None, []
         ok, frame = self.capture.read()
         if not ok:
             raise ValueError('Camera stopped returning frames')
@@ -71,16 +76,22 @@ class OwnerCamera:
         return frame, features
 
     def read(self):
+        if self.capture is None:
+            return False
         _, features = self.frame()
         return matches([self.recognizer.match(feature, ref, self.cv.FaceRecognizerSF_FR_COSINE)
                         for feature in features for ref in self.references])
 
     def close(self):
-        self.capture.release()
+        if self.capture is not None:
+            self.capture.release()
 
 
 def enroll(root):
     """Only deliberate SPACE presses enroll. No unattended enrollment or saved photos."""
+    if sys.platform != "win32":
+        return 0
+    from .workspace import save
     camera = OwnerCamera(root, enrolled=False)
     cv = camera.cv
     samples = []
@@ -119,6 +130,9 @@ def enroll(root):
 
 
 def watch(root):
+    if sys.platform != "win32":
+        return 0
+    from .workspace import save
     if not (root / 'owner.dpapi').exists():
         save(root / 'camera-status.json', {'state': 'enrollment required'})
         return 0
