@@ -6,7 +6,7 @@ Mega Zword is a Python command line tool that routes prompts to installed AI com
 
 Gemini has two separate identities: `gemini-api` is the Google AI Studio Developer API; `gemini` is the Antigravity CLI (`agy`, with an old Gemini CLI fallback). The API is in the free-first routes. The CLI is a separate no-cost fallback identity after the free APIs/local model, respects its out mark, runs read-only, and stays excluded from `--edit`. Install agy, run `agy` once to sign in, then check with `megazword doctor`. `megazword usage` reads the CLI quota from `agy -p /usage --output-format json` (the Gemini models pool drives the meter; Antigravity's Claude/GPT pool is shown but ignored).
 
-**Status:** Beta 1 (v0.1.0b1, 2026-10-11). Tested on Windows; CI runs on Windows and Linux.
+**Status:** Beta 1 (v0.1.0b1, 2026-10-11). Tested on Windows; CI runs on Windows and Linux. Linux setup: [docs/LINUX.md](docs/LINUX.md).
 
 ## Where development happens
 
@@ -48,6 +48,15 @@ from any folder. The installer finishes with `megazword doctor`.
 
 To install manually instead: `python -m venv .venv`, then
 `.venv\Scripts\python -m pip install -e .`.
+
+### Linux
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -e .
+```
+
+Put `.venv/bin` on your `PATH`, then run `megazword doctor`. There is no `scripts/install.sh` and no `.desktop` file in this tree. `megazword app install` is the Windows Start menu shortcut and exits on Linux. The dashboard still opens in an app window with `megazword dashboard --app` when Chromium, Chrome, or Edge is on `PATH`. Keys, scheduling, and the Windows-only terminal workspace are in [docs/LINUX.md](docs/LINUX.md).
 
 ## Quick start
 

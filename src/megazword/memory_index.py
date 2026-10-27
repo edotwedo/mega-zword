@@ -51,6 +51,7 @@ LOAD_WHEN = {
     "INSPIRATION.md": "when you need direction on what this is for",
     "INSPIRATION-ROADMAP.md": "when sequencing ideas into work",
     "LANDING-PAGE.md": "when the task touches the public page",
+    "LINUX.md": "when installing or running Mega Zword on Linux",
     "PHIL-SETUP-MAP.md": "when setting up Phil's machine or the launchers",
     "PRODUCTS.md": "when the task is about what we sell",
     "PROVIDER-TERMS.md": "before automating a provider or changing access",
