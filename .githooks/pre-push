@@ -46,15 +46,25 @@ case "$(uname -s)" in
   *) native=bin/python; fallback=Scripts/python.exe ;;
 esac
 python=""
-for candidate in "${MZ_PYTHON:-}" "$root/.venv/$native" "$main/.venv/$native" \
-                 "$root/.venv/$fallback" "$main/.venv/$fallback" python3 python; do
-  [ -n "$candidate" ] || continue
-  if command -v "$candidate" >/dev/null 2>&1 &&
-      "$candidate" -c 'import sys' >/dev/null 2>&1; then
-    python="$candidate"
-    break
+# MZ_PYTHON is an explicit choice (tests point it at `false` to stop before the
+# suite). A bad value must not fall through to the worktree venv, or the suite
+# re-enters this hook and the gate recurses.
+if [ -n "${MZ_PYTHON:-}" ]; then
+  if command -v "$MZ_PYTHON" >/dev/null 2>&1 &&
+      "$MZ_PYTHON" -c 'import sys' >/dev/null 2>&1; then
+    python="$MZ_PYTHON"
   fi
-done
+else
+  for candidate in "$root/.venv/$native" "$main/.venv/$native" \
+                   "$root/.venv/$fallback" "$main/.venv/$fallback" python3 python; do
+    [ -n "$candidate" ] || continue
+    if command -v "$candidate" >/dev/null 2>&1 &&
+        "$candidate" -c 'import sys' >/dev/null 2>&1; then
+      python="$candidate"
+      break
+    fi
+  done
+fi
 if [ -z "$python" ]; then
   echo "land-gate: NOTHING WAS VERIFIED - no runnable python found on this machine; push blocked"
   exit 1
