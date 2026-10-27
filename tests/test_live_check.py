@@ -7,6 +7,8 @@ are first on PATH and HOME/USERPROFILE point at an empty folder.
 import subprocess
 import sys
 import tempfile
+
+import pytest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -24,7 +26,7 @@ def run(env, *args):
 def fake_env():
     tmp = Path(tempfile.mkdtemp(prefix="mz-live-test-"))
     env = smoke.make_env(tmp)
-    # The fake gemini/openrouter/groq aren't installed; only the three fakes are.
+    # Only repository CLIs are available; API providers have no credentials.
     return tmp, env
 
 
@@ -46,3 +48,18 @@ def test_full_check_on_fakes():
     assert "auto-pick chose" in out and r.returncode == 0, out + r.stderr
     log = (tmp / "mz" / "log.jsonl").read_text(encoding="utf-8")
     assert log.count('"forced": true') >= 2  # went through the normal, logged path
+
+
+def test_smoke_refuses_missing_fakes_before_any_subprocess(tmp_path, monkeypatch):
+    monkeypatch.setattr(smoke, "FAKES", tmp_path / "missing-fakes")
+    with pytest.raises(RuntimeError, match="Smoke fake CLI missing or not executable"):
+        smoke.make_env(tmp_path)
+
+
+def test_smoke_drops_inherited_hive_identity_and_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("MEGAZWORD_SEAT", "LiveSeat")
+    monkeypatch.setenv("HIVE_ROOM_URL", "https://example.invalid")
+    monkeypatch.setenv("HIVE_ROOM_KEY_LIVESEAT", "test-only-placeholder")
+    env = smoke.make_env(tmp_path)
+    assert "MEGAZWORD_SEAT" not in env
+    assert not any(name.startswith("HIVE_") for name in env)

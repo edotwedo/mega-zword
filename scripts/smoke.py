@@ -49,12 +49,14 @@ def make_env(tmp: Path) -> dict:
     # No real API keys (any *_API_KEY, so future HTTP backends are covered too):
     # nothing here may reach a paid or rate-limited API.
     for key in [k for k in env if k.upper().endswith(("_API_KEY", "_API_TOKEN"))
-                or k.upper() == "CLOUDFLARE_ACCOUNT_ID"]:
+                or k.upper() == "CLOUDFLARE_ACCOUNT_ID"
+                or k.upper().startswith("HIVE_") or k.upper() == "MEGAZWORD_SEAT"]:
         del env[key]
     home = tmp / "home"
     home.mkdir()
     env.update({
-        "PATH": str(FAKES) + os.pathsep + _without_real_agy(env.get("PATH", "")),
+        "PATH": os.pathsep.join((str(FAKES), str(FAKE_AGY),
+                                 _without_real_agy(env.get("PATH", "")))),
         "MZ_SMOKE_PYTHON": sys.executable,
         "MEGAZWORD_HOME": str(tmp / "mz"),
         # Refused instantly: the rater falls back to its rule, no local model.
@@ -71,9 +73,9 @@ def make_env(tmp: Path) -> dict:
     })
     # Missing executable bits must fail closed instead of falling through to a
     # real CLI later on PATH (which could spend tokens despite the fake home).
-    for name in ("claude", "codex", "grok", "gemini"):
+    for name in ("claude", "codex", "grok", "gemini", "agy"):
         executable = shutil.which(name, path=env["PATH"])
-        if not executable or Path(executable).resolve().parent != FAKES.resolve():
+        if not executable or Path(executable).resolve().parent != (FAKE_AGY if name == "agy" else FAKES).resolve():
             raise RuntimeError(f"Smoke fake CLI missing or not executable: {name}")
     return env
 

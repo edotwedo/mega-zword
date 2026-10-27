@@ -5,3 +5,5 @@ scripts/fake_cli/grok text eol=lf
 scripts/fake_cli/gemini text eol=lf
 # Hooks run under sh, which chokes on a CRLF shebang.
 .githooks/* text eol=lf
+
+scripts/fake_agy/agy text eol=lf
