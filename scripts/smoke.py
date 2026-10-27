@@ -86,6 +86,35 @@ def mz(env: dict, cwd: Path, *args: str, stdin: str = "") -> subprocess.Complete
                           cwd=cwd, timeout=120)
 
 
+def linux_checks(env: dict, cwd: Path) -> None:
+    """Keep Windows-only dependencies and shell regressions out of POSIX startup."""
+    commands = [(f"Linux: megazword {arg} runs without a traceback",
+                 [sys.executable, "-m", "megazword.cli", arg])
+                for arg in ("--version", "doctor")]
+    for module in ("megazword.cli", "megazword.dashboard"):
+        commands.append((f"Linux: importing {module} does not import winpty", [
+            sys.executable, "-c",
+            f"import sys; import {module}; "
+            "assert not any(n == 'winpty' or n.startswith('winpty.') "
+            "for n in sys.modules), 'winpty was imported'",
+        ]))
+    for launcher in ("hive_resume.sh", "dolphin_up.sh", "hive_poke.sh"):
+        commands.append((f"Linux: scripts/{launcher} passes sh -n",
+                         ["sh", "-n", str(REPO / "scripts" / launcher)]))
+    for name, command in commands:
+        if os.name == "nt":
+            print(f"SKIP  {name}  (Windows)")
+            continue
+        try:
+            result = subprocess.run(command, env=env, cwd=cwd, capture_output=True,
+                                    text=True, encoding="utf-8", timeout=120)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            check(name, False, str(exc))
+            continue
+        output = result.stdout + result.stderr
+        check(name, result.returncode == 0 and "Traceback" not in output, output)
+
+
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -170,6 +199,7 @@ def main() -> int:
     work.mkdir()
     env = make_env(tmp)
     try:
+        linux_checks(env, work)
         imported = subprocess.run(
             [sys.executable, "-c", "import megazword.cli"],
             env=env, cwd=work, capture_output=True, text=True, timeout=30)
