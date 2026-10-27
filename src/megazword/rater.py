@@ -44,7 +44,45 @@ def rule_rate(prompt: str) -> Rating:
     return Rating("medium", "default for mid-size prompts", "rule")
 
 
+def _from_jev(prompt: str, answers: dict) -> Rating:
+    block = answers["difficulty"]
+    level = str(block.get("choice", "")).lower().strip()
+    probs = block.get("probabilities") or {}
+    if level not in RATINGS and probs:
+        level = max(probs, key=probs.get)
+    if level not in RATINGS:
+        raise ValueError(f"unexpected rating {level!r}")
+    shown = probs.get(level)
+    reason = "jev" if shown is None else f"jev p={shown}"
+    # Small models underrate hard work, so the keyword rule can raise
+    # (never lower) the rating. Jev is held to the same floor.
+    rule = rule_rate(prompt)
+    if rule.level == "hard" and level != "hard":
+        return Rating("hard", f"{reason}; raised by rule: {rule.reason}", "jev+rule")
+    return Rating(level, reason, "jev")
+
+
 def rate(prompt: str, model: str = DEFAULT_RATER_MODEL) -> Rating:
+    from .decision import JevDecision, pick
+    decision = pick()
+    if isinstance(decision, JevDecision):
+        try:
+            answers = decision.choose(prompt[:4000], {
+                "difficulty": {
+                    "type": "choice",
+                    "instructions": "How hard is this request for a coding assistant?",
+                    "criteria": {
+                        "easy": "quick fact or one-step",
+                        "medium": "normal coding/writing/small bug",
+                        "hard": "multi-step, design, large or tricky change, unknown debugging",
+                    },
+                },
+            })
+            return _from_jev(prompt, answers)
+        except Exception as exc:
+            fallback = rule_rate(prompt)
+            fallback.reason += f" (jev unavailable: {type(exc).__name__})"
+            return fallback
     try:
         raw = ollama.generate(RATER_PROMPT.format(prompt=prompt[:4000]), model,
                               json_format=True, timeout=120)  # first call loads the model
@@ -53,8 +91,6 @@ def rate(prompt: str, model: str = DEFAULT_RATER_MODEL) -> Rating:
         if level not in RATINGS:
             raise ValueError(f"unexpected rating {level!r}")
         reason = str(data.get("reason", "")).strip()
-        # Small models underrate hard work, so the keyword rule can raise
-        # (never lower) the rating.
         rule = rule_rate(prompt)
         if rule.level == "hard" and level != "hard":
             return Rating("hard", f"{reason}; raised by rule: {rule.reason}", f"local:{model}+rule")

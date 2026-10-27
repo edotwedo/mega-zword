@@ -52,9 +52,40 @@ def check(prompt: str, answer: str, model: str,
     return f"quality check: {reason}"
 
 
+def jev_check(prompt: str, answer: str, decision) -> str | None:
+    """A dodge reason from a noul question. Errors keep the answer."""
+    from .decision import noul_probability
+    try:
+        answers = decision.choose(
+            {"request": prompt[:PROMPT_CHARS], "answer": answer[:ANSWER_CHARS]},
+            {"dodge": {"type": "noul", "instructions": (
+                "Does this answer fail to address the request? "
+                "True only for a clear dodge: wrong topic, only a promise, or no real content. "
+                "Short correct answers are not dodges.")}},
+        )
+        probability = noul_probability(answers.get("dodge"))
+    except Exception:
+        return None
+    if probability is None or probability < 0.5:
+        return None
+    return "quality check: answer does not address the request"
+
+
 def judge_for(prompt: str, model: str, base: Callable[[str], str | None],
               generate: Callable[..., str] | None = None) -> Callable[[str], str | None]:
-    """An escalate() judge: the cheap rule judge first, then the quality check."""
+    """An escalate() judge: the cheap rule judge first, then Jev or the local check.
+
+    A caller-supplied generate (tests, and the no-key path) keeps today's Ollama
+    check. Jev is used only when a key is set and nobody injected a generator.
+    """
     def judge(text: str) -> str | None:
-        return base(text) or check(prompt, text, model, generate)
+        ruled = base(text)
+        if ruled:
+            return ruled
+        if generate is None:
+            from .decision import JevDecision, pick
+            decision = pick()
+            if isinstance(decision, JevDecision):
+                return jev_check(prompt, text, decision)
+        return check(prompt, text, model, generate)
     return judge
