@@ -176,6 +176,8 @@ USER_ENV_KEYS = (
 
 def _windows_user_env(name: str) -> str | None:
     """HKCU\\Environment value for name, or None. Never logged."""
+    if os.name != "nt":
+        return None
     import winreg
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
@@ -185,16 +187,25 @@ def _windows_user_env(name: str) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _stored_secret(name: str) -> str | None:
+    """Value from the POSIX secret file, or None. Never logged."""
+    from . import credential_store
+    try:
+        return credential_store.read(name)
+    except credential_store.VaultError:
+        return None
+
+
 def load_user_env(read=None, env=None) -> list[str]:
     """Copy known keys missing from env (os.environ) out of the Windows User
-    environment. Already-set vars are left alone. Returns the names copied."""
+    environment, or off Windows out of the 0600 secret file, so a desktop,
+    cron or systemd launch gets the same keys as a shell. Already-set vars are
+    left alone. Returns the names copied."""
     env = os.environ if env is None else env
     if env.get("MEGAZWORD_NO_USER_ENV"):  # smoke/live-check: keys were removed on purpose
         return []
     if read is None:
-        if os.name != "nt":
-            return []
-        read = _windows_user_env
+        read = _windows_user_env if os.name == "nt" else _stored_secret
     copied = []
     for name in USER_ENV_KEYS:
         if env.get(name):

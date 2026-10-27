@@ -33,8 +33,21 @@ def test_uses_os_environ_by_default(monkeypatch):
     assert "GROQ_API_KEY" not in os.environ
 
 
-def test_noop_off_windows(monkeypatch):
+def test_off_windows_reads_the_secret_file(monkeypatch):
+    from megazword import credential_store
     monkeypatch.setattr(config.os, "name", "posix")
+    monkeypatch.setattr(credential_store, "read",
+                        lambda name: "fake-groq" if name == "GROQ_API_KEY" else None)
+    env = {}
+    assert config.load_user_env(env=env) == ["GROQ_API_KEY"]
+    assert env == {"GROQ_API_KEY": "fake-groq"}
+
+
+def test_off_windows_unreadable_secret_file_copies_nothing(monkeypatch):
+    from megazword import credential_store
+    monkeypatch.setattr(config.os, "name", "posix")
+    monkeypatch.setattr(credential_store, "read",
+                        lambda name: (_ for _ in ()).throw(credential_store.VaultError("open to others")))
     assert config.load_user_env(env={}) == []
 
 
