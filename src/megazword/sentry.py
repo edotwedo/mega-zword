@@ -100,6 +100,11 @@ def check_actionable_heuristic(msg: room.RoomMessage, seat: str) -> bool:
     for p in patterns:
         if p in author:
             return False
+        prefix = text.strip().lower()
+        if prefix.startswith(p + ":") or prefix.startswith(p + " -") or prefix.startswith(p + " ->"):
+            # If it's a report of work done or status, ignore it
+            if any(w in prefix for w in ["complete", "done", "landed", "resolved", "pass", "finished", "claiming"]):
+                return False
 
     # Skip closing summaries or completed work reports
     if text.startswith("CLOSING SUMMARY") or "All three items are done" in text:
