@@ -16,6 +16,7 @@ dropped connection is worse than a noisy line in the output.
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
@@ -240,9 +241,12 @@ def replace_text(designation: str) -> str:
     rows = {row["designation"].casefold(): row for row in status_rows()}
     row = rows.get(designation.casefold(), {})
     where = row.get("dir") or str(SEATS_ROOT / designation.lower())
+    command = (f"scripts/hive_resume.sh --only {designation}"
+               if sys.platform.startswith("linux") else
+               f"pwsh -File scripts/hive_resume.ps1 -Only {designation}")
     lines = [f"Replace {designation}"
              + (f" ({row['cli']})" if row.get("cli") else ""),
-             f"  1. reopen the seat:  pwsh -File scripts/hive_resume.ps1 -Only {designation}",
+             f"  1. reopen the seat:  {command}",
              f"     worktree: {where}"]
     handoff = newest_handoff(designation)
     if handoff:
