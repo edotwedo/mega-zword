@@ -116,8 +116,9 @@ def _curl_bin() -> str | None:
 def _use_curl(name: str, url: str | None = None) -> bool:
     # This PC's Python TLS fingerprint is blocked by Cloudflare on Groq.
     # curl reads the authorization header from a temporary file, not argv.
-    return (name == "groq" and bool(_curl_bin()) and url is not None
-            and urllib.parse.urlsplit(url).hostname == "api.groq.com")
+    if not _curl_bin() or url is None:
+        return False
+    return urllib.parse.urlsplit(url).hostname == "api.groq.com"
 
 
 def _cloudflare_1010(body: bytes) -> bool:
@@ -358,11 +359,12 @@ class OpenAICompatibleBackend(Backend):
         except (APIHTTPError, ToolsUnsupported):
             raise
         except urllib.error.HTTPError as exc:
+            try:
+                raw = exc.read(16384)
+            except OSError:
+                raw = b""
+            body_reader = _BytesBody(raw)
             if exc.code == 429 and self.name in {"cloudflare", "mistral"}:
-                try:
-                    raw = exc.read(16384)
-                except OSError:
-                    raw = b""
                 reason = ""
                 headers = exc.headers
                 if self.name == "cloudflare" and _cloudflare_daily_quota_exhausted(raw):
@@ -372,7 +374,20 @@ class OpenAICompatibleBackend(Backend):
                 elif self.name == "mistral" and _mistral_rate_limited(raw):
                     reason = "Mistral rate limit exceeded (code 1300)"
                 raise APIHTTPError(exc.code, headers, reason) from None
-            reason = _safe_reason(exc) if exc.code in (400, 403, 422) else ""
+            if exc.code == 403 and _cloudflare_1010(raw):
+                if _curl_bin():
+                    try:
+                        payload, response_headers = _curl_json_post(
+                            self._endpoint(), headers, body, timeout or self.timeout, tools)
+                        self._record_rate_limit_headers(response_headers)
+                        message = payload["choices"][0]["message"]
+                        if not isinstance(message, dict):
+                            raise ValueError("missing answer")
+                        return redact_payload(message)
+                    except Exception:
+                        pass
+                raise APIHTTPError(exc.code, exc.headers, blocked=True) from None
+            reason = _safe_reason(body_reader) if exc.code in (400, 403, 422) else ""
             if exc.code == 402:
                 # Payment required: this free grant is spent (billing stays off, so
                 # nothing was charged). Mark it so routing stops trying it.

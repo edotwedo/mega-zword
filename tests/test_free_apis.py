@@ -682,3 +682,38 @@ def test_each_ovh_model_is_its_own_keyless_pool():
     assert all(backends[n].keyless and backends[n].available() for n in KEYLESS)
     assert all(agent.DEFAULT_PACE[n] == 31 for n in KEYLESS if n.startswith("ovh"))  # 2/min per model
     assert agent.DEFAULT_PACE["kilo"] == 18  # 200/hour per IP, shared by every kilo-* model
+
+
+def test_use_curl_matches_all_groq_variants_and_api_groq_com(monkeypatch):
+    from megazword import free_apis
+    monkeypatch.setattr(free_apis, "_curl_bin", lambda: "curl")
+    assert free_apis._use_curl("groq", "https://api.groq.com/openai/v1/chat/completions")
+    assert free_apis._use_curl("groq-120b", "https://api.groq.com/openai/v1/chat/completions")
+    assert free_apis._use_curl("groq-qwen", "https://api.groq.com/openai/v1/chat/completions")
+    assert free_apis._use_curl("custom-name", "https://api.groq.com/openai/v1/chat/completions")
+    assert not free_apis._use_curl("cloudflare", "https://api.cloudflare.com/client/v4/accounts/x/ai/v1")
+    monkeypatch.setattr(free_apis, "_curl_bin", lambda: None)
+    assert not free_apis._use_curl("groq", "https://api.groq.com/openai/v1/chat/completions")
+
+
+def test_urllib_1010_falls_back_to_curl(api, monkeypatch):
+    from megazword import free_apis
+    monkeypatch.setattr(free_apis, "_use_curl", lambda *args: False)
+    monkeypatch.setattr(free_apis, "_curl_bin", lambda: "curl")
+    body = b"error code: 1010 Access denied. Cloudflare blocked this request."
+
+    def fail(*args, **kwargs):
+        raise urllib.error.HTTPError("https://api.groq.com/openai/v1/chat/completions", 403,
+                                     "Forbidden", {}, io.BytesIO(body))
+
+    curled = []
+    def fake_curl(url, headers, body, timeout, tools=None):
+        curled.append((url, body))
+        return {"choices": [{"message": {"role": "assistant", "content": "recovered via curl"}}]}, {}
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail)
+    monkeypatch.setattr(free_apis, "_curl_json_post", fake_curl)
+    res = api.run("test prompt")
+    assert res.ok
+    assert res.text == "recovered via curl"
+    assert len(curled) == 1

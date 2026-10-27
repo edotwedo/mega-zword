@@ -27,6 +27,7 @@ REVIEWERS = 1          # routine change; the heartbeat uses 2 before merging (Ph
 SPARES = 2             # backups from other families when a reviewer fails
 MAX_DIFF_CHARS = 24_000
 GREPTILE_MONTHLY = 50
+DEFAULT_REVIEW_TIMEOUT = 35
 SEVERITY = {"high": 0, "medium": 1, "med": 1, "low": 2}
 
 PROMPT = """You are one of {n} independent code reviewers. Other reviewers from
@@ -342,7 +343,7 @@ def collect(repo: Path, backends: dict[str, Backend], cfg: config.Config, base: 
           f"{', '.join(b.name for b in reviewers) or 'no free models'}"
           f"{' + greptile' if use_greptile else ''}", file=sys.stderr)
     for b in picked:
-        b.timeout = cfg.timeouts.get(b.name, b.timeout)
+        b.timeout = cfg.timeouts.get(b.name, min(b.timeout, DEFAULT_REVIEW_TIMEOUT))
     with ThreadPoolExecutor(max_workers=max(1, len(reviewers) + 1)) as pool:
         futures = [pool.submit(b.run, prompt) for b in reviewers]
         side = pool.submit(greptile, repo, label) if use_greptile else None
