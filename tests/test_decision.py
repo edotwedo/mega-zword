@@ -108,6 +108,10 @@ def test_uncertain_choice_raises_one_level(monkeypatch):
     assert _from_jev("explain lists", answers(0.95)).level == "easy"
     assert _from_jev("explain lists", answers(0.2)).level == "easy"
     assert _from_jev("explain lists", answers(0.6, "medium")).level == "hard"
+    assert _from_jev("explain lists", answers(0.70, "medium")).level == "medium"
+    assert _from_jev("explain lists", answers(0.69, "medium")).level == "hard"
+    assert _from_jev("explain lists", answers(0.50)).level == "medium"
+    assert _from_jev("explain lists", answers(0.49)).level == "easy"
 
     transport = _Transport([200], body=_choice_body(0.6))
     decision = JevDecision("k", opener=transport, sleep=lambda _s: None, rng=lambda: 0)

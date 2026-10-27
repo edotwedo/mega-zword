@@ -57,7 +57,8 @@ def _from_jev(prompt: str, answers: dict) -> Rating:
     # A chosen probability in this band does not settle the level, so raise
     # one step. Hard is already the top. 0.7/0.3 are the skill's thresholds;
     # below 0.5 the choice is the other way, so it is left alone.
-    if shown is not None and 0.5 <= float(shown) <= 0.7 and level != "hard":
+    # 0.7 is the edge of confidence, not doubt, so it does not raise.
+    if shown is not None and 0.5 <= float(shown) < 0.7 and level != "hard":
         level = "medium" if level == "easy" else "hard"
         reason = f"jev uncertain p={shown}, raised"
     # Small models underrate hard work, so the keyword rule can raise
