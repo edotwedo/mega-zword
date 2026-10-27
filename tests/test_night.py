@@ -285,6 +285,7 @@ def test_one_run_at_a_time(origin):
 
 
 def test_install_prints_plan_and_needs_yes(monkeypatch, capsys):
+    monkeypatch.setattr(night, "_ON_WINDOWS", True)
     calls = []
     monkeypatch.setattr(night, "_schtasks", lambda args: calls.append(args) or
                         subprocess.CompletedProcess(args, 0, "", ""))
@@ -482,3 +483,41 @@ def test_night_tries_only_one_cheap_model(origin):
     night.run_night(n, queue=str(origin), max_jobs=1, write=lambda s: None)
     assert pro.seen and not flash.seen  # the first cheap model only, then paid
     assert codex.calls
+
+
+def _fake_systemd(monkeypatch, returncode=0):
+    calls = []
+    monkeypatch.setattr(night, "_ON_WINDOWS", False)
+    monkeypatch.setattr(night, "_systemd", lambda action, name, files=None: calls.append((action, name, files))
+                        or subprocess.CompletedProcess([action], returncode, "", "boom" if returncode else ""))
+    return calls
+
+
+def test_linux_install_writes_a_daily_systemd_timer(monkeypatch, capsys):
+    calls = _fake_systemd(monkeypatch)
+    monkeypatch.setenv("MEGAZWORD_HOME", "/home/x/my mz")
+    assert night.install("01:30") == 0 and calls == []
+    assert night.install("01:30", yes=True) == 0
+    action, name, files = calls[0]
+    assert (action, name) == ("install", night.TASK_NAME)
+    service, timer = files["megazword-nightshift.service"], files["megazword-nightshift.timer"]
+    assert "Type=oneshot" in service and "night run --post" in service
+    assert 'Environment="MEGAZWORD_HOME=/home/x/my mz"' in service
+    assert "OnCalendar=*-*-* 01:30:00" in timer and "WantedBy=timers.target" in timer
+    assert night.remove() == 0 and calls[1][:2] == ("remove", night.TASK_NAME)
+
+
+def test_linux_install_failure_is_reported(monkeypatch, capsys):
+    _fake_systemd(monkeypatch, returncode=1)
+    assert night.install("01:30", yes=True) == 1
+    assert "scheduling failed: boom" in capsys.readouterr().err
+
+
+def test_unit_files_escape_percent_for_systemd():
+    files = night.unit_files("MegaZword-X", '"/opt/50%/python" -m megazword.cli x', ["OnActiveSec=1min"], "x")
+    assert "ExecStart=\"/opt/50%%/python\" -m megazword.cli x" in files["megazword-x.service"]
+
+
+def test_real_systemd_is_never_touched_by_tests():
+    with pytest.raises(RuntimeError, match="real systemctl"):
+        night._systemd("install", "MegaZword-X", {})
