@@ -99,8 +99,14 @@ def test_kill_tree_kills_grandchild(tmp_path):
         assert _pid_alive(proc.pid)
         assert _pid_alive(child_pid)
         backends._kill_tree(proc)
-        assert not _pid_alive(proc.pid)
-        assert not _pid_alive(child_pid)
+        # SIGKILL leaves a zombie until it is reaped. os.kill(pid, 0) still
+        # reports that pid as alive, so give the reaper a moment.
+        for pid in (proc.pid, child_pid):
+            for _ in range(50):
+                if not _pid_alive(pid):
+                    break
+                time.sleep(0.02)
+            assert not _pid_alive(pid)
     finally:
         backends._kill_tree(proc)
 
