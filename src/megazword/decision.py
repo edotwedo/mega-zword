@@ -61,6 +61,7 @@ class JevDecision:
         self.last_usage = None
 
     def choose(self, state, questions: dict) -> dict:
+        started = time.time()
         body = {"model": "jev-latest", "state": state, "questions": questions}
         self.last_request = body
         raw_body = json.dumps(body).encode()
@@ -89,8 +90,19 @@ class JevDecision:
                 raise DecisionError("jev response has no answers")
             usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
             self.last_usage = usage
-            log.info("jev input_tokens=%s request=%s response=%s",
-                     usage.get("input_tokens"), body, payload)
+            log.info("jev input_tokens=%s", usage.get("input_tokens"))
+            # Also write the run log the other backends write to, so Jev spend is visible
+            # where `megazword usage` and the dashboards look. Logging never fails a call.
+            try:
+                from . import log as _log
+                from .config import HOME as _home
+                _log.append(_home / "log.jsonl", backend="jev", forced=True, review=False,
+                            seconds=round(time.time() - started, 2), ok=True,
+                            prompt_chars=len(raw_body), answer_chars=len(raw),
+                            est_tokens=(len(raw_body) + len(raw)) // 4,
+                            jev_input_tokens=usage.get("input_tokens"))
+            except Exception:
+                pass
             return answers
 
     def _post(self, request) -> tuple[int, bytes]:

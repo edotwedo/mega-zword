@@ -33,10 +33,14 @@ if common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) &
 fi
 
 python=""
-for candidate in "${MZ_PYTHON:-}" "$root/.venv/Scripts/python.exe" "$main/.venv/Scripts/python.exe" \
-                 "$root/.venv/bin/python" "$main/.venv/bin/python" python3 python; do
+for candidate in "${MZ_PYTHON:-}" "$root/.venv/bin/python" "$main/.venv/bin/python" \
+                 "$root/.venv/Scripts/python.exe" "$main/.venv/Scripts/python.exe" python3 python; do
   [ -n "$candidate" ] || continue
-  if command -v "$candidate" >/dev/null 2>&1; then python="$candidate"; break; fi
+  # command -v accepts a leftover Windows python.exe on Linux, because the file is
+  # executable - it just cannot run. Prove the interpreter works before trusting it.
+  if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys' >/dev/null 2>&1; then
+    python="$candidate"; break
+  fi
 done
 [ -z "$python" ] && exit 0
 
