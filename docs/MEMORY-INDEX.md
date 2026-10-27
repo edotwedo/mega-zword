@@ -32,6 +32,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/LINUX-TIMERS.md` | 3.9 kB | when your task names it, or changes what it describes |
 | `docs/OPEN-BRANCHES.md` | 3.8 kB | when your task names it, or changes what it describes |
 | `docs/PHIL-SETUP-MAP.md` | 3.7 kB | when setting up Phil's machine or the launchers |
+| `docs/PHONE-DOLPHIN.md` | 4.9 kB | when your task names it, or changes what it describes |
 | `docs/PLAN-hermes-execution.md` | 15.7 kB | when your task names it, or changes what it describes |
 | `docs/PRODUCTS.md` | 2.0 kB | when the task is about what we sell |
 | `docs/PROPOSAL-beat-hermes.md` | 11.1 kB | when your task names it, or changes what it describes |
