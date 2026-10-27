@@ -10,7 +10,7 @@
 set -u
 
 if [ "${MZ_SKIP_GATE:-}" = "1" ]; then
-  echo "land-gate: SKIPPED (MZ_SKIP_GATE=1) - nothing was verified"
+  echo "land-gate: BYPASS / SKIPPED (MZ_SKIP_GATE=1) - NOTHING WAS VERIFIED"
   exit 0
 fi
 
@@ -31,25 +31,37 @@ if [ "$saw_any" = "1" ] && [ "$deletes_only" = "1" ]; then
   exit 0
 fi
 
-root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "land-gate: NOTHING WAS VERIFIED - cannot locate repository; push blocked"
+  exit 1
+}
 main="$root"
 if common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && [ -n "$common" ]; then
   main=$(dirname "$common")
 fi
 
+# Git Bash uses Windows virtualenvs; POSIX must prefer native executables.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) native=Scripts/python.exe; fallback=bin/python ;;
+  *) native=bin/python; fallback=Scripts/python.exe ;;
+esac
 python=""
-for candidate in "${MZ_PYTHON:-}" "$root/.venv/Scripts/python.exe" "$main/.venv/Scripts/python.exe" \
-                 "$root/.venv/bin/python" "$main/.venv/bin/python" python3 python; do
+for candidate in "${MZ_PYTHON:-}" "$root/.venv/$native" "$main/.venv/$native" \
+                 "$root/.venv/$fallback" "$main/.venv/$fallback" python3 python; do
   [ -n "$candidate" ] || continue
-  if command -v "$candidate" >/dev/null 2>&1; then python="$candidate"; break; fi
+  if command -v "$candidate" >/dev/null 2>&1 &&
+      "$candidate" -c 'import sys' >/dev/null 2>&1; then
+    python="$candidate"
+    break
+  fi
 done
 if [ -z "$python" ]; then
-  echo "land-gate: NOTHING WAS VERIFIED - no python found on this machine"
-  exit 0
+  echo "land-gate: NOTHING WAS VERIFIED - no runnable python found on this machine; push blocked"
+  exit 1
 fi
 if ! "$python" -c "import pytest" >/dev/null 2>&1; then
-  echo "land-gate: NOTHING WAS VERIFIED - $python has no pytest"
-  exit 0
+  echo "land-gate: NOTHING WAS VERIFIED - $python has no pytest; push blocked"
+  exit 1
 fi
 
 # git exports GIT_DIR and friends to its hooks. The suite builds its own throwaway
@@ -58,7 +70,10 @@ fi
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR \
       GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
 
-cd "$root" || exit 0
+cd "$root" || {
+  echo "land-gate: NOTHING WAS VERIFIED - cannot enter repository; push blocked"
+  exit 1
+}
 
 # M2/P3: use THIS worktree's task gate; another checkout's installed code may be old.
 # Check before spending the suite, then again after it (leases may change meanwhile).
