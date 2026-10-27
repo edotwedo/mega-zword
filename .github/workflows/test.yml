@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - name: Install
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev]" "psutil>=7" "Pillow>=10.1"
       - name: Verify POSIX fake CLI launchers
         if: runner.os == 'Linux'
         shell: bash
