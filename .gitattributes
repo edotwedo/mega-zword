@@ -7,3 +7,5 @@ scripts/fake_cli/gemini text eol=lf
 .githooks/* text eol=lf
 
 scripts/fake_agy/agy text eol=lf
+
+scripts/windows_gate.sh text eol=lf

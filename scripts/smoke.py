@@ -33,8 +33,19 @@ def _without_real_agy(path: str) -> str:
     """Drop PATH folders holding a real Antigravity CLI: Gemini prefers agy
     when it's on PATH, and nothing here may reach a real AI."""
     names = ("agy", "agy.exe", "agy.cmd", "agy.bat")
-    return os.pathsep.join(p for p in path.split(os.pathsep)
-                           if not any((Path(p) / n).is_file() for n in names if p))
+    safe = []
+    for folder in path.split(os.pathsep):
+        if not folder:
+            continue
+        try:
+            if any((Path(folder) / name).is_file() for name in names):
+                continue
+        except OSError:
+            # Windows can expose untrusted mounts (WinError 448) on PATH.
+            # An unreadable directory cannot safely provide a smoke dependency.
+            continue
+        safe.append(folder)
+    return os.pathsep.join(safe)
 
 results: list[tuple[str, bool, str]] = []
 
