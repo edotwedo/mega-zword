@@ -77,13 +77,22 @@ def available() -> bool:
         return False
 
 
-def icon_path() -> str | None:
+def icon_path(png: bool = False) -> str | None:
     """The bundled MZ icon as a real file path, or None if it's missing."""
+    name = "mz.png" if png else "mz.ico"
     try:
-        path = Path(str(resources.files("megazword").joinpath("mz.ico")))
+        path = Path(str(resources.files("megazword").joinpath(name)))
+        if path.is_file():
+            return str(path)
     except (ModuleNotFoundError, TypeError):
-        return None
-    return str(path) if path.is_file() else None
+        pass
+    if png:
+        try:
+            path = Path(str(resources.files("megazword").joinpath("mz.ico")))
+            return str(path) if path.is_file() else None
+        except (ModuleNotFoundError, TypeError):
+            pass
+    return None
 
 
 def run_window(url: str, on_closed: Callable[[], None] | None = None, webview=None) -> None:
@@ -114,9 +123,29 @@ LAUNCH_CODE = "import sys; from megazword.cli import main; sys.exit(main(['dashb
 
 def shortcut_path(env: dict | None = None) -> Path:
     import os
+    import sys
     env = os.environ if env is None else env
+    is_win = (sys.platform == "win32") or ("APPDATA" in env and "XDG_DATA_HOME" not in env)
+    if not is_win:
+        data_home = Path(env.get("XDG_DATA_HOME") or (Path(env.get("HOME") or Path.home()) / ".local" / "share"))
+        return data_home / "applications" / "megazword.desktop"
     return (Path(env.get("APPDATA") or Path.home() / "AppData" / "Roaming")
             / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Mega Zword.lnk")
+
+
+def desktop_entry_content(exec_cmd: str, icon: str | None) -> str:
+    icon_line = f"Icon={icon}\n" if icon else ""
+    return (
+        "[Desktop Entry]\n"
+        "Name=Mega Zword\n"
+        "Comment=Run your AI CLIs from one place\n"
+        f"Exec={exec_cmd}\n"
+        f"{icon_line}"
+        "Terminal=false\n"
+        "Type=Application\n"
+        "Categories=Development;\n"
+        "StartupNotify=true\n"
+    )
 
 
 def launcher_python(python: str | None = None) -> str:
@@ -139,12 +168,28 @@ def shortcut_script(link: Path, target: str, args: str, icon: str | None, workdi
 
 
 def install_shortcut(run=None, env: dict | None = None, python: str | None = None) -> Path:
-    """Create or refresh the Start menu shortcut. Windows only."""
+    """Create or refresh the Start menu or desktop shortcut."""
+    import os
+    import sys
+    import shutil
     import subprocess
     from .backends import no_window
-    run = run or subprocess.run
+    env = os.environ if env is None else env
     link = shortcut_path(env)
     link.parent.mkdir(parents=True, exist_ok=True)
+    is_win = (sys.platform == "win32") or ("APPDATA" in env and "XDG_DATA_HOME" not in env)
+    if not is_win:
+        mz_bin = shutil.which("megazword")
+        if mz_bin:
+            exec_cmd = f"{mz_bin} dashboard --app"
+        else:
+            py = launcher_python(python)
+            exec_cmd = f"{py} -m megazword.cli dashboard --app"
+        content = desktop_entry_content(exec_cmd, icon_path(png=True))
+        link.write_text(content, encoding="utf-8")
+        return link
+
+    run = run or subprocess.run
     args = '-c "' + LAUNCH_CODE + '"'
     script = shortcut_script(link, launcher_python(python), args, icon_path(), str(Path.home()))
     result = run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
