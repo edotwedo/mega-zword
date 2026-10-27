@@ -98,6 +98,15 @@ def _conflicts(tasks, files, now, own=None):
             and wanted & set(t["files"])]
 
 
+def list_tasks(repo, *, now=None):
+    """Read tasks with lease expiry reflected in their reported state."""
+    root, now = _root(repo), _now(now)
+    with _registry(root) as tasks:
+        return [dict(row, state="expired" if row["state"] == "open" and
+                     not _active(row, now) else row["state"])
+                for row in tasks.values()]
+
+
 def new(repo, title, files, *, seat=None, now=None):
     root, now, owner = _root(repo), _now(now), _owner(seat)
     if not title.strip():

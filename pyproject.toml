@@ -16,7 +16,7 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "psutil>=7", "Pillow>=10.1"]
+dev = ["pytest>=8", "psutil>=7", "Pillow>=10.1", "pywinpty>=3; sys_platform == 'win32'"]
 # B6b: the desktop window (WebView2 on Windows). Without it, an Edge/Chrome app window.
 app = ["pywebview>=5"]
 # Local face presence only; no model service or camera-image uploads.
