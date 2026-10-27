@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -77,6 +78,47 @@ def test_expiry_and_heartbeat_are_thirty_minutes_and_cannot_resurrect(repo):
     assert second["id"] != first["id"]
     with pytest.raises(task.TaskError, match="expired"):
         task.update(repo, first["id"], seat="Briar-20", now=NOW + timedelta(minutes=51))
+
+
+@pytest.fixture
+def idle_task(repo, tmp_path, monkeypatch):
+    """Reproduce the idle-seat lease loss without real state or wall-clock waits."""
+    monkeypatch.setenv("MEGAZWORD_HOME", str(tmp_path / "megazword-home"))
+    return task.new(repo, "idle seat", ["work.py"], seat="Briar-20", now=NOW)
+
+
+@pytest.mark.parametrize("minutes", [30, 31])
+def test_expired_task_beat_is_refused_with_recovery_message(
+        repo, idle_task, monkeypatch, capsys, minutes):
+    expired_at = NOW + timedelta(minutes=minutes)
+    monkeypatch.chdir(repo)
+    monkeypatch.setattr(task, "_now", lambda value: value or expired_at)
+    args = SimpleNamespace(action="beat", id=idle_task["id"], seat="Briar-20", files=[])
+    assert task.command(args) == 1
+    assert capsys.readouterr().out.strip() == (
+        "task: task lease expired or released; create a new task")
+    stored = task.list_tasks(repo, now=expired_at)[0]
+    assert stored["tick"] == 0
+    assert stored["heartbeat_at"] == idle_task["heartbeat_at"]
+    assert stored["expires_at"] == idle_task["expires_at"]
+
+
+def test_task_store_reports_expired_lease_instead_of_open(repo, idle_task):
+    assert task.list_tasks(repo, now=NOW + timedelta(minutes=29))[0]["state"] == "open"
+    assert task.list_tasks(repo, now=NOW + timedelta(minutes=30))[0]["state"] == "expired"
+    assert task.list_tasks(repo, now=NOW + timedelta(minutes=31))[0]["state"] == "expired"
+
+
+def test_replacement_task_can_claim_expired_tasks_files(repo, idle_task):
+    expired_at = NOW + timedelta(minutes=31)
+    replacement = task.new(repo, "replacement", idle_task["files"],
+                           seat="Briar-20", now=expired_at)
+    assert replacement["id"] != idle_task["id"]
+    assert replacement["branch"] != idle_task["branch"]
+    assert replacement["files"] == idle_task["files"]
+    assert replacement["expires_at"] == (expired_at + timedelta(minutes=30)).isoformat()
+    states = {row["id"]: row["state"] for row in task.list_tasks(repo, now=expired_at)}
+    assert states == {idle_task["id"]: "expired", replacement["id"]: "open"}
 
 
 def test_heartbeat_can_extend_the_file_set_but_not_take_another_lease(repo):
