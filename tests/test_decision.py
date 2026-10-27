@@ -87,6 +87,34 @@ def test_choose_logs_input_tokens():
     assert decision.last_request["model"] == "jev-latest"
 
 
+def _choice_body(probability, choice="easy"):
+    return json.dumps({
+        "model": "jev-latest",
+        "answers": {"difficulty": {
+            "type": "choice", "choice": choice,
+            "probabilities": {choice: probability},
+            "confidence": probability,
+        }},
+        "usage": {"input_tokens": 4},
+    }).encode()
+
+
+def test_uncertain_choice_raises_one_level(monkeypatch):
+    from megazword.rater import _from_jev
+    def answers(probability, choice="easy"):
+        return {"difficulty": {"choice": choice, "probabilities": {choice: probability}}}
+    raised = _from_jev("explain lists", answers(0.6))
+    assert raised.level == "medium" and raised.reason == "jev uncertain p=0.6, raised"
+    assert _from_jev("explain lists", answers(0.95)).level == "easy"
+    assert _from_jev("explain lists", answers(0.2)).level == "easy"
+    assert _from_jev("explain lists", answers(0.6, "medium")).level == "hard"
+
+    transport = _Transport([200], body=_choice_body(0.6))
+    decision = JevDecision("k", opener=transport, sleep=lambda _s: None, rng=lambda: 0)
+    monkeypatch.setattr("megazword.decision.pick", lambda: decision)
+    assert rate("explain lists").reason == "jev uncertain p=0.6, raised"
+
+
 def test_mid_noul_is_not_a_dodge():
     class Fake:
         def choose(self, state, questions):
@@ -95,8 +123,9 @@ def test_mid_noul_is_not_a_dodge():
             return {"dodge": {"type": "noul", "noul": self.p}}
 
     fake = Fake()
-    fake.p = 0.5
-    assert jev_check("sum 2+2", "4", fake) is None
+    for probability in (0.3, 0.5, 0.7):
+        fake.p = probability
+        assert jev_check("sum 2+2", "4", fake) is None
     fake.p = 0.91
     assert jev_check("sum 2+2", "later", fake) == "quality check: answer does not address the request"
 
