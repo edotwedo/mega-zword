@@ -29,6 +29,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/INSPIRATION-ROADMAP.md` | 6.2 kB | when sequencing ideas into work |
 | `docs/INSPIRATION.md` | 7.9 kB | when you need direction on what this is for |
 | `docs/LANDING-PAGE.md` | 6.1 kB | when the task touches the public page |
+| `docs/LINUX-TIMERS.md` | 3.9 kB | when your task names it, or changes what it describes |
 | `docs/OPEN-BRANCHES.md` | 3.8 kB | when your task names it, or changes what it describes |
 | `docs/PHIL-SETUP-MAP.md` | 3.7 kB | when setting up Phil's machine or the launchers |
 | `docs/PLAN-hermes-execution.md` | 15.7 kB | when your task names it, or changes what it describes |
