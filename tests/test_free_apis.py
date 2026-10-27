@@ -356,9 +356,7 @@ def test_cli_forced_and_edit_agent(name, key_env, monkeypatch, capsys):
 
 
 NEW_FREE = ("cloudflare", "zai", "zai-47", "gemini-api", "nvidia", "nvidia-lightning",
-            "mistral", "tencent-glm-5.3-flash", "tencent-glm-5.3",
-            "tencent-kimi-k2.7-code", "tencent-kimi-k3",
-            "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp")
+            "mistral")
 
 
 def test_free_backends_are_registered_and_routed_before_paid_plans():
@@ -474,21 +472,20 @@ def test_low_request_quota_is_persisted_until_header_reset(api, monkeypatch, tmp
 
 def test_all_default_routes_try_free_backends_before_paid_plans():
     free = {"openrouter", "groq", "cloudflare", "zai", "gemini-api", "gemini",
-            "mistral", "nvidia", "tencent", "ollama",
-            "tencent-glm-5.3-flash", "tencent-glm-5.3",
-            "tencent-kimi-k2.7-code", "tencent-kimi-k3",
-            "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp"}
+            "mistral", "nvidia", "ollama"}
     paid = {"claude", "codex", "grok"}
+    spent = {
+        "tencent", "tencent-glm-5.3-flash", "tencent-glm-5.3",
+        "tencent-kimi-k2.7-code", "tencent-kimi-k3",
+        "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
+    }
     for route in config.DEFAULT_ROUTE.values():
         free_positions = [i for i, name in enumerate(route) if name in free]
         paid_positions = [i for i, name in enumerate(route) if name in paid]
         assert free_positions and paid_positions
         assert max(free_positions) < min(paid_positions)
-    assert config.DEFAULT_FREE_FAILOVER[:6] == [
-        "tencent-glm-5.3-flash", "tencent-glm-5.3",
-        "tencent-kimi-k2.7-code", "tencent-kimi-k3",
-        "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
-    ]
+        assert spent.isdisjoint(route)
+    assert spent.isdisjoint(config.DEFAULT_FREE_FAILOVER)
     assert not ({"kimi", "qwen-coder", "deepseek"} & set(config.DEFAULT_FREE_FAILOVER))
 
 
@@ -579,18 +576,16 @@ def test_tencent_tokenhub_request_uses_deepseek_v4_pro_singapore_and_key(monkeyp
     assert json.loads(seen[0].data)["model"] == "deepseek-v4-pro"
 
 
-def test_all_six_live_verified_tencent_models_are_routed():
+def test_spent_tencent_grants_stay_defined_but_unrouted():
     backends = default_backends()
     assert "tencent" in backends
-    assert all("tencent" not in route for route in config.DEFAULT_ROUTE.values())
-    assert "tencent" not in config.DEFAULT_FREE_FAILOVER
     working = ("tencent-glm-5.3-flash", "tencent-glm-5.3",
                "tencent-kimi-k2.7-code", "tencent-kimi-k3",
                "tencent-deepseek-v4-pro",
                "tencent-deepseek-v4-flash-vision-exp")
     assert set(working).issubset(backends)
-    assert all(route[:6] == list(working) for route in config.DEFAULT_ROUTE.values())
-    assert all(name in config.DEFAULT_FREE_FAILOVER for name in working)
+    assert all(set(working).isdisjoint(route) for route in config.DEFAULT_ROUTE.values())
+    assert set(working).isdisjoint(config.DEFAULT_FREE_FAILOVER)
     assert all(backends[name].key_env == "TENCENT_TOKENHUB_API_KEY"
                for name in working)
     assert all(backends[name].base_url == backends["tencent"].base_url

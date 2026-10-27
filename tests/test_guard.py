@@ -52,9 +52,10 @@ def test_trainers_go_first_for_easy_only():
     assert "mistral" not in [b.name for b in hard]
 
 
-def test_default_easy_route_starts_with_verified_tencent_group():
-    assert DEFAULT_ROUTE["easy"][:6] == [
+def test_default_routes_leave_out_spent_tencent_grants():
+    spent = {
         "tencent-glm-5.3-flash", "tencent-glm-5.3",
         "tencent-kimi-k2.7-code", "tencent-kimi-k3",
         "tencent-deepseek-v4-pro", "tencent-deepseek-v4-flash-vision-exp",
-    ]
+    }
+    assert all(spent.isdisjoint(names) for names in DEFAULT_ROUTE.values())
