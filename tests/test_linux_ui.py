@@ -18,6 +18,9 @@ class BlockWindows(importlib.abc.MetaPathFinder):
                         "winpty", "cv2", "numpy"}:
             raise AssertionError("Windows dependency imported: " + fullname)
 sys.meta_path.insert(0, BlockWindows())
+import megazword.cli
+import megazword.dashboard
+assert not any(name == "winpty" or name.startswith("winpty.") for name in sys.modules)
 from megazword.cli import main
 assert main(["--help"]) == 0
 '''], capture_output=True, text=True)
@@ -37,6 +40,7 @@ sys.meta_path.insert(0, BlockWindows())
 from megazword import dashboard, cmdc_quota
 from megazword.face_identity import OwnerCamera, enroll, watch
 app = dashboard.AppState()
+assert not any(name == "winpty" or name.startswith("winpty.") for name in sys.modules)
 camera = OwnerCamera(Path("/unused"))
 assert camera.read() is False
 assert camera.frame() == (None, [])
