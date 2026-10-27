@@ -78,3 +78,15 @@ def test_install_without_yes_only_prints_the_plan():
     lines = []
     assert usage_guard.install(every=30, yes=False, write=lines.append) == 0
     assert any(usage_guard.TASK_NAME in line for line in lines)
+
+
+def test_linux_install_repeats_every_n_minutes(monkeypatch):
+    import subprocess
+    from megazword import night
+    calls = []
+    monkeypatch.setattr(night, "_ON_WINDOWS", False)
+    monkeypatch.setattr(night, "_systemd", lambda action, name, files=None: calls.append(files)
+                        or subprocess.CompletedProcess([action], 0, "", ""))
+    assert usage_guard.install(every=30, yes=True, write=lambda s: None) == 0
+    timer = calls[0]["megazword-guard.timer"]
+    assert "OnActiveSec=1min" in timer and "OnUnitActiveSec=30min" in timer

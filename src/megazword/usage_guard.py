@@ -208,10 +208,10 @@ def install(every: int = DEFAULT_EVERY, yes: bool = False,
     if not yes:
         write("[guard] add --yes to create it")
         return 0
-    result = night._schtasks(["/Create", "/TN", TASK_NAME, "/SC", "MINUTE", "/MO", str(every),
-                              "/TR", command, "/F"])
+    result = night.schedule(TASK_NAME, command, ["/SC", "MINUTE", "/MO", str(every)],
+                            ["OnActiveSec=1min", f"OnUnitActiveSec={every}min"], "megazword usage guard")
     if result.returncode != 0:
-        write(f"[guard] schtasks failed: {(result.stderr or result.stdout).strip()[:300]}")
+        write(f"[guard] scheduling failed: {(result.stderr or result.stdout).strip()[:300]}")
         return 1
     write(f"[guard] scheduled {TASK_NAME} every {every} min. Off: `megazword guard stop` "
           "(skips runs) or `megazword guard remove` (deletes the task)")
@@ -220,9 +220,9 @@ def install(every: int = DEFAULT_EVERY, yes: bool = False,
 
 def remove(write: Callable[[str], None] = print) -> int:
     from . import night
-    result = night._schtasks(["/Delete", "/TN", TASK_NAME, "/F"])
+    result = night.unschedule(TASK_NAME)
     if result.returncode != 0:
-        write(f"[guard] schtasks: {(result.stderr or result.stdout).strip()[:300]}")
+        write(f"[guard] unschedule: {(result.stderr or result.stdout).strip()[:300]}")
         return 1
     write(f"[guard] removed {TASK_NAME}")
     return 0

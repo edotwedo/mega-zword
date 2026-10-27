@@ -313,3 +313,14 @@ def test_heartbeat_run_builds_ais_that_can_edit(monkeypatch):
     assert cli.main(["heartbeat", "run"]) == 0
     assert cli.main(["heartbeat", "status"]) == 0
     assert seen == [True, False]
+
+
+def test_linux_install_beats_every_n_hours_inside_the_window(monkeypatch):
+    calls = []
+    monkeypatch.setattr(night, "_ON_WINDOWS", False)
+    monkeypatch.setattr(night, "_systemd", lambda action, name, files=None: calls.append(files)
+                        or subprocess.CompletedProcess([action], 0, "", ""))
+    assert heartbeat.install("09:00", 3, "21:00", yes=True) == 0
+    timer = calls[0]["megazword-heartbeat.timer"]
+    beats = [line for line in timer.splitlines() if line.startswith("OnCalendar=")]
+    assert beats == [f"OnCalendar=*-*-* {h:02d}:00:00" for h in (9, 12, 15, 18)]

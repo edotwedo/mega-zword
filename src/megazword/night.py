@@ -163,6 +163,80 @@ def _schtasks(args: list[str]) -> subprocess.CompletedProcess:
     return run_cmd(["schtasks", *args], timeout=60)
 
 
+# Off Windows a scheduled task is a systemd --user .service + .timer pair:
+# the unit owns its environment, and load_user_env fills keys from the 0600 file.
+_ON_WINDOWS = os.name == "nt"
+
+
+def unit_name(task_name: str) -> str:
+    return task_name.lower()  # MegaZword-NightShift -> megazword-nightshift
+
+
+def _unit_quote(value: str) -> str:
+    """A literal value inside a double-quoted unit-file word: systemd would
+    otherwise expand %-specifiers (%q is the hostname) and C escapes."""
+    if "\n" in value or "\r" in value:
+        raise ValueError("a newline cannot be written into a systemd unit")
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
+
+
+def unit_files(task_name: str, command: str, timer: list[str], description: str) -> dict[str, str]:
+    """The .service and .timer text for a scheduled job; `timer` is its [Timer] lines."""
+    name = unit_name(task_name)
+    env = ""
+    if os.environ.get("MEGAZWORD_HOME"):  # a custom home must follow the job
+        env = f'Environment="MEGAZWORD_HOME={_unit_quote(os.environ["MEGAZWORD_HOME"])}"\n'
+    service = (f"[Unit]\nDescription={description}\n\n[Service]\nType=oneshot\n{env}"
+               f"ExecStart={command.replace('%', '%%')}\n")
+    timer_text = (f"[Unit]\nDescription={description}\n\n[Timer]\n"
+                  + "".join(f"{line}\n" for line in timer)
+                  + "\n[Install]\nWantedBy=timers.target\n")
+    return {f"{name}.service": service, f"{name}.timer": timer_text}
+
+
+def _systemd(action: str, task_name: str, files: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    """Install or remove a systemd --user timer; tests replace this so they never
+    touch the real user session."""
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        raise RuntimeError(f"test tried to run real systemctl: {action} {task_name}")
+    unit_dir = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
+    timer = f"{unit_name(task_name)}.timer"
+    try:
+        if action == "install":
+            unit_dir.mkdir(parents=True, exist_ok=True)
+            for filename, text in (files or {}).items():
+                (unit_dir / filename).write_text(text, encoding="utf-8")
+            res = run_cmd(["systemctl", "--user", "daemon-reload"], timeout=60)
+            if res.returncode != 0:
+                return res
+            return run_cmd(["systemctl", "--user", "enable", "--now", timer], timeout=60)
+        res = run_cmd(["systemctl", "--user", "disable", "--now", timer], timeout=60)
+        for suffix in (".timer", ".service"):
+            (unit_dir / f"{unit_name(task_name)}{suffix}").unlink(missing_ok=True)
+        run_cmd(["systemctl", "--user", "daemon-reload"], timeout=60)
+        return res
+    except OSError as exc:  # no systemctl, or an unwritable unit dir
+        return subprocess.CompletedProcess([action, task_name], 127, "", str(exc))
+
+
+def schedule(task_name: str, command: str, schtasks_args: list[str], timer: list[str],
+             description: str) -> subprocess.CompletedProcess:
+    """Create a scheduled task: schtasks on Windows, a systemd --user timer elsewhere."""
+    if _ON_WINDOWS:
+        return _schtasks(["/Create", "/TN", task_name, *schtasks_args, "/TR", command, "/F"])
+    try:
+        files = unit_files(task_name, command, timer, description)
+    except ValueError as exc:
+        return subprocess.CompletedProcess(["install", task_name], 2, "", str(exc))
+    return _systemd("install", task_name, files)
+
+
+def unschedule(task_name: str) -> subprocess.CompletedProcess:
+    if _ON_WINDOWS:
+        return _schtasks(["/Delete", "/TN", task_name, "/F"])
+    return _systemd("remove", task_name)
+
+
 # ---------- repos and branches ----------
 
 def remote_url(repo: str) -> str:
@@ -758,9 +832,10 @@ def install(at: str = "01:00", yes: bool = False) -> int:
     if not yes:
         print("[megazword] add --yes to create it")
         return 0
-    res = _schtasks(["/Create", "/TN", TASK_NAME, "/SC", "DAILY", "/ST", at, "/TR", cmd, "/F"])
+    res = schedule(TASK_NAME, cmd, ["/SC", "DAILY", "/ST", at], [f"OnCalendar=*-*-* {at}:00"],
+                   "megazword night shift")
     if res.returncode != 0:
-        print(f"[megazword] schtasks failed: {(res.stderr or res.stdout).strip()[:300]}", file=sys.stderr)
+        print(f"[megazword] scheduling failed: {(res.stderr or res.stdout).strip()[:300]}", file=sys.stderr)
         return 1
     print(f"[megazword] scheduled {TASK_NAME} daily at {at}. Off: `megazword night stop` "
           "(skips runs) or `megazword night remove` (deletes the task)")
@@ -768,9 +843,9 @@ def install(at: str = "01:00", yes: bool = False) -> int:
 
 
 def remove() -> int:
-    res = _schtasks(["/Delete", "/TN", TASK_NAME, "/F"])
+    res = unschedule(TASK_NAME)
     if res.returncode != 0:
-        print(f"[megazword] schtasks: {(res.stderr or res.stdout).strip()[:300]}", file=sys.stderr)
+        print(f"[megazword] unschedule: {(res.stderr or res.stdout).strip()[:300]}", file=sys.stderr)
         return 1
     print(f"[megazword] removed {TASK_NAME}")
     return 0

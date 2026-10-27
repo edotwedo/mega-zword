@@ -386,10 +386,13 @@ def install(start: str, every_hours: int, until: str, yes: bool = False) -> int:
     if not yes:
         print("[heartbeat] add --yes to create it")
         return 0
-    res = night._schtasks(["/Create", "/TN", TASK_NAME, "/SC", "DAILY", "/ST", start,
-                           "/RI", str(every_hours * 60), "/DU", duration, "/TR", cmd, "/F"])
+    start_min = h1 * 60 + m1
+    beats = range(start_min, start_min + minutes, every_hours * 60)  # like /RI within /DU
+    timer = [f"OnCalendar=*-*-* {t // 60:02d}:{t % 60:02d}:00" for t in beats]
+    res = night.schedule(TASK_NAME, cmd, ["/SC", "DAILY", "/ST", start, "/RI", str(every_hours * 60),
+                                          "/DU", duration], timer, "megazword heartbeat")
     if res.returncode != 0:
-        print(f"[heartbeat] schtasks failed: {(res.stderr or res.stdout).strip()[:300]}", file=sys.stderr)
+        print(f"[heartbeat] scheduling failed: {(res.stderr or res.stdout).strip()[:300]}", file=sys.stderr)
         return 1
     print(f"[heartbeat] scheduled. Pause: `megazword night stop`. Remove: `megazword heartbeat remove`.")
     return 0
@@ -454,7 +457,7 @@ def command(args, backends, cfg: config.Config) -> int:
             return 2
         return unshelve(args.item)
     if args.action == "remove":
-        res = night._schtasks(["/Delete", "/TN", TASK_NAME, "/F"])
+        res = night.unschedule(TASK_NAME)
         print("[heartbeat] removed" if res.returncode == 0 else "[heartbeat] no task to remove")
         return 0
     return status()
