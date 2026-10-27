@@ -186,3 +186,23 @@ def test_broken_desktop_window_falls_back_to_the_browser_window(tmp_path, monkey
     assert dashboard.serve(port, project="proj", open_browser=True, app_window=True) == 0
     assert opened == [(f"http://127.0.0.1:{port}/", 200)]
     assert "desktop window failed (RuntimeError: WebView2 runtime not found)" in capsys.readouterr().err
+
+
+def test_shortcut_linux_path_and_install(tmp_path):
+    env = {"XDG_DATA_HOME": str(tmp_path)}
+    link = desktop.shortcut_path(env)
+    assert link == tmp_path / "applications" / "megazword.desktop"
+    assert not link.exists()
+
+    installed = desktop.install_shortcut(env=env)
+    assert installed == link
+    assert link.is_file()
+    text = link.read_text(encoding="utf-8")
+    assert "[Desktop Entry]" in text
+    assert "Name=Mega Zword" in text
+    assert "Exec=" in text and "dashboard --app" in text
+    assert "Terminal=false" in text
+
+    assert desktop.remove_shortcut(env) is True
+    assert not link.exists()
+    assert desktop.remove_shortcut(env) is False
