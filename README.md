@@ -49,6 +49,24 @@ from any folder. The installer finishes with `megazword doctor`.
 To install manually instead: `python -m venv .venv`, then
 `.venv\Scripts\python -m pip install -e .`.
 
+### Linux
+
+From the cloned checkout (Python 3.11+):
+
+```sh
+python -m venv .venv
+. .venv/bin/activate
+pip install -e .
+```
+
+Supply API keys through environment variables, or export them from a local file
+restricted with `chmod 600` (0600); Linux has no Windows Credential Manager.
+For background jobs, configure systemd user timers (`systemctl --user`), rather
+than the Windows `schtasks` installers; the CLI does not install Linux timers.
+`megazword tab` uses OSC 2 terminal titles (kitty remote control when available).
+`megazword dashboard --app` opens a Chromium/Chrome app window when installed
+and on PATH; otherwise it falls back to a normal browser tab.
+
 ## Quick start
 
 Typing plain `megazword` at a terminal opens the app window (`megazword dashboard --app`), which
