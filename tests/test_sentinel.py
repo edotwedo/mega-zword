@@ -162,14 +162,16 @@ def test_install_dry_run_does_not_create_task(capsys, monkeypatch):
     assert "install --yes" in out and "ntfy" in out
 
 
-def test_install_yes_on_unix_skips_schtasks(monkeypatch, capsys):
+def test_install_yes_on_unix_skips_schtasks(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(sentinel, "_is_windows", lambda: False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
     ran = []
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: ran.append(a) or type(
         "R", (), {"returncode": 0, "stderr": "", "stdout": ""})())
-    assert sentinel.install(True) == 2
-    assert ran == []
-    assert "Windows-only" in capsys.readouterr().out
+    assert sentinel.install(True) == 0
+    assert ran
+    assert all(args[0][0] != "schtasks" for args in ran)
+    assert "user timer" in capsys.readouterr().out
 
 
 def test_install_yes_creates_tasks(monkeypatch, capsys):

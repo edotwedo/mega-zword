@@ -81,6 +81,19 @@ def _registry(root):
             write_atomic(path, json.dumps(state, indent=2) + "\n")
 
 
+def list_tasks(repo, now=None):
+    """Open leases stay open until expires_at; a due lease is reported expired."""
+    root, now = _root(repo), _now(now)
+    with _registry(root) as tasks:
+        rows = []
+        for task in tasks.values():
+            row = dict(task)
+            if row.get("state") == "open" and not _active(row, now):
+                row["state"] = "expired"
+            rows.append(row)
+        return rows
+
+
 def _active(task, now):
     try:
         if task["state"] != "open":
