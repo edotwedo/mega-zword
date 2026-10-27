@@ -276,6 +276,13 @@ def build_parser() -> argparse.ArgumentParser:
     room_post.add_argument("--room", default="hive", help="room name (default: hive)")
     room_post.add_argument("--post", action="store_true", help="actually post it to Q with gh")
 
+    room_sentry = room_sub.add_parser("sentry", help="hive room sentry: wait for work without burning LLM tokens")
+    room_sentry.add_argument("--seat", help="seat to monitor (default: $MEGAZWORD_SEAT)")
+    room_sentry.add_argument("--room", default="hive", help="room name (default: hive)")
+    room_sentry.add_argument("--interval", type=int, default=15, help="poll interval in seconds")
+    room_sentry.add_argument("--timeout", type=int, default=None, help="timeout in seconds")
+    room_sentry.add_argument("--init-now", action="store_true", help="set bookmark to current head and exit")
+
     for action in sub._choices_actions:
         sub.choices[action.dest].description = action.help
     return parser
@@ -763,6 +770,16 @@ def main(argv: list[str] | None = None,
             if getattr(args, "state", None):
                 argv += ["--state", args.state]
             return room_wait.main(argv)
+        if action == "sentry":
+            from . import sentry
+            argv = ["--room", args.room, "--interval", str(args.interval)]
+            if getattr(args, "seat", None):
+                argv += ["--seat", args.seat]
+            if getattr(args, "timeout", None) is not None:
+                argv += ["--timeout", str(args.timeout)]
+            if getattr(args, "init_now", False):
+                argv.append("--init-now")
+            return sentry.main(argv)
         if action == "escalate":
             from . import escalate_watch
             return escalate_watch.main(["--room", args.room])
