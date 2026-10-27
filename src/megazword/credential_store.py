@@ -7,6 +7,8 @@ import json
 import os
 import re
 import sys
+import tempfile
+from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
 
@@ -116,35 +118,52 @@ def _store_path() -> Path:
 def _load() -> dict:
     path = _store_path()
     try:
-        mode = path.stat().st_mode
+        fd = os.open(path, os.O_RDONLY)
     except FileNotFoundError:
         return {}
     except OSError:
         raise VaultError("Secret file unreadable") from None
-    if mode & 0o077:  # like ssh: refuse a key file other users can read
-        raise VaultError(f"Secret file is open to other users; run: chmod 600 {path}")
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        raise VaultError("Secret file unreadable") from None
+    with os.fdopen(fd, "rb") as f:
+        st = os.fstat(fd)  # check the file actually opened, not the path
+        if st.st_uid != os.getuid() or st.st_mode & 0o077:  # like ssh
+            raise VaultError(f"Secret file is open to other users; run: chmod 600 {path}")
+        try:
+            data = json.loads(f.read().decode("utf-8"))
+        except (OSError, ValueError):
+            raise VaultError("Secret file unreadable") from None
     if not isinstance(data, dict) or not all(isinstance(v, str) for v in data.values()):
         raise VaultError("Invalid secret file")
     return data
 
 def _save(data: dict) -> None:
     path = _store_path()
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp = None
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp.unlink(missing_ok=True)
-        # O_EXCL with 0600: the file is never readable by others, even for a moment
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        # mkstemp: unique name, O_EXCL, 0600 - never readable by others, even briefly
+        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, sort_keys=True)
         os.replace(tmp, path)
     except OSError:
-        tmp.unlink(missing_ok=True)
+        if tmp:
+            Path(tmp).unlink(missing_ok=True)
         raise VaultError("Secret file write failed") from None
+
+@contextmanager
+def _locked():
+    """Serialize read-modify-write across processes so writers don't drop keys."""
+    import fcntl
+    path = _store_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(path.with_name(path.name + ".lock"), os.O_RDWR | os.O_CREAT, 0o600)
+    except OSError:
+        raise VaultError("Secret file write failed") from None
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
 
 
 # Public API
@@ -190,9 +209,10 @@ def write(name: str, value: str) -> None:
     _validate_name(name)
     blob_bytes = _check_value(value)
     if _file_store():
-        data = _load()
-        data[name] = value
-        _save(data)
+        with _locked():
+            data = _load()
+            data[name] = value
+            _save(data)
         return
     api = _api()
     target = _target_name(name)
@@ -223,9 +243,10 @@ def delete(name: str) -> None:
         raise VaultError("Credential manager not available")
     _validate_name(name)
     if _file_store():
-        data = _load()
-        if data.pop(name, None) is not None:
-            _save(data)
+        with _locked():
+            data = _load()
+            if data.pop(name, None) is not None:
+                _save(data)
         return
     api = _api()
     target = _target_name(name)

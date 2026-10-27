@@ -142,7 +142,7 @@ def test_posix_file_roundtrip_is_0600_and_atomic():
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert vault.read("GROQ_API_KEY") == "fake-é"
     assert json.loads(path.read_text(encoding="utf-8")) == {"GROQ_API_KEY": "fake-é", "MISTRAL_API_KEY": "fake-m"}
-    assert [p.name for p in path.parent.iterdir()] == ["secrets.json"]  # no temp file left
+    assert sorted(p.name for p in path.parent.iterdir()) == ["secrets.json", "secrets.json.lock"]  # no temp file left
     vault.delete("GROQ_API_KEY")
     vault.delete("GROQ_API_KEY")  # deleting a missing key is not an error
     assert vault.read("GROQ_API_KEY") is None
@@ -186,3 +186,16 @@ def test_posix_invalid_values_are_rejected(value):
     with pytest.raises(vault.VaultError):
         vault.write("GROQ_API_KEY", value)
     assert not vault._store_path().exists()
+
+
+@posix_only
+def test_posix_concurrent_writers_keep_every_key():
+    import threading
+    names = [f"KEY_{i}" for i in range(8)]
+    threads = [threading.Thread(target=vault.write, args=(n, "fake")) for n in names]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(vault._load()) == names
+
