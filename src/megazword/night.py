@@ -172,12 +172,20 @@ def unit_name(task_name: str) -> str:
     return task_name.lower()  # MegaZword-NightShift -> megazword-nightshift
 
 
+def _unit_quote(value: str) -> str:
+    """A literal value inside a double-quoted unit-file word: systemd would
+    otherwise expand %-specifiers (%q is the hostname) and C escapes."""
+    if "\n" in value or "\r" in value:
+        raise ValueError("a newline cannot be written into a systemd unit")
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("%", "%%")
+
+
 def unit_files(task_name: str, command: str, timer: list[str], description: str) -> dict[str, str]:
     """The .service and .timer text for a scheduled job; `timer` is its [Timer] lines."""
     name = unit_name(task_name)
     env = ""
     if os.environ.get("MEGAZWORD_HOME"):  # a custom home must follow the job
-        env = f'Environment="MEGAZWORD_HOME={os.environ["MEGAZWORD_HOME"]}"\n'
+        env = f'Environment="MEGAZWORD_HOME={_unit_quote(os.environ["MEGAZWORD_HOME"])}"\n'
     service = (f"[Unit]\nDescription={description}\n\n[Service]\nType=oneshot\n{env}"
                f"ExecStart={command.replace('%', '%%')}\n")
     timer_text = (f"[Unit]\nDescription={description}\n\n[Timer]\n"
@@ -216,7 +224,11 @@ def schedule(task_name: str, command: str, schtasks_args: list[str], timer: list
     """Create a scheduled task: schtasks on Windows, a systemd --user timer elsewhere."""
     if _ON_WINDOWS:
         return _schtasks(["/Create", "/TN", task_name, *schtasks_args, "/TR", command, "/F"])
-    return _systemd("install", task_name, unit_files(task_name, command, timer, description))
+    try:
+        files = unit_files(task_name, command, timer, description)
+    except ValueError as exc:
+        return subprocess.CompletedProcess(["install", task_name], 2, "", str(exc))
+    return _systemd("install", task_name, files)
 
 
 def unschedule(task_name: str) -> subprocess.CompletedProcess:

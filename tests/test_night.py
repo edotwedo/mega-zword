@@ -521,3 +521,27 @@ def test_unit_files_escape_percent_for_systemd():
 def test_real_systemd_is_never_touched_by_tests():
     with pytest.raises(RuntimeError, match="real systemctl"):
         night._systemd("install", "MegaZword-X", {})
+
+
+@pytest.mark.parametrize("home, written", [
+    ("/tmp/50%quota", "/tmp/50%%quota"),  # %q would expand to the hostname
+    ('/tmp/a"b', '/tmp/a\\"b'),
+    ("/tmp/a\\b", "/tmp/a\\\\b"),
+])
+def test_custom_home_is_written_literally_for_systemd(monkeypatch, home, written):
+    monkeypatch.setenv("MEGAZWORD_HOME", home)
+    service = night.unit_files("MegaZword-X", "x", [], "x")["megazword-x.service"]
+    assert f'Environment="MEGAZWORD_HOME={written}"' in service
+
+
+def test_custom_home_with_newline_is_refused(monkeypatch):
+    monkeypatch.setenv("MEGAZWORD_HOME", "/tmp/a\nExecStart=/bin/evil")
+    with pytest.raises(ValueError, match="newline"):
+        night.unit_files("MegaZword-X", "x", [], "x")
+
+
+def test_install_with_unwritable_home_reports_instead_of_crashing(monkeypatch, capsys):
+    calls = _fake_systemd(monkeypatch)
+    monkeypatch.setenv("MEGAZWORD_HOME", "/tmp/a\nb")
+    assert night.install("01:30", yes=True) == 1 and calls == []
+    assert "newline" in capsys.readouterr().err
