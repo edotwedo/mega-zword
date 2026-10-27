@@ -111,16 +111,85 @@ def test_hook_skips_a_delete_only_push():
     assert "running the suite" not in proc.stdout
 
 
-@pytest.mark.skipif(SH is None, reason="needs sh (Git Bash) on PATH")
-def test_hook_does_not_shortcut_a_real_push():
-    """The counterpart: a normal push must fall through to the suite, not the shortcut.
-    MZ_PYTHON points at `false`, so this stops at the python probe instead of running
-    the whole suite from inside the suite."""
-    proc = subprocess.run([SH, str(HOOK)], input="refs/heads/x abc refs/heads/x 000\n",
-                          capture_output=True, text=True, cwd=ROOT,
-                          env={**os.environ, "MZ_PYTHON": "false"})
-    assert "delete-only" not in proc.stdout
+@pytest.fixture
+def hook_sandbox(tmp_path):
+    if SH is None or os.name == "nt":
+        pytest.skip("isolated executable fixtures need POSIX sh")
+    tools = tmp_path / "tools"
+    tools.mkdir()
+
+    def executable(path, body):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("#!/bin/sh\n" + body)
+        path.chmod(0o755)
+        return path
+
+    executable(tools / "git", 'case "$*" in *--show-toplevel*) pwd;; *--git-common-dir*) exit 1;; *) exit 0;; esac\n')
+    executable(tools / "uname", 'echo "${TEST_PLATFORM:-Linux}"\n')
+    env = {**os.environ, "PATH": str(tools), "MZ_PYTHON": ""}
+    env.pop("MZ_SKIP_GATE", None)
+
+    def run(**overrides):
+        return subprocess.run(
+            [SH, str(HOOK)], input="refs/heads/x abc refs/heads/x 000\n",
+            capture_output=True, text=True, cwd=tmp_path,
+            env={**env, **overrides},
+        )
+
+    return tmp_path, tools, executable, run
+
+
+def test_hook_blocks_when_no_python_runs(hook_sandbox):
+    root, tools, executable, run = hook_sandbox
+    # Executable Windows leftovers and PATH commands must actually run.
+    for path in (root / ".venv/Scripts/python.exe", tools / "python3", tools / "python"):
+        executable(path, "exit 126\n")
+    proc = run(MZ_PYTHON="false")
+    assert proc.returncode == 1
     assert "NOTHING WAS VERIFIED" in proc.stdout
+    assert "delete-only" not in proc.stdout
+
+
+def test_hook_blocks_without_pytest(hook_sandbox):
+    root, _, executable, run = hook_sandbox
+    executable(root / ".venv/bin/python", '[ "$2" = "import sys" ]\n')
+    proc = run()
+    assert proc.returncode == 1
+    assert "has no pytest" in proc.stdout
+
+
+@pytest.mark.parametrize("platform,native", [
+    ("Linux", "bin/python"), ("MINGW64_NT", "Scripts/python.exe"),
+    ("MSYS_NT", "Scripts/python.exe"), ("CYGWIN_NT", "Scripts/python.exe"),
+])
+def test_hook_prefers_native_python_and_runs_suite(hook_sandbox, platform, native):
+    root, _, executable, run = hook_sandbox
+    for candidate in ("bin/python", "Scripts/python.exe"):
+        executable(root / ".venv" / candidate,
+                   f'echo "{candidate}:$*" >> calls\nexit 0\n')
+    proc = run(TEST_PLATFORM=platform)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    calls = (root / "calls").read_text().splitlines()
+    assert calls[0] == f"{native}:-c import sys"
+    assert f"{native}:-m pytest -q" in calls
+    assert all(line.startswith(native + ":") for line in calls)
+    assert "suite passed" in proc.stdout
+
+
+def test_hook_rejects_broken_override_and_falls_back(hook_sandbox):
+    root, tools, executable, run = hook_sandbox
+    broken = executable(tools / "broken", "exit 126\n")
+    executable(root / ".venv/bin/python", "exit 0\n")
+    proc = run(MZ_PYTHON=str(broken))
+    assert proc.returncode == 0
+    assert "suite passed" in proc.stdout
+
+
+def test_hook_bypass_is_explicit_and_loud(hook_sandbox):
+    *_, run = hook_sandbox
+    proc = run(MZ_SKIP_GATE="1")
+    assert proc.returncode == 0
+    assert "BYPASS" in proc.stdout and "MZ_SKIP_GATE=1" in proc.stdout
 
 
 def test_pre_commit_hook_survives_the_windows_checkout():

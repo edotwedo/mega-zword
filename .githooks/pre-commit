@@ -32,11 +32,21 @@ if common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) &
   main=$(dirname "$common")
 fi
 
+# Match pre-push: hybrid checkouts may still contain Windows executables on
+# Linux (or POSIX symlinks on Windows). Existence alone does not make one run.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) native=Scripts/python.exe; fallback=bin/python ;;
+  *) native=bin/python; fallback=Scripts/python.exe ;;
+esac
 python=""
-for candidate in "${MZ_PYTHON:-}" "$root/.venv/Scripts/python.exe" "$main/.venv/Scripts/python.exe" \
-                 "$root/.venv/bin/python" "$main/.venv/bin/python" python3 python; do
+for candidate in "${MZ_PYTHON:-}" "$root/.venv/$native" "$main/.venv/$native" \
+                 "$root/.venv/$fallback" "$main/.venv/$fallback" python3 python; do
   [ -n "$candidate" ] || continue
-  if command -v "$candidate" >/dev/null 2>&1; then python="$candidate"; break; fi
+  if command -v "$candidate" >/dev/null 2>&1 &&
+      "$candidate" -c 'import sys' >/dev/null 2>&1; then
+    python="$candidate"
+    break
+  fi
 done
 [ -z "$python" ] && exit 0
 
