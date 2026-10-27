@@ -13,3 +13,8 @@ htmlcov/
 
 # Command Code's own state (taste, plans, history) - never part of this product.
 .commandcode/
+
+# Local settings, remote attachments, and Wrangler state.
+.claude/settings.local.json
+.codex-remote-attachments/
+.wrangler/
