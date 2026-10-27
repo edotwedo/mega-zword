@@ -103,19 +103,19 @@ def test_flag_on_before_start_uses_no_model_steps(tmp_path):
     assert not model.seen
 
 
-def test_off_runs_normally_with_one_flag_stat_per_step(tmp_path, monkeypatch):
+def test_off_runs_normally_with_one_flag_check_per_step(tmp_path, monkeypatch):
     andon.pull("old pause")
     andon.release()
     path = andon.flag_path()
-    original = type(path).stat
+    original = type(path).exists
     stats = []
 
-    def stat(self, *args, **kwargs):
+    def exists(self, *args, **kwargs):
         if self == path:
             stats.append(self)
         return original(self, *args, **kwargs)
 
-    monkeypatch.setattr(type(path), "stat", stat)
+    monkeypatch.setattr(type(path), "exists", exists)
     loop, model = coding(tmp_path, [call("list_files", glob="*"), call("finish", summary="done")])
     result = loop.run("inspect folder")
     assert result.ok and result.text == "done"

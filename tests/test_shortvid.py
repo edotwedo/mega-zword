@@ -21,10 +21,15 @@ def test_shortvid_scripts_pricing():
             assert "29.99" in full_text, f"{s_path.name} must mention 29.99 if price is stated"
             assert "29.00" not in full_text, f"{s_path.name} must not contain stale 29.00"
 
-def test_shortvid_slide_rendering(tmp_path):
+def test_shortvid_slide_rendering(tmp_path, monkeypatch):
     """Test generating carousel slides without requiring external video encoding."""
     script_file = SCRIPTS_DIR / "spanda-001.json"
     data = json.loads(script_file.read_text(encoding="utf-8"))
+    # Pillow bundles a scalable font; exercise rendering without system fonts.
+    font = shortvid.ImageFont.load_default(size=48)
+    font_path = tmp_path / "test-font.ttf"
+    font_path.write_bytes(font.font_bytes)
+    monkeypatch.setattr(shortvid, "find_font", lambda names: str(font_path))
     theme = shortvid.Theme(data.get("theme", {}))
     brand = data.get("brand", "")
     scenes = data.get("scenes", [])

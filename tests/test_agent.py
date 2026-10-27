@@ -732,7 +732,7 @@ def test_search_files_finds_lines_and_skips_private_files(tmp_path):
                                     call("finish", summary="found it")])
     assert loop.run("find the scout parser").ok
     results = [m["content"] for m in model.seen[-1][0] if m["role"] == "tool"]
-    assert results[0].splitlines() == ["src/a.py:2: def scout_parser():", "src/b.py:1: scout = 2"]
+    assert sorted(results[0].splitlines()) == ["src/a.py:2: def scout_parser():", "src/b.py:1: scout = 2"]
     assert results[1] == "no matches"  # invalid regex is searched literally
     assert "SECRET" not in results[2] and ".env" not in results[2] and "blob.bin" not in results[2]
 

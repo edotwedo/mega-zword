@@ -49,11 +49,11 @@ def isolated_home(tmp_path, monkeypatch):
     from megazword import backends as _backends
     real_exec = _backends.CLIBackend._exec
     allowed = [Path(__file__).resolve().parents[1], Path(tempfile.gettempdir()).resolve(),
-               Path(sys.executable).resolve().parent, tmp_path.resolve()]
+               tmp_path.resolve()]
 
     def guarded_exec(self, cmd, stdin):
         exe = Path(cmd[0]).resolve()
-        if not any(exe.is_relative_to(root) for root in allowed):
+        if exe != Path(sys.executable).resolve() and not any(exe.is_relative_to(root) for root in allowed):
             raise RuntimeError(f"test tried to run a real CLI: {exe}")
         return real_exec(self, cmd, stdin)
 

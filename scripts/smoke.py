@@ -69,6 +69,12 @@ def make_env(tmp: Path) -> dict:
         "PYTHONPATH": str(REPO / "src"),
         "PYTHONIOENCODING": "utf-8",
     })
+    # Missing executable bits must fail closed instead of falling through to a
+    # real CLI later on PATH (which could spend tokens despite the fake home).
+    for name in ("claude", "codex", "grok", "gemini"):
+        executable = shutil.which(name, path=env["PATH"])
+        if not executable or Path(executable).resolve().parent != FAKES.resolve():
+            raise RuntimeError(f"Smoke fake CLI missing or not executable: {name}")
     return env
 
 
@@ -162,6 +168,16 @@ def main() -> int:
     work.mkdir()
     env = make_env(tmp)
     try:
+        imported = subprocess.run(
+            [sys.executable, "-c", "import megazword.cli"],
+            env=env, cwd=work, capture_output=True, text=True, timeout=30)
+        check("CLI imports on this platform", imported.returncode == 0, imported.stderr)
+
+        r = mz(env, work, "doctor")
+        check("doctor runs without a real AI or desktop",
+              r.returncode == 0 and "Python" in r.stdout and "Hive:" in r.stdout,
+              r.stdout + r.stderr)
+
         r = mz(env, work, "backends")
         check("backends finds all four fakes",
               r.returncode == 0 and r.stdout.count("installed") == 4, r.stdout + r.stderr)
