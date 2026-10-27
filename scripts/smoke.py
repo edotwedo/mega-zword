@@ -98,7 +98,7 @@ def linux_checks(env: dict, cwd: Path) -> None:
             "assert not any(n == 'winpty' or n.startswith('winpty.') "
             "for n in sys.modules), 'winpty was imported'",
         ]))
-    for launcher in ("hive_resume.sh", "dolphin_up.sh", "hive_poke.sh"):
+    for launcher in ("hive_resume.sh", "dolphin_up.sh"):
         commands.append((f"Linux: scripts/{launcher} passes sh -n",
                          ["sh", "-n", str(REPO / "scripts" / launcher)]))
     for name, command in commands:

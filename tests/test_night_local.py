@@ -61,7 +61,7 @@ def test_clear_queue_exits_zero(night_local, branch_calls):
     night_local.JOBS.write_text(json.dumps({"jobs": []}), encoding="utf-8")
 
     assert night_local.main() == 0
-    assert len(branch_calls) == 2
+    assert branch_calls == []  # one branch now: the driver never switches branches
     assert "queue clear: no local jobs" in night_local.LOG.read_text()
     assert not night_local.STATE.exists()
 
@@ -75,7 +75,7 @@ def test_already_done_job_is_skipped(night_local, branch_calls):
     night_local.STATE.write_text(state, encoding="utf-8")
 
     assert night_local.main() == 0
-    assert len(branch_calls) == 2
+    assert branch_calls == []  # one branch now: the driver never switches branches
     assert night_local.STATE.read_text(encoding="utf-8") == state
     assert "queue clear: every local job is done or failed" in night_local.LOG.read_text()
 

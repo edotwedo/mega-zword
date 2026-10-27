@@ -17,18 +17,24 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 HOME = Path(os.environ.get("MEGAZWORD_HOME", Path.home() / ".megazword"))
-JOBS = HOME / "night" / "local-jobs.json"
-STATE = HOME / "night" / "local-state.json"
-LOG = HOME / "night" / "local.log"
+REPO = Path(os.environ.get("MZ_NIGHT_REPO", "/home/edotwedo/workspace/mega-zword"))
+JOBS = HOME / "night" / os.environ.get("MZ_NIGHT_JOBS", "local-jobs.json")
+STATE = HOME / "night" / os.environ.get("MZ_NIGHT_STATE", "local-state.json")
+LOG = HOME / "night" / os.environ.get("MZ_NIGHT_LOG", "local.log")
 STOP = HOME / "STOP"
-REPO = Path("/home/edotwedo/workspace/mega-zword")
 BACKENDS = ("codex", "claude", "gemini")
+# A reviewer reads the diff; only a compiler proves it. Set MZ_NIGHT_CHECK to the repo's own
+# mechanical gate (RobinTHood: `npx --no-install tsc --noEmit`) and a job that changes code but
+# fails it is not done, whatever the model or the reviewer said.
+CHECK = os.environ.get("MZ_NIGHT_CHECK", "")
+CHECK_TIMEOUT = 600
 JOB_TIMEOUT = 1500  # seconds
 MAX_ATTEMPTS = 2
 
@@ -82,6 +88,13 @@ def run_one(backend: str, prompt: str) -> bool:
     changed = tree_digest() != before
     tail = (completed.stdout or "").strip().splitlines()[-1:] or [""]
     log(f"  {backend}: exit={completed.returncode} changed={changed} | {tail[0][:120]}")
+    if changed and CHECK:
+        check = subprocess.run(shlex.split(CHECK), cwd=REPO, capture_output=True,
+                               text=True, timeout=CHECK_TIMEOUT)
+        first = (check.stderr or check.stdout or "").strip().splitlines()[:2]
+        log(f"  check: exit={check.returncode} ({CHECK}) {' | '.join(first)[:160]}")
+        if check.returncode != 0:
+            return False
     return changed
 
 
@@ -105,14 +118,9 @@ def main() -> int:
     if STOP.exists():
         log("stopped: STOP file is set")
         return 0
-    # Keep tonight's work on one branch so nothing lands on main unreviewed (M1/M3).
-    # NOT `checkout -B`: force-resetting the branch every tick would orphan the commits the
-    # previous ticks already made.
-    branch = f"night-local/{time.strftime('%Y%m%d')}"
-    exists = subprocess.run(["git", "rev-parse", "--verify", "--quiet", branch],
-                            cwd=REPO, capture_output=True, text=True).returncode == 0
-    subprocess.run(["git", "checkout", branch] if exists else ["git", "checkout", "-b", branch],
-                   cwd=REPO, capture_output=True, text=True)
+    # Work on whatever branch is checked out: main. There is ONE branch now - the newest commit
+    # on main is "the fixed one" (Phil, 2026-10-27). Per-job branches bought us wrong-branch
+    # commits, orphaned commits and merge conflicts for no benefit, so they are gone.
     spec = load(JOBS, {})
     jobs = spec.get("jobs", []) if isinstance(spec, dict) else []
     if not jobs:

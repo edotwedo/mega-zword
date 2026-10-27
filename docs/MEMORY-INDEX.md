@@ -47,3 +47,4 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/ROADMAP.md` | 7.8 kB | when choosing what to build next |
 | `docs/ROUTING_RESEARCH.md` | 8.9 kB | when the task is model routing |
 | `docs/TASKS.md` | 1.9 kB | when your task names it, or changes what it describes |
+| `docs/WORKFLOW.md` | 2.0 kB | when your task names it, or changes what it describes |
