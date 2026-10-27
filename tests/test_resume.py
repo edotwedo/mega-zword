@@ -62,12 +62,30 @@ def test_seats_ignores_a_worker_it_does_not_know():
     assert resume.seats("| Sauna-Mech | ? | x | |\n") == []
 
 
-def test_agy_is_not_promised_a_resume_it_cannot_do():
-    # Harbor022's audit, 2026-10-21: `resume` printed "continues the newest session" for agy,
-    # which has no such form, so that seat came back blank while the plan claimed otherwise.
-    assert "agy" not in resume.HAS_RECENT_FORM
-    assert resume.resume_args("agy", "C:/x", None) == []
-    assert resume.resume_args("claude", "C:/x", None) == ["--permission-mode", "acceptEdits", "-c"]
+def test_agy_resumes_the_newest_conversation_or_one_named_exactly():
+    """MIKE-54 supplied the real forms on 2026-10-26: `agy -c` and `agy --conversation <id>`.
+    An earlier version asserted the opposite - that agy had no resume form - because the flag
+    list was wrong, not because agy lacks one. A blank seat restored as "fresh" was the symptom."""
+    assert "agy" in resume.HAS_RECENT_FORM
+    assert resume.resume_args("agy", "/x", None) == ["-c"]
+    assert resume.resume_args("agy", "/x", "69bf406f-0726-46de-808b-8f1acdc67930") == \
+        ["--conversation", "69bf406f-0726-46de-808b-8f1acdc67930"]
+
+
+def test_agy_session_is_the_newest_conversation_db(tmp_path):
+    """agy keeps one <conversation-id>.db per conversation in a single global folder, so unlike
+    the other CLIs its newest transcript is not scoped to a working directory."""
+    import os
+    folder = tmp_path / "conversations"
+    folder.mkdir(parents=True)
+    older = folder / "0659f7d9-f15c-4de9-b951-6b341ed50fff.db"
+    older.write_text("{}", encoding="utf-8")
+    newest = folder / "69bf406f-0726-46de-808b-8f1acdc67930.db"
+    newest.write_text("{}", encoding="utf-8")
+    os.utime(older, (1, 1))
+    os.utime(newest, (2, 2))
+    assert resume.agy_session("/anywhere", folder) == "69bf406f-0726-46de-808b-8f1acdc67930"
+    assert resume.agy_session("/anywhere", tmp_path / "nope") is None
 
 
 def test_claude_session_is_the_newest_transcript_for_that_directory(tmp_path):
@@ -215,3 +233,66 @@ def test_record_survives_a_corrupt_registry(tmp_path, monkeypatch):
     assert resume.read_recorded(tmp_path) == {}
     resume.record([{"designation": "Gauge-18", "cli": "grok", "dir": "d"}], tmp_path)
     assert resume.read_recorded(tmp_path)["gauge-18"]["cli"] == "grok"
+
+
+def test_seats_maps_a_worker_named_plain_claude():
+    """The roster's Worker column says "Claude". The map knew only the literal "Claude
+    Code", so the row was dropped from the respawn plan silently - the same disappearing-seat
+    bug Harbor022 hit from the other direction (2026-10-26)."""
+    assert resume.seats("| Harbor022 | Claude | review | |\n") == [("Harbor022", "claude")]
+    # A parenthetical names the lane, not a different CLI, so the row still counts.
+    assert resume.seats("| Harbor022 | Claude (review) | review | |\n") == [("Harbor022", "claude")]
+
+
+def test_seats_skips_a_cloud_seat_with_no_local_tab():
+    """Tern-25 and Vesper-25 run in a browser ("Claude (cloud)"), so there is no window on
+    this machine to respawn. Dropping them is deliberate - unlike an unparsed row, there is
+    nothing local the plan could launch."""
+    roster = "| Tern-25 | Claude (cloud) | guard | |\n| Harbor022 | Claude | review | |\n"
+    assert resume.seats(roster) == [("Harbor022", "claude")]
+
+
+def test_a_designation_with_no_digit_is_invisible_to_the_plan():
+    """Documented behaviour, not a bug to fix here: DESIGNATION requires two digits so that a
+    SPEC section like "B15" and prose like "Phase2:" are not read as seats. A roster row named
+    "Patcher" therefore registers no claims and never appears in the respawn plan, which is the
+    roster's documented designation shape ([A-Za-z]{3,}-?\\d{1,4}) being broken, not the parser."""
+    assert resume.seats("| Patcher | Claude | review | |\n") == []
+
+
+def test_cmdc_slug_drops_the_leading_separator_command_code_drops():
+    """Verified on Linux 2026-10-26: /home/edotwedo/workspace/mega-zword is filed by Command
+    Code as 'home-edotwedo-workspace-mega-zword', while Claude files the same directory as
+    '-home-edotwedo-workspace-mega-zword'. cmdc_session kept the dash, so every cmdc seat on
+    this machine reported "no session found" and was told to start fresh."""
+    assert resume.cmdc_slug("/home/edotwedo/workspace/mega-zword") == \
+        "home-edotwedo-workspace-mega-zword"
+    assert resume.slug("/home/edotwedo/workspace/mega-zword") == \
+        "-home-edotwedo-workspace-mega-zword"
+    # A Windows drive letter is alphanumeric, so Windows behaviour is unchanged.
+    assert resume.cmdc_slug(r"C:\Users\mrmar\mz-seats\cinder-21") == \
+        "c--users-mrmar-mz-seats-cinder-21"
+
+
+def test_cmdc_session_is_found_under_the_separator_less_folder(tmp_path):
+    folder = tmp_path / "home-edotwedo-workspace-mega-zword"
+    folder.mkdir(parents=True)
+    (folder / "4cc21ea8-f8bb-4b47-ba7a-13bc4c49ed54.jsonl").write_text("{}", encoding="utf-8")
+    assert resume.cmdc_session("/home/edotwedo/workspace/mega-zword", tmp_path) == \
+        "4cc21ea8-f8bb-4b47-ba7a-13bc4c49ed54"
+
+
+def test_cmdc_session_never_returns_a_checkpoints_file_as_a_session(tmp_path):
+    """'<id>.checkpoints.jsonl' is a .jsonl beside '<id>.jsonl', and it is the newer of the
+    two while a seat is working - so picking the newest file handed back '<id>.checkpoints'
+    as a session id (measured on this machine, 2026-10-26)."""
+    import os
+    folder = tmp_path / resume.cmdc_slug("/proj")
+    folder.mkdir(parents=True)
+    transcript = folder / "aaaa1111-0000-4000-8000-000000000001.jsonl"
+    transcript.write_text("{}", encoding="utf-8")
+    checkpoints = folder / "aaaa1111-0000-4000-8000-000000000001.checkpoints.jsonl"
+    checkpoints.write_text("{}", encoding="utf-8")
+    os.utime(transcript, (1, 1))
+    os.utime(checkpoints, (2, 2))
+    assert resume.cmdc_session("/proj", tmp_path) == "aaaa1111-0000-4000-8000-000000000001"

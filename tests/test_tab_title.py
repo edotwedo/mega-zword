@@ -115,3 +115,73 @@ def test_keep_reports_when_it_cannot_attach():
     calls, kwargs = _fake_keep(attach=lambda pid: False)
     assert tab_title.keep("Cinder-21", 42, **kwargs) == 1
     assert calls == []
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX terminal")
+def test_posix_title_writes_osc_to_tty(tmp_path, monkeypatch):
+    import builtins
+
+    target = tmp_path / "tty"
+    real_open = builtins.open
+    monkeypatch.delenv("KITTY_LISTEN_ON", raising=False)
+    monkeypatch.setattr(builtins, "open", lambda *a, **kw: real_open(target, "w", **kw))
+    assert tab_title.apply_title("Gavin-27")
+    assert target.read_bytes() == b"\x1b]2;Gavin-27\x07"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX terminal")
+def test_posix_title_falls_back_to_stdout(monkeypatch, capsys):
+    import builtins
+
+    def unavailable(*args, **kwargs):
+        raise OSError("no controlling tty")
+
+    monkeypatch.delenv("KITTY_LISTEN_ON", raising=False)
+    monkeypatch.setattr(builtins, "open", unavailable)
+    assert tab_title.apply_title("Gavin-27")
+    assert capsys.readouterr().out == "\x1b]2;Gavin-27\x07"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX terminal")
+@pytest.mark.parametrize("returncode", [0, 1])
+def test_posix_prefers_kitty_with_osc_fallback(monkeypatch, capsys, returncode):
+    import builtins
+    from types import SimpleNamespace
+
+    calls = []
+
+    def run(cmd, **kwargs):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=returncode)
+
+    def unavailable(*args, **kwargs):
+        raise OSError("no tty")
+
+    monkeypatch.setenv("KITTY_LISTEN_ON", "unix:/tmp/kitty-test")
+    monkeypatch.setattr(tab_title.subprocess, "run", run)
+    monkeypatch.setattr(builtins, "open", unavailable)
+    assert tab_title.apply_title("Gavin-27")
+    assert calls == [["kitten", "@", "set-tab-title", "Gavin-27"]]
+    assert capsys.readouterr().out == ("" if returncode == 0 else "\x1b]2;Gavin-27\x07")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX terminal")
+def test_posix_keeper_restores_a_reset_title(monkeypatch, capsys):
+    import builtins
+
+    def unavailable(*args, **kwargs):
+        raise OSError("no tty")
+
+    ticks = []
+
+    def reset(_):
+        print("\x1b]2;reset\x07", end="")
+        ticks.append(1)
+
+    monkeypatch.delenv("KITTY_LISTEN_ON", raising=False)
+    monkeypatch.setattr(builtins, "open", unavailable)
+    assert tab_title.keep("Gavin-27", 42, alive=lambda _: len(ticks) < 2,
+                          sleep=reset, stop=lambda: False) == 0
+    assert capsys.readouterr().out == (
+        "\x1b]2;Gavin-27\x07\x1b]2;reset\x07" * 2
+    )

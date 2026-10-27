@@ -14,7 +14,12 @@ Session stores, as they actually are on this machine (verified, not assumed):
 - claude: ``~/.claude/projects/<slug>/<session-id>.jsonl`` where the slug is the directory
   path with every non-alphanumeric character turned into ``-``. Resume: ``--resume <id>``.
 - cmdc: sessions are project-scoped, ``~/.commandcode/projects/<slug>/``. Resume: ``-c``.
+  Its folder key drops a leading separator ('/home/me/proj' -> 'home-me-proj', where Claude
+  keeps the dash), and it writes a ``<id>.checkpoints.jsonl`` beside each transcript
+  (both verified on Linux, 2026-10-26).
 - codex: date-partitioned rollout files; the first JSON line carries the cwd. Resume by id.
+- agy: ``~/.gemini/antigravity-cli/conversations/<conversation-id>.db``, one global folder
+  rather than a per-directory one. Resume: ``-c`` or ``--conversation <id>``.
 """
 
 from __future__ import annotations
@@ -33,25 +38,33 @@ CLAUDE_HOME = Path.home() / ".claude" / "projects"
 CODECODE_HOME = Path.home() / ".commandcode" / "projects"
 CODEX_SESSIONS = Path.home() / ".codex" / "sessions"
 GROK_SESSIONS = Path.home() / ".grok" / "sessions"
+AGY_CONVERSATIONS = Path.home() / ".gemini" / "antigravity-cli" / "conversations"
 
 # The roster's "Worker" column, as the CLIs are actually named.
 # Gemini's binary on this box is `agy` (Antigravity). Mapping the roster word to `gemini`
 # made hive_resume.ps1 run a command that is not on PATH, so Forge-22's tab died with
 # "command not found" - found by Harbor022's review of the first version, 2026-10-21.
 WORKER_CLI = {
+    "claude": "claude",
     "claude code": "claude",
     "codex": "codex",
     "grok": "grok",
     "gemini": "agy",
     "command code": "cmdc",
 }
+
+# A worker word naming a browser or cloud seat ("Claude (cloud)") is not a local CLI, so
+# there is no tab on this machine to respawn. Skipping it is deliberate: the plan must not
+# invent a worktree and a window for a seat that runs somewhere else.
+REMOTE_WORKER = re.compile(r"\b(?:cloud|web)\b")
 ROW = re.compile(rf"^\|\s*({DESIGNATION})\s*\|\s*([^|]+?)\s*\|", re.MULTILINE)
 
-# CLIs that can be told "bring back the newest conversation in THIS directory". agy
-# (Antigravity, the Gemini seat) has no such form, so the plan must not claim a resume for
-# it - Harbor022's audit found `resume` printing "continues the newest session" for a seat
-# that actually starts blank (2026-10-21).
-HAS_RECENT_FORM = ("claude", "grok", "codex", "cmdc")
+# CLIs that can be told "bring back the newest conversation". Four of them mean "the newest
+# in THIS directory"; agy keeps one global folder instead. The first version of this list left
+# agy out because Harbor022's audit found `resume` claiming a form it did not have (2026-10-21)
+# - but that was the flag list being wrong, not agy lacking one: MIKE-54 supplied the real
+# forms on 2026-10-26 (`agy -c`, `agy --conversation <id>`) and both are in the binary.
+HAS_RECENT_FORM = ("claude", "grok", "codex", "cmdc", "agy")
 
 
 def slug(path: str) -> str:
@@ -61,12 +74,27 @@ def slug(path: str) -> str:
 
 
 def seats(roster_text: str) -> list[tuple[str, str]]:
-    """(designation, cli) for each seat on the roster, in file order."""
+    """(designation, cli) for each seat on the roster, in file order.
+
+    The Worker column is prose, so it is read loosely: a plain "Claude" and a
+    "Claude (review)" both name the CLI, and only a cloud or browser seat is dropped -
+    it has no local tab to respawn, which is a different thing from a row we failed to
+    parse. The first version knew only the literal "Claude Code", so a roster whose
+    Worker column said "Claude" lost the seat from the plan with nothing printed.
+    """
     found = []
+    seen = set()
     for designation, worker in ROW.findall(roster_text):
-        cli = WORKER_CLI.get(worker.strip().casefold())
-        if cli:
+        word = worker.strip().casefold()
+        if REMOTE_WORKER.search(word):
+            continue
+        cli = WORKER_CLI.get(word) or WORKER_CLI.get(re.sub(r"\s*\([^)]*\)", "", word).strip())
+        # The roster carries the Windows team and the Linux team in separate tables, and one
+        # designation must never appear twice in the plan: the launcher would open two windows
+        # for it. First row wins.
+        if cli and designation.casefold() not in seen:
             found.append((designation, cli))
+            seen.add(designation.casefold())
     return found
 
 
@@ -82,17 +110,38 @@ def claude_session(directory: str, home: Path | None = None) -> str | None:
     return max(files, key=lambda f: f.stat().st_mtime).stem
 
 
+def cmdc_slug(directory: str) -> str:
+    """Command Code's project folder for a directory: like ``slug``, lowercased, but with a
+    leading separator dropped. Verified on Linux, 2026-10-26: this directory is filed as
+    ``home-edotwedo-workspace-mega-zword``, where Claude files the same one as
+    ``-home-edotwedo-workspace-mega-zword``. Keeping the dash is right for Claude and wrong
+    here, and it made every cmdc seat report "no session" on this machine."""
+    return slug(directory).lower().removeprefix("-")
+
+
 def cmdc_session(directory: str, home: Path | None = None) -> str | None:
     """Command Code scopes sessions to the project directory, so the newest transcript
-    there is the one to continue."""
-    folder = (home or CODECODE_HOME) / slug(directory).lower()
-    try:
-        files = [f for f in folder.glob("*.jsonl") if f.is_file()]
-    except OSError:
-        return None
-    if not files:
-        return None
-    return max(files, key=lambda f: f.stat().st_mtime).stem
+    there is the one to continue.
+
+    ``<id>.checkpoints.jsonl`` sits beside ``<id>.jsonl`` and is a .jsonl too, so choosing
+    the newest file by mtime alone could hand back ``<id>.checkpoints`` as a session id -
+    and while a seat is working it is routinely the newer of the two.
+    """
+    root = home or CODECODE_HOME
+    newest: tuple[float, str] | None = None
+    # Both spellings are tried: the fix above is measured, and a CLI that changes its folder
+    # key again should degrade to the old guess rather than to nothing.
+    for name in dict.fromkeys((cmdc_slug(directory), slug(directory).lower())):
+        try:
+            found = [(path.stat().st_mtime, path.stem)
+                     for path in (root / name).glob("*.jsonl")
+                     if path.is_file() and not path.name.endswith(".checkpoints.jsonl")]
+        except OSError:
+            continue
+        for entry in found:
+            if newest is None or entry[0] > newest[0]:
+                newest = entry
+    return newest[1] if newest else None
 
 
 def codex_session(directory: str, home: Path | None = None) -> str | None:
@@ -130,11 +179,11 @@ def _codex_id(path: Path) -> str:
 def resume_args(cli: str, directory: str, session: str | None, fresh: bool = False) -> list[str]:
     """The flags that bring this seat's conversation back.
 
-    When the exact session cannot be named, every one of these CLIs has a "most recent in
-    THIS directory" form - claude `-c`, codex `resume --last`, grok `-c`, cmdc `-c`. That is
-    what a respawn means, and it is strictly better than starting a stranger: the directory
-    is the seat's, so the newest conversation in it is almost certainly the right one.
-    ``fresh`` asks for none of it.
+    When the exact session cannot be named, every one of these CLIs has a "most recent"
+    form - claude `-c`, codex `resume --last`, grok `-c`, cmdc `-c`, agy `-c`. For all but agy
+    that means the newest conversation in THIS directory, which is what a respawn means: it is
+    strictly better than starting a stranger, because the directory is the seat's, so the
+    newest conversation in it is almost certainly the right one. ``fresh`` asks for none of it.
     """
     base = ["--permission-mode", "acceptEdits"] if cli in ("claude", "grok") else []
     if fresh:
@@ -145,6 +194,10 @@ def resume_args(cli: str, directory: str, session: str | None, fresh: bool = Fal
         return ["resume", session] if session else ["resume", "--last"]
     if cli == "cmdc":
         return ["-r", session] if session else ["-c"]
+    if cli == "agy":
+        # MIKE-54, 2026-10-26: `agy -c` continues the newest conversation and
+        # `agy --conversation <id>` targets one exactly. Both are in the binary.
+        return ["--conversation", session] if session else ["-c"]
     return base
 
 
@@ -196,6 +249,21 @@ def grok_session(directory: str, home: Path | None = None) -> str | None:
     return best[1] if best else None
 
 
+def agy_session(directory: str, home: Path | None = None) -> str | None:
+    """Antigravity (agy) keeps one ``<conversation-id>.db`` per conversation in a single global
+    folder - not under a directory slug like the others, so the newest file is the newest
+    conversation. ``directory`` is accepted for the caller's uniform signature and ignored.
+    """
+    folder = home or AGY_CONVERSATIONS
+    try:
+        files = [path for path in folder.glob("*.db") if path.is_file()]
+    except OSError:
+        return None
+    if not files:
+        return None
+    return max(files, key=lambda path: path.stat().st_mtime).stem
+
+
 def find_session(cli: str, directory: str, designation: str = "") -> str | None:
     if cli == "claude":
         return claude_session_for(designation, directory) if designation else claude_session(directory)
@@ -205,6 +273,8 @@ def find_session(cli: str, directory: str, designation: str = "") -> str | None:
         return grok_session(directory)
     if cli == "codex":
         return codex_session(directory)
+    if cli == "agy":
+        return agy_session(directory)
     return None
 
 

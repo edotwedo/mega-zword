@@ -24,6 +24,29 @@ One live window per paid solution. This is the entire team; there is no second s
 | Tern-25 | Claude (cloud) | `claude-web` | guard accuracy; identity unconfirmed | 2026-10-26 00:26 |
 | Vesper-25 | Claude (cloud) | `claude-web` | repo-map work; identity unconfirmed | 2026-10-26 00:24 |
 
+## Linux team (Phil, 2026-10-26 - fresh personalities on this box)
+
+**These five are the only seats that come back after a reboot on this machine.** They are
+separate people from the Windows team above, with fresh contexts: Phil did not want the
+Windows seats' transcripts resumed here, so nothing on this box starts one. The Windows
+seats stay in the room and stay reachable for information; they are not launched locally.
+
+Phil uses the plain name and never the number (`agy`=MIKE, `grok`=Billy, `codex`=WenWei,
+`claude`=Paul). The digits are the agents' business - they are what `claims.py` and
+`resume.py` need to see a seat at all (`Designation shape`, below).
+
+| Designation | Worker | CLI | Tab | Phil calls it | Last post |
+| --- | --- | --- | --- | --- | --- |
+| Gavin-27 | Command Code | `cmdc` | window 1 | Gavin | live 2026-10-26 |
+| MIKE-54 | Gemini | `agy` | window 2 | MIKE | live 2026-10-26 |
+| Billy-55 | Grok | `grok` | window 2 | Billy | live 2026-10-26 |
+| WenWei-56 | Codex | `codex` | window 2 | WenWei | live 2026-10-26 |
+| Paul-53 | Claude | `claude` | window 2 | Paul | live 2026-10-26 |
+
+The layout is saved and replayed by `scripts/hive_snapshot.py` (snapshot) and
+`scripts/hive_resume.sh` (restore, installed as a `post-boot` hook). The seat list lives in
+that script's `SEATS` table, the same way `hive_up.ps1` carries its lane table.
+
 **Renames are the session, not a new worker** (Phil, 2026-10-26): TheRock = Briar-20, Patcher =
 Briar-22. Old designations are retired; a rename inherits its own prior work but no one else's
 claims. **Nock-21 is Grok and is OUT OF USAGE, not missing.** The second cmdc window is

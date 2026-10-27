@@ -192,8 +192,8 @@ class App:
         self._room_lock = threading.RLock()
         self._room_session: tuple[str, str] | None = None  # (room, session id) started here
         from .face_identity import OwnerCamera
-        from .workspace import home as workspace_home
-        self.camera = CameraWatcher(factory=lambda: OwnerCamera(workspace_home()))
+        self.camera = CameraWatcher(
+            factory=lambda: OwnerCamera(Path.home() / ".megazword" / "workspace"))
 
     def briefing_view(self) -> dict:
         data = briefing.snapshot()
@@ -700,6 +700,14 @@ def running_dashboard(host: str, port: int, timeout: float = 2.0) -> bool:
         return False
 
 
+class AppState(App):
+    """Dashboard state with the same defaults used by the server."""
+
+    def __init__(self, cfg=None, project=None, **kwargs):
+        super().__init__(cfg if cfg is not None else config.load(),
+                         project if project is not None else project_name(), **kwargs)
+
+
 def serve(port: int = 8765, project: str | None = None, open_browser: bool = True,
           host: str = "127.0.0.1", app_window: bool = False) -> int:
     if host in ("0.0.0.0", "::", ""):
@@ -710,7 +718,7 @@ def serve(port: int = 8765, project: str | None = None, open_browser: bool = Tru
     if open_browser and app_window and not remote:
         from .desktop import refresh_idle_dashboard
         refresh_idle_dashboard(port, os.environ.get('MEGAZWORD_BUILD', ''))
-    app = App(config.load(), project or project_name())
+    app = AppState(project=project)
     try:
         server = Server((host, port), make_handler(app, port, remote))
     except OSError as exc:

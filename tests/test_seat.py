@@ -82,7 +82,10 @@ def test_replace_prints_the_relaunch_line_and_the_first_prompt(tmp_path, monkeyp
     seat.retire("Harbor022", next_step="finish #21", home=tmp_path, now=NOW,
                 say=lambda *args: None, ping=lambda body: None)
     text = seat.replace_text("Harbor022")
-    assert "hive_resume.ps1 -Only Harbor022" in text
+    expected = ("scripts/hive_resume.sh --only Harbor022"
+                if seat.sys.platform.startswith("linux") else
+                "pwsh -File scripts/hive_resume.ps1 -Only Harbor022")
+    assert expected in text
     assert "You are Harbor022" in text
     assert "retired-harbor022.md" in text
 
@@ -218,3 +221,10 @@ def test_status_shows_what_a_seat_last_said_when_it_has_no_card(tmp_path, monkey
     assert "reviewing the mirror" in seat.render_status(seat.status_rows(tmp_path))
     # A seat that has said nothing at all still reads honestly.
     assert rows["Cinder-21"]["state"] == ""
+
+
+def test_replace_keeps_windows_command(monkeypatch):
+    monkeypatch.setattr(seat.sys, "platform", "win32")
+    monkeypatch.setattr(seat, "status_rows", lambda: [])
+    monkeypatch.setattr(seat, "newest_handoff", lambda _: None)
+    assert "pwsh -File scripts/hive_resume.ps1 -Only Gavin-27" in seat.replace_text("Gavin-27")
