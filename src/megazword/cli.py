@@ -1,4 +1,4 @@
-﻿"""The `megazword` command."""
+"""The `megazword` command."""
 
 from __future__ import annotations
 
@@ -679,21 +679,21 @@ def main(argv: list[str] | None = None,
         from . import desktop
         if args.action == "remove":
             gone = desktop.remove_shortcut()
-            print("[megazword] Start menu shortcut removed" if gone
-                  else "[megazword] no Start menu shortcut to remove", file=sys.stderr)
+            label = "Start menu shortcut" if os.name == "nt" else "desktop entry"
+            print(f"[megazword] {label} removed" if gone
+                  else f"[megazword] no {label} to remove", file=sys.stderr)
             return 0
-        if os.name != "nt":
-            print("[megazword] the Start menu shortcut is Windows only", file=sys.stderr)
-            return 2
         try:
             link = desktop.install_shortcut()
         except (OSError, subprocess.SubprocessError) as exc:
             print(f"[megazword] couldn't make the shortcut: {exc}", file=sys.stderr)
             return 1
-        print(f"[megazword] Start menu: 'Mega Zword' ({link})", file=sys.stderr)
+        label = "Start menu" if os.name == "nt" else "Desktop entry"
+        print(f"[megazword] {label}: 'Mega Zword' ({link})", file=sys.stderr)
         if not desktop.available():
-            print("[megazword] tip: `pip install pywebview` for the real desktop window; "
-                  "without it the shortcut opens an Edge/Chrome app window", file=sys.stderr)
+            tip_browser = "an Edge/Chrome" if os.name == "nt" else "a browser"
+            print(f"[megazword] tip: `pip install pywebview` for the real desktop window; "
+                  f"without it the shortcut opens {tip_browser} app window", file=sys.stderr)
         return 0
 
     if args.command == "import-hive":

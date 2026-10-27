@@ -18,8 +18,9 @@ _WINDOWS_PATHS = (
     r"Microsoft\Edge\Application\msedge.exe",
     r"Google\Chrome\Application\chrome.exe",
 )
-_PATH_NAMES = ("msedge", "microsoft-edge", "google-chrome", "chrome", "chromium",
-               "chromium-browser")
+_PATH_NAMES = ("msedge", "microsoft-edge", "microsoft-edge-stable",
+               "google-chrome", "google-chrome-stable", "chrome", "chromium",
+               "chromium-browser", "brave", "brave-browser")
 
 
 def find_app_browser(env: dict | None = None, exists=os.path.isfile,
