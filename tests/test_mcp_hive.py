@@ -17,6 +17,11 @@ def isolated_home(tmp_path, monkeypatch):
     return tmp_path
 
 
+def test_live_room_credentials_never_reach_these_tests():
+    # This module overrides conftest's isolated_home; the live-room guard must still run.
+    assert not [name for name in __import__("os").environ if name.startswith("HIVE_ROOM_")]
+
+
 def call_tool(name, arguments, request_id=7):
     response = mcp_hive.handle({
         "jsonrpc": "2.0",

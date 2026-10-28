@@ -19,6 +19,11 @@
             "type": "command",
             "command": "python .claude/hooks/usage_check.py prompt",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python hive/length_watch.py",
+            "timeout": 10
           }
         ]
       }

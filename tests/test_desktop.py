@@ -188,7 +188,8 @@ def test_broken_desktop_window_falls_back_to_the_browser_window(tmp_path, monkey
     assert "desktop window failed (RuntimeError: WebView2 runtime not found)" in capsys.readouterr().err
 
 
-def test_shortcut_linux_path_and_install(tmp_path):
+def test_shortcut_linux_path_and_install(tmp_path, monkeypatch):
+    monkeypatch.setattr("sys.platform", "linux")  # the Linux branch, on every CI runner
     env = {"XDG_DATA_HOME": str(tmp_path)}
     link = desktop.shortcut_path(env)
     assert link == tmp_path / "applications" / "megazword.desktop"
