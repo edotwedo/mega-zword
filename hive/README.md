@@ -7,3 +7,4 @@ here or the package build starts including this folder.
 | Tool | What it does |
 |---|---|
 | `length_watch.py` | Claude Code hook. Warns a bot as its conversation fills up, and nudges Phil when he gets chatty. |
+| `SORTING.md` | Draft: which `src/megazword` modules ship, go to a Dev edition, or stay Hive-only. |
