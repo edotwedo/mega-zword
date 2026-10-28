@@ -1,3 +1,4 @@
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -22,6 +23,16 @@ def pytest_unconfigure(config):
     if own:
         import shutil
         shutil.rmtree(own, ignore_errors=True)
+
+
+@pytest.fixture(autouse=True)
+def _no_live_room(monkeypatch):
+    """Never let a test reach the live Hive room. Its own name, so a module that
+    overrides isolated_home (test_mcp_hive does) cannot drop it: on 2026-10-28 a
+    cloud container with HIVE_ROOM_URL/TOKEN set posted test fixtures to the room."""
+    for name in list(os.environ):
+        if name.startswith("HIVE_ROOM_"):
+            monkeypatch.delenv(name)
 
 
 @pytest.fixture(autouse=True)
@@ -77,8 +88,6 @@ def isolated_home(tmp_path, monkeypatch):
     # ...or inherit a bot's seat, which would block posting as phil (B7).
     monkeypatch.delenv("MEGAZWORD_SEAT", raising=False)
     monkeypatch.delenv("MEGAZWORD_RUN_CONTROL", raising=False)
-    monkeypatch.delenv("HIVE_ROOM_URL", raising=False)
-    monkeypatch.delenv("HIVE_ROOM_TOKEN", raising=False)
     for var in ("OPENROUTER_API_KEY", "GROQ_API_KEY", "CEREBRAS_API_KEY", "CLOUDFLARE_API_TOKEN",
                 "CLOUDFLARE_ACCOUNT_ID", "ZAI_API_KEY", "GOOGLE_AI_API_KEY",
                 "NVIDIA_API_KEY", "MISTRAL_API_KEY", "TENCENT_TOKENHUB_API_KEY", "COMMANDCODE_API_KEY",
