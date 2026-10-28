@@ -113,7 +113,7 @@ def _curl_bin() -> str | None:
     return shutil.which("curl.exe") or shutil.which("curl")
 
 
-_CURL_HOSTS = {"api.groq.com", "gen.pollinations.ai"}
+_CURL_HOSTS = {"api.groq.com", "gen.pollinations.ai", "text.pollinations.ai"}
 
 
 def _use_curl(name: str, url: str | None = None) -> bool:
@@ -641,4 +641,10 @@ def free_backends(models: dict[str, str]) -> list[Backend]:
                                   model=m.get(name, model), keyless=True, trains_on_data=True)
           for name, model in (("kilo", "kilo-auto/free"), ("kilo-cohere", "cohere/north-mini-code:free"),
                               ("kilo-nemotron", "nvidia/nemotron-3-super-120b-a12b:free"))],
+        # Pollinations classic endpoint provides anonymous keyless generation.
+        # gen.pollinations.ai 401s on cache misses without a key; text.pollinations.ai/openai
+        # is the public keyless route. keyless=True keeps it out of the KEYLESS tuple.
+        OpenAICompatibleBackend(
+            "pollinations", base_url="https://text.pollinations.ai/openai",
+            model=m.get("pollinations", "openai"), keyless=True, trains_on_data=True),
     ]

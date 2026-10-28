@@ -113,6 +113,7 @@ DEFAULT_FREE = {
     "kilo": "kilo-auto/free",
     "kilo-cohere": "cohere/north-mini-code:free",
     "kilo-nemotron": "nvidia/nemotron-3-super-120b-a12b:free",
+    "pollinations": "openai",
     "gemini-api": "gemini-3.5-flash-lite",
     "gemini-api-31-lite": "gemini-3.1-flash-lite",
     "cerebras": "qwen-3.8-27b",

@@ -627,6 +627,14 @@ def test_openrouter_default_uses_free_router():
     assert default_backends()["openrouter"].model == "openrouter/free"
 
 
+def test_pollinations_is_keyless_and_hits_classic_endpoint():
+    from megazword.free_apis import free_backends
+    backend = {b.name: b for b in free_backends(config.DEFAULT_FREE)}["pollinations"]
+    assert backend.available() and backend.keyless and backend.trains_on_data
+    assert backend.base_url == "https://text.pollinations.ai/openai"
+    assert backend.model == "openai"
+
+
 def test_ovh_is_keyless_and_never_sends_a_key(monkeypatch):
     from megazword.free_apis import KEYLESS, free_backends
     monkeypatch.setenv("OVH_AI_ENDPOINTS_ACCESS_TOKEN", "secret-test-credential")
