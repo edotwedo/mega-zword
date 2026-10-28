@@ -7,4 +7,5 @@ here or the package build starts including this folder.
 | Tool | What it does |
 |---|---|
 | `length_watch.py` | Claude Code hook. Warns a bot as its conversation fills up, and nudges Phil when he gets chatty. |
+| `history.py` | Search Phil's exported AI chat histories without rereading them: `index <folder>` once, then `search "words"`, `show <id>`, `stats`. The index stays in `~/.megazword/history/`; exports are never committed. Private data: never let Phil's local model run it (workshop AGENTS.md hard rule), and quote only what the question needs. |
 | `SORTING.md` | Draft: which `src/megazword` modules ship, go to a Dev edition, or stay Hive-only. |
