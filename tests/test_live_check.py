@@ -26,7 +26,9 @@ def run(env, *args):
 def fake_env():
     tmp = Path(tempfile.mkdtemp(prefix="mz-live-test-"))
     env = smoke.make_env(tmp)
-    # Only repository CLIs are available; API providers have no credentials.
+    # This check targets claude/codex/grok. The dedicated smoke check covers
+    # agy separately: its Windows .cmd shim truncates multiline prompt args.
+    env["PATH"] = smoke._without_real_agy(env["PATH"])
     return tmp, env
 
 
@@ -63,3 +65,22 @@ def test_smoke_drops_inherited_hive_identity_and_credentials(tmp_path, monkeypat
     env = smoke.make_env(tmp_path)
     assert "MEGAZWORD_SEAT" not in env
     assert not any(name.startswith("HIVE_") for name in env)
+
+
+def test_smoke_path_skips_inaccessible_mounts_and_real_agy(tmp_path, monkeypatch):
+    safe = tmp_path / "safe"
+    blocked = tmp_path / "untrusted"
+    real_agy = tmp_path / "real-agy"
+    for folder in (safe, blocked, real_agy):
+        folder.mkdir()
+    (real_agy / "agy.cmd").write_text("not a smoke CLI")
+    original = Path.is_file
+
+    def is_file(path):
+        if path.parent == blocked:
+            raise OSError(448, "untrusted mount point")
+        return original(path)
+
+    monkeypatch.setattr(Path, "is_file", is_file)
+    path = smoke.os.pathsep.join((str(safe), str(blocked), str(real_agy), ""))
+    assert smoke._without_real_agy(path) == str(safe)
