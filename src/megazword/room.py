@@ -114,6 +114,31 @@ def extract_mentions(text: str) -> list[str]:
 # 2026-10-21: a cloud cache that has not touched the Worker in that long may already be
 # missing a post, so the read says so instead of looking current.
 STALE_READ_AFTER = timedelta(minutes=10)
+HIVE_ROSTER = Path(__file__).resolve().parents[2] / "docs" / "HIVE-ROSTER.md"
+_ROSTER_CELL = re.compile(r"^\|\s*([^|]+?)\s*\|", re.MULTILINE)
+
+
+def seat_designations(roster_path: Path | None = None) -> set[str]:
+    """Read known seat names from the roster, including retired names in its history."""
+    path = roster_path or HIVE_ROSTER
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return set()
+    names = set()
+    for cell in _ROSTER_CELL.findall(text):
+        name = cell.strip()
+        if name.casefold() in {"designation", "seat", "---"}:
+            continue
+        if re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{1,63}", name):
+            names.add(name.casefold())
+    return names
+
+
+def is_phil(author: str | None) -> bool:
+    """Room authors are Phil unless the roster identifies them as a seat."""
+    name = (author or "").strip().casefold()
+    return bool(name) and name not in seat_designations()
 
 
 class RoomMessages(list):
@@ -354,7 +379,7 @@ def pick_next_speaker(last_msg: RoomMessage | None, eligible: list[str],
     if not eligible:
         return None
 
-    if last_msg and last_msg.author == "phil" and last_msg.mentions:
+    if last_msg and is_phil(last_msg.author) and last_msg.mentions:
         for m in last_msg.mentions:
             if m in eligible:
                 return m
@@ -399,7 +424,7 @@ def build_turn_prompt(state_card: str, rolling_summary: str,
     )
 
     lead_in = (f"Phil just spoke. Address Phil's message as @{speaker}."
-               if last_author == "phil" else
+               if is_phil(last_author) else
                f"Reply as @{speaker}.")
 
     # `others`: bots that can actually speak next. A bot's @mention never starts a
@@ -438,8 +463,8 @@ def save_summary_report(room: str, messages: list[RoomMessage],
     out_path = summary_path(room, home)
 
     stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    speakers = sorted({m.author for m in messages if m.author != "phil"})
-    phil_msgs = sum(1 for m in messages if m.author == "phil")
+    speakers = sorted({m.author for m in messages if not is_phil(m.author)})
+    phil_msgs = sum(1 for m in messages if is_phil(m.author))
 
     lines = [
         f"Hive Room Summary: {room} ({stamp})",
@@ -509,10 +534,11 @@ def run_room(room: str = DEFAULT_ROOM,
 
 
 def check_author(author: str) -> None:
-    """Only Phil posts as phil: a bot seat ($MEGAZWORD_SEAT set to anything else) can't (B7)."""
+    """A seat may post only under its own designation; Phil may use any lane."""
     seat = (os.environ.get("MEGAZWORD_SEAT") or "").strip().lower()
-    if author.strip().lower() == "phil" and seat not in ("", "phil"):
-        raise PermissionError(f"seat '{seat}' cannot post as phil")
+    name = author.strip().lower()
+    if seat and seat != "phil" and name != seat:
+        raise PermissionError(f"seat '{seat}' may only post as its own designation, not '{name}'")
 
 
 def safe_write(write: Callable[[str], None], text: str) -> None:

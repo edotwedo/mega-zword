@@ -14,8 +14,8 @@ from pathlib import Path
 
 from . import config
 from .filelock import locked, write_atomic
-from .room import DEFAULT_ROOM, RemoteRoom, room_dir
-from .room_wait import phil_authors, seat_topic
+from .room import DEFAULT_ROOM, RemoteRoom, is_phil, room_dir
+from .room_wait import seat_topic
 
 # One shape for the roster table and a reply line: 3+ letters, optional hyphen, 1-4 digits.
 SEAT_NAME = r"[A-Za-z]{3,}-?\d{1,4}"
@@ -57,7 +57,7 @@ def escalate(messages, now, roster, state) -> list[Action]:
     actions = []
     seats = list(roster or [])[:2]
     for call, stamp in timed:
-        if call.author not in phil_authors() or call.remote_id <= 0:
+        if not is_phil(call.author) or call.remote_id <= 0:
             continue
         if (now - stamp).total_seconds() > MAX_AGE:
             continue

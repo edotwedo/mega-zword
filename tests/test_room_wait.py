@@ -46,7 +46,7 @@ def line(event, message=""):
 def test_returns_early_on_unseen_phil_message(tmp_path):
     state = tmp_path / "state.json"
     state.write_text('{"last": 3}', encoding="utf-8")
-    room_obj = FakeRoom([msg("codex", 2), msg("phil", 4), msg("codex", 5)])
+    room_obj = FakeRoom([msg("WenWei-56", 2), msg("phil", 4), msg("WenWei-56", 5)])
 
     def opener(*args, **kwargs):
         raise AssertionError("must not open a stream when the cache already answers")
@@ -60,7 +60,8 @@ def test_ignores_bots_and_non_hive_lines(tmp_path):
     state = tmp_path / "s.json"
     lines = [line("open"), line("message", "other:9"), line("message", "codex said hi"),
              line("message", "hive:9")]
-    room_obj = FakeRoom([msg("codex", 5)], [msg("codex", 5), msg("grok", 6), msg("phil", 7)])
+    room_obj = FakeRoom([msg("WenWei-56", 5)],
+                        [msg("WenWei-56", 5), msg("Billy-55", 6), msg("phil", 7)])
     got = room_wait.wait_for_phil(room_obj, "t", state,
                                   opener=lambda url, timeout=None: FakeStream(lines),
                                   sleep=lambda s: None)
@@ -69,7 +70,7 @@ def test_ignores_bots_and_non_hive_lines(tmp_path):
     assert json.loads(state.read_text(encoding="utf-8"))["last"] == 7
 
 
-@pytest.mark.parametrize("author", ["phone", "grok-web"])
+@pytest.mark.parametrize("author", ["phone", "grok-web", "claude-cloud", "claude-web"])
 def test_state_file_written_when_missing(tmp_path, author):
     state = tmp_path / "nested" / "s.json"
     room_obj = FakeRoom([msg(author, 1)])
@@ -123,10 +124,10 @@ def test_multiple_topics_share_one_subscription(tmp_path, monkeypatch):
 
 def test_only_phils_announce_lines_wake_a_seat(tmp_path, monkeypatch):
     monkeypatch.setattr(room_wait.config, "HOME", tmp_path)
-    announce = room.RoomMessage(time="2026-10-19T00:00", author="floor",
+    announce = room.RoomMessage(time="2026-10-19T00:00", author="MIKE-54",
                                 text="ANNOUNCE: check the hive for assignments",
                                 remote_id=5, remote_url="https://room.example")
-    for author in room_wait.PHIL_AUTHORS:
+    for author in ("phone", "grok-web", "claude-cloud", "claude-web"):
         phil = room.RoomMessage(time=announce.time, author=author, text=announce.text,
                                 remote_id=6, remote_url=announce.remote_url)
         room_obj = FakeRoom([announce], [announce, phil])

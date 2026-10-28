@@ -120,18 +120,14 @@ def test_handle_hive_say_defaults_to_seat(monkeypatch, isolated_home):
     assert "reed-12" in floor.format_heard(home=isolated_home)
 
 
-@pytest.mark.parametrize("author", ["phil", "Phil", None])
-def test_handle_hive_say_bot_seat_cannot_post_as_phil(monkeypatch, isolated_home, author):
-    monkeypatch.setenv("MEGAZWORD_SEAT", "claude")
+@pytest.mark.parametrize("author", ["phil", "Phil", "claude-cloud"])
+def test_handle_hive_say_seat_cannot_post_as_phil_lane(monkeypatch, isolated_home, author):
+    monkeypatch.setenv("MEGAZWORD_SEAT", "MIKE-54")
     args = {"text": "ship it"}
-    if author:
-        args["author"] = author
+    args["author"] = author
     result = call_tool("hive_say", args)
-    if author is None:  # falls back to the seat, which is fine
-        assert text_result(result) == "[claude] ship it"
-        return
     assert result["isError"] is True
-    assert "cannot post as phil" in result["content"][0]["text"]
+    assert "may only post as its own designation" in result["content"][0]["text"]
     assert room.read_messages("hive", home=isolated_home) == []
 
 
@@ -144,12 +140,13 @@ def test_handle_hive_say_phil_allowed_without_bot_seat(monkeypatch, isolated_hom
 
 
 def test_room_say_bot_seat_cannot_post_as_phil(monkeypatch, isolated_home):
-    monkeypatch.setenv("MEGAZWORD_SEAT", "grok")
+    monkeypatch.setenv("MEGAZWORD_SEAT", "MIKE-54")
     with pytest.raises(PermissionError):
-        room.say("hive", "pretend", home=isolated_home, write=lambda s: None)
+        room.say("hive", "pretend", author="claude-cloud", home=isolated_home,
+                 write=lambda s: None)
     assert room.read_messages("hive", home=isolated_home) == []
-    room.say("hive", "as myself", author="grok", home=isolated_home, write=lambda s: None)
-    assert room.read_messages("hive", home=isolated_home)[0].author == "grok"
+    room.say("hive", "as myself", author="MIKE-54", home=isolated_home, write=lambda s: None)
+    assert room.read_messages("hive", home=isolated_home)[0].author == "mike-54"
 
 
 def test_handle_hive_wait_new_message(monkeypatch):

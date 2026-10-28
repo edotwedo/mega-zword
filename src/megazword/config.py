@@ -249,10 +249,6 @@ class Config:
     healthchecks_url: str = ""
     # The human-selected conductor; capacity rankings do not change ownership.
     work_owner: str = ""
-    # Who counts as Phil in the room. `[phil] authors` in config.toml overrides this, so a
-    # new instance of his is recognised without a code change (Phil, 2026-10-23).
-    phil_authors: list[str] = field(default_factory=lambda: ["phil", "phone", "grok-web"])
-
     def out_now(self, now: datetime | None = None) -> set[str]:
         """AIs marked out whose return time hasn't passed yet."""
         now = now or datetime.now(timezone.utc)
@@ -284,11 +280,6 @@ def load(path: Path | None = None) -> Config:
         cfg.work_owner = work.get("owner", "").strip()
         if cfg.work_owner and not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", cfg.work_owner):
             raise ValueError("work.owner must be a backend name")
-        phil = data.get("phil", {})
-        if isinstance(phil, dict) and isinstance(phil.get("authors"), list):
-            authors = [str(a).strip() for a in phil["authors"] if str(a).strip()]
-            if authors:
-                cfg.phil_authors = authors
         oneshot = data.get("oneshot", {})
         if isinstance(oneshot, dict) and isinstance(oneshot.get("lean"), bool):
             cfg.lean = oneshot["lean"]
@@ -593,19 +584,6 @@ def set_work_owner(name: str, path: Path | None = None) -> None:
     if not isinstance(name, str) or (name and not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", name)):
         raise ValueError("work.owner must be a backend name")
     _set_key(path or HOME / "config.toml", "work", "owner", json.dumps(name) if name else None)
-
-
-def phil_authors() -> tuple[str, ...]:
-    """Who counts as Phil. `[phil] authors` in config.toml wins; the default is silent.
-
-    Hardcoding this tuple was why a new instance of his went unrecognised on 2026-10-23. He
-    edits one list instead of waiting for a code change.
-    """
-    try:
-        authors = tuple(load().phil_authors)
-    except (OSError, ValueError, TypeError):
-        authors = ()
-    return authors or ("phil", "phone", "grok-web")
 
 
 def _known_ai(name: str) -> None:

@@ -21,22 +21,18 @@ def message(text, author="phil", id=1):
 
 
 def test_a_phil_lane_always_wakes():
-    for lane in ("phil", "phone", "grok-web"):
+    for lane in ("phil", "phone", "grok-web", "claude-cloud", "claude-web"):
         assert wake.is_wake("anything at all", lane) is True
         assert wake.is_wake("", lane) is True
 
 
-def test_another_bot_never_wakes_the_conductor():
-    for lane in ("claude-pc", "briar-20", "nock-21", "cinder-21", "floor"):
+def test_rostered_seat_never_wakes_the_conductor_by_author_alone():
+    for lane in ("MIKE-54", "Billy-55", "WenWei-56", "Paul-53", "Gavin-27"):
         assert wake.is_wake("Phil says do this", lane) is False
 
 
-def test_a_web_lane_wakes_only_when_it_names_phil_as_the_source():
-    # A claude.ai chat speaking for itself is teammate data; a relay is Phil.
-    assert wake.is_wake("I reviewed the patch and think it is fine", "claude-web") is False
-    assert wake.is_wake("Rook-24 relaying for Phil: get back to work", "claude-web") is True
-    assert wake.is_wake("Phil directly says: assign the next item", "claude-web") is True
-    assert wake.is_wake("from Phil: check the queue", "chatgpt") is True
+def test_non_roster_web_author_is_phil_without_relay_wording():
+    assert wake.is_wake("I reviewed the patch and think it is fine", "claude-web") is True
 
 
 def test_pending_returns_only_newer_wakes_oldest_first():

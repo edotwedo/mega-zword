@@ -16,17 +16,7 @@ import urllib.request
 from pathlib import Path
 
 from . import config
-from .room import DEFAULT_ROOM, RemoteRoom, room_dir
-
-# Phil confirmed grok-web as his lane in a direct PC chat (2026-10-20). Editable since
-# 2026-10-23: `[phil] authors` in config.toml overrides it, so a new instance of his is
-# recognised without a code change.
-PHIL_AUTHORS = ("phil", "phone", "grok-web")
-
-
-def phil_authors() -> tuple[str, ...]:
-    return config.phil_authors()
-
+from .room import DEFAULT_ROOM, RemoteRoom, is_phil, room_dir
 
 STREAM = "https://ntfy.sh/{topic}/json"
 SIGNAL = re.compile(r"hive:\d+")
@@ -47,10 +37,10 @@ def _save_last(path: Path, value: int) -> None:
 
 
 def _unseen(room_obj, last: int):
-    """Only Phil's lanes are actionable, including ANNOUNCE lines."""
+    """Only roster-unknown authors (Phil's lanes) are actionable, including ANNOUNCE lines."""
     return [m for m in room_obj.cached()
             if m.remote_id > last
-            and m.author in phil_authors()]
+            and is_phil(m.author)]
 
 
 def _event(line) -> dict:

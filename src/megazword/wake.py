@@ -28,13 +28,8 @@ from typing import Callable
 from . import claims as ledger
 from . import config
 from .filelock import locked, write_atomic
+from .room import is_phil
 
-# Phil's lanes. A message from here always wakes the conductor. Editable: `[phil] authors`
-# in config.toml overrides it, so a new instance of his is recognised without a code change.
-PHIL_LANES = ("phil", "phone", "grok-web")
-# A web lane may only wake when it names Phil as the source; on its own it is teammate data.
-WEB_LANES = ("claude-web", "chatgpt", "gemini-web")
-RELAY = re.compile(r"\b(relay|relaying|from phil|phil (?:says|asks|wants|directly))\b", re.IGNORECASE)
 # The watcher polls every 60 s (scripts/wake_watch.ps1). Three missed polls means the
 # listener is down, not quiet.
 HEALTH_MAX = 180.0
@@ -50,13 +45,6 @@ ITEM_WORK = re.compile(
     r"done|finished|complete\w*)\b",
     re.IGNORECASE,
 )
-
-
-def _phil_lanes() -> tuple[str, ...]:
-    try:
-        return tuple(config.phil_authors())
-    except (OSError, ValueError, TypeError):
-        return PHIL_LANES
 
 
 def _field(message, name, default=""):
@@ -126,10 +114,8 @@ def relevance(message, me, claims=()) -> str | None:
     """
     text = _field(message, "text") or ""
     author = (_field(message, "author") or "").strip().lower()
-    if author in _phil_lanes():
+    if is_phil(author):
         return "phil"
-    if author in WEB_LANES and RELAY.search(text):
-        return "phil"  # a web lane speaking for Phil is Phil
     seat = _squash(me)
     if seat and seat in _squash(text):
         return "mention"

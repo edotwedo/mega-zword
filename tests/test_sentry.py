@@ -47,7 +47,7 @@ def test_heuristic_ignores_closing_summary():
 
 
 def test_heuristic_detects_seat_directive():
-    m = msg("claude-pc", "MIKE-54: review task/578d7921105f on main.")
+    m = msg("Gavin-27", "MIKE-54: review task/578d7921105f on main.")
     assert sentry.check_actionable_heuristic(m, "MIKE-54")
     assert not sentry.check_actionable_heuristic(m, "Paul-53")
 
@@ -64,7 +64,7 @@ def test_heuristic_detects_unassigned_work():
 
 
 def test_heuristic_skips_assignments_to_other_seats():
-    m = msg("claude-pc", "ASSIGN -> Billy-55: wire Jev in as decision layer.")
+    m = msg("Gavin-27", "ASSIGN -> Billy-55: wire Jev in as decision layer.")
     assert sentry.check_actionable_heuristic(m, "Billy-55")
     assert not sentry.check_actionable_heuristic(m, "Paul-53")
 

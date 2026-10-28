@@ -119,7 +119,7 @@ def check_actionable_heuristic(msg: room.RoomMessage, seat: str) -> bool:
                 return True
 
     # Any message from Phil
-    if author in config.phil_authors():
+    if room.is_phil(author):
         return True
 
     # Open unassigned work / multi-assignment broadcasts

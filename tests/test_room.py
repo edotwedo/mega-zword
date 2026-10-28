@@ -132,9 +132,15 @@ def test_pick_next_speaker_mentions():
     assert speaker_fallback == "codex"
 
     # A bot @mention must not start another one-shot (falls back to burn order)
-    bot = room.RoomMessage(time="", author="codex", text="hey @grok identify", mentions=["grok"])
+    bot = room.RoomMessage(time="", author="WenWei-56", text="hey @grok identify", mentions=["grok"])
     speaker_bot = room.pick_next_speaker(bot, eligible, burn_order, last_speaker="grok")
     assert speaker_bot == "codex"
+
+
+def test_claude_cloud_mention_is_a_phil_wake():
+    message = room.RoomMessage(time="", author="claude-cloud", text="@codex please review",
+                               mentions=["codex"])
+    assert room.pick_next_speaker(message, ["claude", "codex"], ["claude", "codex"]) == "codex"
 
 
 def test_pick_next_speaker_alternates_away_from_last_speaker():
@@ -164,15 +170,18 @@ def test_room_stop_command(tmp_path):
 def test_save_summary_report(tmp_path):
     messages = [
         room.RoomMessage("2026-10-11T12:00:00Z", "phil", "hello"),
-        room.RoomMessage("2026-10-11T12:00:05Z", "claude", "hi phil @codex"),
-        room.RoomMessage("2026-10-11T12:00:10Z", "codex", "reporting in"),
+        room.RoomMessage("2026-10-11T12:00:02Z", "claude-cloud", "hello from work"),
+        room.RoomMessage("2026-10-11T12:00:03Z", "claude-web", "hello from web"),
+        room.RoomMessage("2026-10-11T12:00:05Z", "Paul-53", "hi phil @codex"),
+        room.RoomMessage("2026-10-11T12:00:10Z", "WenWei-56", "reporting in"),
     ]
     report_file = room.save_summary_report("testroom", messages, "workshop", home=tmp_path)
     assert report_file.exists()
     content = report_file.read_text(encoding="utf-8")
     assert "Hive Room Summary: testroom" in content
     assert "Primary project: workshop" in content
-    assert "Participating bots: claude, codex" in content
+    assert "Phil: 3, Bots: 2" in content
+    assert "Participating bots: Paul-53, WenWei-56" in content
 
 
 def test_room_cli_commands(tmp_path, capsys):

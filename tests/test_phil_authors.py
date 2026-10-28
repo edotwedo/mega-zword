@@ -1,32 +1,27 @@
-"""Who counts as Phil is config, not a hardcoded tuple.
+"""Phil is identified by exclusion against the seat roster, not a lane list."""
 
-Hardcoding it is why a new instance of his went unrecognised on 2026-10-23 and looked like a
-"relay" to be verified. `[phil] authors` in config.toml is the one place to add one.
-"""
+import pytest
 
-from megazword import config, room_wait, wake
+from megazword import room, room_wait, wake
 
 
-def _write_config(text: str) -> None:
-    config.HOME.mkdir(parents=True, exist_ok=True)
-    (config.HOME / "config.toml").write_text(text, encoding="utf-8")
+@pytest.mark.parametrize("author", ["claude-cloud", "claude-web", "phone", "grok-web", "phil"])
+def test_non_roster_lanes_are_phil_everywhere(author):
+    assert room.is_phil(author)
+    assert wake.is_wake("", author)
+    assert room_wait._unseen(type("R", (), {"cached": lambda self: [
+        room.RoomMessage("", author, "hello", remote_id=1)
+    ]})(), 0)
 
 
-def test_defaults_are_the_confirmed_lanes():
-    assert config.phil_authors() == ("phil", "phone", "grok-web")
+def test_rostered_designation_is_a_seat_not_phil():
+    assert not room.is_phil("MIKE-54")
+    assert not wake.is_wake("", "MIKE-54")
 
 
-def test_a_new_instance_in_config_is_recognised_everywhere():
-    _write_config('[phil]\nauthors = ["phil", "claude-web", "briar-22"]\n')
-    expected = ("phil", "claude-web", "briar-22")
-    assert config.phil_authors() == expected
-    assert room_wait.phil_authors() == expected
-    # A configured lane wakes with no "relay" phrase - it is simply him.
-    assert wake.is_wake("", "claude-web") is True
-    assert wake.is_wake("", "briar-22") is True
-    assert wake.is_wake("", "some-bot") is False
-
-
-def test_a_malformed_config_falls_back_and_never_raises():
-    _write_config('[phil]\nauthors = "not-a-list"\n')
-    assert config.phil_authors() == ("phil", "phone", "grok-web")
+def test_roster_changes_are_read_without_a_lane_config(tmp_path, monkeypatch):
+    roster = tmp_path / "HIVE-ROSTER.md"
+    roster.write_text("| Active seat | Worker |\n| --- | --- |\n| NewSeat | Codex |\n")
+    monkeypatch.setattr(room, "HIVE_ROSTER", roster)
+    assert not room.is_phil("newseat")
+    assert room.is_phil("new-lane")

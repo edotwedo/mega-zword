@@ -52,7 +52,7 @@ def test_answer_at_seven_stops_after_first_step(tmp_path):
     run = lambda minute: watch.run_pass(room, START + timedelta(minutes=minute), ROSTER,
                                         state, "pc", "phone", lambda *a: sends.append(a))
     assert len(run(5)) == 1
-    room.messages.append(message("codex", "Beacon-17: on it", 7, 2))
+    room.messages.append(message("WenWei-56", "Beacon-17: on it", 7, 2))
     assert run(10) == run(15) == []
     assert sends == [(watch.seat_topic("Beacon-17"), "hive:1")]
 
@@ -63,28 +63,28 @@ def test_old_calls_never_escalate_so_a_first_run_cannot_flood_the_phone():
     assert len(watch.escalate(old, START + timedelta(minutes=60), ROSTER, {})) == 6
 
 
-@pytest.mark.parametrize("author", ["codex", "floor", "claude-web", "chatgpt"])
+@pytest.mark.parametrize("author", ["MIKE-54", "Paul-53", "Billy-55", "Gavin-27"])
 def test_bot_posts_are_never_calls(author):
     assert watch.escalate([message(author)], START + timedelta(minutes=20), ROSTER, {}) == []
 
 
 @pytest.mark.parametrize("text", ["Reply to hive:1", "Taking #1", "answering call 1", "message #1 done"])
 def test_explicit_call_references_answer(text):
-    messages = [message(), message("bot", text, 7, 2)]
+    messages = [message(), message("MIKE-54", text, 7, 2)]
     assert watch.escalate(messages, START + timedelta(minutes=15), ROSTER, {}) == []
 
 
 def test_only_later_answers_and_exact_call_ids_count():
-    messages = [message("bot", "Beacon-17: earlier", -1, 0), message(),
-                message("bot", "answering hive:10", 2, 2),
+    messages = [message("MIKE-54", "Beacon-17: earlier", -1, 0), message(),
+                message("MIKE-54", "answering hive:10", 2, 2),
                 message("phil", "Beacon-17: still waiting", 3, 3),
-                message("bot", "Beacon-17: future", 20, 4)]
+                message("MIKE-54", "Beacon-17: future", 20, 4)]
     actions = watch.escalate(messages, START + timedelta(minutes=5), ROSTER, {})
     assert [(a.call_id, a.step) for a in actions] == [(1, 1)]
 
 
-@pytest.mark.parametrize("author", ["phone", "grok-web"])
-def test_phone_and_grok_web_lanes_and_independent_calls(author):
+@pytest.mark.parametrize("author", ["phone", "grok-web", "claude-cloud", "claude-web"])
+def test_phil_lanes_and_independent_calls(author):
     state = {}
     messages = [message(), message(author, minute=4, remote_id=2)]
     assert [(a.call_id, a.step) for a in watch.escalate(
@@ -139,7 +139,7 @@ def test_roster_rejects_malformed_names(tmp_path):
 
 @pytest.mark.parametrize("text", ["Harbor022: answering", "Harbor022 answering"])
 def test_hyphenless_reply_is_recognised(text):
-    messages = [message(), message("claude", text, 7, 2)]
+    messages = [message(), message("Paul-53", text, 7, 2)]
     assert watch.escalate(messages, START + timedelta(minutes=15),
                           ["Harbor022", "Briar-20"], {}) == []
 
@@ -151,7 +151,7 @@ def test_hyphenless_reply_is_recognised(text):
     "Harbor022extra: here",
 ])
 def test_malformed_reply_name_is_still_rejected(text):
-    messages = [message(), message("claude", text, 7, 2)]
+    messages = [message(), message("Paul-53", text, 7, 2)]
     actions = watch.escalate(messages, START + timedelta(minutes=15), ROSTER, {})
     assert [(a.step, a.seat) for a in actions] == [(1, ROSTER[0]), (2, ROSTER[1]), (3, None)]
 
