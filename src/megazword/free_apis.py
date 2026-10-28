@@ -113,12 +113,16 @@ def _curl_bin() -> str | None:
     return shutil.which("curl.exe") or shutil.which("curl")
 
 
+_CURL_HOSTS = {"api.groq.com", "gen.pollinations.ai"}
+
+
 def _use_curl(name: str, url: str | None = None) -> bool:
-    # This PC's Python TLS fingerprint is blocked by Cloudflare on Groq.
-    # curl reads the authorization header from a temporary file, not argv.
+    # This PC's Python TLS fingerprint is blocked by Cloudflare on Groq, and pollinations
+    # answers curl with 200 and urllib with 401 for the identical request (verified
+    # 2026-10-28). curl reads the authorization header from a temporary file, not argv.
     if not _curl_bin() or url is None:
         return False
-    return urllib.parse.urlsplit(url).hostname == "api.groq.com"
+    return urllib.parse.urlsplit(url).hostname in _CURL_HOSTS
 
 
 def _cloudflare_1010(body: bytes) -> bool:
