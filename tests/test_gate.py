@@ -112,6 +112,15 @@ def test_hook_skips_a_delete_only_push():
 
 
 @pytest.mark.skipif(SH is None, reason="needs sh (Git Bash) on PATH")
+def test_hook_skips_docs_only_push():
+    proc = subprocess.run([SH, str(HOOK)],
+                          input="refs/heads/main HEAD refs/heads/main HEAD~1\n",
+                          capture_output=True, text=True, cwd=ROOT)
+    assert proc.returncode == 0
+    assert "docs-only push" in proc.stdout
+    assert "running the suite" not in proc.stdout
+
+
 def test_hook_does_not_shortcut_a_real_push():
     """The counterpart: a normal push must fall through to the suite, not the shortcut.
     MZ_PYTHON points at `false`, so this stops at the python probe instead of running

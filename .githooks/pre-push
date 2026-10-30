@@ -104,6 +104,58 @@ if PYTHONPATH="$root/src" "$python" -c "from megazword import memory_index; memo
   fi
 fi
 
+# Rules check: Ballot P1/P2. Rules must match approved ballot even on docs-only pushes.
+if ! PYTHONPATH="$root/src" "$python" -c \
+    'from megazword import rules; ok, msg = rules.check(); raise SystemExit(0 if ok else 1)' >/dev/null 2>&1; then
+  echo "land-gate: unvoted rules change in docs/SYSTEM-DRAFT.md; push blocked"
+  exit 1
+fi
+
+# Docs-only shortcut (Phil directive, 2026-10-30): if every commit being pushed only touches
+# documentation or notes, skip the 2,200-test suite (saves ~100s of CPU).
+is_doc_only=0
+if [ "$saw_any" = "1" ]; then
+  can_check_diff=1
+  changed_files=""
+  while read -r l_ref l_sha r_ref r_sha; do
+    [ -n "${l_ref:-}" ] || continue
+    [ "$l_ref" != "(delete)" ] || continue
+    if [ -z "${r_sha:-}" ] || [ "$r_sha" = "0000000000000000000000000000000000000000" ]; then
+      base=$(git merge-base origin/main "$l_sha" 2>/dev/null || git merge-base main "$l_sha" 2>/dev/null) || { can_check_diff=0; break; }
+      diff_out=$(git diff --name-only "$base" "$l_sha" 2>/dev/null) || { can_check_diff=0; break; }
+    else
+      diff_out=$(git diff --name-only "$r_sha" "$l_sha" 2>/dev/null) || { can_check_diff=0; break; }
+    fi
+    changed_files="${changed_files}
+${diff_out}"
+  done <<EOF
+$push_refs
+EOF
+
+  if [ "$can_check_diff" = "1" ]; then
+    has_code=0
+    saw_files=0
+    for f in $changed_files; do
+      [ -n "$f" ] || continue
+      saw_files=1
+      case "$f" in
+        docs/SYSTEM-DRAFT.md|docs/RULES.md) has_code=1; break ;;
+        docs/*|*.md|*.txt|.gitignore) ;;
+        *) has_code=1; break ;;
+      esac
+    done
+    if [ "$saw_files" = "1" ] && [ "$has_code" = "0" ]; then
+      is_doc_only=1
+    fi
+  fi
+fi
+
+if [ "$is_doc_only" = "1" ]; then
+  if ! task_gate; then exit 1; fi
+  echo "land-gate: docs-only push - suite skipped (saved ~100s)"
+  exit 0
+fi
+
 echo "land-gate: running the suite before this push (a few minutes)"
 if "$python" -m pytest -q; then
   if ! task_gate; then exit 1; fi
