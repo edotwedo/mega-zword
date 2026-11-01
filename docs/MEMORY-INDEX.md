@@ -11,7 +11,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/STATUS.md` | 4.2 kB | always - current state and the exact next step |
 | `docs/SPEC.md` | 12.1 kB | when the task changes what we are building, or a decision behind it |
 | `docs/DECISIONS.md` | 23.2 kB | when you are changing or questioning a past choice with Phil |
-| `docs/HIVE-ROSTER.md` | 6.9 kB | when you need a seat's role, window or designation shape |
+| `docs/HIVE-ROSTER.md` | 7.0 kB | when you need a seat's role, window or designation shape |
 | `docs/SYSTEM-DRAFT.md` | 6.7 kB | when you are writing or changing a rule (needs a ballot first) |
 | `docs/FLOOR.md` | 9.7 kB | when you are working the floor: seats, claims, the conductor |
 | `docs/AGENT-ACCESS.md` | 2.4 kB | when wiring a new AI CLI into the Hive |
