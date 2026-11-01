@@ -43,7 +43,7 @@ Phil uses the plain name and never the number (`agy`=MIKE, `grok`=Billy, `codex`
 | WenWei-56 | Codex | `codex` | window 2 | WenWei | live 2026-10-26 |
 | Paul-53 | Claude | `claude` | window 2 | Paul | live 2026-10-26 |
 | Gilbert-6969 | Command Code (free model) | `cmdc` | window 2 | Gilbert | new 2026-10-29 |
-| isthmus-56 | Claude (mobile rc) | `claude` | Claude Android app | isthmus | live 2026-11-01 |
+| isthmus-56 | Claude (mobile rc) | `claude` | Claude Android app | Phil (isthmus) | live 2026-11-01 (carries Phil direct authority) |
 
 The layout is saved and replayed by `scripts/hive_snapshot.py` (snapshot) and
 `scripts/hive_resume.sh` (restore, installed as a `post-boot` hook). The seat list lives in
