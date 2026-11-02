@@ -6,11 +6,14 @@
 #   scripts/hive_resume.sh --print-only    show what would open; open nothing
 #   scripts/hive_resume.sh --install-hook  restore on every reboot (Omarchy post-boot hook)
 #
-# The layout comes from scripts/hive_snapshot.py. One kitty is started with remote control on
-# our own socket, the first seat runs in its first tab, and every other seat is added with
-# `kitten @ launch --type=tab|os-window --env MEGAZWORD_SEAT=<seat>` - which is what gives
-# each tab its own identity instead of inheriting one shared variable (the bug of
-# 2026-10-26: five windows, all Gavin-27).
+# The layout comes from scripts/hive_snapshot.py. One SEATLESS kitty is started, purely to own a
+# remote-control socket, and then EVERY seat is added with
+# `kitten @ launch --type=tab|os-window --env MEGAZWORD_SEAT=<seat>` - which is what gives each
+# tab its own identity instead of inheriting one shared variable (the bug of 2026-10-26: five
+# windows, all Gavin-27). The host is a seatless `sleep` on purpose: `kitty -e <cmd>` exits when
+# <cmd> exits and the socket dies with it, so a seat riding in the host could take the whole
+# restore down. The host tab is closed afterwards, and the restore then COUNTS the seats that
+# actually came up and logs the count.
 #
 # A kitty session file would have been the natural fit and does not work: kitty 0.49.2 calls
 # the whole session invalid when it contains `launch --title` or `launch --env`. Details and
@@ -108,18 +111,45 @@ if [ -z "$only" ]; then
 fi
 if command -v kitty >/dev/null 2>&1; then
   rm -f "$socket"
-  # Detached: the hook must not block the desktop session waiting on a terminal.
+  # The host kitty is SEATLESS on purpose. `kitty -e <cmd>` exits when <cmd> exits and the
+  # control socket dies with the process, so a seat riding in the host made that one seat's
+  # health a liveness dependency for every other seat. Detached: the hook must not block the
+  # desktop session waiting on a terminal.
   setsid sh -c "$("$python" "$snapshot" "$@" --kitty-start)" >/dev/null 2>&1 &
-  # Wait for the socket the launch commands talk to.
-  for _ in $(seq 1 60); do [ -S "$socket" ] && break; sleep 0.25; done
-  if [ ! -S "$socket" ]; then
-    echo "hive: kitty did not open its control socket at $socket; nothing was restored" >&2
+  # Wait until remote control actually ANSWERS, not merely until the socket file exists. Every
+  # seat is now a `kitten @ launch` against this socket, so a socket that exists but is not yet
+  # serving would fail all six launches at once (grok review, 2026-10-30).
+  ready=""
+  tries=0
+  while [ "$tries" -lt 60 ]; do
+    if kitten @ --to "unix:$socket" ls >/dev/null 2>&1; then ready=1; break; fi
+    sleep 0.25
+    tries=$((tries + 1))
+  done
+  if [ -z "$ready" ]; then
+    echo "hive: kitty never answered on $socket; nothing was restored" >&2
     exit 1
   fi
   "$python" "$snapshot" "$@" --kitty-tabs | while IFS= read -r command; do
     sh -c "$command" >/dev/null 2>&1 || echo "hive: could not open one seat: $command" >&2
   done
-  echo "hive: restored ${seat_count} seats in one kitty"
+  # Drop the host tab - matched by title, never by a missing env var, because a tab whose CLI
+  # has not appeared yet looks seatless too. So the window ends up being nothing but seats.
+  "$python" "$snapshot" "$@" --close-host | while IFS= read -r command; do
+    sh -c "$command" >/dev/null 2>&1 || true
+  done
+  # Count what actually came up, print it, and keep a line of it. Silence is what let three
+  # restore bugs live for days: a restore that cannot say what it opened is not finished.
+  report=$("$python" "$snapshot" "$@" --verify 2>&1)
+  status=$?
+  echo "hive: ${report}"
+  printf '%s  %s\n' "$(date -Is 2>/dev/null || date)" "$report" \
+    >> "${HOME}/.megazword/hive-restore.log"
+  if [ "$status" -ne 0 ]; then
+    # No boot marker on a bad count, so an incomplete restore can still run again this boot.
+    echo "hive: restore incomplete - leaving the boot marker unset so it can retry" >&2
+    exit 1
+  fi
 else
   echo "hive: kitty is not installed - the tab grouping cannot be restored; opening windows" >&2
   "$python" "$snapshot" "$@" --ghostty | while IFS= read -r command; do

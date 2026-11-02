@@ -114,7 +114,7 @@ def test_hook_skips_a_delete_only_push():
 @pytest.mark.skipif(SH is None, reason="needs sh (Git Bash) on PATH")
 def test_hook_skips_docs_only_push():
     proc = subprocess.run([SH, str(HOOK)],
-                          input="refs/heads/main HEAD refs/heads/main HEAD~1\n",
+                          input="refs/heads/main 0a7e7b5 refs/heads/main 0a7e7b5~1\n",
                           capture_output=True, text=True, cwd=ROOT)
     assert proc.returncode == 0
     assert "docs-only push" in proc.stdout

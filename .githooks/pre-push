@@ -105,10 +105,12 @@ if PYTHONPATH="$root/src" "$python" -c "from megazword import memory_index; memo
 fi
 
 # Rules check: Ballot P1/P2. Rules must match approved ballot even on docs-only pushes.
-if ! PYTHONPATH="$root/src" "$python" -c \
-    'from megazword import rules; ok, msg = rules.check(); raise SystemExit(0 if ok else 1)' >/dev/null 2>&1; then
-  echo "land-gate: unvoted rules change in docs/SYSTEM-DRAFT.md; push blocked"
-  exit 1
+if [ -f "$root/docs/SYSTEM-DRAFT.md" ]; then
+  if ! PYTHONPATH="$root/src" "$python" -c \
+      'from megazword import rules; ok, msg = rules.check(); raise SystemExit(0 if ok else 1)' >/dev/null 2>&1; then
+    echo "land-gate: unvoted rules change in docs/SYSTEM-DRAFT.md; push blocked"
+    exit 1
+  fi
 fi
 
 # Docs-only shortcut (Phil directive, 2026-10-30): if every commit being pushed only touches

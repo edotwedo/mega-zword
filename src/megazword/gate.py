@@ -65,8 +65,18 @@ def install(root: Path | None = None) -> int:
     return proc.returncode
 
 
-def suite_command(python: str | None = None) -> list[str]:
-    return [python or sys.executable, "-m", "pytest", "-q"]
+def find_python(root: Path | None = None) -> str:
+    native = "Scripts/python.exe" if os.name == "nt" else "bin/python"
+    fallback = "bin/python" if os.name == "nt" else "Scripts/python.exe"
+    base = root or Path.cwd()
+    for candidate in [base / ".venv" / native, base / ".venv" / fallback]:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return sys.executable
+
+
+def suite_command(python: str | None = None, cwd: Path | None = None) -> list[str]:
+    return [python or find_python(cwd), "-m", "pytest", "-q"]
 
 
 def run_gate(python: str | None = None, cwd: Path | None = None,
@@ -77,7 +87,7 @@ def run_gate(python: str | None = None, cwd: Path | None = None,
         print(f"land-gate: SKIPPED ({SKIP_ENV}=1) - nothing was verified")
         return 0
     print("land-gate: running the suite before this push (this takes a few minutes)")
-    proc = runner(suite_command(python), cwd=str(cwd) if cwd else None)
+    proc = runner(suite_command(python, cwd=cwd), cwd=str(cwd) if cwd else None)
     if proc.returncode == 0:
         print("land-gate: suite passed")
         return 0
