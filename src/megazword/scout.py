@@ -6,6 +6,7 @@ import json
 import re
 from datetime import date
 from pathlib import Path
+from . import __version__
 from urllib.request import Request, urlopen
 from typing import List, Dict, Any
 
@@ -44,13 +45,13 @@ def fetch_endpoints(model_id: str) -> Dict[str, Any]:
     Returns the parsed JSON response.
     """
     url = f"https://openrouter.ai/api/v1/models/{model_id}/endpoints"
-    request = Request(url, headers={"User-Agent": "megazword/0.1.0b1"})
+    request = Request(url, headers={"User-Agent": f"megazword/{__version__}"})
     with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
         return json.load(response)
 
 
 def fetch_litellm() -> Dict[str, Any]:
-    request = Request(LITELLM_URL, headers={"User-Agent": "megazword/0.1.0b1"})
+    request = Request(LITELLM_URL, headers={"User-Agent": f"megazword/{__version__}"})
     with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
         return json.load(response)
 

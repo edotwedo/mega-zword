@@ -67,7 +67,8 @@ def test_fetch_endpoints_monkeypatched():
         args, kwargs = mock_urlopen.call_args
         request = args[0]
         assert request.full_url == "https://openrouter.ai/api/v1/models/test/model/endpoints"
-        assert request.get_header("User-agent") == "megazword/0.1.0b1"
+        from megazword import __version__
+        assert request.get_header("User-agent") == f"megazword/{__version__}"
         assert result == {
             "data": {
                 "endpoints": [

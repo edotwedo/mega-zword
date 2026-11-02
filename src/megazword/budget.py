@@ -12,7 +12,7 @@ import json
 import time
 import urllib.request
 
-from . import config
+from . import config, __version__
 from .filelock import write_atomic
 from .keys import get_key
 
@@ -46,7 +46,7 @@ def _fetch_spend() -> float:
     if not key:
         raise RuntimeError("OPENROUTER_API_KEY not set")
     request = urllib.request.Request(KEY_URL, headers={
-        "Authorization": f"Bearer {key}", "User-Agent": "megazword/0.1.0b1"})
+        "Authorization": f"Bearer {key}", "User-Agent": f"megazword/{__version__}"})
     with urllib.request.urlopen(request, timeout=15) as response:
         data = json.load(response).get("data", {})
     return float(data["usage_monthly"])

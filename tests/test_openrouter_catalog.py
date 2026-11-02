@@ -43,9 +43,10 @@ def test_free_models_cli_fetches_public_catalog_and_formats_result(monkeypatch, 
     output = capsys.readouterr().out
     assert "a:free" in output and "32,768 tokens" in output
     assert "Catalog only" in output
+    from megazword import __version__
     assert observed == {"url": openrouter_catalog.CATALOG_URL,
                         "timeout": openrouter_catalog.TIMEOUT_SECONDS,
-                        "ua": "megazword/0.1.0b1"}
+                        "ua": f"megazword/{__version__}"}
 
 
 def test_catalog_failure_is_reported_without_traceback(monkeypatch, capsys):

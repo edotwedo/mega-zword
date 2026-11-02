@@ -8,6 +8,8 @@ import sys
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from . import __version__
+
 
 CATALOG_URL = "https://openrouter.ai/api/v1/models"
 TIMEOUT_SECONDS = 15
@@ -44,7 +46,7 @@ def free_tool_models(payload: dict) -> list[dict]:
 
 
 def fetch_catalog() -> dict:
-    request = Request(CATALOG_URL, headers={"User-Agent": "megazword/0.1.0b1"})
+    request = Request(CATALOG_URL, headers={"User-Agent": f"megazword/{__version__}"})
     with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
         return json.load(response)
 
