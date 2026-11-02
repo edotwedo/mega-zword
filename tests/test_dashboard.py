@@ -256,6 +256,15 @@ def test_post_with_token_starts_job(server):
     assert view["done"] and view["out"] == "answer"
 
 
+def test_review_endpoint_starts_job(server):
+    base, app = server
+    resp = json.loads(_post(base + "/api/review", {"base": "origin/main", "count": 2}, app.token).read())
+    job = resp["job"]
+    assert job in app.jobs
+    cmd = app.jobs[job].cmd
+    assert "review" in cmd and "--base" in cmd and "origin/main" in cmd
+
+
 def test_answers_saved_trimmed_and_shown(app):
     from megazword import answers
     for i in range(5):

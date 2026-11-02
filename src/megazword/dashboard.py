@@ -399,6 +399,19 @@ class App:
             args += ["-m", model]
         return self._start("retry: " + (model or "stronger AI"), args)
 
+    def review(self, body: dict) -> dict:
+        base = str(body.get("base", "")).strip()
+        count = int(body.get("count") or 2)
+        count = max(1, min(count, 5))
+        greptile = bool(body.get("greptile", False))
+        args = ["review", "-n", str(count)]
+        if base:
+            args += ["--base", base]
+        if greptile:
+            args.append("--greptile")
+        label = f"review: {base or 'HEAD'} ({count} AI{'s' if count > 1 else ''})"
+        return self._start(label, args)
+
     def cancel(self, body: dict) -> dict:
         job = self.jobs.get(str(body.get("job", "")))
         if job is None:
@@ -663,7 +676,8 @@ def make_handler(app: App, port: int, remote: bool = False):
                           "/api/workers/send": app.worker_send,
                           "/api/room/start": app.room_start,
                           "/api/room/pause": app.room_pause,
-                          "/api/room/stop": app.room_stop}.get(self.path)
+                          "/api/room/stop": app.room_stop,
+                          "/api/review": app.review}.get(self.path)
                 if action is None:
                     return self._json(404, {"error": "not found"})
                 return self._json(200, action(body))

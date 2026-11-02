@@ -3,41 +3,61 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#111918">
+<meta name="theme-color" content="#141311">
 <title>Mega Zword</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b1010'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-family='Segoe UI,Arial,sans-serif' font-size='30' font-weight='800' fill='%2372f0a5'%3EMZ%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23181614' stroke='%234a433a' stroke-width='2'/%3E%3Crect x='6' y='6' width='52' height='52' rx='8' fill='%23121110'/%3E%3Ccircle cx='50' cy='14' r='3' fill='%2322c55e'/%3E%3Cpath d='M16 44V20l9 12 9-12v24M38 20h12l-12 24h12' fill='none' stroke='%2322c55e' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root {
   color-scheme: dark;
-  --bg: #0b1010; --panel: #111918; --line: #71827a; --text: #edf3ef; --dim: #a5b5ad;
-  --accent: #72f0a5; --ok: #72f0a5; --warn: #ffd166; --bad: #ff8585; --info: #8dc8ff;
-  --claude: #f0a181; --codex: #8bdcff; --grok: #c6b4ff; --local: #b7e88b;
-  --field: #0a1210; --button: #192420; --inset: #080e0c;
-  --on-accent: #092115; --on-bad: #280909;
-  --mono: "Cascadia Code", Consolas, ui-monospace, monospace;
+  --bg: #141210;
+  --panel: #1e1b18;
+  --panel-card: #26221e;
+  --line: #82776a;
+  --line-strong: #9e9384;
+  --text: #f5ede2;
+  --dim: #b8aca0;
+  --accent: #62f098;
+  --ok: #62f098;
+  --warn: #ffd166;
+  --bad: #ff8a8a;
+  --info: #8dc8ff;
+  --claude: #f0a181;
+  --codex: #8bdcff;
+  --grok: #c8b8ff;
+  --local: #b8e88c;
+  --field: #141210;
+  --button: #26221e;
+  --inset: #100f0d;
+  --on-accent: #092115;
+  --on-bad: #280909;
+  --mono: "Cascadia Code", Consolas, "JetBrains Mono", ui-monospace, monospace;
   --radius: 8px;
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; background: radial-gradient(ellipse at 45% -30%, #20332c 0, transparent 52%), var(--bg);
-  color: var(--text); font: 15px/1.5 "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; }
+body { margin: 0; background: radial-gradient(ellipse at 50% -20%, #2b251e 0, transparent 55%), var(--bg);
+  color: var(--text); font: 14.5px/1.5 "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; }
 button, select, input, textarea { font: inherit; color: var(--text); background: var(--field);
   border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 11px; }
 .shell { min-height: 100vh; display: grid; grid-template-columns: 224px minmax(0, 1fr); }
-.sidebar { position: sticky; top: 0; height: 100vh; padding: 20px 12px; display: flex; flex-direction: column;
-  gap: 22px; background: color-mix(in srgb, var(--panel) 82%, transparent);
-  border-right: 1px solid var(--line); backdrop-filter: blur(22px); }
-.brand { display: flex; align-items: center; gap: 11px; padding: 2px 9px; color: var(--text); text-decoration: none; }
-.brand-mark { font: 800 14px/1 var(--mono); letter-spacing: -1px; color: var(--accent); }
-.brand-name { font-size: 14px; font-weight: 750; letter-spacing: .12em; }
+.sidebar { position: sticky; top: 0; height: 100vh; padding: 18px 12px; display: flex; flex-direction: column;
+  gap: 18px; background: var(--panel); border-right: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px; color: var(--text); text-decoration: none; }
+.brand-badge { display: inline-flex; align-items: center; justify-content: center; position: relative;
+  width: 28px; height: 28px; background: #181614; border: 1px solid var(--line); border-radius: 6px;
+  font: 800 12px/1 var(--mono); color: var(--accent); letter-spacing: -0.5px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 4px rgba(0,0,0,0.3); }
+.brand-badge::after { content: ''; position: absolute; top: 3px; right: 3px; width: 4px; height: 4px;
+  border-radius: 50%; background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+.brand-name { font-size: 13.5px; font-weight: 750; letter-spacing: .12em; color: var(--text); }
 .side-label { margin: 0 10px 4px; color: var(--dim); font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
-.tab-strip { display: grid; gap: 5px; }
+.tab-strip { display: grid; gap: 4px; }
 .sidebar, .sidebar > div { min-width: 0; }
-.nav-tab { min-height: 42px; display: flex; align-items: center; gap: 11px; padding: 8px 11px;
+.nav-tab { min-height: 38px; display: flex; align-items: center; gap: 10px; padding: 7px 10px;
   width:100%; border: 1px solid transparent; border-radius: var(--radius); color: var(--dim);
-  background:transparent; text-align:left; text-decoration: none; min-width: 0; overflow: hidden; }
-.nav-tab:hover { background: var(--button); color: var(--text); }
-.nav-tab[aria-pressed="true"] { color: var(--text); background: #1a2922; border-color: #3a6250; }
+  background:transparent; text-align:left; text-decoration: none; min-width: 0; overflow: hidden; font-size: 13.5px; }
+.nav-tab:hover { background: var(--button); color: var(--text); border-color: var(--line); }
+.nav-tab[aria-pressed="true"] { color: #fff; background: var(--button); border-color: var(--line-strong); border-left: 3px solid var(--accent); }
 .nav-icon { width: 18px; text-align: center; font: 600 14px var(--mono); }
 .side-status { margin-top: auto; color: var(--dim); font-size: 12px; padding: 10px; border-top: 1px solid var(--line); }
 .live-dot { color: var(--accent); font: 700 11px var(--mono); }
@@ -201,21 +221,16 @@ main[hidden], #hive[hidden] { display:none; }
 #brief-dialog::backdrop { background:#0009; }
 #brief-text { margin-top:16px; }
 /* Console workspace: one transcript, then one prompt. */
-:root {
-  --bg:#050906; --panel:#080e0a; --inset:#050906; --field:#080e0a;
-  --text:#c1e6cb; --dim:#8eae99; --accent:#80eaa1; --ok:#80eaa1;
-  --line:#587b62; --button:#101e15; --radius:3px;
-}
-body { background:var(--bg); font-family:var(--mono); }
-.sidebar, header { background:var(--panel); backdrop-filter:none; }
-section { box-shadow:none; }
-.console { background:var(--bg); border:0; padding:0; }
-.console h2 { color:var(--accent); font:600 13px var(--mono); text-transform:none; letter-spacing:0; }
+.sidebar, header { background:var(--panel); }
+section { box-shadow:0 4px 16px rgba(0,0,0,0.25); }
+.console { background:transparent; border:0; padding:0; box-shadow:none; }
+.console h2 { color:var(--accent); font:700 13px var(--mono); text-transform:uppercase; letter-spacing:0.05em; }
 .console-transcript, .console .room-messages {
   height:clamp(260px, 48vh, 680px); max-height:none; min-height:0;
-  overflow:auto; scrollbar-color:#355c41 var(--bg); scrollbar-gutter:stable;
-  border:0; border-bottom:1px solid var(--line); border-radius:0;
-  padding:12px 0; margin:0 0 14px; overflow-wrap:anywhere;
+  overflow:auto; scrollbar-color:#4a4339 var(--inset); scrollbar-gutter:stable;
+  border:1px solid var(--line); border-radius:var(--radius);
+  background:var(--inset);
+  padding:14px 16px; margin:0 0 14px; overflow-wrap:anywhere;
 }
 #jobs:empty::before { content:"Ready. What are we working on?"; color:var(--dim); }
 .console .job { background:transparent; border:0; border-bottom:1px solid var(--line);
@@ -225,8 +240,9 @@ section { box-shadow:none; }
 .console .ans pre { padding:30px 0 0; }
 .console .room-message { border:0; padding:12px 0; white-space:pre-wrap; }
 .console .room-message b { color:var(--accent); }
-.console textarea { min-height:76px; max-height:240px; border:0; border-left:2px solid var(--accent);
-  border-radius:0; background:var(--field); padding:12px 14px; font:14px/1.6 var(--mono); }
+.console textarea { min-height:76px; max-height:240px; border:1px solid var(--line);
+  border-left:3px solid var(--accent); border-radius:var(--radius); background:var(--field);
+  padding:12px 14px; font:14px/1.6 var(--mono); color:var(--text); }
 .console .prompt-label { margin-bottom:8px; }
 .console-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .console-toolbar .go { margin-left:auto; }
@@ -247,14 +263,15 @@ section { box-shadow:none; }
 </head>
 <body>
 <div class="app-titlebar" id="app-titlebar" hidden>
-  <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="8" fill="#72f0a5"/><path d="M5 22V10l5 6 5-6v12M18 10h9l-9 12h9" fill="none" stroke="#092115" stroke-width="2.5" stroke-linejoin="round"/></svg>
+  <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="6" fill="#141311" stroke="#3d3730" stroke-width="1.5"/><circle cx="26" cy="6" r="2" fill="#22c55e"/><path d="M7 23V9l5.5 7.5L18 9v14M20 9h6l-6 14h6" fill="none" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   <strong>MEGA ZWORD</strong><span id="app-caption">Home</span>
 </div>
 <div class="shell">
 <aside class="sidebar" aria-label="Workspace sidebar">
-  <div class="sidebar-head"><a class="brand" href="#home" aria-label="Mega Zword Home"><span class="brand-mark">[MZ]</span><span class="brand-name">MEGA ZWORD</span></a></div>
+  <div class="sidebar-head"><a class="brand" href="#home" aria-label="Mega Zword Home"><span class="brand-badge" aria-hidden="true">[MZ]</span><span class="brand-name">MEGA ZWORD</span></a></div>
   <div><p class="side-label">Workspace</p><nav class="tab-strip" aria-label="Workspace tabs">
     <button class="nav-tab" id="tab-home" type="button" aria-pressed="true" data-view="home"><span class="nav-icon" aria-hidden="true">⌂</span>Home</button>
+    <button class="nav-tab" id="tab-review" type="button" aria-pressed="false" data-view="review"><span class="nav-icon" aria-hidden="true">✓</span>Code Review</button>
     <button class="nav-tab" id="tab-hive" type="button" aria-pressed="false" data-view="hive"><span class="nav-icon" aria-hidden="true">◇</span>Hive</button>
     <button class="nav-tab" id="tab-setup" type="button" aria-pressed="false" data-view="setup"><span class="nav-icon" aria-hidden="true">⚙</span>Setup</button>
   </nav></div>
@@ -362,6 +379,45 @@ section { box-shadow:none; }
   <p><button class="nav-tab" type="button" id="setup-init" hidden>Create the starting config</button></p>
   <div id="setup-checks"></div>
   <p class="side-label" id="setup-config-path"></p>
+</div>
+
+<div id="review-view" class="hive-view" role="region" aria-labelledby="review-title" hidden>
+  <section class="wide console">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px;">
+      <h2 id="review-title" style="margin:0;">Code Review · Multi-AI Diff Audit</h2>
+      <span class="note">Instant parallel review across independent models. Fast, non-blocking developer sanity checks.</span>
+    </div>
+    
+    <div style="margin:16px 0; padding:14px; background:var(--panel-card); border:1px solid var(--line); border-radius:var(--radius); display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+      <label style="flex:1 1 220px; display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--dim);">
+        Base Git Reference (leave blank for uncommitted changes / last commit)
+        <input id="review-base" placeholder="origin/main...HEAD or commit hash" style="font-family:var(--mono); font-size:13px;">
+      </label>
+      <label style="display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--dim);">
+        Parallel Reviewers
+        <select id="review-count">
+          <option value="1">1 reviewer (fast check)</option>
+          <option value="2" selected>2 reviewers (consensus)</option>
+          <option value="3">3 reviewers (deep audit)</option>
+        </select>
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--dim); padding-bottom:6px;">
+        <input type="checkbox" id="review-greptile"> Include Greptile PR
+      </label>
+      <button id="review-run-btn" class="go" type="button" style="padding:8px 18px;">Run Review ⚡</button>
+    </div>
+
+    <div id="review-status" class="note" role="status" style="margin-bottom:12px; font-weight:500;">Ready to review changes.</div>
+
+    <div id="review-summary" style="display:none; margin-bottom:14px; padding:12px 14px; background:var(--inset); border:1px solid var(--line); border-radius:var(--radius); border-left:3px solid var(--accent);">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <strong id="review-summary-title" style="font-size:14px;">Findings Summary</strong>
+        <span id="review-summary-stats" class="note"></span>
+      </div>
+    </div>
+
+    <div id="review-findings" class="review-results" style="display:grid; gap:8px;"></div>
+  </section>
 </div>
 
 <div id="hive" class="hive-view" role="region" aria-labelledby="hive-title" hidden>
@@ -943,10 +999,12 @@ async function load(refresh) {
     $("build-info").textContent = state.build ? `Build ${state.build}` : "Older server";
     renderProjects(state);
     setChatTabs(state.tabs); renderChatAis();
-    if (!load.opened) {  // deep link on first load: #hive or #tab-t1
+    if (!load.opened) {  // deep link on first load: #hive or #tab-t1 or #review
       load.opened = true;
       const h = location.hash || "";
-      if (h === "#hive") setView("hive"); else if (h.startsWith("#tab-")) setView("tab:" + h.slice(5));
+      if (h === "#hive") setView("hive");
+      else if (h === "#review") setView("review");
+      else if (h.startsWith("#tab-")) setView("tab:" + h.slice(5));
     }
     updateWindowTitle();
   } catch { $("meta").textContent = "dashboard server stopped"; return; }
@@ -1026,13 +1084,16 @@ function setView(view) {
   if (previous !== view) $("chat-input").value = view.startsWith("tab:") ? chatDrafts.get(view.slice(4)) || "" : "";
   const hive = view === "hive";
   const setup = view === "setup";
+  const review = view === "review";
   $("home-view").hidden = view !== "home";
   $("hive").hidden = !hive;
   $("setup").hidden = !setup;
+  $("review-view").hidden = !review;
   $("chat").hidden = !tab;
-  $("view-title").textContent = setup ? "Setup" : hive ? "Hive" : tab ? tab.title : "Home";
+  $("view-title").textContent = setup ? "Setup" : hive ? "Hive" : review ? "Code Review" : tab ? tab.title : "Home";
   updateWindowTitle();
   $("tab-home").setAttribute("aria-pressed", String(view === "home"));
+  $("tab-review").setAttribute("aria-pressed", String(review));
   $("tab-hive").setAttribute("aria-pressed", String(hive));
   $("tab-setup").setAttribute("aria-pressed", String(setup));
   if (setup) renderSetup();
@@ -1139,8 +1200,120 @@ async function roomAction(path, body = {}) {
 }
 
 $("tab-home").onclick = () => setView("home");
+$("tab-review").onclick = () => setView("review");
 $("tab-hive").onclick = () => setView("hive");
 $("tab-setup").onclick = () => setView("setup");
+
+// Code Review tab logic
+let currentReviewJob = null;
+async function watchReview(id) {
+  currentReviewJob = id;
+  const statusEl = $("review-status");
+  const runBtn = $("review-run-btn");
+  while (true) {
+    try {
+      const j = await (await fetch("/api/job/" + id)).json();
+      const lastLine = (j.err || "").trim().split("\n").filter(Boolean).slice(-1)[0] || "Reviewing...";
+      if (!j.done) {
+        statusEl.innerHTML = `<span class="spin"></span> ${esc(lastLine)}`;
+      } else {
+        runBtn.disabled = false;
+        renderReviewResult(j);
+        break;
+      }
+    } catch (e) {
+      statusEl.textContent = "Error watching review: " + e.message;
+      runBtn.disabled = false;
+      break;
+    }
+    await new Promise(r => setTimeout(r, 800));
+  }
+}
+
+function renderReviewResult(j) {
+  const statusEl = $("review-status");
+  const summaryBox = $("review-summary");
+  const findingsEl = $("review-findings");
+  
+  const text = (j.out || j.err || "").trim();
+  const lines = text.split("\n");
+  
+  const findingRegex = /^(HIGH|MEDIUM|MED|LOW)\s+([^:]+):(\d+):\s+(.+)$/i;
+  const findings = [];
+  
+  for (const line of lines) {
+    const m = line.trim().match(findingRegex);
+    if (m) {
+      findings.push({
+        severity: m[1].toUpperCase() === "MED" ? "MEDIUM" : m[1].toUpperCase(),
+        path: m[2],
+        line: m[3],
+        text: m[4]
+      });
+    }
+  }
+
+  summaryBox.style.display = "block";
+  statusEl.textContent = j.code === 0 ? "Review complete." : "Review finished with notices.";
+
+  if (findings.length > 0) {
+    const high = findings.filter(f => f.severity === "HIGH").length;
+    const med = findings.filter(f => f.severity === "MEDIUM").length;
+    const low = findings.filter(f => f.severity === "LOW").length;
+    $("review-summary-title").textContent = `${findings.length} Finding${findings.length > 1 ? "s" : ""} Identified`;
+    $("review-summary-stats").innerHTML = `${high ? `<span class="badge" style="background:#3b1414;color:#ef4444;border-color:#ef4444">${high} HIGH</span> ` : ""}${med ? `<span class="badge" style="background:#3b2d14;color:#f59e0b;border-color:#f59e0b">${med} MED</span> ` : ""}${low ? `<span class="badge" style="background:#262320;color:#d6cfc5;border-color:#574f45">${low} LOW</span>` : ""}`;
+    
+    findingsEl.innerHTML = findings.map(f => {
+      const badgeStyle = f.severity === "HIGH" 
+        ? "background:#3b1414;color:#ef4444;border-color:#ef4444" 
+        : f.severity === "MEDIUM" 
+        ? "background:#3b2d14;color:#f59e0b;border-color:#f59e0b" 
+        : "background:#262320;color:#d6cfc5;border-color:#574f45";
+      return `<div style="padding:12px; background:var(--panel-card); border:1px solid var(--line); border-radius:var(--radius); display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="badge" style="${badgeStyle}; font-weight:700; font-size:11px;">${esc(f.severity)}</span>
+          <code style="color:var(--text); font-weight:600;">${esc(f.path)}:${esc(f.line)}</code>
+        </div>
+        <div style="color:var(--text); font-size:13.5px; line-height:1.4;">${esc(f.text)}</div>
+      </div>`;
+    }).join("");
+  } else {
+    $("review-summary-title").textContent = "No Blocking Issues";
+    $("review-summary-stats").innerHTML = `<span class="badge" style="background:#142e1d;color:#22c55e;border-color:#22c55e">CLEAN</span>`;
+    findingsEl.innerHTML = `<div style="padding:16px; background:var(--panel-card); border:1px solid var(--line); border-radius:var(--radius); color:var(--ok); font-weight:600;">✓ Review finished: No high or agreed blocking issues found in this diff.</div>`;
+  }
+
+  const rawBox = document.createElement("details");
+  rawBox.style.cssText = "margin-top:12px; color:var(--dim); font-size:12.5px;";
+  rawBox.innerHTML = `<summary style="cursor:pointer; padding:6px 0;">View raw reviewer output</summary>
+    <pre style="margin-top:8px; padding:12px; background:var(--inset); border:1px solid var(--line); border-radius:var(--radius); max-height:400px; overflow:auto; font-size:13px;">${esc(text)}</pre>`;
+  findingsEl.appendChild(rawBox);
+}
+
+$("review-run-btn").onclick = async () => {
+  const btn = $("review-run-btn");
+  btn.disabled = true;
+  $("review-status").innerHTML = '<span class="spin"></span> Launching parallel reviewers…';
+  $("review-findings").innerHTML = "";
+  $("review-summary").style.display = "none";
+  try {
+    const res = await post("/api/review", {
+      base: $("review-base").value.trim(),
+      count: parseInt($("review-count").value, 10) || 2,
+      greptile: $("review-greptile").checked
+    });
+    if (res.job) {
+      $("review-status").innerHTML = `<span class="spin"></span> Running review (${esc(res.job)})…`;
+      watchReview(res.job);
+    } else {
+      $("review-status").textContent = res.error || "Failed to start review.";
+      btn.disabled = false;
+    }
+  } catch (err) {
+    $("review-status").textContent = "Error: " + err.message;
+    btn.disabled = false;
+  }
+};
 
 // Setup, in the dashboard: the same doctor checks the CLI prints, plus the one
 // action a new install needs. Setup used to mean a terminal, which is the worst
