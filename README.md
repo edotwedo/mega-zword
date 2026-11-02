@@ -16,41 +16,49 @@
 - **Universal Terminal Chat:** Jump straight into interactive chat with any model from your command line (`megazword chat`).
 - **Parallel Multi-AI Code Review:** Run `git diff` and let three different AI models review your changes side-by-side before you commit (`megazword review`).
 - **Smart Prompt Routing:** Run `megazword run "explain this bug"` and let the engine automatically choose the right model based on task difficulty.
-- **Local Web Dashboard:** Launch a real-time browser telemetry dashboard showing your token usage, latency, and run history (`megazword dashboard`).
+- **Native Desktop App & Dashboard:** Run it as a standalone Windows desktop app window with its own taskbar icon (`megazword` or double-click the desktop shortcut), complete with live meters and run boxes.
 - **Free-First Architecture:** Automatically prioritizes free developer tiers (Google AI Studio, Groq, Ollama) before touching paid API credits.
 
 ---
 
 ## 🚀 3-Minute Quickstart
 
-### 1. Clone & Set Up Virtual Environment
-
-```bash
+### On Windows (Recommended)
+Open PowerShell and run:
+```powershell
 # Clone Brennan's branch
 git clone -b brennans-branch https://github.com/edotwedo/mega-zword.git
 cd mega-zword
 
-# Create and activate a Python virtual environment (Python 3.11+)
-python3 -m venv .venv
-source .venv/bin/activate       # On Linux/macOS
-# .venv\Scripts\activate       # On Windows
+# Run the installer with desktop app shortcut
+.\scripts\install.ps1 -Shortcut
+```
+> **Tip:** The `-Shortcut` flag drops a **Mega Zword** app icon right on your Windows Desktop and Start Menu. Double-clicking it opens the native desktop app window!
 
-# Install in editable mode
+---
+
+### On Linux / macOS
+```bash
+git clone -b brennans-branch https://github.com/edotwedo/mega-zword.git
+cd mega-zword
+
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
 ```
 
-### 2. Run Diagnostics
-Check which AI tools and keys are already available on your machine:
+### Check Your Setup
+Run diagnostics to see what models and tools are detected:
 ```bash
 megazword doctor
 ```
 
-### 3. Configure Your Keys (Optional)
-Copy the example environment template:
+### Configure Your Keys (Optional)
+Copy the example environment template and add whatever keys you want to use:
 ```bash
 cp .env.example .env
 ```
-Add any API keys you want to use (OpenRouter, Google AI Studio, Groq). If you have **Ollama** running locally, Mega Zword detects it automatically with zero configuration.
+*(If you run **Ollama** locally, Mega Zword detects it automatically with zero configuration).*
 
 ---
 
