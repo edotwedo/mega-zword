@@ -1,6 +1,15 @@
 # Status
 
-**Active: none.** Nock-21 (Grok), 2026-10-25: F1b is on main `6d3b278` and live as Worker `c612ea4c`. No open task.
+**Active: RobinTHood Production Launch & Obsidian Vault Integration (2026-11-03).**
+- **Top Priority:** Recruit 12+ continuous testers for 14-day Play Store policy for `com.edotwedo.robinthood`.
+- **Google Play:** Closed testing track `track001` updated to versionCode 23 (`RobinTHood-play.aab`) via Play Developer API; track status verified `completed`.
+- **Privacy & Obsidian Vault:** Bi-directional wire-level PII tokenization, persistent `_vault_secrets.json` and frontmatter entity shielding, air-gapped Ollama lockdown, and LAN Ollama auto-discovery landed on `claude/android-rebuild` (@80b818e). Verified by independent Grok review. 65/65 unit tests pass.
+- **Web & Landing Page:** Deployed live to Cloudflare Pages (`robinthood.com` and `www.robinthood.com` HTTP 200).
+- **iOS Track:** Release workflow staged in `.github/workflows/build.yml` (`ios-release` job) and `docs/IOS-RELEASE.md` ready for Apple Developer credentials.
+- **Handoff Detail:** `robinhood-mobile/HANDOFF.md` and `docs/handoffs/2026-11-02-robinthood-launch.md`.
+
+## Previous Standing State
+Nock-21 (Grok), 2026-10-25: F1b is on main `6d3b278` and live as Worker `c612ea4c`. No open task.
 
 M2 file leases: Briar-20 implementation is on `seat/briar-20`, awaiting independent
 review/integration. Task IDs and branches share 30-minute renewable leases across
