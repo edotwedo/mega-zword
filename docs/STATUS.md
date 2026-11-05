@@ -3,7 +3,7 @@
 **Active: RobinTHood Production Launch & Obsidian Vault Integration (2026-11-05).**
 - **Top Priority:** Closed testing for 14-day Play Store policy underway on `track001` with 102 vetted testers uploaded (`com.edotwedo.robinthood`).
 - **Google Play:** Closed testing track `track001` updated to versionCode 25 (`v0.8.6`) with R8 minification, DEX optimization, and resource shrinking active; status verified `completed`. Runner workspace on Donna's PC migrated to C: NVMe SSD.
-- **Store Listings & App Store Prep:** Lane 4 completed in PR #31 (`STORE-LISTINGS-ALL-LANGUAGES.md` with Play Store listings in 8 languages, App Store draft, Apple privacy nutrition labels).
+- **Store Listings & App Store Prep:** Lane 4 landed on `claude/android-rebuild` (@4d24223) containing `STORE-LISTINGS-ALL-LANGUAGES.md` with Play Store listings in 8 languages, App Store draft, and Apple privacy nutrition labels (re-verified by Paul-53).
 - **Privacy & Obsidian Vault:** Bi-directional wire-level PII tokenization, persistent `_vault_secrets.json` and frontmatter entity shielding, air-gapped Ollama lockdown, and LAN Ollama auto-discovery landed on `claude/android-rebuild`. 65/65 unit tests pass.
 - **Web & Landing Page:** Deployed live to Cloudflare Pages (`robinthood.com` and `www.robinthood.com` HTTP 200) with honest privacy disclosures.
 - **iOS Track:** Release workflow staged in `.github/workflows/build.yml` (`ios-release` job) and `docs/IOS-RELEASE.md` ready for Apple Developer credentials.
