@@ -140,13 +140,17 @@ def test_hook_skips_docs_only_push(tmp_path):
                                     check=True, capture_output=True).stdout
         (home / "rules-approval.json").write_text(json.dumps(
             {"sha256": hashlib.sha256(rules_blob).hexdigest(), "ballot": "TEST"}), encoding="utf-8")
+        # Bytes, not text: text mode on Windows sends CRLF, the hook reads "sha\r", the diff
+        # fails, and the hook runs the whole suite from inside the suite (hung CI 2026-11-08).
+        # The timeout turns any future fall-through into a failure instead of a hang.
         proc = subprocess.run([SH, str(HOOK)],
-                              input=f"refs/heads/main {head} refs/heads/main {base}\n",
-                              capture_output=True, text=True, cwd=wt,
+                              input=f"refs/heads/main {head} refs/heads/main {base}\n".encode(),
+                              capture_output=True, cwd=wt, timeout=120,
                               env={**os.environ, "MEGAZWORD_HOME": str(home)})
-        assert proc.returncode == 0, proc.stdout + proc.stderr
-        assert "docs-only push" in proc.stdout
-        assert "running the suite" not in proc.stdout
+        out = proc.stdout.decode(errors="replace")
+        assert proc.returncode == 0, out + proc.stderr.decode(errors="replace")
+        assert "docs-only push" in out
+        assert "running the suite" not in out
     finally:
         git("worktree", "remove", "--force", str(wt))
 
