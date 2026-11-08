@@ -5,6 +5,8 @@ front door red. These cover the gate's decision, the git wiring, and the hook
 file itself (a CRLF shebang would silently break it under sh).
 """
 
+import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -112,13 +114,41 @@ def test_hook_skips_a_delete_only_push():
 
 
 @pytest.mark.skipif(SH is None, reason="needs sh (Git Bash) on PATH")
-def test_hook_skips_docs_only_push():
-    proc = subprocess.run([SH, str(HOOK)],
-                          input="refs/heads/main 0a7e7b5 refs/heads/main 0a7e7b5~1\n",
-                          capture_output=True, text=True, cwd=ROOT)
-    assert proc.returncode == 0
-    assert "docs-only push" in proc.stdout
-    assert "running the suite" not in proc.stdout
+def test_hook_skips_docs_only_push(tmp_path):
+    """The hook is run against a docs-only commit made here, in a throwaway worktree.
+    The first version pinned commit 0a7e7b5, which a CI checkout (depth 1) does not have,
+    and ran in the real checkout, where the hook rewrote docs/MEMORY-INDEX.md and hid a
+    stale committed index from test_memory_index (2026-11-08)."""
+    def git(*args, cwd=ROOT):
+        return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True,
+                              text=True).stdout.strip()
+    base = git("rev-parse", "HEAD")
+    wt = tmp_path / "wt"
+    git("worktree", "add", "--detach", str(wt), base)
+    try:
+        readme = wt / "README.md"
+        readme.write_text(readme.read_text(encoding="utf-8") + "\nhook probe\n", encoding="utf-8")
+        git("-c", "user.name=test", "-c", "user.email=test@example.invalid",
+            "commit", "-qam", "docs probe", cwd=wt)
+        head = git("rev-parse", "HEAD", cwd=wt)
+        # The hook also runs the rules check, which needs a recorded ballot. A runner has none,
+        # so hand it an approval for the rules exactly as committed; this test is about the
+        # docs-only shortcut, and test_rules covers the check itself.
+        home = tmp_path / "home"
+        home.mkdir()
+        rules_blob = subprocess.run(["git", "show", "HEAD:docs/SYSTEM-DRAFT.md"], cwd=wt,
+                                    check=True, capture_output=True).stdout
+        (home / "rules-approval.json").write_text(json.dumps(
+            {"sha256": hashlib.sha256(rules_blob).hexdigest(), "ballot": "TEST"}), encoding="utf-8")
+        proc = subprocess.run([SH, str(HOOK)],
+                              input=f"refs/heads/main {head} refs/heads/main {base}\n",
+                              capture_output=True, text=True, cwd=wt,
+                              env={**os.environ, "MEGAZWORD_HOME": str(home)})
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert "docs-only push" in proc.stdout
+        assert "running the suite" not in proc.stdout
+    finally:
+        git("worktree", "remove", "--force", str(wt))
 
 
 def test_hook_does_not_shortcut_a_real_push():

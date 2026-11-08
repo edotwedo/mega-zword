@@ -1,7 +1,10 @@
 """B6b desktop window: pywebview is faked, so no real window ever opens."""
 
 import struct
+import sys
 import urllib.request
+
+import pytest
 
 from megazword import config, dashboard, desktop
 
@@ -188,6 +191,7 @@ def test_broken_desktop_window_falls_back_to_the_browser_window(tmp_path, monkey
     assert "desktop window failed (RuntimeError: WebView2 runtime not found)" in capsys.readouterr().err
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="the Linux launcher path; Windows always gets the Start menu link")
 def test_shortcut_linux_path_and_install(tmp_path):
     env = {"XDG_DATA_HOME": str(tmp_path)}
     link = desktop.shortcut_path(env)
