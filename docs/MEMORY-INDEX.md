@@ -31,6 +31,7 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/LANDING-PAGE.md` | 6.1 kB | when the task touches the public page |
 | `docs/LINUX-TIMERS.md` | 3.9 kB | when your task names it, or changes what it describes |
 | `docs/OPEN-BRANCHES.md` | 3.8 kB | when your task names it, or changes what it describes |
+| `docs/PATCHBAY.md` | 2.9 kB | when your task names it, or changes what it describes |
 | `docs/PHIL-SETUP-MAP.md` | 3.7 kB | when setting up Phil's machine or the launchers |
 | `docs/PHONE-DOLPHIN.md` | 4.9 kB | when your task names it, or changes what it describes |
 | `docs/PLAN-hermes-execution.md` | 15.7 kB | when your task names it, or changes what it describes |
@@ -47,6 +48,5 @@ task - loading everything is what this index exists to stop. Archives are greppe
 | `docs/ROADMAP.md` | 7.8 kB | when choosing what to build next |
 | `docs/ROUTING_RESEARCH.md` | 8.9 kB | when the task is model routing |
 | `docs/TASKS.md` | 1.9 kB | when your task names it, or changes what it describes |
-| `docs/TODO.md` | 6.5 kB | when your task names it, or changes what it describes |
 | `docs/WORKFLOW.md` | 2.0 kB | when your task names it, or changes what it describes |
 | `docs/untappedgold.md` | 3.9 kB | when your task names it, or changes what it describes |

@@ -188,6 +188,8 @@ class App:
         self._job_projects: dict[str, str] = {}
         self._jobs_lock = threading.Lock()
         self._n = 0
+        from .patchbay import PatchBay
+        self.patchbay = PatchBay(config.HOME, self.patchbay_send)
         self._room_thread: threading.Thread | None = None
         self._room_lock = threading.RLock()
         self._room_session: tuple[str, str] | None = None  # (room, session id) started here
@@ -482,6 +484,62 @@ class App:
                          lambda p: rate(p, self.cfg.rater_model),
                          cli.plan_statuses, bool(body.get("context")))
 
+    def patchbay_send(self, node, prompt):
+        provider = node["provider"]
+        account = "cmdc" if provider.startswith("cmdc-") else provider
+        if provider in self.cfg.out_now() or account in self.cfg.out_now():
+            raise ValueError("Provider is marked out; choose another connected agent")
+        for meter in self.usage.get():
+            if meter.get("service") != account:
+                continue
+            for window in meter.get("windows", []):
+                name = window["name"]
+                floor = 90 if name == "5-hour" else 95 if name.startswith("weekly") else 100
+                if window["used"] >= floor:
+                    raise ValueError(f"Shared {name} allowance reached its stop threshold")
+        result = self.tabs_send({"id": node["tab_id"], "prompt": prompt})
+        if not result.get("ok"):
+            raise ValueError(result.get("error") or "Agent turn failed")
+        return result["answer"]
+
+    def patchbay_view(self):
+        return {**self.patchbay.view(), "usage": self.usage.get(), "providers": [name for name, backend in self.backends.items()
+                                                      if backend.available()],
+                "project": self.project, "working_folder": str(Path.cwd().resolve())}
+
+    def patchbay_add(self, body):
+        if body.get("kind") == "agent":
+            provider = str(body.get("provider", ""))
+            if provider not in self.backends or not self.backends[provider].available():
+                raise ValueError("Choose an installed, configured provider")
+            tab = tabs.create(provider, self.project, str(body.get("title", "Agent")), self.backends)
+            try:
+                return self.patchbay.add({**body, "tab_id": tab["id"]})
+            except Exception:
+                tabs.close(tab["id"])
+                raise
+        return self.patchbay.add(body)
+
+    def patchbay_action(self, body):
+        action = body.get("action")
+        if action == "add":
+            return self.patchbay_add(body)
+        if action == "move":
+            return self.patchbay.move(body)
+        if action == "connect":
+            return self.patchbay.connect(body["source"], body["target"])
+        if action == "remove":
+            return self.patchbay.remove(body)
+        if action == "start":
+            return self.patchbay.start(body["target"], body.get("prompt", ""), body.get("budget", 4))
+        if action in ("pause", "resume", "discard"):
+            return self.patchbay.control(action)
+        if action == "preview":
+            return self.patchbay.preview(body["message"])
+        if action == "apply":
+            return self.patchbay.apply(body["message"], body["sha256"])
+        raise ValueError("Unknown patch bay action")
+
     # Hive room API for the B4 tab (Tally-11, 2026-10-12). Turns run in a background
     # thread in this process; Stop sets the room's stop flag, checked before every turn.
     def _room_name(self, value: object) -> str:
@@ -612,8 +670,10 @@ def make_handler(app: App, port: int, remote: bool = False):
             if remote and not self._token_ok(self._given_token()):
                 return self._json(403, {"error": "open the link with ?t=<token> printed by megazword"})
             path = self.path.split("?")[0]
-            if path == "/":
-                body = page(app.token)
+            if path in ("/", "/patchbay"):
+                body = (resources.files("megazword").joinpath("patchbay.html").read_text("utf-8")
+                        .replace("__MZ_TOKEN__", app.token).encode("utf-8")
+                        if path == "/patchbay" else page(app.token))
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
@@ -638,6 +698,8 @@ def make_handler(app: App, port: int, remote: bool = False):
             if path.startswith("/api/job/"):
                 job = app.jobs.get(path.rsplit("/", 1)[-1])
                 return self._json(200, job.view()) if job else self._json(404, {})
+            if path == "/api/patchbay":
+                return self._json(200, app.patchbay_view())
             if path == "/api/tabs":
                 return self._json(200, app.tabs_list())
             if path == "/api/room":
@@ -677,11 +739,12 @@ def make_handler(app: App, port: int, remote: bool = False):
                           "/api/room/start": app.room_start,
                           "/api/room/pause": app.room_pause,
                           "/api/room/stop": app.room_stop,
-                          "/api/review": app.review}.get(self.path)
+                          "/api/review": app.review,
+                          "/api/patchbay": app.patchbay_action}.get(self.path)
                 if action is None:
                     return self._json(404, {"error": "not found"})
                 return self._json(200, action(body))
-            except (ValueError, json.JSONDecodeError) as exc:
+            except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
                 return self._json(400, {"error": str(exc)})
             except OSError:
                 return self._json(500, {"error": "could not complete the action; check local files and executable access"})

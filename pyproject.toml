@@ -31,7 +31,7 @@ megazword = "megazword.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-megazword = ["dashboard.html", "mz.ico"]
+megazword = ["dashboard.html", "patchbay.html", "mz.ico"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
