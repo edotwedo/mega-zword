@@ -135,3 +135,35 @@ def test_shared_account_floor_blocks_provider_alias(tmp_path, monkeypatch):
     monkeypatch.setattr(app, 'tabs_send', lambda *_: pytest.fail('quota floor must stop dispatch'))
     with pytest.raises(ValueError, match='allowance'):
         app.patchbay_send(dict(provider='cmdc-glm', tab_id='fake'), 'hello')
+
+
+def test_http_patchbay_requires_token_for_mutations(tmp_path, monkeypatch):
+    import json
+    import urllib.error
+    import urllib.request
+    from http.server import ThreadingHTTPServer
+    from megazword import config, dashboard
+    monkeypatch.setattr(config, 'HOME', tmp_path)
+    app = dashboard.App(config.Config(), 'test', dashboard.Usage(lambda: []), {})
+    server = ThreadingHTTPServer(('127.0.0.1', 0), dashboard.make_handler(app, 0))
+    # Host validation must use the actual ephemeral port.
+    server.RequestHandlerClass = dashboard.make_handler(app, server.server_port)
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    base = f'http://127.0.0.1:{server.server_port}'
+    try:
+        page = urllib.request.urlopen(base + '/patchbay').read().decode()
+        assert app.token in page and '__MZ_TOKEN__' not in page
+        payload = json.dumps(dict(action='add', kind='hub', title='Document', root=str(tmp_path), file='doc.txt')).encode()
+        req = urllib.request.Request(base + '/api/patchbay', data=payload, headers={'Content-Type': 'application/json'})
+        with pytest.raises(urllib.error.HTTPError) as denied:
+            urllib.request.urlopen(req)
+        assert denied.value.code == 403
+        req.add_header('X-MZ-Token', app.token)
+        hub = json.load(urllib.request.urlopen(req))
+        state = json.load(urllib.request.urlopen(base + '/api/patchbay'))
+        assert state['nodes'][0]['id'] == hub['id']
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(3)

@@ -16,7 +16,7 @@ const node=id=>board.nodes.find(n=>n.id===id);const label=id=>id==='owner'?'You'
 function notice(text){$('notice').textContent=text}
 async function api(body){const r=await fetch('/api/patchbay',{method:'POST',headers:{'Content-Type':'application/json','X-MZ-Token':TOKEN},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw Error(d.error||'Action failed');return d}
 async function act(body){try{const d=await api(body);await refresh();return d}catch(e){notice(e.message);return null}}
-async function refresh(){try{const r=await fetch('/api/patchbay');if(!r.ok)throw Error('Could not load board');board=await r.json();if(!dragging)render();}catch(e){notice(e.message)}}
+async function refresh(){try{const r=await fetch('/api/patchbay',{headers:{'X-MZ-Token':TOKEN}});if(!r.ok)throw Error('Could not load board');board=await r.json();if(!dragging)render();}catch(e){notice(e.message)}}
 function elem(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e}
 function render(){
  $('counts').textContent=`${board.nodes.length} modules / ${board.wires.length} cables`;$('empty').hidden=!!board.nodes.length;
