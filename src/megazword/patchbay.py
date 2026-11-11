@@ -90,6 +90,7 @@ class PatchBay:
                 "x": 80 if kind == "agent" else 760, "y": 90}
         if kind == "agent":
             node.update(tab_id=data["tab_id"], provider=data["provider"],
+                        tab_created=str(data.get("tab_created", "")),
                         role=str(data.get("role", ""))[:4000])
         else:
             root = Path(str(data.get("root", ""))).expanduser().resolve()
@@ -135,11 +136,11 @@ class PatchBay:
             self._editable(db)
             if body.get("wire"):
                 db.execute("DELETE FROM wires WHERE id=?", (body["wire"],))
-            else:
-                node_id = body["id"]
-                db.execute("DELETE FROM wires WHERE source=? OR target=?", (node_id, node_id))
-                db.execute("DELETE FROM nodes WHERE id=?", (node_id,))
-        return {"ok": True}
+                return {"ok": True}
+            node = self._node(db, body["id"])
+            db.execute("DELETE FROM wires WHERE source=? OR target=?", (node["id"], node["id"]))
+            db.execute("DELETE FROM nodes WHERE id=?", (node["id"],))
+        return {"ok": True, "node": node}
 
     @staticmethod
     def file_path(node):
@@ -240,8 +241,10 @@ class PatchBay:
                         db.execute("UPDATE messages SET state='cancelled' WHERE state='queued'")
                         db.execute("UPDATE runs SET state='cancelled' WHERE state IN ('paused','running','pausing','limit')")
                     else:
-                        # Budget is absolute per run: resume never creates free extra turns.
-                        db.execute("UPDATE runs SET state='running' WHERE state IN ('paused','pausing','running') AND used < budget")
+                        # Budget is absolute per run: drain() still refuses an agent turn once
+                        # used == budget (the run goes to 'limit'), but an exhausted run may resume
+                        # so outputs already queued for hubs become reviewable artifacts.
+                        db.execute("UPDATE runs SET state='running' WHERE state IN ('paused','pausing','running')")
             if action == "resume":
                 self._thread = threading.Thread(target=self._work, daemon=True, name="patchbay-delivery")
                 self._thread.start()

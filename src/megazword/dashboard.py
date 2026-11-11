@@ -497,6 +497,12 @@ class App:
                 floor = 90 if name == "5-hour" else 95 if name.startswith("weekly") else 100
                 if window["used"] >= floor:
                     raise ValueError(f"Shared {name} allowance reached its stop threshold")
+        # Tab ids are reused (lowest free tN), so a closed agent tab can come back as a different
+        # conversation, even on another provider. Only send to the exact tab this module created.
+        tab = next((t for t in tabs.list_tabs() if t["id"] == node["tab_id"]), None)
+        if (tab is None or tab["ai"] != provider
+                or (node.get("tab_created") and tab["created"] != node["tab_created"])):
+            raise ValueError("This agent's chat tab was closed or replaced; remove the module and add it again")
         result = self.tabs_send({"id": node["tab_id"], "prompt": prompt})
         if not result.get("ok"):
             raise ValueError(result.get("error") or "Agent turn failed")
@@ -514,7 +520,7 @@ class App:
                 raise ValueError("Choose an installed, configured provider")
             tab = tabs.create(provider, self.project, str(body.get("title", "Agent")), self.backends)
             try:
-                return self.patchbay.add({**body, "tab_id": tab["id"]})
+                return self.patchbay.add({**body, "tab_id": tab["id"], "tab_created": tab["created"]})
             except Exception:
                 tabs.close(tab["id"])
                 raise
@@ -529,7 +535,13 @@ class App:
         if action == "connect":
             return self.patchbay.connect(body["source"], body["target"])
         if action == "remove":
-            return self.patchbay.remove(body)
+            removed = self.patchbay.remove(body)
+            # The module owned its chat tab; release it so add/remove cycles don't use up MAX_TABS.
+            # Removing a cable leaves the conversation alone.
+            node = removed.get("node")
+            if node and node.get("kind") == "agent" and node.get("tab_id"):
+                tabs.close(node["tab_id"])
+            return {"ok": True}
         if action == "start":
             return self.patchbay.start(body["target"], body.get("prompt", ""), body.get("budget", 4))
         if action in ("pause", "resume", "discard"):

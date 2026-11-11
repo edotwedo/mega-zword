@@ -167,3 +167,68 @@ def test_http_patchbay_requires_token_for_mutations(tmp_path, monkeypatch):
         server.shutdown()
         server.server_close()
         worker.join(3)
+
+
+def test_pause_on_last_turn_still_lets_hub_output_resume_without_extra_turns(tmp_path):
+    entered, release = threading.Event(), threading.Event()
+    calls = []
+    def send(node, prompt):
+        calls.append(node['id'])
+        entered.set()
+        assert release.wait(5)
+        return 'final document\n'
+    bay = PatchBay(tmp_path / 'state', send)
+    a, b = agent(bay, 'Writer'), agent(bay, 'Reviewer')
+    (tmp_path / 'doc.md').write_text('old\n')
+    h = bay.add(dict(kind='hub', title='Document', root=str(tmp_path), file='doc.md'))['id']
+    bay.connect(a, h)
+    bay.connect(a, b)
+    bay.start(a, 'write it', 1)
+    assert entered.wait(3)
+    bay.control('pause')
+    release.set()
+    paused = finish(bay)
+    assert paused['runs'][0]['state'] == 'paused' and paused['runs'][0]['used'] == 1
+    bay.control('resume')
+    state = finish(bay)
+    assert calls == [a], 'resume must not buy the Reviewer a turn past the budget'
+    assert any(m['state'] == 'artifact' and m['target'] == h for m in state['messages'])
+    assert state['runs'][0]['state'] == 'limit'
+
+
+def _app(tmp_path, monkeypatch):
+    from megazword import config, dashboard
+    monkeypatch.setattr(config, 'HOME', tmp_path)
+    app = dashboard.App(config.Config(), 'test', dashboard.Usage(lambda: []), {})
+    return app, dashboard
+
+
+def test_agent_tab_closed_and_reused_is_not_sent_to(tmp_path, monkeypatch):
+    from megazword import tabs
+    app, _ = _app(tmp_path, monkeypatch)
+    first = tabs.create('fake', None, 'Writer')
+    node = app.patchbay.add(dict(kind='agent', title='Writer', provider='fake', tab_id=first['id'], tab_created=first['created']))
+    monkeypatch.setattr(app, 'tabs_send', lambda body: {'ok': True, 'answer': 'hi'})
+    assert app.patchbay_send(node, 'hello') == 'hi'
+    tabs.close(first['id'])
+    with pytest.raises(ValueError, match='closed or replaced'):
+        app.patchbay_send(node, 'hello')
+    other = tabs.create('other-ai', None, 'Someone else')
+    assert other['id'] == first['id'], 'tab ids are reused; that is the hazard'
+    monkeypatch.setattr(app, 'tabs_send', lambda *_: pytest.fail('must not reach the replacement tab'))
+    with pytest.raises(ValueError, match='closed or replaced'):
+        app.patchbay_send(node, 'hello')
+
+
+def test_removing_an_agent_closes_its_tab_but_removing_a_wire_does_not(tmp_path, monkeypatch):
+    from megazword import tabs
+    app, _ = _app(tmp_path, monkeypatch)
+    t1, t2 = tabs.create('fake', None, 'A'), tabs.create('fake', None, 'B')
+    a = app.patchbay.add(dict(kind='agent', title='A', provider='fake', tab_id=t1['id'], tab_created=t1['created']))
+    b = app.patchbay.add(dict(kind='agent', title='B', provider='fake', tab_id=t2['id'], tab_created=t2['created']))
+    app.patchbay.connect(a['id'], b['id'])
+    wire = app.patchbay.view()['wires'][0]['id']
+    app.patchbay_action(dict(action='remove', wire=wire))
+    assert {t['id'] for t in tabs.list_tabs()} == {t1['id'], t2['id']}
+    app.patchbay_action(dict(action='remove', id=a['id']))
+    assert {t['id'] for t in tabs.list_tabs()} == {t2['id']}
