@@ -71,7 +71,9 @@ def test_dashboard_state_has_trend(tmp_path):
 def test_cli_stats_free(tmp_path, capsys):
     cfg = config.Config(log_path=tmp_path / "log.jsonl")
     sample(tmp_path / "log.jsonl")
-    assert main(["stats", "--days", "30", "--free"], {}, cfg) == 0
+    # The CLI counts back from the real clock and the sample is pinned to TODAY, so widen the window.
+    days = (date.today() - TODAY).days + 2
+    assert main(["stats", "--days", str(days), "--free"], {}, cfg) == 0
     out = capsys.readouterr().out
     assert "FREE MODELS TOTAL" in out
     assert "SUB/PAID TOTAL" in out

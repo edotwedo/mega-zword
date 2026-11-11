@@ -11,8 +11,8 @@ from megazword.cli import main
 NOW = datetime(2026, 10, 11, 12, tzinfo=timezone.utc)
 
 
-def write_runs(cfg, rows):
-    cfg.log_path.write_text("\n".join(json.dumps({"time": NOW.isoformat(), **r}) for r in rows)
+def write_runs(cfg, rows, at=NOW):
+    cfg.log_path.write_text("\n".join(json.dumps({"time": at.isoformat(), **r}) for r in rows)
                             + "\n", encoding="utf-8")
 
 
@@ -54,7 +54,8 @@ def test_votes_tip_the_balance(cfg, monkeypatch):
 
 
 def test_cli_prints_and_changes_nothing(cfg, capsys):
-    write_runs(cfg, runs("grok", "easy", 0, 5) + runs("codex", "easy", 5, 0))
+    # The CLI looks back from the real clock, so these runs must be recent (NOW is fixed in 2026-10).
+    write_runs(cfg, runs("grok", "easy", 0, 5) + runs("codex", "easy", 5, 0), at=datetime.now(timezone.utc))
     before = dict(cfg.route)
     assert main(["advise"], {}, cfg) == 0
     out = capsys.readouterr().out
