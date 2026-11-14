@@ -236,9 +236,22 @@ def seats_in_kitty(ls_dump: list) -> tuple[list[tuple[str, int | None]], list[in
 
 
 def _alive(pid: object) -> bool:
-    """Is that window's process still running? A dead CLI is not a seat that came up."""
+    """Is that window's process still running? A dead CLI is not a seat that came up.
+
+    Never os.kill(pid, 0) on Windows: signal 0 there is CTRL_C_EVENT, which sends Ctrl+C to
+    the whole console - it killed the Windows CI run from inside the test suite (2026-11-02).
+    """
     if not isinstance(pid, int) or pid <= 0:
         return False
+    if os.name == "nt":
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
