@@ -150,7 +150,7 @@ def test_each_seat_is_told_its_own_working_directory(tmp_path):
     for seat in snapshot.SEATS:
         assert dirs[seat["designation"]] == seat.get("dir", str(tmp_path))
     mike = next(c for c in snapshot.kitty_tab_commands(state) if "MIKE-54" in c)
-    assert f"--cwd={tmp_path}" in mike
+    assert f"--cwd={shlex.quote(str(tmp_path))}" in mike
 
 
 def test_only_filters_before_session_lookup(monkeypatch, capsys):

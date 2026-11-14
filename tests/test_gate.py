@@ -112,10 +112,20 @@ def test_hook_skips_a_delete_only_push():
 
 
 @pytest.mark.skipif(SH is None, reason="needs sh (Git Bash) on PATH")
-def test_hook_skips_docs_only_push():
+def test_hook_skips_docs_only_push(tmp_path):
+    """The hook checks the rules before its docs-only shortcut, and that check needs a recorded
+    ballot. A fresh machine (CI) has none, so without one here this failed for a reason that had
+    nothing to do with docs. Record an approval of the committed rules in a throwaway home."""
+    import json
+    from megazword import rules
+    home = tmp_path / "mz"
+    home.mkdir()
+    (home / "rules-approval.json").write_text(json.dumps(
+        {"sha256": rules.head_hash(), "ballot": "TEST", "approved": "test"}), encoding="utf-8")
+    env = {**os.environ, "MEGAZWORD_HOME": str(home)}
     proc = subprocess.run([SH, str(HOOK)],
                           input="refs/heads/main 0a7e7b5 refs/heads/main 0a7e7b5~1\n",
-                          capture_output=True, text=True, cwd=ROOT)
+                          capture_output=True, text=True, cwd=ROOT, env=env)
     assert proc.returncode == 0
     assert "docs-only push" in proc.stdout
     assert "running the suite" not in proc.stdout
