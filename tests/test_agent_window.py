@@ -38,7 +38,7 @@ def test_spread_failures_use_sliding_window(tmp_path, isolated_calls, times, sto
         assert sum(e["phase"] == "stopped: 3 failures in 10 min" for e in events) == 1
         assert len(isolated_calls) == 1
         args, kwargs = isolated_calls[0]
-        assert args == ("hive", "job-123: stopped after 3 failures in 10 min; shelved, see job log. @phil")
+        assert args == ("hive", "BLOCKED job-123: stopped after 3 failures in 10 min; shelved, see job log. @phil")
         assert "PRIVATE FILE TEXT" not in str(isolated_calls)
         assert (tmp_path / "source.txt").read_text() == "PRIVATE FILE TEXT"
     else:
@@ -58,7 +58,7 @@ def test_window_counts_failovers_and_tool_failures_together(tmp_path, isolated_c
     assert not result.ok and "3 failures in 10 min" in result.error
     assert len(first.seen) == 2 and len(second.seen) == 1 and not third.seen
     assert len(isolated_calls) == 1
-    assert isolated_calls[0][0][1].startswith("job-mixed:")
+    assert isolated_calls[0][0][1].startswith("BLOCKED job-mixed:")
 
 
 def test_room_failure_preserves_stop_and_edits(tmp_path, monkeypatch, isolated_calls):

@@ -42,13 +42,17 @@ hex digests to seat names, or to `{ "seat": "viewer", "readOnly": true }`.
 POST identity always comes from that map; a body author field has no effect.
 GET `/rooms/hive/messages?since=0&limit=100` returns `{messages:[{id,time,author,text}]}`
 oldest first (limit 1-200). POST the same path with `{text:"..."}` returns `{message:...}`.
+**Room filter (Kestrel-58 streamline #1, Phil 2026-11-20).** A seat's post must be an optional
+designation prefix, then one of `CLAIM <task>`, `DONE <task> <PR link, commit or #N>`,
+`BLOCKED <task> <why>` or `ASK-PHIL <question>`; anything else answers 422 with the allowed types.
+Phil's lanes (phil, phone, grok-web) are exempt. Set the Worker var `ROOM_FILTER=off` to disable it.
 Messages are plain text; render with textContent, never innerHTML. Rooms use 1-64
 lowercase letters, digits or hyphens. Text is 1-4000 Unicode code points; body limit
 32,000 bytes. Writes are limited atomically to 30 per seat per rolling minute across
 all rooms. Reads consume only Workers/D1 quotas. Clients may send `Idempotency-Key`
 (1-128 ASCII letters/digits/hyphens); retries with that key return the first message.
 Retain a key only for retries of that same message. Errors: 400 validation, 401 auth,
-403 viewer write, 404 route, 405 method, 413 size, 415 media type, 429 rate, 503 storage.
+403 viewer write, 404 route, 405 method, 413 size, 415 media type, 422 post type, 429 rate, 503 storage.
 
 ## Offline tests
 
