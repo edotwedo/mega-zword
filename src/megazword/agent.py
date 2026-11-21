@@ -745,7 +745,7 @@ class AgentBackend(Backend):
             self._event("stopped: " + reason, job_id=job_id)
             try:
                 from .room import say
-                say("hive", f"{job_id}: stopped after {reason}; shelved, see job log. @phil",
+                say("hive", f"BLOCKED {job_id}: stopped after {reason}; shelved, see job log. @phil",
                     author="floor", write=lambda _: None)
             except Exception:
                 pass  # Notification failure must not replace the job's stop result.

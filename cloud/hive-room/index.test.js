@@ -6,7 +6,8 @@ globalThis.crypto ??= webcrypto;
 
 // Fake credentials are generated in memory, never stored in fixtures.
 const token = crypto.randomUUID(), viewer = crypto.randomUUID();
-const env = {SEAT_TOKENS: JSON.stringify({[await digest(token)]: 'cirrus-17', [await digest(viewer)]: {seat: 'viewer', readOnly: true}})};
+// Most tests check transport, not the post-type filter, so they run with it off.
+const env = {ROOM_FILTER: 'off', SEAT_TOKENS: JSON.stringify({[await digest(token)]: 'cirrus-17', [await digest(viewer)]: {seat: 'viewer', readOnly: true}})};
 class FakeStore {
   rows = [];
   async list(room, since, limit) { return this.rows.filter(m => m.room === room && m.id > since).slice(0, limit); }
@@ -534,4 +535,42 @@ test('one open claim per seat is still the cap', async () => {
   assert.equal((await post(a, 'cinder-21: claiming #2', e)).status, 409);
   assert.equal((await post(a, 'cinder-21: releasing #1', e)).status, 201);
   assert.equal((await post(a, 'cinder-21: claiming #2', e)).status, 201);
+});
+
+// Room filter (Kestrel-58 streamline #1).
+const filtered = {...env, ROOM_FILTER: undefined};
+const phil = crypto.randomUUID();
+filtered.SEAT_TOKENS = JSON.stringify({...JSON.parse(env.SEAT_TOKENS), [await digest(phil)]: 'phone'});
+const typed = (text, who = token) => handle(new Request('https://room.example/rooms/hive/messages', {
+  method: 'POST', headers: {Authorization: `Bearer ${who}`, 'Content-Type': 'application/json'}, body: JSON.stringify({text})
+}), filtered, store);
+test('filter accepts the four post types, with or without a designation', async () => {
+  for (const text of ['CLAIM queue merge', 'Wren-60: CLAIM #4', 'Tern-61 (claude cloud): CLAIM \'room filter\'',
+    'Wren-60: DONE room filter https://github.com/edotwedo/mega-zword/pull/64', 'DONE #4 at 85d9ad8',
+    'Wren-60: BLOCKED deploy needs Phil wrangler login', 'Wren-60 \u2014 ASK-PHIL merge QUEUE.md now?', 'ASK-PHIL: which repo?'])
+    assert.equal((await typed(text)).status, 201, text);
+});
+test('filter rejects chatter, acks and malformed types', async () => {
+  for (const text of ['hi', 'Wren-60: online', 'timer on', 'Wren-60: claiming #4', 'claim #4', 'CLAIMED #4',
+    'Wren-60: DONE room filter', 'BLOCKED deploy', 'Wren-60: thanks, CLAIM noted', 'ANNOUNCE: read the roadmap']) {
+    const res = await typed(text);
+    assert.equal(res.status, 422, text);
+    assert.match((await res.json()).error, /CLAIM|DONE|BLOCKED/);
+  }
+  assert.equal(store.rows.length, 0);
+});
+test("filter exempts Phil's lanes and can be switched off", async () => {
+  assert.equal((await typed('testing testing', phil)).status, 201);
+  assert.equal((await handle(new Request('https://room.example/rooms/hive/messages', {
+    method: 'POST', headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'}, body: JSON.stringify({text: 'hi'})
+  }), {...filtered, ROOM_FILTER: 'OFF'}, store)).status, 201);
+});
+test('filter applies to MCP posts too', async () => {
+  const rpc = text => handle(new Request('https://room.example/mcp', {method: 'POST',
+    headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
+    body: JSON.stringify({jsonrpc: '2.0', id: 1, method: 'tools/call', params: {name: 'post_message', arguments: {text}}})}), filtered, store);
+  const bad = await (await rpc('Wren-60: on it')).json();
+  assert.equal(bad.result.isError, true);
+  const good = await (await rpc('Wren-60: CLAIM #9')).json();
+  assert.notEqual(good.result.isError, true);
 });
